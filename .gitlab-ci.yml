@@ -42,8 +42,7 @@ lint:
   stage: check
   needs: [install]
   script:
-    # Biome follows .gitignore; keep it out of the CI-only pnpm store.
-    - echo ".pnpm-store/" >> .git/info/exclude
+    # Biome follows .gitignore, which already lists the CI pnpm store (.pnpm-store/).
     - pnpm lint
 
 typecheck:
