@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=DM+Mono:wght@400;500&amp;display=swap" />
+<style>
+body{margin:0}
+.ad-root{width:1280px;height:800px;position:relative;overflow:hidden;display:grid;grid-template-columns:220px minmax(0,1fr);font-family:"Hanken Grotesk",ui-sans-serif,system-ui,sans-serif;font-size:13.5px;line-height:1.4;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-align:left}
+.ad-dark{--bg:oklch(0.2 0.006 270);--side:oklch(0.175 0.006 270);--raise:oklch(0.235 0.008 270);--raise2:oklch(0.26 0.009 270);--line:oklch(0.31 0.008 270);--line2:oklch(0.26 0.008 270);--fg:oklch(0.94 0.004 270);--muted:oklch(0.72 0.01 270);--faint:oklch(0.56 0.01 270);--accent:oklch(0.72 0.16 355);--accentbg:oklch(0.3 0.06 355);--sel:oklch(0.26 0.03 355);--review:oklch(0.76 0.1 280);--done:oklch(0.76 0.11 155);--urgent:oklch(0.72 0.17 30);--shadow:0 24px 60px -16px oklch(0 0 0 / 0.65)}
+.ad-light{--bg:oklch(0.985 0.003 270);--side:oklch(0.965 0.004 270);--raise:oklch(0.997 0.002 270);--raise2:oklch(0.955 0.005 270);--line:oklch(0.9 0.006 270);--line2:oklch(0.935 0.005 270);--fg:oklch(0.22 0.01 270);--muted:oklch(0.47 0.012 270);--faint:oklch(0.62 0.01 270);--accent:oklch(0.55 0.19 355);--accentbg:oklch(0.95 0.03 355);--sel:oklch(0.955 0.025 355);--review:oklch(0.5 0.13 280);--done:oklch(0.52 0.11 155);--urgent:oklch(0.55 0.19 28);--shadow:0 20px 48px -14px oklch(0.3 0.03 270 / 0.25),0 2px 6px oklch(0.3 0.02 270 / 0.06)}
+.ad-root :where(a){color:inherit;text-decoration:none}
+.ad-root :where(a:hover){color:var(--fg)}
+.ad-mono{font-family:"DM Mono",ui-monospace,monospace}
+.ad-side{background:var(--side);border-right:1px solid var(--line2);display:flex;flex-direction:column;padding:12px 10px;gap:1px;min-height:0}
+.ad-ws{display:flex;align-items:center;gap:9px;padding:4px 8px 14px;font-weight:700}
+.ad-logo{width:22px;height:22px;border-radius:7px;background:var(--accent);color:var(--bg);display:grid;place-items:center;font-size:12px}
+.ad-ni{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:8px;color:var(--muted)}
+.ad-nion{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:8px;background:var(--raise2);color:var(--fg);font-weight:600}
+.ad-cnt{margin-left:auto;font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--faint)}
+.ad-sect{font-size:11px;font-weight:600;color:var(--faint);padding:16px 10px 6px;letter-spacing:0.04em;text-transform:uppercase}
+.ad-pk{font-family:"DM Mono",ui-monospace,monospace;font-size:10.5px;color:var(--faint);width:26px}
+.ad-sfoot{margin-top:auto;display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--line2);padding-top:8px}
+.ad-av{width:22px;height:22px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;background:oklch(0.85 0.06 var(--h));color:oklch(0.3 0.08 var(--h))}
+.ad-ag{width:22px;height:22px;flex:none;border-radius:7px;display:grid;place-items:center;font-family:"DM Mono",ui-monospace,monospace;font-size:10.5px;font-weight:500;background:var(--accentbg);color:var(--accent)}
+.ad-main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.ad-top{height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px 0 22px;border-bottom:1px solid var(--line2)}
+.ad-crumb{color:var(--muted)}
+.ad-crumbon{font-weight:600}
+.ad-topr{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ad-search{display:flex;align-items:center;justify-content:space-between;width:210px;height:30px;padding:0 6px 0 10px;border-radius:8px;background:var(--raise);border:1px solid var(--line2);color:var(--faint)}
+.ad-kbd{font-family:"DM Mono",ui-monospace,monospace;font-size:10.5px;line-height:16px;min-width:18px;text-align:center;padding:0 4px;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+.ad-btn{font:inherit;font-weight:600;display:flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 12px;border:0;border-radius:8px;background:var(--fg);color:var(--bg);cursor:pointer}
+.ad-btnk{font-family:"DM Mono",ui-monospace,monospace;font-size:10.5px;line-height:16px;min-width:18px;text-align:center;border-radius:4px;background:oklch(0.5 0 0 / 0.25)}
+.ad-desk{flex:none;padding:14px 22px 12px;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:10px}
+.ad-deskh{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--faint);letter-spacing:0.04em;text-transform:uppercase}
+.ad-cards{display:flex;gap:10px}
+.ad-card{width:278px;box-sizing:border-box;padding:10px 12px;border-radius:12px;background:var(--raise);border:1px solid var(--line2);display:flex;flex-direction:column;gap:6px}
+.ad-ch{display:flex;align-items:center;gap:8px}
+.ad-cn{font-weight:600}
+.ad-cfor{color:var(--faint);font-size:12px}
+.ad-state{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--accent)}
+.ad-stateidle{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--faint)}
+.ad-pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accentbg)}
+.ad-idot{width:7px;height:7px;border-radius:50%;border:1.5px solid var(--faint);box-sizing:border-box}
+.ad-ctask{display:flex;gap:8px;white-space:nowrap;overflow:hidden;font-size:12.5px}
+.ad-ctask span:last-child{overflow:hidden;text-overflow:ellipsis}
+.ad-ck{font-family:"DM Mono",ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+.ad-clast{font-size:12px;color:var(--muted)}
+.ad-filters{height:42px;flex:none;display:flex;align-items:center;gap:6px;padding:0 22px}
+.ad-chip{font:inherit;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--muted);cursor:pointer}
+.ad-chipv{color:var(--fg);font-weight:500}
+.ad-list{flex:1;min-height:0;overflow:hidden}
+.ad-g{height:32px;display:flex;align-items:center;gap:8px;padding:0 22px;font-weight:600;font-size:12.5px;color:var(--muted)}
+.ad-gc{font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);font-weight:400}
+.ad-row{height:36px;display:grid;grid-template-columns:14px 64px minmax(0,1fr) 160px 40px;gap:12px;align-items:center;padding:0 22px;border-top:1px solid var(--line2)}
+.ad-rowsel{height:36px;display:grid;grid-template-columns:14px 64px minmax(0,1fr) 160px 40px;gap:12px;align-items:center;padding:0 22px;border-top:1px solid var(--line2);background:var(--sel)}
+.ad-key{font-family:"DM Mono",ui-monospace,monospace;font-size:11.5px;color:var(--faint)}
+.ad-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ad-who{display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap;overflow:hidden;font-size:12.5px}
+.ad-busy{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+.ad-upd{font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);text-align:right}
+.ad-pri{width:3px;height:16px;border-radius:2px;justify-self:center}
+.ad-p4{background:var(--urgent)}
+.ad-p3{background:var(--fg)}
+.ad-p2{background:var(--muted)}
+.ad-p1{background:var(--line)}
+.ad-p0{background:transparent;border:1px dashed var(--line);box-sizing:border-box}
+.ad-panel{position:absolute;top:56px;right:8px;bottom:8px;width:460px;background:var(--raise);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
+.ad-ph{height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 20px;border-bottom:1px solid var(--line2);color:var(--muted)}
+.ad-sp{flex:1}
+.ad-pb{flex:1;min-height:0;overflow:hidden;padding:18px 20px 0;display:flex;flex-direction:column;gap:16px}
+.ad-pt{margin:0;font-size:19px;line-height:1.3;font-weight:700;letter-spacing:-0.01em;text-wrap:pretty}
+.ad-props{display:flex;flex-wrap:wrap;gap:6px}
+.ad-prop{display:flex;align-items:center;gap:7px;height:28px;padding:0 10px 0 8px;border-radius:8px;background:var(--raise2);font-size:12.5px;font-weight:500}
+.ad-pl{color:var(--faint);font-weight:400}
+.ad-stp{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.ad-desc{display:flex;flex-direction:column;gap:8px;line-height:1.55}
+.ad-desc p{margin:0;text-wrap:pretty}
+.ad-desc code{font-family:"DM Mono",ui-monospace,monospace;font-size:12px;background:var(--raise2);border-radius:5px;padding:1px 5px}
+.ad-chk{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.ad-li{display:flex;gap:9px;align-items:flex-start}
+.ad-box{width:14px;height:14px;flex:none;margin-top:3px;border-radius:4px;border:1.5px solid var(--faint);box-sizing:border-box}
+.ad-boxon{width:14px;height:14px;flex:none;margin-top:3px;border-radius:4px;background:var(--accent)}
+.ad-struck{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.ad-sec{font-size:11px;font-weight:600;color:var(--faint);letter-spacing:0.04em;text-transform:uppercase;border-top:1px solid var(--line2);padding-top:14px}
+.ad-act{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.ad-ai{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:start;color:var(--muted);font-size:13px}
+.ad-ai b{color:var(--fg);font-weight:600}
+.ad-when{font-family:"DM Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);padding-top:2px}
+.ad-cbox{flex:none;margin:10px 14px 14px;height:40px;border-radius:10px;border:1px dashed var(--line);display:flex;align-items:center;padding:0 12px;color:var(--faint)}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="Task list · Agent desk">
+  <aside class="ad-side">
+    <div class="ad-ws"><span class="ad-logo">R</span><span>Reddevs</span></div>
+    <a class="ad-ni" href="#">Dashboard</a>
+    <a class="ad-ni" href="#">My tasks<span class="ad-cnt">4</span></a>
+    <div class="ad-sect">Projects</div>
+    <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+      <a class="{{ p.cls }}" href="#"><span class="ad-pk">{{ p.key }}</span><span>{{ p.name }}</span><span class="ad-cnt">{{ p.open }}</span></a>
+    </sc-for>
+    <div class="ad-sect">Agents</div>
+    <a class="ad-ni" href="#"><span class="ad-ag">C</span><span>claude-dev</span><span class="ad-busy" style="margin-left:auto"></span></a>
+    <a class="ad-ni" href="#"><span class="ad-ag">X</span><span>codex-ci</span></a>
+    <div class="ad-sfoot">
+      <a class="ad-ni" href="#">Members</a>
+      <a class="ad-ni" href="#">Settings</a>
+      <div class="ad-ni"><span class="ad-av" style="--h:25">AR</span><span>Ana Ruiz</span></div>
+    </div>
+  </aside>
+  <main class="ad-main">
+    <header class="ad-top">
+      <span class="ad-crumb">Payments</span><span class="ad-crumb">/</span><span class="ad-crumbon">Tasks</span>
+      <div class="ad-topr">
+        <div class="ad-search"><span>Search tasks</span><span class="ad-kbd">/</span></div>
+        <button class="ad-btn">New task<span class="ad-btnk">C</span></button>
+      </div>
+    </header>
+    <section class="ad-desk" data-screen-label="Agents now">
+      <div class="ad-deskh"><span>Agents on this project</span></div>
+      <div class="ad-cards">
+        <sc-for list="{{ agents }}" as="a" hint-placeholder-count="2">
+          <div class="ad-card">
+            <div class="ad-ch"><span class="ad-ag">{{ a.ini }}</span><span class="ad-cn">{{ a.name }}</span><span class="ad-cfor">for {{ a.forWho }}</span>
+              <span class="{{ a.stateCls }}"><span class="{{ a.dotCls }}"></span>{{ a.state }}</span></div>
+            <div class="ad-ctask"><span class="ad-ck">{{ a.key }}</span><span>{{ a.task }}</span></div>
+            <div class="ad-clast">{{ a.last }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+    <div class="ad-filters">
+      <button class="ad-chip">Status <span class="ad-chipv">Any</span></button>
+      <button class="ad-chip">Priority <span class="ad-chipv">Any</span></button>
+      <button class="ad-chip">Assignee <span class="ad-chipv">Any</span></button>
+    </div>
+    <div class="ad-list">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+        <div class="ad-g"><span>{{ g.name }}</span><span class="ad-gc">{{ g.count }}</span></div>
+        <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+          <div class="{{ t.rowCls }}">
+            <span class="{{ t.priCls }}"></span>
+            <span class="ad-key">{{ t.key }}</span>
+            <span class="ad-title">{{ t.title }}</span>
+            <span class="ad-who"><sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span><span>{{ t.who }}</span></sc-if></span>
+            <span class="ad-upd">{{ t.upd }}</span>
+          </div>
+        </sc-for>
+      </sc-for>
+    </div>
+    <section class="ad-panel" data-screen-label="Task panel · PAY-142">
+      <div class="ad-ph"><span class="ad-mono">PAY-142</span><span class="ad-sp"></span><a href="#">Open as page</a><span class="ad-kbd">Esc</span></div>
+      <div class="ad-pb">
+        <h2 class="ad-pt">Retry failed webhook deliveries with exponential backoff</h2>
+        <div class="ad-props">
+          <span class="ad-prop"><span class="ad-stp"></span>In progress</span>
+          <span class="ad-prop"><span class="ad-pl">Priority</span>High</span>
+          <span class="ad-prop"><span class="ad-ag">C</span>claude-dev<span class="ad-pl">for Ana Ruiz</span></span>
+          <span class="ad-prop"><span class="ad-pl">Created</span>Ana Ruiz, Oct 20</span>
+        </div>
+        <div class="ad-desc">
+          <p>Deliveries that fail with a 5xx or time out are dropped today. Retry them with exponential backoff, capped at 6 attempts over about 24 hours.</p>
+          <ul class="ad-chk">
+            <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+              <li class="ad-li"><span class="{{ c.box }}"></span><span class="{{ c.txt }}">{{ c.label }}</span></li>
+            </sc-for>
+          </ul>
+          <p>Backoff is <code>30s × 2^n</code> with jitter.</p>
+        </div>
+        <div class="ad-sec">Activity</div>
+        <ol class="ad-act">
+          <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+            <li class="ad-ai"><span class="{{ a.avCls }}" style="--h:{{ a.hue }}">{{ a.ini }}</span><span><b>{{ a.who }}</b>{{ a.forTxt }} {{ a.what }}</span><span class="ad-when">{{ a.when }}</span></li>
+          </sc-for>
+        </ol>
+      </div>
+      <div class="ad-cbox">Comments arrive in a later release.</div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "dark", "tsType": "\"light\" | \"dark\"" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'dark';
+    const people = {
+      ana: { who: 'Ana Ruiz', ini: 'AR', hue: 25, agent: false },
+      tomas: { who: 'Tomás Berg', ini: 'TB', hue: 220, agent: false },
+      claude: { who: 'claude-dev', ini: 'C', hue: 0, agent: true },
+      codex: { who: 'codex-ci', ini: 'X', hue: 0, agent: true }
+    };
+    const task = (key, title, pri, who, upd) => {
+      const p = who ? people[who] : null;
+      return {
+        key, title, upd,
+        rowCls: key === 'PAY-142' ? 'ad-rowsel' : 'ad-row',
+        priCls: 'ad-pri ad-p' + pri,
+        has: !!p, who: p ? p.who : '', ini: p ? p.ini : '', hue: p ? p.hue : 0,
+        avCls: p && p.agent ? 'ad-ag' : 'ad-av'
+      };
+    };
+    const groups = [
+      { name: 'In progress', tasks: [
+        task('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 3, 'claude', '3m'),
+        task('PAY-131', 'Add idempotency keys to the refund endpoint', 4, 'codex', '12m'),
+        task('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 2, 'ana', '1h')
+      ]},
+      { name: 'In review', tasks: [
+        task('PAY-138', 'Webhook signature check accepts expired timestamps', 4, 'claude', '25m'),
+        task('PAY-135', 'Paginate the transactions CSV export', 2, 'tomas', '3h')
+      ]},
+      { name: 'Todo', tasks: [
+        task('PAY-144', 'Show a test-mode banner on the billing settings page', 1, null, '2h'),
+        task('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 3, 'tomas', '5h'),
+        task('PAY-137', 'Document the nightly payout reconciliation job', 0, 'claude', '1d'),
+        task('PAY-129', 'Remove legacy v0 checkout routes', 2, null, '2d')
+      ]}
+    ].map((g) => ({ ...g, count: g.tasks.length }));
+    const agents = [
+      { ini: 'C', name: 'claude-dev', forWho: 'Ana Ruiz', state: 'Working', stateCls: 'ad-state', dotCls: 'ad-pulse', key: 'PAY-142', task: 'Retry failed webhook deliveries with exponential backoff', last: 'Checked off 2 items · 3m ago' },
+      { ini: 'X', name: 'codex-ci', forWho: 'Tomás Berg', state: 'Idle', stateCls: 'ad-stateidle', dotCls: 'ad-idot', key: 'PAY-131', task: 'Add idempotency keys to the refund endpoint', last: 'Moved to In progress · 12m ago' }
+    ];
+    const projects = [
+      { key: 'PAY', name: 'Payments', open: 12, cls: 'ad-nion' },
+      { key: 'WEB', name: 'Web app', open: 27, cls: 'ad-ni' },
+      { key: 'CLI', name: 'pm CLI', open: 9, cls: 'ad-ni' },
+      { key: 'INF', name: 'Infra', open: 5, cls: 'ad-ni' }
+    ];
+    const checks = [
+      { label: 'Store attempt count and next_attempt_at on the delivery', done: true },
+      { label: 'Schedule retries as pg-boss jobs', done: true },
+      { label: 'Stop on 4xx, except 408 and 429', done: false },
+      { label: 'Show attempt history in the delivery log', done: false }
+    ].map((c) => ({ ...c, box: c.done ? 'ad-boxon' : 'ad-box', txt: c.done ? 'ad-struck' : '' }));
+    const act = (pk, what, when, forWho) => {
+      const p = people[pk];
+      return { who: p.who, ini: p.ini, hue: p.hue, avCls: p.agent ? 'ad-ag' : 'ad-av', what, when, forTxt: forWho ? ' for ' + forWho : '' };
+    };
+    const activity = [
+      act('ana', 'created the task', 'Oct 20'),
+      act('ana', 'assigned it to claude-dev', 'Oct 20'),
+      act('claude', 'moved it from Todo to In progress', '40m', 'Ana Ruiz'),
+      act('claude', 'checked off 2 items', '3m', 'Ana Ruiz')
+    ];
+    return { rootCls: 'ad-root ad-' + theme, groups, agents, projects, checks, activity };
+  }
+}
+</script>
+</body>
+</html>

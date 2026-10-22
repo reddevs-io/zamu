@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" />
+<style>
+body{margin:0}
+.pc-root{width:1280px;height:800px;position:relative;overflow:hidden;display:grid;grid-template-columns:236px minmax(0,1fr);font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:13.5px;line-height:1.45;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-align:left}
+.pc-light{--bg:oklch(0.972 0.01 85);--sheet:oklch(0.992 0.006 85);--fg:oklch(0.24 0.015 60);--muted:oklch(0.46 0.015 60);--faint:oklch(0.6 0.012 60);--rule:oklch(0.86 0.012 80);--rule2:oklch(0.91 0.01 80);--accent:oklch(0.56 0.17 35);--sel:oklch(0.935 0.03 55);--review:oklch(0.47 0.1 260);--done:oklch(0.5 0.09 150);--ink-on:oklch(0.98 0.008 85);--shadow:-24px 0 48px -24px oklch(0.35 0.03 60 / 0.28)}
+.pc-dark{--bg:oklch(0.205 0.01 60);--sheet:oklch(0.238 0.011 60);--fg:oklch(0.92 0.012 85);--muted:oklch(0.73 0.014 80);--faint:oklch(0.57 0.012 70);--rule:oklch(0.34 0.01 60);--rule2:oklch(0.28 0.01 60);--accent:oklch(0.73 0.15 40);--sel:oklch(0.28 0.035 45);--review:oklch(0.76 0.09 260);--done:oklch(0.75 0.1 150);--ink-on:oklch(0.2 0.01 60);--shadow:-24px 0 48px -20px oklch(0 0 0 / 0.6)}
+.pc-root a{color:inherit;text-decoration:none}
+.pc-root a:hover{color:var(--accent)}
+.pc-serif{font-family:"Source Serif 4",Georgia,serif}
+.pc-mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.pc-sc{font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.pc-side{border-right:1px solid var(--rule);display:flex;flex-direction:column;padding:22px 20px 16px;min-height:0;gap:2px}
+.pc-ws{display:flex;flex-direction:column;gap:2px;margin-bottom:22px}
+.pc-wsname{font-family:"Source Serif 4",Georgia,serif;font-size:20px;font-weight:600;line-height:1.1}
+.pc-toc{display:flex;align-items:baseline;gap:6px;height:28px;color:var(--muted)}
+.pc-tocon{display:flex;align-items:baseline;gap:6px;height:28px;color:var(--fg);font-weight:600}
+.pc-lead{flex:1;border-bottom:1px dotted var(--faint);transform:translateY(-4px);min-width:12px}
+.pc-num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;color:var(--faint)}
+.pc-numon{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;color:var(--accent);font-weight:500}
+.pc-sect{margin:18px 0 6px}
+.pc-sidefoot{margin-top:auto;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--rule);padding-top:10px}
+.pc-me{display:flex;align-items:center;gap:8px;height:32px}
+.pc-av{width:20px;height:20px;flex:none;display:grid;place-items:center;border-radius:50%;font-size:9px;font-weight:600;background:oklch(0.87 0.05 var(--h));color:oklch(0.33 0.08 var(--h))}
+.pc-ag{width:20px;height:20px;flex:none;display:grid;place-items:center}
+.pc-ag::before{content:"";width:12px;height:12px;background:var(--fg);transform:rotate(45deg);border-radius:1px}
+.pc-main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.pc-top{flex:none;height:88px;box-sizing:border-box;display:flex;align-items:flex-end;gap:16px;padding:22px 28px 14px;border-bottom:1px solid var(--rule)}
+.pc-h1{margin:2px 0 0;font-family:"Source Serif 4",Georgia,serif;font-size:32px;line-height:1.05;font-weight:500;letter-spacing:-0.01em}
+.pc-topr{margin-left:auto;display:flex;align-items:center;gap:18px;padding-bottom:4px}
+.pc-search{display:flex;align-items:center;gap:40px;color:var(--faint);border-bottom:1px solid var(--rule);height:30px}
+.pc-kbd{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;color:var(--muted);border:1px solid var(--rule);border-radius:3px;padding:0 5px;line-height:16px}
+.pc-btn{font:inherit;font-weight:500;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px 0 14px;border:0;border-radius:3px;background:var(--fg);color:var(--ink-on);cursor:pointer}
+.pc-btnk{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;opacity:0.7}
+.pc-filters{flex:none;height:40px;display:flex;align-items:center;gap:22px;padding:0 28px;color:var(--muted);border-bottom:1px solid var(--rule2)}
+.pc-fv{color:var(--fg);border-bottom:1px solid var(--faint)}
+.pc-fr{margin-left:auto;font-style:italic;font-family:"Source Serif 4",Georgia,serif;color:var(--faint);font-size:14px}
+.pc-list{flex:1;min-height:0;overflow:hidden;padding:4px 0 0}
+.pc-g{display:flex;align-items:baseline;gap:10px;height:44px;padding:14px 28px 0;box-sizing:border-box;border-bottom:1px solid var(--rule)}
+.pc-gname{font-family:"Source Serif 4",Georgia,serif;font-style:italic;font-size:18px;line-height:1}
+.pc-gc{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--faint)}
+.pc-gclosed{display:flex;align-items:baseline;gap:10px;height:36px;padding:10px 28px 0;box-sizing:border-box;color:var(--muted)}
+.pc-row{display:grid;grid-template-columns:62px minmax(0,1fr) 64px 160px 40px;gap:14px;align-items:center;height:40px;padding:0 28px;border-bottom:1px dotted var(--rule)}
+.pc-rowsel{display:grid;grid-template-columns:62px minmax(0,1fr) 64px 160px 40px;gap:14px;align-items:center;height:40px;padding:0 28px;border-bottom:1px dotted var(--rule);background:var(--sel)}
+.pc-key{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;color:var(--faint)}
+.pc-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-pri{font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;color:var(--faint)}
+.pc-pri-hot{font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;color:var(--accent)}
+.pc-who{display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.pc-whoa{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px}
+.pc-upd{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);text-align:right}
+.pc-dot{width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor;box-sizing:border-box;align-self:center}
+.pc-d-prog{color:var(--accent);background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
+.pc-d-review{color:var(--review);background:conic-gradient(currentColor 0 75%,transparent 75%)}
+.pc-d-todo{color:var(--muted)}
+.pc-d-backlog{color:var(--faint);border-style:dotted}
+.pc-d-done{color:var(--done);background:currentColor}
+.pc-d-cancel{color:var(--faint);background:linear-gradient(135deg,transparent 40%,currentColor 40% 60%,transparent 60%)}
+.pc-sheet{position:absolute;top:88px;right:0;bottom:0;width:548px;background:var(--sheet);box-shadow:var(--shadow);border-left:1px solid var(--rule);display:flex;flex-direction:column;min-height:0}
+.pc-sh{flex:none;height:44px;display:flex;align-items:center;gap:16px;padding:0 20px 0 36px;color:var(--muted);border-bottom:1px solid var(--rule2)}
+.pc-sp{flex:1}
+.pc-link{display:flex;align-items:center;gap:6px}
+.pc-sbody{flex:1;min-height:0;overflow:hidden;padding:20px 40px 0 36px;display:flex;flex-direction:column;gap:16px}
+.pc-stitle{margin:0;font-family:"Source Serif 4",Georgia,serif;font-size:26px;line-height:1.18;font-weight:500;letter-spacing:-0.012em;text-wrap:balance}
+.pc-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px;padding:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.pc-mv{display:flex;align-items:center;gap:8px;margin-top:3px}
+.pc-for{color:var(--muted)}
+.pc-doc{font-family:"Source Serif 4",Georgia,serif;font-size:15px;line-height:1.55;display:flex;flex-direction:column;gap:8px}
+.pc-doc p{margin:0;text-wrap:pretty}
+.pc-doc code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+.pc-cl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.pc-cli{display:flex;gap:10px;align-items:baseline}
+.pc-box{width:11px;height:11px;flex:none;border:1.25px solid var(--muted);box-sizing:border-box;transform:translateY(1px)}
+.pc-boxon{width:11px;height:11px;flex:none;background:var(--accent);box-sizing:border-box;transform:translateY(1px)}
+.pc-struck{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.pc-act{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.pc-ai{display:grid;grid-template-columns:58px minmax(0,1fr);gap:12px;color:var(--muted)}
+.pc-ai b{font-weight:500;color:var(--fg)}
+.pc-when{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);padding-top:2px}
+.pc-comment{flex:none;margin:10px 36px 14px;padding-top:10px;border-top:1px dotted var(--rule);font-family:"Source Serif 4",Georgia,serif;font-style:italic;color:var(--faint);font-size:14.5px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="Task list · Paper">
+  <aside class="pc-side">
+    <div class="pc-ws"><span class="pc-sc">Workspace ▾</span><span class="pc-wsname">Reddevs</span></div>
+    <a class="pc-toc" href="#"><span>Dashboard</span></a>
+    <a class="pc-toc" href="#"><span>My tasks</span><span class="pc-lead"></span><span class="pc-num">4</span></a>
+    <div class="pc-sc pc-sect">Projects</div>
+    <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+      <a class="{{ p.cls }}" href="#"><span>{{ p.name }}</span><span class="pc-lead"></span><span class="{{ p.numCls }}">{{ p.open }}</span></a>
+    </sc-for>
+    <div class="pc-sidefoot">
+      <a class="pc-toc" href="#">Members</a>
+      <a class="pc-toc" href="#">Settings</a>
+      <div class="pc-me"><span class="pc-av" style="--h:25">AR</span><span>Ana Ruiz</span></div>
+    </div>
+  </aside>
+  <main class="pc-main">
+    <header class="pc-top">
+      <div><div class="pc-sc">PAY · Project</div><h1 class="pc-h1">Payments</h1></div>
+      <div class="pc-topr">
+        <div class="pc-search"><span>Search tasks</span><span class="pc-kbd">/</span></div>
+        <button class="pc-btn">New task<span class="pc-btnk">C</span></button>
+      </div>
+    </header>
+    <div class="pc-filters">
+      <span>Status <span class="pc-fv">any</span></span>
+      <span>Priority <span class="pc-fv">any</span></span>
+      <span>Assignee <span class="pc-fv">any</span></span>
+      <span class="pc-fr">grouped by status</span>
+    </div>
+    <div class="pc-list">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+        <div class="pc-g"><span class="{{ g.dot }}"></span><span class="pc-gname">{{ g.name }}</span><span class="pc-gc">{{ g.count }}</span></div>
+        <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+          <div class="{{ t.rowCls }}">
+            <span class="pc-key">{{ t.key }}</span>
+            <span class="pc-title">{{ t.title }}</span>
+            <span class="{{ t.priCls }}">{{ t.pri }}</span>
+            <span class="pc-who"><sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span><span class="{{ t.nameCls }}">{{ t.who }}</span></sc-if></span>
+            <span class="pc-upd">{{ t.upd }}</span>
+          </div>
+        </sc-for>
+      </sc-for>
+      <sc-for list="{{ closed }}" as="g" hint-placeholder-count="3">
+        <div class="pc-gclosed"><span class="{{ g.dot }}"></span><span class="pc-gname">{{ g.name }}</span><span class="pc-gc">{{ g.count }}</span></div>
+      </sc-for>
+    </div>
+    <section class="pc-sheet" data-screen-label="Task panel · PAY-142">
+      <div class="pc-sh">
+        <span class="pc-mono">PAY-142</span>
+        <span class="pc-sp"></span>
+        <a class="pc-link" href="#">Open as page</a>
+        <span class="pc-link">Close <span class="pc-kbd">Esc</span></span>
+      </div>
+      <div class="pc-sbody">
+        <h2 class="pc-stitle">Retry failed webhook deliveries with exponential backoff</h2>
+        <div class="pc-meta">
+          <div><div class="pc-sc">Status</div><div class="pc-mv"><span class="pc-dot pc-d-prog"></span>In progress</div></div>
+          <div><div class="pc-sc">Priority</div><div class="pc-mv"><span class="pc-pri-hot">High</span></div></div>
+          <div><div class="pc-sc">Assignee</div><div class="pc-mv"><span class="pc-ag"></span><span class="pc-whoa">claude-dev</span><span class="pc-for">for Ana Ruiz</span></div></div>
+          <div><div class="pc-sc">Created</div><div class="pc-mv"><span class="pc-av" style="--h:25">AR</span>Ana Ruiz<span class="pc-for">Oct 20</span></div></div>
+        </div>
+        <div class="pc-doc">
+          <p>Deliveries that fail with a 5xx or time out are dropped today. Retry them with exponential backoff, capped at 6 attempts over about 24 hours.</p>
+          <ul class="pc-cl">
+            <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+              <li class="pc-cli"><span class="{{ c.box }}"></span><span class="{{ c.txt }}">{{ c.label }}</span></li>
+            </sc-for>
+          </ul>
+          <p>Backoff is <code>30s × 2^n</code> with jitter.</p>
+        </div>
+        <div class="pc-sc">Activity</div>
+        <ol class="pc-act">
+          <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+            <li class="pc-ai"><span class="pc-when">{{ a.when }}</span><span><b>{{ a.who }}</b>{{ a.forTxt }} {{ a.what }}</span></li>
+          </sc-for>
+        </ol>
+      </div>
+      <div class="pc-comment">Comments arrive in a later release.</div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light", "tsType": "\"light\" | \"dark\"" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const people = {
+      ana: { who: 'Ana Ruiz', ini: 'AR', hue: 25, agent: false },
+      tomas: { who: 'Tomás Berg', ini: 'TB', hue: 220, agent: false },
+      claude: { who: 'claude-dev', ini: '', hue: 0, agent: true },
+      codex: { who: 'codex-ci', ini: '', hue: 0, agent: true }
+    };
+    const D = { prog: 'pc-dot pc-d-prog', review: 'pc-dot pc-d-review', todo: 'pc-dot pc-d-todo', backlog: 'pc-dot pc-d-backlog', done: 'pc-dot pc-d-done', cancel: 'pc-dot pc-d-cancel' };
+    const PRI = { 4: 'Urgent', 3: 'High', 2: 'Medium', 1: 'Low', 0: '' };
+    const task = (key, title, pri, who, upd) => {
+      const p = who ? people[who] : null;
+      return {
+        key, title, upd,
+        rowCls: key === 'PAY-142' ? 'pc-rowsel' : 'pc-row',
+        pri: PRI[pri], priCls: pri >= 3 ? 'pc-pri-hot' : 'pc-pri',
+        has: !!p,
+        who: p ? p.who : '',
+        ini: p ? p.ini : '',
+        hue: p ? p.hue : 0,
+        avCls: p && p.agent ? 'pc-ag' : 'pc-av',
+        nameCls: p && p.agent ? 'pc-whoa' : ''
+      };
+    };
+    const groups = [
+      { name: 'In progress', dot: D.prog, tasks: [
+        task('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 3, 'claude', '3m'),
+        task('PAY-131', 'Add idempotency keys to the refund endpoint', 4, 'codex', '12m'),
+        task('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 2, 'ana', '1h')
+      ]},
+      { name: 'In review', dot: D.review, tasks: [
+        task('PAY-138', 'Webhook signature check accepts expired timestamps', 4, 'claude', '25m'),
+        task('PAY-135', 'Paginate the transactions CSV export', 2, 'tomas', '3h')
+      ]},
+      { name: 'Todo', dot: D.todo, tasks: [
+        task('PAY-144', 'Show a test-mode banner on the billing settings page', 1, null, '2h'),
+        task('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 3, 'tomas', '5h'),
+        task('PAY-137', 'Document the nightly payout reconciliation job', 0, 'claude', '1d'),
+        task('PAY-129', 'Remove legacy v0 checkout routes', 2, null, '2d')
+      ]}
+    ].map((g) => ({ ...g, count: g.tasks.length }));
+    const closed = [
+      { name: 'Backlog', dot: D.backlog, count: 18 },
+      { name: 'Done', dot: D.done, count: 64 },
+      { name: 'Canceled', dot: D.cancel, count: 3 }
+    ];
+    const projects = [
+      { name: 'Payments', open: 12, cls: 'pc-tocon', numCls: 'pc-numon' },
+      { name: 'Web app', open: 27, cls: 'pc-toc', numCls: 'pc-num' },
+      { name: 'pm CLI', open: 9, cls: 'pc-toc', numCls: 'pc-num' },
+      { name: 'Infra', open: 5, cls: 'pc-toc', numCls: 'pc-num' }
+    ];
+    const checks = [
+      { label: 'Store attempt count and next_attempt_at on the delivery', done: true },
+      { label: 'Schedule retries as pg-boss jobs', done: true },
+      { label: 'Stop on 4xx, except 408 and 429', done: false },
+      { label: 'Show attempt history in the delivery log', done: false }
+    ].map((c) => ({ ...c, box: c.done ? 'pc-boxon' : 'pc-box', txt: c.done ? 'pc-struck' : '' }));
+    const act = (pk, what, when, forWho) => ({ who: people[pk].who, what, when, forTxt: forWho ? ', for ' + forWho + ',' : '' });
+    const activity = [
+      act('ana', 'created the task', 'Oct 20'),
+      act('ana', 'assigned it to claude-dev', 'Oct 20'),
+      act('claude', 'moved it from Todo to In progress', '40m', 'Ana Ruiz'),
+      act('claude', 'checked off 2 items', '3m', 'Ana Ruiz')
+    ];
+    return { rootCls: 'pc-root pc-' + theme, groups, closed, projects, checks, activity };
+  }
+}
+</script>
+</body>
+</html>

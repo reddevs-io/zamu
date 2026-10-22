@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;family=Martian+Mono:wght@400;500&amp;display=swap" />
+<style>
+body{margin:0}
+.lg-root{width:1280px;height:800px;position:relative;overflow:hidden;display:grid;grid-template-columns:64px 600px minmax(0,1fr);font-family:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;font-size:13px;line-height:1.4;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-align:left}
+.lg-light{--bg:oklch(0.985 0.004 240);--rail:oklch(0.22 0.02 255);--railfg:oklch(0.82 0.015 250);--railon:oklch(0.98 0.004 240);--band:oklch(0.962 0.006 240);--line:oklch(0.88 0.008 245);--line2:oklch(0.93 0.006 245);--fg:oklch(0.2 0.02 255);--muted:oklch(0.46 0.02 255);--faint:oklch(0.62 0.015 255);--accent:oklch(0.52 0.2 262);--sel:oklch(0.94 0.03 262);--review:oklch(0.5 0.15 300);--done:oklch(0.52 0.11 155);--urgent:oklch(0.55 0.2 28)}
+.lg-dark{--bg:oklch(0.185 0.012 255);--rail:oklch(0.13 0.012 255);--railfg:oklch(0.66 0.015 250);--railon:oklch(0.95 0.006 240);--band:oklch(0.215 0.013 255);--line:oklch(0.31 0.014 255);--line2:oklch(0.255 0.013 255);--fg:oklch(0.94 0.006 240);--muted:oklch(0.72 0.015 250);--faint:oklch(0.56 0.015 250);--accent:oklch(0.72 0.15 258);--sel:oklch(0.26 0.04 262);--review:oklch(0.76 0.11 300);--done:oklch(0.76 0.12 155);--urgent:oklch(0.7 0.17 30)}
+.lg-root :where(a){color:inherit;text-decoration:none}
+.lg-root :where(a:hover){color:var(--accent)}
+.lg-mono{font-family:"Martian Mono",ui-monospace,monospace}
+.lg-rail{background:var(--rail);display:flex;flex-direction:column;align-items:stretch;padding:12px 0;gap:2px}
+.lg-ws{width:32px;height:32px;margin:0 auto 14px;background:var(--accent);color:oklch(0.99 0 0);display:grid;place-items:center;font-weight:700;font-size:14px}
+.lg-rk{height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--railfg);font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;font-weight:500}
+.lg-rkon{height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--rail);background:var(--railon);font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;font-weight:500}
+.lg-rn{font-size:9px;opacity:0.7}
+.lg-rsp{flex:1}
+.lg-rme{width:28px;height:28px;margin:0 auto;border-radius:50%;background:oklch(0.86 0.06 25);color:oklch(0.32 0.08 25);display:grid;place-items:center;font-size:10px;font-weight:600}
+.lg-rset{color:var(--railfg);font-size:10.5px;text-align:center;margin-bottom:10px}
+.lg-list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.lg-lh{height:64px;flex:none;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--line)}
+.lg-ptitle{font-size:20px;font-weight:600;letter-spacing:-0.01em;line-height:1.1}
+.lg-psub{font-size:11.5px;color:var(--muted);margin-top:3px}
+.lg-lhr{margin-left:auto;display:flex;align-items:center;gap:8px}
+.lg-search{display:flex;align-items:center;justify-content:space-between;width:150px;height:30px;padding:0 6px 0 10px;border:1px solid var(--line);color:var(--faint)}
+.lg-kbd{font-family:"Martian Mono",ui-monospace,monospace;font-size:9.5px;line-height:16px;padding:0 4px;border:1px solid var(--line);color:var(--muted)}
+.lg-btn{font:inherit;font-weight:600;display:flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 12px;border:0;background:var(--fg);color:var(--bg);cursor:pointer}
+.lg-btnk{font-family:"Martian Mono",ui-monospace,monospace;font-size:9.5px;line-height:16px;padding:0 4px;border:1px solid oklch(1 0 0 / 0.3)}
+.lg-filters{height:36px;flex:none;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
+.lg-fv{color:var(--fg);font-weight:500}
+.lg-th{height:28px;flex:none;display:grid;grid-template-columns:72px minmax(0,1fr) 34px 112px 34px;gap:12px;align-items:center;padding:0 20px;border-bottom:1px solid var(--line);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.lg-thr{text-align:right}
+.lg-body{flex:1;min-height:0;overflow:hidden}
+.lg-g{height:30px;display:flex;align-items:center;gap:10px;padding:0 20px;background:var(--band);border-bottom:1px solid var(--line2);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;font-weight:600}
+.lg-gc{font-family:"Martian Mono",ui-monospace,monospace;color:var(--faint);font-size:10px;letter-spacing:0}
+.lg-sq{width:8px;height:8px;flex:none}
+.lg-s-prog{background:var(--accent)}
+.lg-s-review{background:var(--review)}
+.lg-s-todo{border:1.5px solid var(--muted);box-sizing:border-box}
+.lg-s-backlog{border:1.5px dashed var(--faint);box-sizing:border-box}
+.lg-s-done{background:var(--done)}
+.lg-s-cancel{background:var(--faint)}
+.lg-row{height:34px;display:grid;grid-template-columns:72px minmax(0,1fr) 34px 112px 34px;gap:12px;align-items:center;padding:0 20px;border-bottom:1px solid var(--line2)}
+.lg-rowsel{height:34px;display:grid;grid-template-columns:72px minmax(0,1fr) 34px 112px 34px;gap:12px;align-items:center;padding:0 20px;border-bottom:1px solid var(--line2);background:var(--sel)}
+.lg-key{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--muted)}
+.lg-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg-pri{font-size:9px;letter-spacing:1px;color:var(--fg)}
+.lg-prilow{font-size:9px;letter-spacing:1px;color:var(--faint)}
+.lg-priurg{font-size:9px;letter-spacing:1px;color:var(--urgent)}
+.lg-who{display:flex;align-items:center;gap:6px;color:var(--muted);white-space:nowrap;overflow:hidden;font-size:12px}
+.lg-upd{font-family:"Martian Mono",ui-monospace,monospace;font-size:10px;color:var(--faint);text-align:right}
+.lg-av{width:18px;height:18px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:8.5px;font-weight:600;background:oklch(0.86 0.06 var(--h));color:oklch(0.32 0.08 var(--h))}
+.lg-ag{width:18px;height:18px;flex:none;box-sizing:border-box;border:1.5px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-family:"Martian Mono",ui-monospace,monospace;font-size:9px;font-weight:500}
+.lg-detail{display:flex;flex-direction:column;min-width:0;min-height:0}
+.lg-dh{height:64px;flex:none;display:flex;align-items:center;gap:10px;padding:0 24px;border-bottom:1px solid var(--line);color:var(--muted)}
+.lg-sp{flex:1}
+.lg-dbody{flex:1;min-height:0;overflow:hidden;padding:22px 28px 0;display:flex;flex-direction:column;gap:18px}
+.lg-dtitle{margin:0;font-size:22px;line-height:1.25;font-weight:600;letter-spacing:-0.015em;text-wrap:pretty}
+.lg-props{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line)}
+.lg-cell{padding:8px 10px 9px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.lg-cell:last-child{border-right:0}
+.lg-cl{font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.lg-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500}
+.lg-for{color:var(--muted);font-size:11.5px}
+.lg-desc{display:flex;flex-direction:column;gap:8px;line-height:1.55;font-size:13.5px}
+.lg-desc p{margin:0;text-wrap:pretty}
+.lg-desc code{font-family:"Martian Mono",ui-monospace,monospace;font-size:11px;background:var(--band);padding:1px 4px}
+.lg-chk{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.lg-li{display:flex;gap:10px;align-items:baseline}
+.lg-box{width:10px;height:10px;flex:none;border:1.5px solid var(--muted);box-sizing:border-box}
+.lg-boxon{width:10px;height:10px;flex:none;background:var(--fg)}
+.lg-struck{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.lg-sec{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600;padding-top:14px;border-top:1px solid var(--line)}
+.lg-tl{list-style:none;margin:0;padding:0 0 0 14px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:9px;margin-left:4px}
+.lg-tli{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;font-size:12.5px;color:var(--muted)}
+.lg-tli b{color:var(--fg);font-weight:600}
+.lg-node{position:absolute;left:-19px;top:5px;width:9px;height:9px;background:var(--bg);border:1.5px solid var(--muted);box-sizing:border-box;border-radius:50%}
+.lg-nodea{position:absolute;left:-19px;top:5px;width:9px;height:9px;background:var(--accent);box-sizing:border-box}
+.lg-when{font-family:"Martian Mono",ui-monospace,monospace;font-size:10px;color:var(--faint)}
+.lg-comment{flex:none;margin:12px 28px 18px;height:38px;border:1px dashed var(--line);display:flex;align-items:center;padding:0 12px;color:var(--faint)}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="Task list · Ledger">
+  <nav class="lg-rail">
+    <div class="lg-ws">R</div>
+    <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+      <a class="{{ p.cls }}" href="#"><span>{{ p.key }}</span><span class="lg-rn">{{ p.open }}</span></a>
+    </sc-for>
+    <span class="lg-rsp"></span>
+    <a class="lg-rset" href="#">Team</a>
+    <a class="lg-rset" href="#">Settings</a>
+    <span class="lg-rme">AR</span>
+  </nav>
+  <section class="lg-list">
+    <header class="lg-lh">
+      <div><div class="lg-ptitle">Payments</div><div class="lg-psub"><span class="lg-mono">PAY</span> · 12 open · grouped by status</div></div>
+      <div class="lg-lhr">
+        <div class="lg-search"><span>Search</span><span class="lg-kbd">/</span></div>
+        <button class="lg-btn">New<span class="lg-btnk">C</span></button>
+      </div>
+    </header>
+    <div class="lg-filters"><span>Status <span class="lg-fv">Any</span></span><span>Priority <span class="lg-fv">Any</span></span><span>Assignee <span class="lg-fv">Any</span></span></div>
+    <div class="lg-th"><span>Key</span><span>Title</span><span>Pri</span><span>Assignee</span><span class="lg-thr">Upd</span></div>
+    <div class="lg-body">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+        <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+        <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+          <div class="{{ t.rowCls }}">
+            <span class="lg-key">{{ t.key }}</span>
+            <span class="lg-title">{{ t.title }}</span>
+            <span class="{{ t.priCls }}">{{ t.pri }}</span>
+            <span class="lg-who"><sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span><span>{{ t.who }}</span></sc-if></span>
+            <span class="lg-upd">{{ t.upd }}</span>
+          </div>
+        </sc-for>
+      </sc-for>
+      <sc-for list="{{ closed }}" as="g" hint-placeholder-count="3">
+        <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+      </sc-for>
+    </div>
+  </section>
+  <section class="lg-detail" data-screen-label="Task detail · PAY-142">
+    <header class="lg-dh">
+      <span class="lg-mono">PAY-142</span>
+      <span class="lg-sp"></span>
+      <a href="#">Open as page</a>
+      <span class="lg-kbd">Esc</span>
+    </header>
+    <div class="lg-dbody">
+      <h2 class="lg-dtitle">Retry failed webhook deliveries with exponential backoff</h2>
+      <div class="lg-props">
+        <div class="lg-cell"><span class="lg-cl">Status</span><span class="lg-cv"><span class="lg-sq lg-s-prog"></span>In progress</span></div>
+        <div class="lg-cell"><span class="lg-cl">Priority</span><span class="lg-cv"><span class="lg-pri">■■■</span>High</span></div>
+        <div class="lg-cell"><span class="lg-cl">Assignee</span><span class="lg-cv"><span class="lg-ag">C</span>claude-dev</span><span class="lg-for">for Ana Ruiz</span></div>
+        <div class="lg-cell"><span class="lg-cl">Created</span><span class="lg-cv">Ana Ruiz</span><span class="lg-for">Oct 20</span></div>
+      </div>
+      <div class="lg-desc">
+        <p>Deliveries that fail with a 5xx or time out are dropped today. Retry them with exponential backoff, capped at 6 attempts over about 24 hours.</p>
+        <ul class="lg-chk">
+          <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+            <li class="lg-li"><span class="{{ c.box }}"></span><span class="{{ c.txt }}">{{ c.label }}</span></li>
+          </sc-for>
+        </ul>
+        <p>Backoff is <code>30s × 2^n</code> with jitter.</p>
+      </div>
+      <div class="lg-sec">Activity</div>
+      <ol class="lg-tl">
+        <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+          <li class="lg-tli"><span class="{{ a.node }}"></span><span><b>{{ a.who }}</b>{{ a.forTxt }} {{ a.what }}</span><span class="lg-when">{{ a.when }}</span></li>
+        </sc-for>
+      </ol>
+    </div>
+    <div class="lg-comment">Comments arrive in a later release.</div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light", "tsType": "\"light\" | \"dark\"" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const people = {
+      ana: { who: 'Ana Ruiz', ini: 'AR', hue: 25, agent: false },
+      tomas: { who: 'Tomás Berg', ini: 'TB', hue: 220, agent: false },
+      claude: { who: 'claude-dev', ini: 'C', hue: 0, agent: true },
+      codex: { who: 'codex-ci', ini: 'X', hue: 0, agent: true }
+    };
+    const SQ = { prog: 'lg-sq lg-s-prog', review: 'lg-sq lg-s-review', todo: 'lg-sq lg-s-todo', backlog: 'lg-sq lg-s-backlog', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel' };
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const task = (key, title, pri, who, upd) => {
+      const p = who ? people[who] : null;
+      return {
+        key, title, upd,
+        rowCls: key === 'PAY-142' ? 'lg-rowsel' : 'lg-row',
+        pri: PRI[pri][0], priCls: PRI[pri][1],
+        has: !!p, who: p ? p.who : '', ini: p ? p.ini : '', hue: p ? p.hue : 0,
+        avCls: p && p.agent ? 'lg-ag' : 'lg-av'
+      };
+    };
+    const groups = [
+      { name: 'In progress', sq: SQ.prog, tasks: [
+        task('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 3, 'claude', '3m'),
+        task('PAY-131', 'Add idempotency keys to the refund endpoint', 4, 'codex', '12m'),
+        task('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 2, 'ana', '1h')
+      ]},
+      { name: 'In review', sq: SQ.review, tasks: [
+        task('PAY-138', 'Webhook signature check accepts expired timestamps', 4, 'claude', '25m'),
+        task('PAY-135', 'Paginate the transactions CSV export', 2, 'tomas', '3h')
+      ]},
+      { name: 'Todo', sq: SQ.todo, tasks: [
+        task('PAY-144', 'Show a test-mode banner on the billing settings page', 1, null, '2h'),
+        task('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 3, 'tomas', '5h'),
+        task('PAY-137', 'Document the nightly payout reconciliation job', 0, 'claude', '1d'),
+        task('PAY-129', 'Remove legacy v0 checkout routes', 2, null, '2d')
+      ]}
+    ].map((g) => ({ ...g, count: g.tasks.length }));
+    const closed = [
+      { name: 'Backlog', sq: SQ.backlog, count: 18 },
+      { name: 'Done', sq: SQ.done, count: 64 },
+      { name: 'Canceled', sq: SQ.cancel, count: 3 }
+    ];
+    const projects = [
+      { key: 'PAY', open: 12, cls: 'lg-rkon' },
+      { key: 'WEB', open: 27, cls: 'lg-rk' },
+      { key: 'CLI', open: 9, cls: 'lg-rk' },
+      { key: 'INF', open: 5, cls: 'lg-rk' }
+    ];
+    const checks = [
+      { label: 'Store attempt count and next_attempt_at on the delivery', done: true },
+      { label: 'Schedule retries as pg-boss jobs', done: true },
+      { label: 'Stop on 4xx, except 408 and 429', done: false },
+      { label: 'Show attempt history in the delivery log', done: false }
+    ].map((c) => ({ ...c, box: c.done ? 'lg-boxon' : 'lg-box', txt: c.done ? 'lg-struck' : '' }));
+    const act = (pk, what, when, forWho) => ({ who: people[pk].who, node: people[pk].agent ? 'lg-nodea' : 'lg-node', what, when, forTxt: forWho ? ' for ' + forWho : '' });
+    const activity = [
+      act('ana', 'created the task', 'Oct 20'),
+      act('ana', 'assigned it to claude-dev', 'Oct 20'),
+      act('claude', 'moved it from Todo to In progress', '40m', 'Ana Ruiz'),
+      act('claude', 'checked off 2 items', '3m', 'Ana Ruiz')
+    ];
+    return { rootCls: 'lg-root lg-' + theme, groups, closed, projects, checks, activity };
+  }
+}
+</script>
+</body>
+</html>

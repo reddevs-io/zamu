@@ -1,0 +1,24 @@
+{
+  "name": "@pm/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "auth:generate": "auth generate --config better-auth.config.ts --output ../db/src/schema/auth.ts --yes",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@better-auth/api-key": "1.7.12",
+    "@pm/db": "workspace:*",
+    "better-auth": "1.7.12",
+    "drizzle-orm": "1.0.0-rc.5"
+  },
+  "devDependencies": {
+    "auth": "1.7.12"
+  }
+}

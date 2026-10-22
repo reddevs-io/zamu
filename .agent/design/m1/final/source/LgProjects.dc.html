@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<style>
+.pj-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.pj-cols{grid-template-columns:72px minmax(0,1fr) 220px 56px 110px 56px}
+.pj-row{height:52px;display:grid;grid-template-columns:72px minmax(0,1fr) 220px 56px 110px 56px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.pj-name{font-weight:600;font-size:13.5px}
+.pj-desc{font-size:12px;color:var(--muted)}
+.pj-stack{display:flex;gap:3px}
+.pj-num{font-family:"Martian Mono",ui-monospace,monospace;font-size:11px;text-align:right}
+.pj-legend{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--muted)}
+.pj-li{display:flex;gap:6px;align-items:center}
+.pj-emptywrap{flex:1;display:flex;align-items:center;padding:0 96px}
+.pj-hint{display:flex;flex-direction:column;gap:6px;width:100%}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnavon" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <sc-for list="{{ railProjects }}" as="p" hint-placeholder-count="4">
+        <a class="lg-rk" href="#"><span>{{ p.key }}</span><span class="lg-rn">{{ p.open }}</span></a>
+      </sc-for>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="pj-main">
+      <header class="lg-head">
+        <div><h1 class="lg-h1">Projects</h1><div class="lg-sub">{{ subtitle }}</div></div>
+        <div class="lg-headr">
+          <div class="lg-search"><span>Search</span><span class="lg-kbd">/</span></div>
+          <button class="lg-btn">New project<span class="lg-btnk">P</span></button>
+        </div>
+      </header>
+      <sc-if value="{{ hasProjects }}" hint-placeholder-val="{{ true }}">
+        <div class="lg-bar">
+          <div class="pj-legend">
+            <span class="pj-li"><span class="lg-sq lg-s-prog"></span>In progress</span>
+            <span class="pj-li"><span class="lg-sq lg-s-review"></span>In review</span>
+            <span class="pj-li"><span class="lg-sq lg-s-todo"></span>Todo</span>
+            <span class="pj-li"><span class="lg-sq lg-s-backlog"></span>Backlog</span>
+          </div>
+          <span class="lg-sp"></span><span>Sorted by last update</span>
+        </div>
+        <div class="lg-th pj-cols"><span>Key</span><span>Project</span><span>Open tasks by status</span><span class="lg-right">Open</span><span>Members</span><span class="lg-right">Upd</span></div>
+        <sc-for list="{{ projects }}" as="p" hint-placeholder-count="5">
+          <div class="pj-row">
+            <span class="lg-key">{{ p.key }}</span>
+            <div style="min-width:0"><div class="pj-name lg-trunc">{{ p.name }}</div><div class="pj-desc lg-trunc">{{ p.desc }}</div></div>
+            <div class="lg-bars" style="width:200px">
+              <span class="lg-s-prog" style="flex:{{ p.prog }}"></span>
+              <span class="lg-s-review" style="flex:{{ p.review }}"></span>
+              <span class="lg-s-todo" style="flex:{{ p.todo }};box-sizing:border-box"></span>
+              <span class="lg-s-backlog" style="flex:{{ p.backlog }};box-sizing:border-box"></span>
+            </div>
+            <span class="pj-num">{{ p.open }}</span>
+            <span class="pj-stack"><sc-for list="{{ p.members }}" as="m" hint-placeholder-count="3"><span class="{{ m.cls }}" style="--h:{{ m.hue }}">{{ m.ini }}</span></sc-for></span>
+            <span class="lg-upd">{{ p.upd }}</span>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+        <div class="pj-emptywrap">
+          <div class="lg-empty">
+            <h2 class="lg-h2">No projects yet</h2>
+            <p class="lg-muted" style="margin:0;line-height:1.55">A project holds tasks. Each one gets a short key that prefixes its task IDs, like PAY-42.</p>
+            <button class="lg-btn">New project<span class="lg-btnk">P</span></button>
+            <div class="pj-hint"><span class="lg-cap">Or from the CLI</span><div class="lg-code">pm projects create --name "Payments" --key PAY</div></div>
+          </div>
+        </div>
+      </sc-if>
+    </section>
+  </div>
+  <sc-if value="{{ isDialog }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:120px;width:500px" data-screen-label="New project dialog">
+      <div class="lg-dh"><span style="font-weight:600">New project</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db">
+        <div class="lg-field"><span class="lg-label">Name</span><div class="lg-input">Billing reconciliation</div></div>
+        <div class="lg-field"><span class="lg-label">Key</span><div class="lg-inputf" style="width:140px"><span class="lg-mono">BIL</span><span class="lg-caret"></span></div><span class="lg-hint">Suggested from the name. Task IDs will look like BIL-1. You can change it until the first task exists.</span></div>
+        <div class="lg-field"><span class="lg-label">Description <span class="lg-faint" style="font-weight:400">optional</span></span><div class="lg-input"><span class="lg-ph">What this project covers</span></div></div>
+      </div>
+      <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">Create project<span class="lg-btnk">⌘↵</span></button></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["list", "dialog", "empty"], "default": "list" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'list';
+    const H = (ini, hue) => ({ ini, hue, cls: 'lg-av' });
+    const A = (ini) => ({ ini, hue: 0, cls: 'lg-ag' });
+    const all = [
+      { key: 'PAY', name: 'Payments', desc: 'Checkout, refunds, webhooks and payouts', prog: 3, review: 2, todo: 4, backlog: 3, upd: '3m', members: [H('AR', 25), H('TB', 220), A('C'), A('X')] },
+      { key: 'WEB', name: 'Web app', desc: 'The customer-facing dashboard', prog: 5, review: 3, todo: 9, backlog: 10, upd: '20m', members: [H('TB', 220), H('MO', 140), A('C')] },
+      { key: 'CLI', name: 'pm CLI', desc: 'Command-line client for people and agents', prog: 2, review: 1, todo: 4, backlog: 2, upd: '1h', members: [H('AR', 25), A('X')] },
+      { key: 'DOCS', name: 'Customer-facing documentation, onboarding guides, migration notes for v1 customers and the public API reference', desc: 'Guides, migration notes and the API reference', prog: 0, review: 1, todo: 2, backlog: 6, upd: '2d', members: [H('MO', 140)] },
+      { key: 'INF', name: 'Infra', desc: 'Servers, backups and deploys', prog: 1, review: 0, todo: 2, backlog: 2, upd: '4d', members: [H('AR', 25)] }
+    ].map((p) => ({ ...p, open: p.prog + p.review + p.todo + p.backlog }));
+    const empty = state === 'empty';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: { list: 'Projects', dialog: 'Projects · new project', empty: 'Projects · empty' }[state],
+      subtitle: empty ? 'Reddevs workspace' : '5 projects in Reddevs',
+      hasProjects: !empty,
+      isEmpty: empty,
+      isDialog: state === 'dialog',
+      projects: all,
+      railProjects: empty ? [] : all.filter((p) => p.key !== 'DOCS').map((p) => ({ key: p.key, open: p.open }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+# GitLab CI for project-management. Runs on merge requests and on the default branch.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+stages:
+  - install
+  - check
+  - test
+  - build
+
+# Node jobs share a pnpm store cached per lockfile. The install job fills it; the others only read it and
+# install offline-first, which takes seconds once the store is warm.
+.node:
+  image: node:24-slim
+  variables:
+    PNPM_STORE: $CI_PROJECT_DIR/.pnpm-store
+  cache:
+    key:
+      prefix: pnpm-store
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store/
+    policy: pull
+  before_script:
+    # Install the pnpm version pinned in package.json ("packageManager": "pnpm@x.y.z").
+    - npm install --global --no-fund --no-audit --allow-scripts=pnpm pnpm@$(node -p 'require("./package.json").packageManager.split("@")[1]')
+    - pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE"
+
+install:
+  extends: .node
+  stage: install
+  cache:
+    policy: pull-push
+  script:
+    - pnpm store prune --store-dir "$PNPM_STORE"
+
+lint:
+  extends: .node
+  stage: check
+  needs: [install]
+  script:
+    # Biome follows .gitignore, which already lists the CI pnpm store (.pnpm-store/).
+    - pnpm lint
+
+typecheck:
+  extends: .node
+  stage: check
+  needs: [install]
+  script:
+    - pnpm typecheck
+
+test:
+  extends: .node
+  stage: test
+  needs: [install]
+  services:
+    - name: postgres:18
+      alias: postgres
+  variables:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_DB: project_management
+    DATABASE_URL: postgres://postgres:postgres@postgres:5432/project_management
+    TEST_DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres
+    BETTER_AUTH_SECRET: ci-only-secret-not-used-outside-tests-0123456789
+    BETTER_AUTH_URL: http://localhost:3000
+    PUBLIC_URL: http://localhost:3000
+  script:
+    - pnpm test
+
+# Builds the image, starts the self-hosting stack with docker compose and waits for /api/healthz.
+docker-build:
+  stage: build
+  needs: []
+  image: docker:29-cli
+  services:
+    - docker:29-dind
+  variables:
+    DOCKER_TLS_CERTDIR: /certs
+    BETTER_AUTH_SECRET: ci-only-secret-not-used-outside-ci-0123456789abcdef
+    PM_IMAGE: project-management:$CI_COMMIT_SHORT_SHA
+  before_script:
+    - until docker info >/dev/null 2>&1; do sleep 1; done
+  script:
+    - docker compose build
+    - docker compose up -d
+    # Ports published by the stack live on the dind service, reachable as "docker".
+    - |
+      for attempt in $(seq 1 60); do
+        if wget -qO- http://docker:3000/api/healthz; then echo; echo "healthy after ${attempt} attempts"; exit 0; fi
+        sleep 2
+      done
+      echo "web did not become healthy"
+      docker compose ps -a
+      docker compose logs
+      exit 1
+  after_script:
+    - docker compose down -v --remove-orphans
+
+# End-to-end tests: Playwright against the docker compose stack on the dind service (see e2e/stack.ts).
+# Runs after docker-build in the same stage, so a broken image fails fast and cheap. The Playwright image has
+# Node 24 and the browsers matching @playwright/test; it gets the Docker CLI from Ubuntu's packages.
+e2e:
+  extends: .node
+  stage: build
+  needs: [install, docker-build]
+  image: mcr.microsoft.com/playwright:v1.64.1-noble
+  services:
+    - docker:29-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: /certs
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: /certs/client
+    # Ports published by the stack live on the dind service, reachable as "docker".
+    E2E_BASE_URL: http://docker:3100
+  before_script:
+    - apt-get update -qq
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends docker.io docker-compose-v2 docker-buildx >/dev/null
+    - |
+      for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
+      docker info >/dev/null
+    - !reference [.node, before_script]
+  script:
+    - pnpm e2e
+  artifacts:
+    when: always
+    expire_in: 2 weeks
+    paths:
+      - playwright-report/
+      - test-results/
+    reports:
+      junit: test-results/junit.xml

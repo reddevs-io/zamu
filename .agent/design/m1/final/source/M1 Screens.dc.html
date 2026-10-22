@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif;color:#1a1a1a}
+a{color:#1a1a1a}
+a:hover{color:#2a78d6}
+.dv-turn{padding:36px 44px 28px;border-bottom:1px solid rgba(0,0,0,0.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 15px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-desc{margin:0 0 18px;max-width:900px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.65);text-wrap:pretty}
+.dv-opts{display:flex;flex-wrap:wrap;gap:24px 24px;align-items:flex-start;max-width:2600px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:8px}
+.dv-olabel{font:500 12px/1.3 system-ui,sans-serif;color:rgba(0,0,0,0.6)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden}
+.dv-intro{display:grid;grid-template-columns:repeat(3,minmax(0,420px));gap:32px;font:12.5px/1.6 system-ui,sans-serif;color:rgba(0,0,0,0.72)}
+.dv-intro h3{margin:0 0 6px;font:600 12.5px/1.3 system-ui,sans-serif;color:#1a1a1a}
+.dv-intro p{margin:0 0 8px;text-wrap:pretty}
+.dv-intro ul{margin:0;padding-left:16px}
+.dv-h{font:700 22px/1.2 system-ui,sans-serif;margin:0 0 6px}
+.dv-lead{font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.6);margin:0 0 24px;max-width:900px}
+</style>
+</helmet>
+<section class="dv-turn" id="intro" data-screen-label="M1 screens · overview">
+  <h1 class="dv-h">M1 screens · direction 2a Ledger</h1>
+  <p class="dv-lead">Every screen from the M1 brief in light and dark, with empty, loading, error and long-content states. Sections below run in the order a new user meets them. Earlier rounds live in M1 Directions.</p>
+  <div class="dv-intro">
+    <div>
+      <h3>Layout rules</h3>
+      <ul>
+        <li>A 64px rail on every signed-in screen: workspace, Dashboard and My tasks (later milestones), Projects, project keys with open counts, Settings, you.</li>
+        <li>Lists are tables with column headers. The task detail pane stays open next to the list instead of covering it.</li>
+        <li>Square corners. Only people get round avatars; agents get a cobalt outlined square.</li>
+        <li>Dialogs sit 70 to 140px from the top over a scrim and close with Esc.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Components to build</h3>
+      <ul>
+        <li>Rail, page header, filter bar, table header, group row, task row, property grid, activity timeline.</li>
+        <li>Buttons (primary, accent, secondary, destructive), text input, select, radio card, checkbox, toggle, kbd hint.</li>
+        <li>Dialog (header, body, footer), error banner, skeleton rows, empty state with CLI hint, code block.</li>
+        <li>Avatar (person, agent), tag, status square, priority glyph, segmented status bar.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Open points</h3>
+      <ul>
+        <li>The CLI is called pm and keys start with pm_live_ until the product is renamed.</li>
+        <li>Dashboard and My tasks are in the rail but not designed: they belong to later milestones.</li>
+        <li>Comments are reserved below the description; they ship after M1.</li>
+        <li>The sign-in side panel is decoration. Drop it if it reads as live data.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<section class="dv-turn" id="s0" data-screen-label="Tokens and components">
+  <div class="dv-thd"><a class="dv-tid" href="#s0">0</a><span class="dv-tname">Tokens and components</span></div>
+  <p class="dv-desc">The shared stylesheet ledger.css holds every token below. Frames in this file import it, so a token change updates every screen.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Light</div><div class="dv-card" style="width:1280px"><dc-import name="LgTokens" theme="light" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgTokens" theme="dark" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s1" data-screen-label="Sign in">
+  <div class="dv-thd"><a class="dv-tid" href="#s1">1</a><span class="dv-tname">Sign in</span></div>
+  <p class="dv-desc">Email and password. When the server has OIDC configured, a Continue with SSO button appears above the form. The left panel is a static sample, not live data.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Default · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgAuth" theme="light" mode="signin" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">SSO enabled, wrong password · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgAuth" theme="dark" mode="sso-error" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s2" data-screen-label="First run">
+  <div class="dv-thd"><a class="dv-tid" href="#s2">2</a><span class="dv-tname">First run</span></div>
+  <p class="dv-desc">Shown only on a fresh install. Two steps: create the admin account, then name the first workspace.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Step 1, account · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgAuth" theme="light" mode="setup-1" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Step 2, workspace · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgAuth" theme="dark" mode="setup-2" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s3" data-screen-label="Projects">
+  <div class="dv-thd"><a class="dv-tid" href="#s3">3</a><span class="dv-tname">Projects</span></div>
+  <p class="dv-desc">Open tasks by status, member avatars (square for agents) and a long name that truncates. New project suggests a key from the name.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">List · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgProjects" theme="light" state="list" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">List · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgProjects" theme="dark" state="list" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">New project · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgProjects" theme="light" state="dialog" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">No projects · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgProjects" theme="dark" state="empty" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s4" data-screen-label="Task list and detail pane">
+  <div class="dv-thd"><a class="dv-tid" href="#s4">4</a><span class="dv-tname">Task list and detail pane</span></div>
+  <p class="dv-desc">The main screen. The rail, list and detail pane are always visible. J/K moves the selection and the pane follows it. Empty, loading and error states keep the layout.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Detail open · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgTasks" theme="light" state="panel" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Detail open · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgTasks" theme="dark" state="panel" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Empty project · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgTasks" theme="light" state="empty" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Loading · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgTasks" theme="dark" state="loading" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Request failed · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgTasks" theme="light" state="error" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s5" data-screen-label="Task page">
+  <div class="dv-thd"><a class="dv-tid" href="#s5">5</a><span class="dv-tname">Task page</span></div>
+  <p class="dv-desc">A direct link opens the task as a full page. Long title and a table in the description. Created by an agent, assigned to a person.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Full page · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgTaskPage" theme="light" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Full page · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgTaskPage" theme="dark" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s6" data-screen-label="Quick create">
+  <div class="dv-thd"><a class="dv-tid" href="#s6">6</a><span class="dv-tname">Quick create</span></div>
+  <p class="dv-desc">C opens it from anywhere. The title has focus. Properties are optional. Create more keeps the dialog open after each task.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Quick create · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgTasks" theme="light" state="create" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Quick create · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgTasks" theme="dark" state="create" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s7" data-screen-label="Members">
+  <div class="dv-thd"><a class="dv-tid" href="#s7">7</a><span class="dv-tname">Members</span></div>
+  <p class="dv-desc">People and agents in one table. Agents show the human responsible for them. Add agent sets name, responsible human, project scope and permission, and creates the first key.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Members · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgSettings" theme="light" page="members" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Add agent · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgSettings" theme="dark" page="add-agent" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s8" data-screen-label="API keys">
+  <div class="dv-thd"><a class="dv-tid" href="#s8">8</a><span class="dv-tname">API keys</span></div>
+  <p class="dv-desc">Every key in the workspace, with owner, scope and last use. A new key is shown once, with a copy button and the CLI login command.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Keys · dark</div><div class="dv-card" style="width:1280px"><dc-import name="LgSettings" theme="dark" page="keys" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Key created · light</div><div class="dv-card" style="width:1280px"><dc-import name="LgSettings" theme="light" page="reveal" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

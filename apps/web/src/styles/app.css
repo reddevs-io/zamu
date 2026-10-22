@@ -1,0 +1,93 @@
+@import 'tailwindcss';
+/* Self-hosted variable fonts (no Google Fonts request). Families: 'Instrument Sans Variable', 'Martian Mono Variable'. */
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource-variable/martian-mono';
+@import './tokens.css';
+
+/* React Aria state variants: hover:, focus:, focus-visible:, pressed:, selected:, disabled:, invalid:, entering: …
+   (they match data-hovered, data-focused and so on; on non-RAC elements they fall back to the native pseudo-class). */
+@plugin 'tailwindcss-react-aria-components';
+
+/* Only Ledger colors exist; Tailwind's default palette is removed so screens cannot drift from the tokens. */
+@theme {
+  --color-*: initial;
+  --font-sans: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Martian Mono Variable', 'Martian Mono', ui-monospace, monospace;
+}
+
+/* `inline` keeps var() references in the utilities, so a nested .light/.dark subtree re-themes itself. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-band: var(--band);
+  --color-rail: var(--rail);
+  --color-rail-fg: var(--rail-fg);
+  --color-rail-on: var(--rail-on);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-sel: var(--sel);
+  --color-focus: var(--focus);
+  --color-review: var(--review);
+  --color-done: var(--done);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-scrim: var(--scrim);
+  --shadow-dialog: var(--shadow);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--fg);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .light,
+  .dark {
+    color: var(--fg);
+  }
+
+  ::selection {
+    background: var(--sel);
+  }
+}
+
+/* Column-header style caption: 10px caps, 600, faint. */
+@utility caps {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+/* Shared keyboard focus ring for buttons, links and rows. Inputs use their own border and halo. */
+@utility focus-ring {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@utility focus-ring-inset {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* Halo used by focused inputs (ledger.css .lg-inputf). */
+@utility halo {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px oklch(0.6 0.15 262 / 0.2);
+}

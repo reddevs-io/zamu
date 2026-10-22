@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" />
+<style>
+.qa-root{width:1280px;height:800px;position:relative;overflow:hidden;display:grid;grid-template-columns:228px minmax(0,1fr);font-family:"Geist",ui-sans-serif,system-ui,sans-serif;font-size:13px;line-height:1.4;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-align:left}
+.qa-light{--bg:oklch(0.988 0.003 80);--side:oklch(0.966 0.004 80);--panel:oklch(0.996 0.002 80);--hover:oklch(0.955 0.005 80);--sel:oklch(0.953 0.03 78);--line:oklch(0.905 0.006 80);--line2:oklch(0.94 0.004 80);--fg:oklch(0.235 0.008 70);--muted:oklch(0.48 0.01 70);--faint:oklch(0.64 0.008 70);--accent:oklch(0.68 0.16 62);--accent-ink:oklch(0.5 0.13 55);--on-accent:oklch(0.2 0.03 60);--st-review:oklch(0.55 0.13 285);--st-done:oklch(0.56 0.11 150);--urgent:oklch(0.56 0.19 30);--shadow:0 16px 40px -12px oklch(0.3 0.02 70 / 0.22),0 2px 6px oklch(0.3 0.02 70 / 0.06)}
+.qa-dark{--bg:oklch(0.195 0.005 70);--side:oklch(0.17 0.005 70);--panel:oklch(0.222 0.006 70);--hover:oklch(0.235 0.006 70);--sel:oklch(0.265 0.035 68);--line:oklch(0.3 0.006 70);--line2:oklch(0.255 0.006 70);--fg:oklch(0.93 0.005 80);--muted:oklch(0.72 0.01 75);--faint:oklch(0.56 0.01 75);--accent:oklch(0.78 0.15 68);--accent-ink:oklch(0.8 0.13 70);--on-accent:oklch(0.2 0.03 60);--st-review:oklch(0.75 0.11 285);--st-done:oklch(0.75 0.12 150);--urgent:oklch(0.7 0.17 32);--shadow:0 20px 48px -10px oklch(0 0 0 / 0.6)}
+body{margin:0}
+.qa-root a{color:inherit;text-decoration:none}
+.qa-root a:hover{color:var(--fg)}
+.qa-mono{font-family:"Geist Mono",ui-monospace,monospace}
+.qa-side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:10px 8px;gap:2px;min-height:0}
+.qa-ws{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-weight:600;margin-bottom:10px}
+.qa-logo{width:20px;height:20px;border-radius:5px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-size:11px;font-weight:600}
+.qa-caret{margin-left:auto;width:6px;height:6px;border-right:1.5px solid var(--faint);border-bottom:1.5px solid var(--faint);transform:rotate(45deg) translateY(-2px)}
+.qa-nav{display:flex;flex-direction:column;gap:1px}
+.qa-navi{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;color:var(--muted)}
+.qa-navi-on{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;background:var(--hover);color:var(--fg);font-weight:500}
+.qa-count{margin-left:auto;font-family:"Geist Mono",ui-monospace,monospace;font-size:11px;color:var(--faint)}
+.qa-sect{font-size:11px;font-weight:500;color:var(--faint);padding:14px 8px 6px;letter-spacing:0.02em}
+.qa-pkey{font-family:"Geist Mono",ui-monospace,monospace;font-size:10.5px;font-weight:500;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;line-height:16px}
+.qa-sidefoot{margin-top:auto;display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--line);padding-top:8px}
+.qa-me{display:flex;align-items:center;gap:8px;height:34px;padding:0 8px;font-weight:500}
+.qa-av{width:20px;height:20px;flex:none;display:grid;place-items:center;font-size:9.5px;font-weight:600;border-radius:50%;background:oklch(0.86 0.06 var(--h));color:oklch(0.32 0.08 var(--h))}
+.qa-av-a{width:20px;height:20px;flex:none;display:grid;place-items:center;font-family:"Geist Mono",ui-monospace,monospace;font-size:10px;font-weight:500;border-radius:5px;background:var(--fg);color:var(--bg)}
+.qa-main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.qa-top{height:48px;flex:none;display:flex;align-items:center;gap:12px;padding:0 16px 0 20px;border-bottom:1px solid var(--line)}
+.qa-crumbs{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.qa-crumb-on{color:var(--fg);font-weight:500}
+.qa-topr{margin-left:auto;display:flex;align-items:center;gap:8px}
+.qa-search{display:flex;align-items:center;gap:24px;height:30px;padding:0 6px 0 10px;border:1px solid var(--line);border-radius:7px;color:var(--faint);width:220px;justify-content:space-between}
+.qa-kbd{font-family:"Geist Mono",ui-monospace,monospace;font-size:10.5px;line-height:16px;min-width:18px;text-align:center;padding:0 4px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;color:var(--muted)}
+.qa-btnp{font:inherit;border:0;cursor:pointer;display:flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 12px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-weight:500}
+.qa-kbdp{font-family:"Geist Mono",ui-monospace,monospace;font-size:10.5px;line-height:16px;min-width:18px;text-align:center;border-radius:4px;background:oklch(1 0 0 / 0.35)}
+.qa-filters{height:42px;flex:none;display:flex;align-items:center;gap:6px;padding:0 20px;border-bottom:1px solid var(--line2)}
+.qa-chip{font:inherit;background:none;cursor:pointer;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px dashed var(--line);border-radius:6px;color:var(--muted)}
+.qa-chipv{color:var(--fg)}
+.qa-fright{margin-left:auto;color:var(--faint);display:flex;gap:14px;align-items:center}
+.qa-list{flex:1;min-height:0;overflow:hidden;padding-bottom:12px}
+.qa-ghead{height:34px;display:flex;align-items:center;gap:8px;padding:0 20px;background:var(--side);border-bottom:1px solid var(--line2);font-weight:500}
+.qa-gcount{color:var(--faint);font-family:"Geist Mono",ui-monospace,monospace;font-size:11px}
+.qa-chev{width:5px;height:5px;border-right:1.5px solid var(--faint);border-bottom:1.5px solid var(--faint);transform:rotate(45deg);margin:0 4px 3px 2px}
+.qa-chevc{width:5px;height:5px;border-right:1.5px solid var(--faint);border-bottom:1.5px solid var(--faint);transform:rotate(-45deg);margin:0 4px 0 1px}
+.qa-row{height:36px;display:grid;grid-template-columns:16px 62px 16px minmax(0,1fr) 150px 44px;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid var(--line2)}
+.qa-rowsel{height:36px;display:grid;grid-template-columns:16px 62px 16px minmax(0,1fr) 150px 44px;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid var(--line2);background:var(--sel);box-shadow:inset 2px 0 0 var(--accent)}
+.qa-key{font-family:"Geist Mono",ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+.qa-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qa-who{display:flex;align-items:center;gap:7px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden}
+.qa-upd{font-family:"Geist Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);text-align:right}
+.qa-st{width:14px;height:14px;border-radius:50%;border:1.5px solid currentColor;box-sizing:border-box;padding:2px;background-clip:content-box}
+.qa-st-backlog{color:var(--faint);border-style:dashed}
+.qa-st-todo{color:var(--muted)}
+.qa-st-prog{color:var(--accent);background-image:conic-gradient(currentColor 0 50%,transparent 50% 100%)}
+.qa-st-review{color:var(--st-review);background-image:conic-gradient(currentColor 0 75%,transparent 75% 100%)}
+.qa-st-done{color:var(--st-done);background-color:currentColor}
+.qa-st-cancel{color:var(--faint);background-image:linear-gradient(135deg,transparent 42%,currentColor 42% 58%,transparent 58%)}
+.qa-pri{display:flex;align-items:flex-end;gap:2px;height:12px;width:14px}
+.qa-pri i{display:block;width:3px;border-radius:1px;background:var(--line)}
+.qa-pri i:nth-child(1){height:5px}
+.qa-pri i:nth-child(2){height:8px}
+.qa-pri i:nth-child(3){height:11px}
+.qa-p1 i:nth-child(-n+1){background:var(--muted)}
+.qa-p2 i:nth-child(-n+2){background:var(--muted)}
+.qa-p3 i{background:var(--fg)}
+.qa-p0 i:nth-child(n){height:2px;background:var(--faint)}
+.qa-p4{width:14px;height:14px;border-radius:4px;background:var(--urgent);display:grid;place-items:center}
+.qa-p4 i{display:none}
+.qa-p4::after{content:"!";color:oklch(0.99 0 0);font-size:10px;font-weight:700;line-height:1}
+.qa-panel{position:absolute;top:56px;right:8px;bottom:8px;width:468px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
+.qa-ph{height:44px;flex:none;display:flex;align-items:center;gap:6px;padding:0 10px 0 18px;border-bottom:1px solid var(--line2)}
+.qa-ghost{font:inherit;color:var(--muted);background:none;border:0;cursor:pointer;display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:6px;color:var(--muted)}
+.qa-sp{flex:1}
+.qa-pbody{flex:1;min-height:0;overflow:hidden;padding:18px 22px 0;display:flex;flex-direction:column;gap:18px}
+.qa-ptitle{margin:0;font-size:19px;line-height:1.3;font-weight:600;letter-spacing:-0.01em;text-wrap:pretty}
+.qa-props{display:grid;grid-template-columns:84px minmax(0,1fr);row-gap:4px;margin:0}
+.qa-props dt{color:var(--muted);height:28px;display:flex;align-items:center}
+.qa-props dd{margin:0;height:28px;display:flex;align-items:center;gap:8px;padding:0 8px;margin-left:-8px;border-radius:6px}
+.qa-propsel{background:var(--hover)}
+.qa-for{color:var(--muted)}
+.qa-desc{border-top:1px solid var(--line2);padding-top:16px;display:flex;flex-direction:column;gap:10px;line-height:1.55}
+.qa-desc p{margin:0;text-wrap:pretty}
+.qa-desc code{font-family:"Geist Mono",ui-monospace,monospace;font-size:12px;background:var(--hover);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
+.qa-check{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.qa-li{display:flex;gap:8px;align-items:flex-start}
+.qa-box{width:13px;height:13px;flex:none;margin-top:3px;border:1.5px solid var(--faint);border-radius:3px;box-sizing:border-box}
+.qa-boxon{width:13px;height:13px;flex:none;margin-top:3px;border-radius:3px;background:var(--fg);box-sizing:border-box;position:relative}
+.qa-boxon::after{content:"";position:absolute;left:4px;top:1px;width:3px;height:6px;border-right:1.5px solid var(--bg);border-bottom:1.5px solid var(--bg);transform:rotate(45deg)}
+.qa-lidone{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.qa-acth{font-weight:500;display:flex;align-items:center;gap:8px;border-top:1px solid var(--line2);padding-top:16px}
+.qa-act{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.qa-ai{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:start}
+.qa-at{color:var(--muted);line-height:1.45;text-wrap:pretty}
+.qa-at b{color:var(--fg);font-weight:500}
+.qa-when{font-family:"Geist Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);padding-top:2px}
+.qa-arrow{color:var(--faint)}
+.qa-composer{flex:none;padding:12px 16px 16px}
+.qa-cbox{height:40px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;padding:0 12px;color:var(--faint)}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="Task list · Quiet utility">
+  <aside class="qa-side">
+    <div class="qa-ws"><span class="qa-logo">R</span><span>Reddevs</span><span class="qa-caret"></span></div>
+    <nav class="qa-nav">
+      <a class="qa-navi" href="#">Dashboard</a>
+      <a class="qa-navi" href="#">My tasks<span class="qa-count">4</span></a>
+    </nav>
+    <div class="qa-sect">Projects</div>
+    <nav class="qa-nav">
+      <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+        <a class="{{ p.cls }}" href="#"><span class="qa-pkey">{{ p.key }}</span><span>{{ p.name }}</span><span class="qa-count">{{ p.open }}</span></a>
+      </sc-for>
+    </nav>
+    <div class="qa-sidefoot">
+      <a class="qa-navi" href="#">Members</a>
+      <a class="qa-navi" href="#">Settings</a>
+      <div class="qa-me"><span class="qa-av" style="--h:25">AR</span><span>Ana Ruiz</span></div>
+    </div>
+  </aside>
+  <main class="qa-main">
+    <header class="qa-top">
+      <div class="qa-crumbs"><span class="qa-pkey">PAY</span><span>Payments</span><span>/</span><span class="qa-crumb-on">Tasks</span></div>
+      <div class="qa-topr">
+        <div class="qa-search"><span>Search tasks</span><span class="qa-kbd">/</span></div>
+        <button class="qa-btnp">New task<span class="qa-kbdp">C</span></button>
+      </div>
+    </header>
+    <div class="qa-filters">
+      <button class="qa-chip">Status<span class="qa-chipv">Any</span></button>
+      <button class="qa-chip">Priority<span class="qa-chipv">Any</span></button>
+      <button class="qa-chip">Assignee<span class="qa-chipv">Any</span></button>
+      <div class="qa-fright"><span>Grouped by status</span><span class="qa-mono">12 open</span></div>
+    </div>
+    <div class="qa-list">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+        <div class="qa-ghead"><span class="qa-chev"></span><span class="{{ g.stCls }}"></span><span>{{ g.name }}</span><span class="qa-gcount">{{ g.count }}</span></div>
+        <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+          <div class="{{ t.rowCls }}">
+            <span class="{{ t.priCls }}"><i></i><i></i><i></i></span>
+            <span class="qa-key">{{ t.key }}</span>
+            <span class="{{ t.stCls }}"></span>
+            <span class="qa-title">{{ t.title }}</span>
+            <span class="qa-who"><sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span><span>{{ t.who }}</span></sc-if></span>
+            <span class="qa-upd">{{ t.upd }}</span>
+          </div>
+        </sc-for>
+      </sc-for>
+      <sc-for list="{{ closed }}" as="g" hint-placeholder-count="3">
+        <div class="qa-ghead"><span class="qa-chevc"></span><span class="{{ g.stCls }}"></span><span>{{ g.name }}</span><span class="qa-gcount">{{ g.count }}</span></div>
+      </sc-for>
+    </div>
+    <section class="qa-panel" data-screen-label="Task panel · PAY-142">
+      <div class="qa-ph">
+        <span class="qa-key">PAY-142</span>
+        <span class="qa-sp"></span>
+        <button class="qa-ghost">Open as page</button>
+        <button class="qa-ghost">Close<span class="qa-kbd">Esc</span></button>
+      </div>
+      <div class="qa-pbody">
+        <h2 class="qa-ptitle">Retry failed webhook deliveries with exponential backoff</h2>
+        <dl class="qa-props">
+          <dt>Status</dt><dd class="qa-propsel"><span class="qa-st qa-st-prog"></span>In progress</dd>
+          <dt>Priority</dt><dd><span class="qa-pri qa-p3"><i></i><i></i><i></i></span>High</dd>
+          <dt>Assignee</dt><dd><span class="qa-av-a">C</span>claude-dev<span class="qa-for">for Ana Ruiz</span></dd>
+          <dt>Created</dt><dd><span class="qa-av" style="--h:25">AR</span>Ana Ruiz<span class="qa-for">Oct 20</span></dd>
+        </dl>
+        <div class="qa-desc">
+          <p>Deliveries that fail with a 5xx or time out are dropped today. Retry them with exponential backoff, capped at 6 attempts over about 24 hours.</p>
+          <ul class="qa-check">
+            <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+              <li class="qa-li"><span class="{{ c.box }}"></span><span class="{{ c.txt }}">{{ c.label }}</span></li>
+            </sc-for>
+          </ul>
+          <p>Backoff is <code>30s × 2^n</code> with jitter.</p>
+        </div>
+        <div class="qa-acth">Activity</div>
+        <ol class="qa-act">
+          <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+            <li class="qa-ai">
+              <span class="{{ a.avCls }}" style="--h:{{ a.hue }}">{{ a.ini }}</span>
+              <span class="qa-at"><b>{{ a.who }}</b> <sc-if value="{{ a.hasFor }}"><span>for {{ a.forWho }} </span></sc-if>{{ a.what }}</span>
+              <span class="qa-when">{{ a.when }}</span>
+            </li>
+          </sc-for>
+        </ol>
+      </div>
+      <div class="qa-composer"><div class="qa-cbox">Comments arrive in a later release.</div></div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light", "tsType": "\"light\" | \"dark\"" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const people = {
+      ana: { who: 'Ana Ruiz', ini: 'AR', hue: 25, agent: false },
+      tomas: { who: 'Tomás Berg', ini: 'TB', hue: 220, agent: false },
+      claude: { who: 'claude-dev', ini: 'C', hue: 0, agent: true },
+      codex: { who: 'codex-ci', ini: 'X', hue: 0, agent: true }
+    };
+    const st = { prog: 'qa-st qa-st-prog', review: 'qa-st qa-st-review', todo: 'qa-st qa-st-todo', backlog: 'qa-st qa-st-backlog', done: 'qa-st qa-st-done', cancel: 'qa-st qa-st-cancel' };
+    const task = (key, title, s, pri, who, upd) => {
+      const p = who ? people[who] : null;
+      return {
+        key, title, upd,
+        rowCls: key === 'PAY-142' ? 'qa-rowsel' : 'qa-row',
+        stCls: st[s],
+        priCls: 'qa-pri qa-p' + pri,
+        has: !!p,
+        who: p ? p.who : '',
+        ini: p ? p.ini : '',
+        hue: p ? p.hue : 0,
+        avCls: p && p.agent ? 'qa-av-a' : 'qa-av'
+      };
+    };
+    const groups = [
+      { name: 'In progress', stCls: st.prog, tasks: [
+        task('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 'prog', 3, 'claude', '3m'),
+        task('PAY-131', 'Add idempotency keys to the refund endpoint', 'prog', 4, 'codex', '12m'),
+        task('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'prog', 2, 'ana', '1h')
+      ]},
+      { name: 'In review', stCls: st.review, tasks: [
+        task('PAY-138', 'Webhook signature check accepts expired timestamps', 'review', 4, 'claude', '25m'),
+        task('PAY-135', 'Paginate the transactions CSV export', 'review', 2, 'tomas', '3h')
+      ]},
+      { name: 'Todo', stCls: st.todo, tasks: [
+        task('PAY-144', 'Show a test-mode banner on the billing settings page', 'todo', 1, null, '2h'),
+        task('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 'todo', 3, 'tomas', '5h'),
+        task('PAY-137', 'Document the nightly payout reconciliation job', 'todo', 0, 'claude', '1d'),
+        task('PAY-129', 'Remove legacy v0 checkout routes', 'todo', 2, null, '2d')
+      ]}
+    ].map((g) => ({ ...g, count: g.tasks.length }));
+    const closed = [
+      { name: 'Backlog', stCls: st.backlog, count: 18 },
+      { name: 'Done', stCls: st.done, count: 64 },
+      { name: 'Canceled', stCls: st.cancel, count: 3 }
+    ];
+    const projects = [
+      { key: 'PAY', name: 'Payments', open: 12, cls: 'qa-navi-on' },
+      { key: 'WEB', name: 'Web app', open: 27, cls: 'qa-navi' },
+      { key: 'CLI', name: 'pm CLI', open: 9, cls: 'qa-navi' },
+      { key: 'INF', name: 'Infra', open: 5, cls: 'qa-navi' }
+    ];
+    const checks = [
+      { label: 'Store attempt count and next_attempt_at on the delivery', done: true },
+      { label: 'Schedule retries as pg-boss jobs', done: true },
+      { label: 'Stop on 4xx, except 408 and 429', done: false },
+      { label: 'Show attempt history in the delivery log', done: false }
+    ].map((c) => ({ ...c, box: c.done ? 'qa-boxon' : 'qa-box', txt: c.done ? 'qa-lidone' : '' }));
+    const act = (pk, what, when, forWho) => {
+      const p = people[pk];
+      return { who: p.who, ini: p.ini, hue: p.hue, avCls: p.agent ? 'qa-av-a' : 'qa-av', what, when, hasFor: !!forWho, forWho: forWho || '' };
+    };
+    const activity = [
+      act('ana', 'created the task', 'Oct 20'),
+      act('ana', 'assigned it to claude-dev', 'Oct 20'),
+      act('claude', 'moved it from Todo to In progress', '40m', 'Ana Ruiz'),
+      act('claude', 'checked off 2 items in the description', '3m', 'Ana Ruiz')
+    ];
+    return { rootCls: 'qa-root qa-' + theme, groups, closed, projects, checks, activity };
+  }
+}
+</script>
+</body>
+</html>

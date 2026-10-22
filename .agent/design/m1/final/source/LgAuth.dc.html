@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<style>
+.au-wrap{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 520px}
+.au-side{background:var(--rail);color:var(--rail-fg);display:flex;flex-direction:column;justify-content:space-between;padding:40px 48px}
+.au-brand{display:flex;align-items:center;gap:12px;color:var(--rail-on);font-weight:600;font-size:15px}
+.au-mark{width:32px;height:32px;background:var(--accent);color:oklch(0.99 0 0);display:grid;place-items:center;font-weight:700;font-size:14px}
+.au-ledger{display:flex;flex-direction:column;gap:0;font-family:"Martian Mono",ui-monospace,monospace;font-size:11px;max-width:460px}
+.au-lrow{display:grid;grid-template-columns:72px minmax(0,1fr) 110px;gap:12px;padding:9px 0;border-top:1px solid oklch(1 0 0 / 0.1);white-space:nowrap}
+.au-lrow span{overflow:hidden;text-overflow:ellipsis}
+.au-lk{color:oklch(0.72 0.15 258)}
+.au-note{font-size:12px;line-height:1.5;max-width:420px}
+.au-main{display:flex;flex-direction:column;justify-content:center;padding:0 64px;gap:22px;background:var(--surface);border-left:1px solid var(--line)}
+.au-steps{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--faint)}
+.au-step{display:flex;align-items:center;gap:8px}
+.au-stepon{display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:600}
+.au-num{width:20px;height:20px;display:grid;place-items:center;border:1px solid var(--line);font-family:"Martian Mono",ui-monospace,monospace;font-size:10px}
+.au-numon{width:20px;height:20px;display:grid;place-items:center;background:var(--fg);color:var(--bg);font-family:"Martian Mono",ui-monospace,monospace;font-size:10px}
+.au-numdone{width:20px;height:20px;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);font-family:"Martian Mono",ui-monospace,monospace;font-size:10px}
+.au-dash{width:28px;height:1px;background:var(--line)}
+.au-form{display:flex;flex-direction:column;gap:14px}
+.au-or{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:11.5px}
+.au-orl{flex:1;height:1px;background:var(--line)}
+.au-row{display:flex;gap:10px}
+.au-foot{font-size:12px;color:var(--muted);border-top:1px solid var(--line-2);padding-top:16px;line-height:1.5}
+.au-ssoicon{width:14px;height:14px;border:1.5px solid var(--fg);box-sizing:border-box}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="au-wrap">
+    <aside class="au-side">
+      <div class="au-brand"><span class="au-mark">R</span><span>Reddevs</span></div>
+      <div class="au-ledger">
+        <sc-for list="{{ ledger }}" as="l" hint-placeholder-count="5">
+          <div class="au-lrow"><span class="au-lk">{{ l.key }}</span><span>{{ l.title }}</span><span>{{ l.who }}</span></div>
+        </sc-for>
+      </div>
+      <p class="au-note">Self-hosted project management. People and agents share one task list, and every change shows who made it.</p>
+    </aside>
+    <main class="au-main">
+      <sc-if value="{{ isSignin }}" hint-placeholder-val="{{ true }}">
+        <div><h1 class="lg-h1">Sign in to Reddevs</h1><div class="lg-sub">Use the account your admin created for you.</div></div>
+        <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
+          <div class="lg-banner"><span class="lg-bannerx"></span><span>Wrong email or password. Check both and try again.</span></div>
+        </sc-if>
+        <div class="au-form">
+          <sc-if value="{{ hasSso }}" hint-placeholder-val="{{ false }}">
+            <button class="lg-btn2 lg-btnw"><span class="au-ssoicon"></span>Continue with SSO</button>
+            <div class="au-or"><span class="au-orl"></span><span>or with email</span><span class="au-orl"></span></div>
+          </sc-if>
+          <div class="lg-field"><span class="lg-label">Email</span><div class="lg-input">ana@reddevs.io</div></div>
+          <div class="lg-field"><span class="lg-label">Password</span><div class="{{ pwCls }}"><span>••••••••••••</span></div></div>
+          <button class="lg-btna lg-btnw">Sign in</button>
+        </div>
+        <div class="au-foot">Agents and scripts sign in with an API key instead:<div class="lg-code" style="margin-top:8px">pm login --key &lt;key&gt;</div></div>
+      </sc-if>
+      <sc-if value="{{ isSetup1 }}" hint-placeholder-val="{{ false }}">
+        <div class="au-steps"><span class="au-stepon"><span class="au-numon">1</span>Admin account</span><span class="au-dash"></span><span class="au-step"><span class="au-num">2</span>Workspace</span></div>
+        <div><h1 class="lg-h1">Set up this server</h1><div class="lg-sub">You're the first person here, so this account becomes the admin.</div></div>
+        <div class="au-form">
+          <div class="lg-field"><span class="lg-label">Your name</span><div class="lg-input">Ana Ruiz</div></div>
+          <div class="lg-field"><span class="lg-label">Email</span><div class="lg-input">ana@reddevs.io</div></div>
+          <div class="lg-field"><span class="lg-label">Password</span><div class="lg-inputf"><span>••••••••</span><span class="lg-caret"></span></div><span class="lg-hint">12 characters or more. 4 to go.</span></div>
+          <button class="lg-btna lg-btnw">Continue</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isSetup2 }}" hint-placeholder-val="{{ false }}">
+        <div class="au-steps"><span class="au-step"><span class="au-numdone">1</span>Admin account</span><span class="au-dash"></span><span class="au-stepon"><span class="au-numon">2</span>Workspace</span></div>
+        <div><h1 class="lg-h1">Name your workspace</h1><div class="lg-sub">A workspace holds your projects, people and agents. You can add more later.</div></div>
+        <div class="au-form">
+          <div class="lg-field"><span class="lg-label">Workspace name</span><div class="lg-inputf"><span>Reddevs</span><span class="lg-caret"></span></div><span class="lg-hint">Usually your team or company name.</span></div>
+          <div class="au-row"><button class="lg-btn2">Back</button><button class="lg-btna" style="flex:1">Create workspace</button></div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "mode": { "editor": "enum", "options": ["signin", "sso-error", "setup-1", "setup-2"], "default": "signin" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const mode = this.props.mode ?? 'signin';
+    const signin = mode === 'signin' || mode === 'sso-error';
+    const ledger = [
+      { key: 'PAY-142', title: 'Retry failed webhook deliveries', who: 'claude-dev' },
+      { key: 'PAY-138', title: 'Signature check accepts expired timestamps', who: 'claude-dev' },
+      { key: 'WEB-311', title: 'Move settings to the new layout', who: 'Tomás Berg' },
+      { key: 'CLI-58', title: 'Add --json to pm tasks list', who: 'codex-ci' },
+      { key: 'INF-19', title: 'Nightly Postgres backup check', who: 'Ana Ruiz' }
+    ];
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: { signin: 'Sign in', 'sso-error': 'Sign in · SSO and error', 'setup-1': 'First run · account', 'setup-2': 'First run · workspace' }[mode],
+      isSignin: signin,
+      hasSso: mode === 'sso-error',
+      hasError: mode === 'sso-error',
+      pwCls: mode === 'sso-error' ? 'lg-inpute' : 'lg-input',
+      isSetup1: mode === 'setup-1',
+      isSetup2: mode === 'setup-2',
+      ledger
+    };
+  }
+}
+</script>
+</body>
+</html>
