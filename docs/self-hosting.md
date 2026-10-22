@@ -1,0 +1,139 @@
+# Self-hosting
+
+project-management runs as one Docker image with three roles, started by `docker-compose.yml`:
+
+| Service   | What it does                                                                |
+| --------- | --------------------------------------------------------------------------- |
+| `db`      | Postgres 18. The only service that keeps state, in the `pgdata` volume.     |
+| `migrate` | Applies database migrations, then exits. Runs on every `docker compose up`. |
+| `web`     | The web app, the REST API (`/api/v1`) and sign-in. Listens on port 3000.    |
+| `worker`  | Background jobs (pg-boss), such as expiring old invitations once a day.     |
+
+`web` and `worker` start only after `migrate` has finished without errors.
+
+## Requirements
+
+- Docker Engine with the Compose plugin (`docker compose version` prints v2 or later).
+- Git, to get the source. There is no published image yet: compose builds it from the checkout.
+- About 1.5 GB of disk for the image and its build cache, plus room for your data.
+- A free TCP port for the web app (3000 unless you change `PORT`).
+
+## Configure
+
+```sh
+git clone https://gitlab.com/reddevsdotio/tooling/project-management.git
+cd project-management
+cp .env.example .env
+```
+
+Edit `.env`:
+
+| Variable             | Required | Default                    | Meaning                                                                                                |
+| -------------------- | -------- | -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `BETTER_AUTH_SECRET` | yes      | none                       | Signs sessions. 32 characters or more: `openssl rand -base64 32`. Compose refuses to start without it. |
+| `BETTER_AUTH_URL`    | no       | `http://localhost:3000`    | The URL people type in their browser. Sign-in fails when it does not match.                            |
+| `PUBLIC_URL`         | no       | `http://localhost:3000`    | Base URL for invitation links. Use the same value as `BETTER_AUTH_URL`.                                |
+| `PORT`               | no       | `3000`                     | Host port the web app is published on.                                                                 |
+| `POSTGRES_USER`      | no       | `postgres`                 | Database user.                                                                                         |
+| `POSTGRES_PASSWORD`  | no       | `postgres`                 | Database password. Set it before the first start: Postgres only reads it when it creates the volume.   |
+| `POSTGRES_DB`        | no       | `project_management`       | Database name.                                                                                         |
+| `PM_IMAGE`           | no       | `project-management:local` | Tag of the image compose builds and runs.                                                              |
+
+`DATABASE_URL` and `TEST_DATABASE_URL` in `.env` are for local development. Compose ignores them: the
+containers reach Postgres as `db` on their own network.
+
+If you change `PORT`, change the port in `BETTER_AUTH_URL` and `PUBLIC_URL` too.
+
+## Start
+
+```sh
+docker compose up -d --build
+docker compose ps
+curl http://localhost:3000/api/healthz
+```
+
+The first build takes a few minutes. `/api/healthz` answers `{"status":"ok"}` once the web app can reach
+Postgres. `docker compose ps` lists `migrate` as exited (code 0); that is expected.
+
+Logs: `docker compose logs -f web worker`.
+
+## First run
+
+Open `BETTER_AUTH_URL` in a browser. A new server sends you to the setup page:
+1. Create the admin account: your name, email and a password of 12 characters or more.
+2. Name the workspace, usually your team or company.
+
+You land on the projects page, signed in. Setup runs once; afterwards `/setup` sends visitors to sign in.
+
+Nobody can sign up on their own. To add people, go to Settings > Members > Invite person, pick a role and copy
+the invitation link. No email is sent: share the link yourself. It works once and expires after a week.
+
+To add an AI agent, see [agents.md](agents.md).
+
+## Ports
+
+| Port | Service | Published                                                                |
+| ---- | ------- | ------------------------------------------------------------------------ |
+| 3000 | `web`   | Yes, on the host port in `PORT`.                                         |
+| 5432 | `db`    | No. Only `migrate`, `web` and `worker` reach it, on the compose network. |
+
+The worker listens on no port. Because Postgres is not published, this stack can run next to another Postgres
+on the same machine.
+
+For HTTPS, put a reverse proxy (Caddy, nginx, Traefik) in front of port 3000 and set `BETTER_AUTH_URL` and
+`PUBLIC_URL` to the public `https://` URL. Then `docker compose up -d` to apply the change.
+
+## Backups
+
+All state lives in Postgres. Dump it with `pg_dump` from the `db` container:
+
+```sh
+mkdir -p ~/pm-backups
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/pm-backups/pm-$(date +%F).dump
+```
+
+This works while the app runs. Keep the dumps outside the checkout (anything in it ends up in the image build
+context) and copy them to another machine.
+
+To restore, stop the app, recreate the database, load the dump and start again:
+
+```sh
+docker compose stop web worker
+docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" --force "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner' < ~/pm-backups/pm-2026-10-22.dump
+docker compose up -d
+```
+
+Recreate the database rather than restoring with `pg_restore --clean`: the job queue uses partitioned tables,
+and `--clean` fails on them.
+
+To restore on a new machine, configure `.env` as above, start only the database (`docker compose up -d db`),
+run the two `docker compose exec` lines, then `docker compose up -d --build`.
+
+## Upgrades
+
+```sh
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/pm-backups/pm-before-upgrade.dump
+git pull
+docker compose up -d --build
+```
+
+Compose rebuilds the image, runs `migrate` against the existing database, then restarts `web` and `worker`.
+If a migration fails, `web` and `worker` do not start: `docker compose logs migrate` shows why.
+
+## The CLI in the image
+
+The image ships the `pm` CLI. It is handy for checking a key from the server:
+
+```sh
+docker compose exec -e PM_KEY=pm_live_... web pm whoami
+```
+
+Agents normally run `pm` on their own machine. See [agents.md](agents.md).
+
+## Stop or remove
+
+```sh
+docker compose down        # stops the stack, keeps the data volume
+docker compose down -v     # also deletes the data volume: everything is gone
+```
