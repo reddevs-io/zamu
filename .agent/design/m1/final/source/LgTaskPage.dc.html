@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<style>
+.tp-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.tp-crumbs{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.tp-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px}
+.tp-doc{padding:28px 48px 0 48px;display:flex;flex-direction:column;gap:20px;overflow:hidden;min-width:0}
+.tp-title{margin:0;font-size:26px;line-height:1.25;font-weight:600;letter-spacing:-0.02em;text-wrap:pretty;max-width:760px}
+.tp-desc{display:flex;flex-direction:column;gap:10px;line-height:1.6;font-size:14px;max-width:720px}
+.tp-desc p{margin:0;text-wrap:pretty}
+.tp-table{border:1px solid var(--line);font-family:"Martian Mono",ui-monospace,monospace;font-size:11px;max-width:520px}
+.tp-tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--line-2)}
+.tp-tr:last-child{border-bottom:0}
+.tp-tr span{padding:6px 10px;border-right:1px solid var(--line-2)}
+.tp-tr span:last-child{border-right:0}
+.tp-th{background:var(--band);color:var(--muted)}
+.tp-side{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tp-prop{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:10px;min-height:44px;padding:0 20px;border-bottom:1px solid var(--line-2)}
+.tp-pv{display:flex;align-items:center;gap:7px;min-width:0;font-weight:500}
+.tp-pv2{display:flex;flex-direction:column;gap:2px;min-width:0;font-weight:500}
+.tp-act{padding:16px 20px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.tp-ai{display:grid;grid-template-columns:18px minmax(0,1fr);gap:10px;font-size:12.5px;color:var(--muted);line-height:1.45}
+.tp-ai b{color:var(--fg);font-weight:600}
+.tp-when{font-family:"Martian Mono",ui-monospace,monospace;font-size:10px;color:var(--faint);display:block;margin-top:1px}
+.tp-comment{margin:4px 48px 20px;height:40px;border:1px dashed var(--line);display:flex;align-items:center;padding:0 12px;color:var(--faint);max-width:720px;box-sizing:border-box}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="Task page · PAY-140">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">12</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="tp-main">
+      <header class="lg-head">
+        <div class="tp-crumbs"><a href="#">Payments</a><span>/</span><span class="lg-mono" style="color:var(--fg)">PAY-140</span></div>
+        <div class="lg-headr"><button class="lg-btn2">Copy link</button><button class="lg-btn2">Back to list<span class="lg-kbd">Esc</span></button></div>
+      </header>
+      <div class="tp-body">
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <article class="tp-doc">
+            <h1 class="tp-title">Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency</h1>
+            <div class="tp-desc">
+              <p>Refunding 4 of 6 line items on a EUR invoice billed to a USD account leaves a 1 cent difference. We round each line after conversion instead of converting the refund total once.</p>
+              <div class="tp-table">
+                <div class="tp-tr tp-th"><span>Line items</span><span>Expected</span><span>Refunded</span></div>
+                <div class="tp-tr"><span>3</span><span>$41.07</span><span>$41.07</span></div>
+                <div class="tp-tr"><span>4</span><span>$54.76</span><span>$54.75</span></div>
+              </div>
+              <p>Convert once at the end, and add a property test that refunds random subsets of line items across currency pairs.</p>
+            </div>
+          </article>
+          <span class="lg-sp"></span>
+          <div class="tp-comment">Comments arrive in a later release.</div>
+        </div>
+        <aside class="tp-side">
+          <div class="tp-prop"><span class="lg-cap">Status</span><span class="tp-pv"><span class="lg-sq lg-s-todo"></span>Todo</span></div>
+          <div class="tp-prop"><span class="lg-cap">Priority</span><span class="tp-pv"><span class="lg-pri">■■■</span>High</span></div>
+          <div class="tp-prop"><span class="lg-cap">Assignee</span><span class="tp-pv"><span class="lg-av" style="--h:220">TB</span>Tomás Berg</span></div>
+          <div class="tp-prop"><span class="lg-cap">Created</span><span class="tp-pv2"><span>codex-ci</span><span class="lg-for">for Tomás Berg · Oct 21, 16:02</span></span></div>
+          <div class="tp-prop"><span class="lg-cap">Updated</span><span class="tp-pv">5h ago</span></div>
+          <div class="lg-cap" style="padding:18px 20px 0">Activity</div>
+          <div class="tp-act">
+            <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+              <div class="tp-ai"><span class="{{ a.avCls }}" style="--h:{{ a.hue }}">{{ a.ini }}</span><span><b>{{ a.who }}</b>{{ a.forTxt }} {{ a.what }}<span class="tp-when">{{ a.when }}</span></span></div>
+            </sc-for>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const P = {
+      tomas: { who: 'Tomás Berg', ini: 'TB', hue: 220, avCls: 'lg-av' },
+      codex: { who: 'codex-ci', ini: 'X', hue: 0, avCls: 'lg-ag' },
+      ana: { who: 'Ana Ruiz', ini: 'AR', hue: 25, avCls: 'lg-av' }
+    };
+    const a = (k, what, when, forWho) => ({ ...P[k], what, when, forTxt: forWho ? ' for ' + forWho : '' });
+    const activity = [
+      a('codex', 'created the task from a failing test in CI', 'Oct 21, 16:02', 'Tomás Berg'),
+      a('codex', 'set priority to High', 'Oct 21, 16:02', 'Tomás Berg'),
+      a('ana', 'assigned it to Tomás Berg', 'Oct 22, 09:40'),
+      a('tomas', 'edited the description', '5h ago')
+    ];
+    return { rootCls: 'lg-root lg-' + theme, activity };
+  }
+}
+</script>
+</body>
+</html>

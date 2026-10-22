@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<style>
+.tk-grid{display:grid;grid-template-columns:600px minmax(0,1fr);min-width:0;min-height:0}
+.tk-list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
+.tk-cols{grid-template-columns:72px minmax(0,1fr) 34px 112px 34px}
+.tk-row{height:34px;display:grid;grid-template-columns:72px minmax(0,1fr) 34px 112px 34px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.tk-rowsel{height:34px;display:grid;grid-template-columns:72px minmax(0,1fr) 34px 112px 34px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);background:var(--sel)}
+.tk-body{flex:1;min-height:0;overflow:hidden}
+.tk-detail{display:flex;flex-direction:column;min-width:0;min-height:0}
+.tk-dbody{flex:1;min-height:0;overflow:hidden;padding:22px 28px 0;display:flex;flex-direction:column;gap:18px}
+.tk-props{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line)}
+.tk-cell{padding:8px 10px 9px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.tk-cell:last-child{border-right:0}
+.tk-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500}
+.tk-desc{display:flex;flex-direction:column;gap:8px;line-height:1.55;font-size:13.5px}
+.tk-desc p{margin:0;text-wrap:pretty}
+.tk-chk{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.tk-li{display:flex;gap:10px;align-items:baseline}
+.tk-box{width:10px;height:10px;flex:none;border:1.5px solid var(--muted);box-sizing:border-box}
+.tk-boxon{width:10px;height:10px;flex:none;background:var(--fg)}
+.tk-struck{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.tk-sec{padding-top:14px;border-top:1px solid var(--line)}
+.tk-tl{list-style:none;margin:0 0 0 4px;padding:0 0 0 14px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+.tk-tli{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;font-size:12.5px;color:var(--muted)}
+.tk-tli b{color:var(--fg);font-weight:600}
+.tk-node{position:absolute;left:-19px;top:5px;width:9px;height:9px;background:var(--bg);border:1.5px solid var(--muted);box-sizing:border-box;border-radius:50%}
+.tk-nodea{position:absolute;left:-19px;top:5px;width:9px;height:9px;background:var(--accent)}
+.tk-comment{flex:none;margin:12px 28px 18px;height:38px;border:1px dashed var(--line);display:flex;align-items:center;padding:0 12px;color:var(--faint)}
+.tk-none{flex:1;display:grid;place-items:center;color:var(--faint)}
+.tk-emptywrap{padding:48px 24px;display:flex}
+.tk-skrow{height:34px;display:grid;grid-template-columns:72px minmax(0,1fr) 34px 112px 34px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.tk-skd{padding:26px 28px;display:flex;flex-direction:column;gap:14px}
+.tk-err{padding:16px 24px}
+.tk-ct{font-size:18px;font-weight:600;display:flex;align-items:center;gap:2px}
+.tk-chips{display:flex;gap:6px;flex-wrap:wrap}
+.tk-chip{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border:1px solid var(--line);font-size:12.5px;color:var(--fg);background:var(--surface)}
+.tk-chipk{color:var(--faint)}
+.tk-area{min-height:84px;border:1px solid var(--line);padding:10px 12px;color:var(--faint);box-sizing:border-box}
+.tk-more{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <sc-for list="{{ railProjects }}" as="p" hint-placeholder-count="4">
+        <a class="{{ p.cls }}" href="#"><span>{{ p.key }}</span><span class="lg-rn">{{ p.open }}</span></a>
+      </sc-for>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <div class="tk-grid">
+      <section class="tk-list">
+        <header class="lg-head">
+          <div style="min-width:0"><h1 class="lg-h1">{{ projName }}</h1><div class="lg-sub"><span class="lg-mono">{{ projKey }}</span> · {{ projSub }}</div></div>
+          <div class="lg-headr">
+            <div class="lg-search" style="width:140px"><span>Search</span><span class="lg-kbd">/</span></div>
+            <button class="lg-btn">New<span class="lg-btnk">C</span></button>
+          </div>
+        </header>
+        <div class="lg-bar"><span>Status <span class="lg-bv">Any</span></span><span>Priority <span class="lg-bv">Any</span></span><span>Assignee <span class="lg-bv">Any</span></span></div>
+        <div class="lg-th tk-cols"><span>Key</span><span>Title</span><span>Pri</span><span>Assignee</span><span class="lg-right">Upd</span></div>
+        <div class="tk-body">
+          <sc-if value="{{ showRows }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+              <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+              <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+                <div class="{{ t.rowCls }}">
+                  <span class="lg-key">{{ t.key }}</span>
+                  <span class="lg-trunc">{{ t.title }}</span>
+                  <span class="{{ t.priCls }}">{{ t.pri }}</span>
+                  <span class="lg-who"><sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span><span class="lg-trunc">{{ t.who }}</span></sc-if></span>
+                  <span class="lg-upd">{{ t.upd }}</span>
+                </div>
+              </sc-for>
+            </sc-for>
+            <sc-for list="{{ closed }}" as="g" hint-placeholder-count="3">
+              <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ skeleton }}" as="k" hint-placeholder-count="10">
+              <div class="tk-skrow"><span class="lg-skel" style="width:48px"></span><span class="lg-skel" style="width:{{ k.w }}%"></span><span class="lg-skel" style="width:20px"></span><span class="lg-skel" style="width:70px"></span><span class="lg-skel" style="width:24px"></span></div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+            <div class="tk-err">
+              <div class="lg-banner"><span class="lg-bannerx"></span><span style="flex:1">Couldn't load tasks. The server took too long to answer.</span><button class="lg-btn2" style="height:28px">Retry</button></div>
+              <p class="lg-hint" style="margin:10px 0 0">Your filters are kept. If this keeps happening, an admin can check the server logs for request <span class="lg-codei">req_8f2c41</span>.</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+            <div class="tk-emptywrap">
+              <div class="lg-empty">
+                <h2 class="lg-h2">No tasks yet</h2>
+                <p class="lg-muted" style="margin:0;line-height:1.55">Create the first one here, or have an agent create it from the CLI.</p>
+                <button class="lg-btn">New task<span class="lg-btnk">C</span></button>
+                <div style="display:flex;flex-direction:column;gap:6px;width:100%"><span class="lg-cap">From the CLI</span><div class="lg-code">pm tasks create --project BIL "Match Stripe payouts to invoices"</div></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </section>
+      <section class="tk-detail" data-screen-label="Task detail">
+        <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ true }}">
+          <header class="lg-head"><span class="lg-mono">PAY-142</span><span class="lg-sp"></span><a class="lg-muted" href="#">Open as page</a><span class="lg-kbd">Esc</span></header>
+          <div class="tk-dbody">
+            <h2 class="lg-h2">Retry failed webhook deliveries with exponential backoff</h2>
+            <div class="tk-props">
+              <div class="tk-cell"><span class="lg-cap">Status</span><span class="tk-cv"><span class="lg-sq lg-s-prog"></span>In progress</span></div>
+              <div class="tk-cell"><span class="lg-cap">Priority</span><span class="tk-cv"><span class="lg-pri">■■■</span>High</span></div>
+              <div class="tk-cell"><span class="lg-cap">Assignee</span><span class="tk-cv"><span class="lg-ag">C</span>claude-dev</span><span class="lg-for">for Ana Ruiz</span></div>
+              <div class="tk-cell"><span class="lg-cap">Created</span><span class="tk-cv">Ana Ruiz</span><span class="lg-for">Oct 20</span></div>
+            </div>
+            <div class="tk-desc">
+              <p>Deliveries that fail with a 5xx or time out are dropped today. Retry them with exponential backoff, capped at 6 attempts over about 24 hours.</p>
+              <ul class="tk-chk">
+                <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+                  <li class="tk-li"><span class="{{ c.box }}"></span><span class="{{ c.txt }}">{{ c.label }}</span></li>
+                </sc-for>
+              </ul>
+              <p>Backoff is <span class="lg-codei">30s × 2^n</span> with jitter.</p>
+            </div>
+            <div class="lg-cap tk-sec">Activity</div>
+            <ol class="tk-tl">
+              <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+                <li class="tk-tli"><span class="{{ a.node }}"></span><span><b>{{ a.who }}</b>{{ a.forTxt }} {{ a.what }}</span><span class="lg-upd">{{ a.when }}</span></li>
+              </sc-for>
+            </ol>
+          </div>
+          <div class="tk-comment">Comments arrive in a later release.</div>
+        </sc-if>
+        <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+          <header class="lg-head"><span class="lg-skel" style="width:70px"></span></header>
+          <div class="tk-skd"><span class="lg-skel" style="width:80%;height:14px"></span><span class="lg-skel" style="width:55%;height:14px"></span><span class="lg-skel" style="width:100%;height:44px;margin-top:8px"></span><span class="lg-skel" style="width:90%"></span><span class="lg-skel" style="width:96%"></span><span class="lg-skel" style="width:70%"></span></div>
+        </sc-if>
+        <sc-if value="{{ noDetail }}" hint-placeholder-val="{{ false }}">
+          <div class="tk-none">{{ noDetailText }}</div>
+        </sc-if>
+      </section>
+    </div>
+  </div>
+  <sc-if value="{{ isCreate }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:110px;width:640px" data-screen-label="Quick create task">
+      <div class="lg-dh"><span class="tk-chip" style="height:26px"><span class="lg-mono" style="font-size:10px">PAY</span>Payments</span><span class="lg-faint">New task</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db">
+        <div class="tk-ct"><span>Record retry attempts in the delivery log</span><span class="lg-caret" style="margin-left:2px;height:22px"></span></div>
+        <div class="tk-area">Add a description. Markdown works.</div>
+        <div class="tk-chips">
+          <span class="tk-chip"><span class="lg-sq lg-s-todo"></span>Todo</span>
+          <span class="tk-chip"><span class="lg-pri">■■</span>Medium</span>
+          <span class="tk-chip"><span class="lg-ag">C</span>claude-dev</span>
+          <span class="tk-chip"><span class="tk-chipk">Assign to me</span><span class="lg-kbd">I</span></span>
+        </div>
+      </div>
+      <div class="lg-df"><span class="tk-more"><span class="lg-toggleon"></span>Create more</span><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">Create task<span class="lg-btnk">⌘↵</span></button></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["panel", "empty", "loading", "error", "create"], "default": "panel" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'panel';
+    const people = {
+      ana: { who: 'Ana Ruiz', ini: 'AR', hue: 25, agent: false },
+      tomas: { who: 'Tomás Berg', ini: 'TB', hue: 220, agent: false },
+      claude: { who: 'claude-dev', ini: 'C', hue: 0, agent: true },
+      codex: { who: 'codex-ci', ini: 'X', hue: 0, agent: true }
+    };
+    const SQ = { prog: 'lg-sq lg-s-prog', review: 'lg-sq lg-s-review', todo: 'lg-sq lg-s-todo', backlog: 'lg-sq lg-s-backlog', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel' };
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const task = (key, title, pri, who, upd) => {
+      const p = who ? people[who] : null;
+      return {
+        key, title, upd,
+        rowCls: key === 'PAY-142' && state === 'panel' ? 'tk-rowsel' : 'tk-row',
+        pri: PRI[pri][0], priCls: PRI[pri][1],
+        has: !!p, who: p ? p.who : '', ini: p ? p.ini : '', hue: p ? p.hue : 0,
+        avCls: p && p.agent ? 'lg-ag' : 'lg-av'
+      };
+    };
+    const groups = [
+      { name: 'In progress', sq: SQ.prog, tasks: [
+        task('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 3, 'claude', '3m'),
+        task('PAY-131', 'Add idempotency keys to the refund endpoint', 4, 'codex', '12m'),
+        task('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 2, 'ana', '1h')
+      ]},
+      { name: 'In review', sq: SQ.review, tasks: [
+        task('PAY-138', 'Webhook signature check accepts expired timestamps', 4, 'claude', '25m'),
+        task('PAY-135', 'Paginate the transactions CSV export', 2, 'tomas', '3h')
+      ]},
+      { name: 'Todo', sq: SQ.todo, tasks: [
+        task('PAY-144', 'Show a test-mode banner on the billing settings page', 1, null, '2h'),
+        task('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 3, 'tomas', '5h'),
+        task('PAY-137', 'Document the nightly payout reconciliation job', 0, 'claude', '1d'),
+        task('PAY-129', 'Remove legacy v0 checkout routes', 2, null, '2d')
+      ]}
+    ].map((g) => ({ ...g, count: g.tasks.length }));
+    const closed = [
+      { name: 'Backlog', sq: SQ.backlog, count: 3 },
+      { name: 'Done', sq: SQ.done, count: 64 },
+      { name: 'Canceled', sq: SQ.cancel, count: 3 }
+    ];
+    const empty = state === 'empty';
+    const railProjects = [
+      { key: 'PAY', open: 12, cls: empty ? 'lg-rk' : 'lg-rkon' },
+      { key: 'WEB', open: 27, cls: 'lg-rk' },
+      { key: 'CLI', open: 9, cls: 'lg-rk' },
+      { key: 'INF', open: 5, cls: 'lg-rk' }
+    ].concat(empty ? [{ key: 'BIL', open: 0, cls: 'lg-rkon' }] : []);
+    const checks = [
+      { label: 'Store attempt count and next_attempt_at on the delivery', done: true },
+      { label: 'Schedule retries as pg-boss jobs', done: true },
+      { label: 'Stop on 4xx, except 408 and 429', done: false },
+      { label: 'Show attempt history in the delivery log', done: false }
+    ].map((c) => ({ ...c, box: c.done ? 'tk-boxon' : 'tk-box', txt: c.done ? 'tk-struck' : '' }));
+    const act = (pk, what, when, forWho) => ({ who: people[pk].who, node: people[pk].agent ? 'tk-nodea' : 'tk-node', what, when, forTxt: forWho ? ' for ' + forWho : '' });
+    const activity = [
+      act('ana', 'created the task', 'Oct 20'),
+      act('ana', 'assigned it to claude-dev', 'Oct 20'),
+      act('claude', 'moved it from Todo to In progress', '40m', 'Ana Ruiz'),
+      act('claude', 'checked off 2 items', '3m', 'Ana Ruiz')
+    ];
+    const skeleton = [62, 80, 54, 71, 88, 47, 66, 75, 58, 83].map((w) => ({ w }));
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: { panel: 'Task list · detail open', empty: 'Task list · empty project', loading: 'Task list · loading', error: 'Task list · error', create: 'Quick create task' }[state],
+      projName: empty ? 'Billing reconciliation' : 'Payments',
+      projKey: empty ? 'BIL' : 'PAY',
+      projSub: empty ? 'no tasks yet' : '12 open · grouped by status',
+      showRows: state === 'panel' || state === 'create',
+      isLoading: state === 'loading',
+      isError: state === 'error',
+      isEmpty: empty,
+      isCreate: state === 'create',
+      showDetail: state === 'panel' || state === 'create',
+      noDetail: empty || state === 'error',
+      noDetailText: empty ? 'Tasks you select show here.' : 'Nothing selected',
+      groups, closed, railProjects, checks, activity, skeleton
+    };
+  }
+}
+</script>
+</body>
+</html>

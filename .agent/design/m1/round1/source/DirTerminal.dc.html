@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=IBM+Plex+Sans:wght@400;500&amp;display=swap" />
+<style>
+body{margin:0}
+.tb-root{width:1280px;height:800px;position:relative;overflow:hidden;display:grid;grid-template-columns:210px minmax(0,1fr);grid-template-rows:minmax(0,1fr) 26px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.5;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-align:left;font-variant-ligatures:none}
+.tb-dark{--bg:oklch(0.165 0.006 250);--side:oklch(0.145 0.006 250);--panel:oklch(0.185 0.007 250);--line:oklch(0.3 0.008 250);--line2:oklch(0.24 0.007 250);--fg:oklch(0.91 0.008 250);--muted:oklch(0.7 0.012 250);--faint:oklch(0.54 0.012 250);--accent:oklch(0.84 0.17 150);--accent-dim:oklch(0.7 0.12 150);--sel:oklch(0.25 0.035 150);--review:oklch(0.8 0.1 240);--urgent:oklch(0.74 0.17 30);--high:oklch(0.86 0.13 85)}
+.tb-light{--bg:oklch(0.976 0.006 100);--side:oklch(0.955 0.007 100);--panel:oklch(0.985 0.005 100);--line:oklch(0.85 0.01 100);--line2:oklch(0.91 0.008 100);--fg:oklch(0.22 0.012 250);--muted:oklch(0.45 0.014 250);--faint:oklch(0.6 0.012 250);--accent:oklch(0.5 0.14 150);--accent-dim:oklch(0.52 0.11 150);--sel:oklch(0.93 0.045 150);--review:oklch(0.48 0.13 250);--urgent:oklch(0.52 0.19 30);--high:oklch(0.52 0.12 70)}
+.tb-root a{color:inherit;text-decoration:none}
+.tb-root a:hover{color:var(--accent)}
+.tb-side{grid-row:1;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:12px 0;min-height:0}
+.tb-ws{padding:0 14px 10px;display:flex;gap:8px;align-items:baseline;border-bottom:1px dashed var(--line);margin-bottom:10px}
+.tb-wsname{font-weight:700}
+.tb-dim{color:var(--faint)}
+.tb-mut{color:var(--muted)}
+.tb-acc{color:var(--accent)}
+.tb-item{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:4px;padding:0 14px 0 10px;height:24px;align-items:center;color:var(--muted)}
+.tb-itemon{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:4px;padding:0 14px 0 10px;height:24px;align-items:center;color:var(--fg);background:var(--sel)}
+.tb-head{padding:12px 14px 4px;color:var(--faint)}
+.tb-pk{color:var(--faint)}
+.tb-sidefoot{margin-top:auto;border-top:1px dashed var(--line);padding-top:8px}
+.tb-main{grid-row:1;position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.tb-cmd{height:40px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)}
+.tb-caret{display:inline-block;width:7px;height:15px;background:var(--accent);vertical-align:-3px;margin-left:2px}
+.tb-keys{margin-left:auto;display:flex;gap:14px;color:var(--muted)}
+.tb-k{color:var(--fg);border:1px solid var(--line);padding:0 5px;margin-right:6px}
+.tb-filter{height:32px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid var(--line2);color:var(--muted)}
+.tb-tok{border-bottom:1px dotted var(--faint)}
+.tb-tok b{font-weight:400;color:var(--fg)}
+.tb-list{flex:1;min-height:0;overflow:hidden;padding:6px 0}
+.tb-g{display:flex;align-items:center;gap:8px;height:30px;padding:0 16px;color:var(--muted);font-weight:500;letter-spacing:0.04em}
+.tb-gfill{flex:1;border-top:1px dashed var(--line);margin-left:4px}
+.tb-row{display:grid;grid-template-columns:12px 64px 28px 24px minmax(0,1fr) 150px 36px;gap:10px;height:28px;align-items:center;padding:0 16px}
+.tb-rowsel{display:grid;grid-template-columns:12px 64px 28px 24px minmax(0,1fr) 150px 36px;gap:10px;height:28px;align-items:center;padding:0 16px;background:var(--sel)}
+.tb-cur{color:var(--accent);font-weight:700}
+.tb-key{color:var(--muted)}
+.tb-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.tb-ag{color:var(--accent-dim)}
+.tb-upd{color:var(--faint);text-align:right}
+.tb-s-prog{color:var(--accent)}
+.tb-s-review{color:var(--review)}
+.tb-s-todo{color:var(--muted)}
+.tb-s-backlog{color:var(--faint)}
+.tb-s-done{color:var(--accent-dim)}
+.tb-s-cancel{color:var(--faint)}
+.tb-p0{color:var(--urgent);font-weight:700}
+.tb-p1{color:var(--high)}
+.tb-p2{color:var(--muted)}
+.tb-p3{color:var(--faint)}
+.tb-pn{color:var(--faint)}
+.tb-panel{position:absolute;top:40px;right:0;bottom:0;width:492px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tb-ph{height:32px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line2)}
+.tb-pbody{flex:1;min-height:0;overflow:hidden;padding:16px 20px 0;display:flex;flex-direction:column;gap:16px}
+.tb-ptitle{margin:0;font-size:16px;line-height:1.4;font-weight:700;text-wrap:pretty}
+.tb-props{display:grid;grid-template-columns:76px minmax(0,1fr);row-gap:2px;margin:0}
+.tb-props dt{color:var(--faint)}
+.tb-props dd{margin:0}
+.tb-sec{display:flex;align-items:center;gap:8px;color:var(--faint)}
+.tb-desc{font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:13.5px;line-height:1.55;display:flex;flex-direction:column;gap:8px}
+.tb-desc p{margin:0;text-wrap:pretty}
+.tb-desc code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;color:var(--accent)}
+.tb-cl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.tb-cli{display:grid;grid-template-columns:30px minmax(0,1fr);align-items:baseline}
+.tb-box{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;color:var(--muted)}
+.tb-boxon{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;color:var(--accent)}
+.tb-done{color:var(--muted)}
+.tb-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:12px}
+.tb-logi{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px}
+.tb-prompt{flex:none;margin:12px 16px 14px;height:34px;border:1px dashed var(--line);display:flex;align-items:center;gap:8px;padding:0 10px;color:var(--faint)}
+.tb-status{grid-column:1 / -1;grid-row:2;display:flex;align-items:center;gap:18px;padding:0 14px;border-top:1px solid var(--line);background:var(--side);color:var(--muted);font-size:11.5px}
+.tb-mode{background:var(--accent);color:var(--bg);padding:0 8px;font-weight:700;margin-left:-14px;height:100%;display:flex;align-items:center}
+.tb-sr{margin-left:auto}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="Task list · Terminal-adjacent">
+  <aside class="tb-side">
+    <div class="tb-ws"><span class="tb-dim">~/</span><span class="tb-wsname">reddevs</span><span class="tb-dim">▾</span></div>
+    <a class="tb-item" href="#"><span></span><span>dashboard</span><span></span></a>
+    <a class="tb-item" href="#"><span></span><span>my-tasks</span><span class="tb-dim">4</span></a>
+    <div class="tb-head">projects/</div>
+    <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+      <a class="{{ p.cls }}" href="#"><span class="tb-acc">{{ p.cur }}</span><span><span class="tb-pk">{{ p.key }}</span> {{ p.name }}</span><span class="tb-dim">{{ p.open }}</span></a>
+    </sc-for>
+    <div class="tb-sidefoot">
+      <a class="tb-item" href="#"><span></span><span>members</span><span></span></a>
+      <a class="tb-item" href="#"><span></span><span>settings</span><span></span></a>
+      <div class="tb-item"><span></span><span class="tb-mut">ana</span><span class="tb-dim">admin</span></div>
+    </div>
+  </aside>
+  <main class="tb-main">
+    <div class="tb-cmd">
+      <span class="tb-acc">$</span>
+      <span><span class="tb-mut">pm tasks --project</span> PAY <span class="tb-mut">--group</span> status<span class="tb-caret"></span></span>
+      <div class="tb-keys"><span><span class="tb-k">/</span>search</span><span><span class="tb-k">c</span>new task</span></div>
+    </div>
+    <div class="tb-filter">
+      <span class="tb-dim">filter</span>
+      <span class="tb-tok">status:<b>any</b></span>
+      <span class="tb-tok">priority:<b>any</b></span>
+      <span class="tb-tok">assignee:<b>any</b></span>
+    </div>
+    <div class="tb-list">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+        <div class="tb-g"><span class="tb-dim">▾</span><span class="{{ g.sCls }}">{{ g.tok }}</span><span>{{ g.label }}</span><span class="tb-dim">({{ g.count }})</span><span class="tb-gfill"></span></div>
+        <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+          <div class="{{ t.rowCls }}">
+            <span class="tb-cur">{{ t.cur }}</span>
+            <span class="tb-key">{{ t.key }}</span>
+            <span class="{{ t.sCls }}">{{ t.tok }}</span>
+            <span class="{{ t.pCls }}">{{ t.pri }}</span>
+            <span class="tb-title">{{ t.title }}</span>
+            <span class="tb-who"><span class="tb-ag">{{ t.mark }}</span>{{ t.who }}</span>
+            <span class="tb-upd">{{ t.upd }}</span>
+          </div>
+        </sc-for>
+      </sc-for>
+      <sc-for list="{{ closed }}" as="g" hint-placeholder-count="3">
+        <div class="tb-g"><span class="tb-dim">▸</span><span class="{{ g.sCls }}">{{ g.tok }}</span><span>{{ g.label }}</span><span class="tb-dim">({{ g.count }})</span><span class="tb-gfill"></span></div>
+      </sc-for>
+    </div>
+    <section class="tb-panel" data-screen-label="Task panel · PAY-142">
+      <div class="tb-ph">
+        <span class="tb-acc">PAY-142</span>
+        <span class="tb-gfill"></span>
+        <span class="tb-mut"><span class="tb-k">o</span>open page</span>
+        <span class="tb-mut"><span class="tb-k">esc</span>close</span>
+      </div>
+      <div class="tb-pbody">
+        <h2 class="tb-ptitle">Retry failed webhook deliveries with exponential backoff</h2>
+        <dl class="tb-props">
+          <dt>status</dt><dd><span class="tb-s-prog">[~]</span> in progress</dd>
+          <dt>priority</dt><dd><span class="tb-p1">P1</span> high</dd>
+          <dt>assignee</dt><dd><span class="tb-ag">◆ </span>claude-dev <span class="tb-dim">acting for</span> ana</dd>
+          <dt>created</dt><dd>ana <span class="tb-dim">2026-10-20 09:14</span></dd>
+        </dl>
+        <div class="tb-sec"><span>description</span><span class="tb-gfill"></span></div>
+        <div class="tb-desc">
+          <p>Deliveries that fail with a 5xx or time out are dropped today. Retry them with exponential backoff, capped at 6 attempts over about 24 hours.</p>
+          <ul class="tb-cl">
+            <sc-for list="{{ checks }}" as="c" hint-placeholder-count="4">
+              <li class="tb-cli"><span class="{{ c.box }}">{{ c.mark }}</span><span class="{{ c.txt }}">{{ c.label }}</span></li>
+            </sc-for>
+          </ul>
+          <p>Backoff is <code>30s × 2^n</code> with jitter.</p>
+        </div>
+        <div class="tb-sec"><span>activity</span><span class="tb-gfill"></span></div>
+        <ol class="tb-log">
+          <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+            <li class="tb-logi"><span class="tb-dim">{{ a.when }}</span><span><span class="tb-ag">{{ a.mark }}</span>{{ a.who }} <span class="tb-dim">{{ a.forTxt }}</span><span class="tb-mut">{{ a.what }}</span></span></li>
+          </sc-for>
+        </ol>
+      </div>
+      <div class="tb-prompt"><span class="tb-acc">&gt;</span><span>comment</span><span class="tb-dim">· ships in a later release</span></div>
+    </section>
+  </main>
+  <footer class="tb-status">
+    <span class="tb-mode">LIST</span>
+    <span><span class="tb-fg">j/k</span> move</span>
+    <span>enter open</span>
+    <span>c new</span>
+    <span>/ search</span>
+    <span>esc close</span>
+    <span class="tb-sr">reddevs/PAY · 12 open</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "dark", "tsType": "\"light\" | \"dark\"" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'dark';
+    const people = {
+      ana: { who: 'ana', agent: false },
+      tomas: { who: 'tomas', agent: false },
+      claude: { who: 'claude-dev', agent: true },
+      codex: { who: 'codex-ci', agent: true }
+    };
+    const S = {
+      prog: ['[~]', 'tb-s-prog', 'IN PROGRESS'],
+      review: ['[?]', 'tb-s-review', 'IN REVIEW'],
+      todo: ['[ ]', 'tb-s-todo', 'TODO'],
+      backlog: ['[.]', 'tb-s-backlog', 'BACKLOG'],
+      done: ['[x]', 'tb-s-done', 'DONE'],
+      cancel: ['[-]', 'tb-s-cancel', 'CANCELED']
+    };
+    const P = { 4: ['P0', 'tb-p0'], 3: ['P1', 'tb-p1'], 2: ['P2', 'tb-p2'], 1: ['P3', 'tb-p3'], 0: ['--', 'tb-pn'] };
+    const task = (key, title, s, pri, who, upd) => {
+      const p = who ? people[who] : null;
+      const sel = key === 'PAY-142';
+      return {
+        key, title, upd,
+        rowCls: sel ? 'tb-rowsel' : 'tb-row',
+        cur: sel ? '>' : '',
+        tok: S[s][0], sCls: S[s][1],
+        pri: P[pri][0], pCls: P[pri][1],
+        mark: p && p.agent ? '◆ ' : '',
+        who: p ? p.who : '—'
+      };
+    };
+    const grp = (s, tasks) => ({ tok: S[s][0], sCls: S[s][1], label: S[s][2], tasks, count: tasks.length });
+    const groups = [
+      grp('prog', [
+        task('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 'prog', 3, 'claude', '3m'),
+        task('PAY-131', 'Add idempotency keys to the refund endpoint', 'prog', 4, 'codex', '12m'),
+        task('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'prog', 2, 'ana', '1h')
+      ]),
+      grp('review', [
+        task('PAY-138', 'Webhook signature check accepts expired timestamps', 'review', 4, 'claude', '25m'),
+        task('PAY-135', 'Paginate the transactions CSV export', 'review', 2, 'tomas', '3h')
+      ]),
+      grp('todo', [
+        task('PAY-144', 'Show a test-mode banner on the billing settings page', 'todo', 1, null, '2h'),
+        task('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 'todo', 3, 'tomas', '5h'),
+        task('PAY-137', 'Document the nightly payout reconciliation job', 'todo', 0, 'claude', '1d'),
+        task('PAY-129', 'Remove legacy v0 checkout routes', 'todo', 2, null, '2d')
+      ])
+    ];
+    const closed = [
+      { ...grp('backlog', []), count: 18 },
+      { ...grp('done', []), count: 64 },
+      { ...grp('cancel', []), count: 3 }
+    ];
+    const projects = [
+      { key: 'PAY', name: 'payments', open: 12, cls: 'tb-itemon', cur: '>' },
+      { key: 'WEB', name: 'web-app', open: 27, cls: 'tb-item', cur: '' },
+      { key: 'CLI', name: 'pm-cli', open: 9, cls: 'tb-item', cur: '' },
+      { key: 'INF', name: 'infra', open: 5, cls: 'tb-item', cur: '' }
+    ];
+    const checks = [
+      { label: 'Store attempt count and next_attempt_at on the delivery', done: true },
+      { label: 'Schedule retries as pg-boss jobs', done: true },
+      { label: 'Stop on 4xx, except 408 and 429', done: false },
+      { label: 'Show attempt history in the delivery log', done: false }
+    ].map((c) => ({ ...c, mark: c.done ? '[x]' : '[ ]', box: c.done ? 'tb-boxon' : 'tb-box', txt: c.done ? 'tb-done' : '' }));
+    const act = (pk, what, when, forWho) => {
+      const p = people[pk];
+      return { who: p.who, mark: p.agent ? '◆ ' : '', what, when, forTxt: forWho ? 'for ' + forWho + ' ' : '' };
+    };
+    const activity = [
+      act('ana', 'created the task', '10-20 09:14'),
+      act('ana', 'assigned claude-dev', '10-20 09:15'),
+      act('claude', 'status todo → in progress', 'today 14:02', 'ana'),
+      act('claude', 'checked off 2 items', 'today 14:39', 'ana')
+    ];
+    return { rootCls: 'tb-root tb-' + theme, groups, closed, projects, checks, activity };
+  }
+}
+</script>
+</body>
+</html>

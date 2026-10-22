@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<style>
+.st-grid{display:grid;grid-template-columns:220px minmax(0,1fr);min-width:0;min-height:0}
+.st-nav{border-right:1px solid var(--line);padding:22px 12px;display:flex;flex-direction:column;gap:2px;background:var(--band)}
+.st-navh{padding:14px 12px 6px}
+.st-ni{height:30px;display:flex;align-items:center;padding:0 12px;color:var(--muted)}
+.st-nion{height:30px;display:flex;align-items:center;padding:0 12px;color:var(--fg);font-weight:600;background:var(--surface);box-shadow:inset 2px 0 0 var(--accent)}
+.st-title{padding:0 12px 4px;font-size:15px;font-weight:600}
+.st-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.st-tabs{display:flex;gap:18px;align-items:center}
+.st-tab{display:flex;gap:6px;align-items:center;height:36px;box-sizing:border-box;color:var(--muted)}
+.st-tabon{display:flex;gap:6px;align-items:center;height:36px;box-sizing:border-box;color:var(--fg);font-weight:600;box-shadow:inset 0 -2px 0 var(--fg)}
+.mb-cols{grid-template-columns:minmax(0,1fr) 72px 80px 170px 84px 28px}
+.mb-row{height:52px;display:grid;grid-template-columns:minmax(0,1fr) 72px 80px 170px 84px 28px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.mb-who{display:flex;align-items:center;gap:10px;min-width:0}
+.mb-name{font-weight:600}
+.mb-mail{font-size:12px;color:var(--muted)}
+.mb-dots{color:var(--faint);text-align:center;font-size:16px}
+.ky-cols{grid-template-columns:minmax(0,1fr) 170px 160px 70px 76px 78px}
+.ky-row{height:48px;display:grid;grid-template-columns:minmax(0,1fr) 170px 160px 70px 76px 78px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.ky-rowoff{height:48px;display:grid;grid-template-columns:minmax(0,1fr) 170px 160px 70px 76px 78px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);color:var(--faint)}
+.ky-name{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ky-pre{font-family:"Martian Mono",ui-monospace,monospace;font-size:10px;color:var(--faint)}
+.ky-scope{font-size:12px;color:var(--muted)}
+.ky-date{font-family:"Martian Mono",ui-monospace,monospace;font-size:10px;color:var(--faint)}
+.dl-sec{display:flex;flex-direction:column;gap:8px}
+.dl-opts{display:flex;flex-direction:column;gap:6px}
+.dl-sub{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:4px 0 0 24px}
+.dl-pick{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.dl-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.dl-desc{font-size:11.5px;color:var(--muted);margin-top:1px}
+.rv-key{display:flex;align-items:center;gap:8px}
+.rv-box{flex:1;font-family:"Martian Mono",ui-monospace,monospace;font-size:12px;height:40px;display:flex;align-items:center;padding:0 12px;border:1px solid var(--accent);background:var(--sel);color:var(--fg);box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.rv-warn{display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+.rv-dot{width:8px;height:8px;background:var(--accent);margin-top:5px;flex:none}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rk" href="#"><span>PAY</span><span class="lg-rn">12</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnavon" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <div class="st-grid">
+      <aside class="st-nav">
+        <div class="st-title">Settings</div>
+        <div class="lg-cap st-navh">Workspace</div>
+        <a class="st-ni" href="#">General</a>
+        <a class="{{ navMembers }}" href="#">Members</a>
+        <a class="{{ navKeys }}" href="#">API keys</a>
+        <div class="lg-cap st-navh">You</div>
+        <a class="st-ni" href="#">Profile</a>
+        <a class="st-ni" href="#">Your API keys</a>
+      </aside>
+      <section class="st-main">
+        <sc-if value="{{ isMembers }}" hint-placeholder-val="{{ true }}">
+          <header class="lg-head">
+            <div><h1 class="lg-h1">Members</h1><div class="lg-sub">4 people and 3 agents in Reddevs</div></div>
+            <div class="lg-headr"><button class="lg-btn2">Invite person</button><button class="lg-btn">Add agent</button></div>
+          </header>
+          <div class="lg-bar" style="height:36px"><div class="st-tabs"><span class="st-tabon">All<span class="lg-gc">7</span></span><span class="st-tab">People<span class="lg-gc">4</span></span><span class="st-tab">Agents<span class="lg-gc">3</span></span></div></div>
+          <div class="lg-th mb-cols"><span>Member</span><span>Kind</span><span>Role</span><span>Responsible human</span><span>Last active</span><span></span></div>
+          <sc-for list="{{ members }}" as="m" hint-placeholder-count="7">
+            <div class="mb-row">
+              <div class="mb-who"><span class="{{ m.avCls }}" style="--h:{{ m.hue }}">{{ m.ini }}</span><div style="min-width:0"><div class="mb-name lg-trunc">{{ m.name }}</div><div class="mb-mail lg-trunc">{{ m.sub }}</div></div></div>
+              <span><span class="{{ m.kindCls }}">{{ m.kind }}</span></span>
+              <span class="lg-muted">{{ m.role }}</span>
+              <span class="lg-who"><sc-if value="{{ m.hasResp }}" hint-placeholder-val="{{ false }}"><span class="lg-av" style="--h:{{ m.respHue }}">{{ m.respIni }}</span><span>{{ m.resp }}</span></sc-if></span>
+              <span class="lg-upd" style="text-align:left">{{ m.last }}</span>
+              <span class="mb-dots">⋯</span>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ isKeys }}" hint-placeholder-val="{{ false }}">
+          <header class="lg-head">
+            <div><h1 class="lg-h1">API keys</h1><div class="lg-sub">Keys let agents and the pm CLI act in this workspace. Each key belongs to one member.</div></div>
+            <div class="lg-headr"><button class="lg-btn">New key</button></div>
+          </header>
+          <div class="lg-th ky-cols" style="margin-top:8px"><span>Key</span><span>Owner</span><span>Scope</span><span>Created</span><span>Last used</span><span></span></div>
+          <sc-for list="{{ keys }}" as="k" hint-placeholder-count="6">
+            <div class="{{ k.rowCls }}">
+              <div class="ky-name"><span class="lg-trunc" style="font-weight:600">{{ k.name }}</span><span class="ky-pre">{{ k.prefix }}</span></div>
+              <span class="lg-who"><span class="{{ k.avCls }}" style="--h:{{ k.hue }}">{{ k.ini }}</span><span class="lg-trunc">{{ k.owner }}</span></span>
+              <span class="ky-scope lg-trunc">{{ k.scope }}</span>
+              <span class="ky-date">{{ k.created }}</span>
+              <span class="ky-date">{{ k.used }}</span>
+              <span><sc-if value="{{ k.active }}" hint-placeholder-val="{{ true }}"><button class="lg-btnd">Revoke</button></sc-if><sc-if value="{{ k.revoked }}" hint-placeholder-val="{{ false }}"><span class="lg-tag">Revoked</span></sc-if></span>
+            </div>
+          </sc-for>
+        </sc-if>
+      </section>
+    </div>
+  </div>
+  <sc-if value="{{ isAddAgent }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:70px;width:560px" data-screen-label="Add agent dialog">
+      <div class="lg-dh"><span style="font-weight:600">Add agent</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db">
+        <div class="lg-field"><span class="lg-label">Name</span><div class="lg-inputf"><span class="lg-mono" style="font-size:12px">docs-bot</span><span class="lg-caret"></span></div><span class="lg-hint">Lowercase, numbers and dashes. Shows in activity next to every change it makes.</span></div>
+        <div class="lg-field"><span class="lg-label">Responsible human</span><div class="lg-input"><span class="lg-av" style="--h:25">AR</span><span>Ana Ruiz</span><span class="lg-sp"></span><span class="lg-faint">▾</span></div><span class="lg-hint">The agent acts for this person. Activity reads "docs-bot for Ana Ruiz".</span></div>
+        <div class="dl-sec"><span class="lg-label">Access</span>
+          <div class="dl-opts">
+            <div class="lg-opt"><span class="lg-radio"></span><span>Whole workspace</span></div>
+            <div class="lg-opton"><span class="lg-radioon"></span><span>Selected projects</span></div>
+            <div class="dl-sub">
+              <span class="dl-pick"><span class="lg-checkon"></span><span class="lg-mono" style="font-size:10.5px">DOCS</span>Documentation</span>
+              <span class="dl-pick"><span class="lg-checkon"></span><span class="lg-mono" style="font-size:10.5px">CLI</span>pm CLI</span>
+              <span class="dl-pick"><span class="lg-check"></span><span class="lg-mono" style="font-size:10.5px">PAY</span>Payments</span>
+              <span class="dl-pick"><span class="lg-check"></span><span class="lg-mono" style="font-size:10.5px">WEB</span>Web app</span>
+            </div>
+          </div>
+        </div>
+        <div class="dl-sec"><span class="lg-label">Permission</span>
+          <div class="dl-two">
+            <div class="lg-opton" style="align-items:flex-start"><span class="lg-radioon" style="margin-top:2px"></span><div><div>Read and write</div><div class="dl-desc">Create and update tasks</div></div></div>
+            <div class="lg-opt" style="align-items:flex-start"><span class="lg-radio" style="margin-top:2px"></span><div><div>Read only</div><div class="dl-desc">List and view tasks</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="lg-df"><span class="lg-hint">Creates the agent and its first API key.</span><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">Create agent</button></div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isReveal }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:140px;width:580px" data-screen-label="Key created · reveal once">
+      <div class="lg-dh"><span style="font-weight:600">Key created for docs-bot</span></div>
+      <div class="lg-db">
+        <div class="rv-warn"><span class="rv-dot"></span><span>Copy it now. You won't see it again. If it gets lost, revoke it and create a new one.</span></div>
+        <div class="rv-key"><div class="rv-box">pm_live_7Hq2mV9xKc4TzR8bN3wLp6Ye1Ua5Fj0D</div><button class="lg-btna" style="height:40px">Copy</button></div>
+        <div class="lg-field"><span class="lg-cap">Use it from the CLI</span><div class="lg-code">pm login --key pm_live_7Hq2mV9xKc4TzR8bN3wLp6Ye1Ua5Fj0D</div></div>
+        <div class="lg-hint">Scope: DOCS and CLI, read and write. Acts for Ana Ruiz.</div>
+      </div>
+      <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn">I copied the key</button></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "page": { "editor": "enum", "options": ["members", "add-agent", "keys", "reveal"], "default": "members" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const page = this.props.page ?? 'members';
+    const members = page === 'members' || page === 'add-agent';
+    const H = { ana: ['Ana Ruiz', 'AR', 25], tomas: ['Tomás Berg', 'TB', 220] };
+    const person = (name, ini, hue, sub, role, last) => ({ name, ini, hue, sub, role, last, kind: 'Person', kindCls: 'lg-tag', avCls: 'lg-avl', hasResp: false, resp: '', respIni: '', respHue: 0 });
+    const agent = (name, ini, resp, last, sub) => ({ name, ini, hue: 0, sub, role: 'Member', last, kind: 'Agent', kindCls: 'lg-taga', avCls: 'lg-agl', hasResp: true, resp: H[resp][0], respIni: H[resp][1], respHue: H[resp][2] });
+    const list = [
+      person('Ana Ruiz', 'AR', 25, 'ana@reddevs.io · you', 'Admin', 'Now'),
+      person('Tomás Berg', 'TB', 220, 'tomas@reddevs.io', 'Member', '20m'),
+      person('Maximiliane Oyelaran-Castellanos', 'MO', 140, 'maximiliane.oyelaran-castellanos@reddevs.io', 'Member', '2d'),
+      person('Jo Park', 'JP', 300, 'Invited Oct 21 · link expires in 6 days', 'Member', '—'),
+      agent('claude-dev', 'C', 'ana', '3m', '1 API key'),
+      agent('codex-ci', 'X', 'tomas', '12m', '1 API key'),
+      agent('release-notes-writer-for-payments', 'R', 'ana', 'Never', 'No keys yet')
+    ];
+    const key = (name, prefix, owner, ini, hue, agentKey, scope, created, used, revoked) => ({
+      name, prefix, owner, ini, hue, scope, created, used,
+      avCls: agentKey ? 'lg-ag' : 'lg-av',
+      active: !revoked, revoked: !!revoked,
+      rowCls: revoked ? 'ky-rowoff' : 'ky-row'
+    });
+    const keys = [
+      key('claude-dev on Ana’s laptop', 'pm_live_4kQz…', 'claude-dev', 'C', 0, true, 'PAY, CLI · read and write', 'Oct 20', '3m'),
+      key('CI runner', 'pm_live_Vb81…', 'codex-ci', 'X', 0, true, 'Workspace · read and write', 'Oct 12', '12m'),
+      key('Ana’s CLI', 'pm_live_p0Lm…', 'Ana Ruiz', 'AR', 25, false, 'Workspace · read and write', 'Sep 30', '2d'),
+      key('Weekly finance export of closed payment tasks for the Monday review', 'pm_live_Zt6c…', 'Tomás Berg', 'TB', 220, false, 'PAY · read only', 'Oct 1', 'Never'),
+      key('Old laptop', 'pm_live_aa93…', 'Ana Ruiz', 'AR', 25, false, 'Workspace · read and write', 'Aug 2', 'Sep 29', true)
+    ];
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: { members: 'Settings · members', 'add-agent': 'Settings · add agent', keys: 'Settings · API keys', reveal: 'Settings · key created' }[page],
+      isMembers: members,
+      isKeys: !members,
+      isAddAgent: page === 'add-agent',
+      isReveal: page === 'reveal',
+      navMembers: members ? 'st-nion' : 'st-ni',
+      navKeys: members ? 'st-ni' : 'st-nion',
+      members: list,
+      keys
+    };
+  }
+}
+</script>
+</body>
+</html>

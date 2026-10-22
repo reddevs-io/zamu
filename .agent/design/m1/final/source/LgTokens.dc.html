@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<style>
+.tz-wrap{height:100%;box-sizing:border-box;padding:32px 40px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.tz-col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.tz-sw{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;align-items:center}
+.tz-chip{width:28px;height:28px;border:1px solid var(--line);box-sizing:border-box}
+.tz-n{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px}
+.tz-type{display:flex;flex-direction:column;gap:10px}
+.tz-t{display:grid;grid-template-columns:120px minmax(0,1fr);align-items:baseline;gap:10px}
+.tz-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tz-stack{display:flex;flex-direction:column;gap:8px}
+.tz-l{display:flex;align-items:center;gap:8px;font-size:12px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="Tokens and components">
+  <div class="tz-wrap">
+    <div class="tz-col">
+      <div class="lg-cap">Color tokens</div>
+      <div class="tz-sw">
+        <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="18">
+          <span class="tz-chip" style="background:var({{ s.v }})"></span><span><span class="tz-n">{{ s.v }}</span> <span class="lg-faint">{{ s.use }}</span></span>
+        </sc-for>
+      </div>
+    </div>
+    <div class="tz-col">
+      <div class="lg-cap">Type</div>
+      <div class="tz-type">
+        <div class="tz-t"><span class="tz-n lg-faint">26 / 600</span><span style="font-size:26px;font-weight:600;letter-spacing:-0.02em">Task page title</span></div>
+        <div class="tz-t"><span class="tz-n lg-faint">22 / 600</span><span class="lg-h2">Pane title</span></div>
+        <div class="tz-t"><span class="tz-n lg-faint">20 / 600</span><span class="lg-h1">Page heading</span></div>
+        <div class="tz-t"><span class="tz-n lg-faint">13.5 / 400</span><span style="font-size:13.5px">Description body text</span></div>
+        <div class="tz-t"><span class="tz-n lg-faint">13 / 400</span><span>Rows, controls, labels</span></div>
+        <div class="tz-t"><span class="tz-n lg-faint">10 caps / 600</span><span class="lg-cap">Column header</span></div>
+        <div class="tz-t"><span class="tz-n lg-faint">Mono 10.5</span><span class="lg-key">PAY-142 · 3m · pm_live_…</span></div>
+      </div>
+      <div class="lg-cap" style="margin-top:8px">Shape and spacing</div>
+      <div class="lg-muted" style="font-size:12px;line-height:1.6">Radius 0 everywhere except avatars of people (circle). Hairline 1px borders. Spacing steps 4, 8, 12, 16, 20, 24. Row heights: 34 tasks, 48 to 52 settings and projects. Rail 64, list column 600.</div>
+    </div>
+    <div class="tz-col">
+      <div class="lg-cap">Components</div>
+      <div class="tz-row"><button class="lg-btn">Primary<span class="lg-btnk">C</span></button><button class="lg-btna">Accent</button><button class="lg-btn2">Secondary</button><button class="lg-btnd">Revoke</button></div>
+      <div class="tz-stack">
+        <div class="lg-input">Default input</div>
+        <div class="lg-inputf"><span>Focused input</span><span class="lg-caret"></span></div>
+        <div class="lg-inpute">Error input</div>
+      </div>
+      <div class="tz-row"><span class="lg-tag">Person</span><span class="lg-taga">Agent</span><span class="lg-tag">Revoked</span><span class="lg-kbd">Esc</span><span class="lg-kbd">⌘↵</span></div>
+      <div class="tz-row">
+        <span class="tz-l"><span class="lg-sq lg-s-backlog"></span>Backlog</span><span class="tz-l"><span class="lg-sq lg-s-todo"></span>Todo</span><span class="tz-l"><span class="lg-sq lg-s-prog"></span>In progress</span>
+        <span class="tz-l"><span class="lg-sq lg-s-review"></span>In review</span><span class="tz-l"><span class="lg-sq lg-s-done"></span>Done</span><span class="tz-l"><span class="lg-sq lg-s-cancel"></span>Canceled</span>
+      </div>
+      <div class="tz-row">
+        <span class="tz-l"><span class="lg-priurg">■■■</span>Urgent</span><span class="tz-l"><span class="lg-pri">■■■</span>High</span><span class="tz-l"><span class="lg-pri">■■</span>Medium</span><span class="tz-l"><span class="lg-pri">■</span>Low</span><span class="tz-l"><span class="lg-prilow">—</span>None</span>
+      </div>
+      <div class="tz-row">
+        <span class="tz-l"><span class="lg-avl" style="--h:25">AR</span>Person</span><span class="tz-l"><span class="lg-agl">C</span>Agent</span>
+        <span class="tz-l"><span class="lg-checkon"></span>Check</span><span class="tz-l"><span class="lg-radioon"></span>Radio</span><span class="tz-l"><span class="lg-toggleon"></span>Toggle</span>
+      </div>
+      <div class="lg-banner"><span class="lg-bannerx"></span><span>Error banner</span></div>
+      <div class="lg-code">pm tasks list --project PAY --json</div>
+      <div class="tz-stack"><span class="lg-skel" style="width:80%"></span><span class="lg-skel" style="width:55%"></span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const swatches = [
+      ['--bg', 'page'], ['--surface', 'dialogs, inputs'], ['--band', 'group rows, footers'], ['--rail', 'project rail'],
+      ['--line', 'borders'], ['--line-2', 'row dividers'], ['--fg', 'text, primary button'], ['--muted', 'secondary text'],
+      ['--faint', 'hints, meta'], ['--accent', 'cobalt: focus, agents, links'], ['--sel', 'selected row'],
+      ['--review', 'In review'], ['--done', 'Done'], ['--danger', 'errors, Urgent, revoke'], ['--danger-bg', 'error banner']
+    ].map(([v, use]) => ({ v, use }));
+    return { rootCls: 'lg-root lg-' + theme, swatches };
+  }
+}
+</script>
+</body>
+</html>
