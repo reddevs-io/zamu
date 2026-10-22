@@ -1,0 +1,35 @@
+# Keep the build context small and free of secrets. Dependencies and build output are produced inside the image.
+**/node_modules
+**/.output
+**/.nitro
+**/.tanstack
+**/.vite
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+playwright-report
+test-results
+blob-report
+
+# Secrets and local environment
+**/.env
+**/.env.*
+!.env.example
+
+# Not needed to build the image
+.git
+.gitlab-ci.yml
+.agent
+memory-bank
+assets
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.idea
+.DS_Store
+
+# Tests and docs do not go into the image
+e2e
+docs
+playwright.config.ts
