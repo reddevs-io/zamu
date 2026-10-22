@@ -1,0 +1,85 @@
+/*
+ * Ledger (2a) design tokens, ported from .agent/design/m1/final/source/ledger.css.
+ *
+ * The page follows prefers-color-scheme. A `.light` or `.dark` class on any element forces that theme
+ * for its subtree (used by the /__ui gallery and by tests). Tailwind utilities read these variables
+ * through `@theme inline` in app.css, so `bg-surface` resolves per element.
+ */
+
+:root,
+.light {
+  color-scheme: light;
+  --bg: oklch(0.985 0.004 240);
+  --surface: oklch(0.998 0.002 240);
+  --band: oklch(0.962 0.006 240);
+  --rail: oklch(0.22 0.02 255);
+  --rail-fg: oklch(0.82 0.015 250);
+  --rail-on: oklch(0.98 0.004 240);
+  --line: oklch(0.88 0.008 245);
+  --line-2: oklch(0.93 0.006 245);
+  --fg: oklch(0.2 0.02 255);
+  --muted: oklch(0.46 0.02 255);
+  --faint: oklch(0.62 0.015 255);
+  --accent: oklch(0.52 0.2 262);
+  --on-accent: oklch(0.99 0 0);
+  --sel: oklch(0.94 0.03 262);
+  --focus: oklch(0.52 0.2 262);
+  --review: oklch(0.5 0.15 300);
+  --done: oklch(0.52 0.11 155);
+  --danger: oklch(0.55 0.2 28);
+  --danger-bg: oklch(0.96 0.03 28);
+  --scrim: oklch(0.2 0.02 255 / 0.35);
+  --shadow: 0 24px 64px -16px oklch(0.2 0.03 255 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+    --bg: oklch(0.185 0.012 255);
+    --surface: oklch(0.215 0.013 255);
+    --band: oklch(0.215 0.013 255);
+    --rail: oklch(0.13 0.012 255);
+    --rail-fg: oklch(0.66 0.015 250);
+    --rail-on: oklch(0.95 0.006 240);
+    --line: oklch(0.31 0.014 255);
+    --line-2: oklch(0.255 0.013 255);
+    --fg: oklch(0.94 0.006 240);
+    --muted: oklch(0.72 0.015 250);
+    --faint: oklch(0.56 0.015 250);
+    --accent: oklch(0.72 0.15 258);
+    --on-accent: oklch(0.16 0.02 255);
+    --sel: oklch(0.26 0.04 262);
+    --focus: oklch(0.72 0.15 258);
+    --review: oklch(0.76 0.11 300);
+    --done: oklch(0.76 0.12 155);
+    --danger: oklch(0.7 0.17 30);
+    --danger-bg: oklch(0.27 0.05 30);
+    --scrim: oklch(0.05 0.01 255 / 0.6);
+    --shadow: 0 24px 64px -12px oklch(0 0 0 / 0.7);
+  }
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: oklch(0.185 0.012 255);
+  --surface: oklch(0.215 0.013 255);
+  --band: oklch(0.215 0.013 255);
+  --rail: oklch(0.13 0.012 255);
+  --rail-fg: oklch(0.66 0.015 250);
+  --rail-on: oklch(0.95 0.006 240);
+  --line: oklch(0.31 0.014 255);
+  --line-2: oklch(0.255 0.013 255);
+  --fg: oklch(0.94 0.006 240);
+  --muted: oklch(0.72 0.015 250);
+  --faint: oklch(0.56 0.015 250);
+  --accent: oklch(0.72 0.15 258);
+  --on-accent: oklch(0.16 0.02 255);
+  --sel: oklch(0.26 0.04 262);
+  --focus: oklch(0.72 0.15 258);
+  --review: oklch(0.76 0.11 300);
+  --done: oklch(0.76 0.12 155);
+  --danger: oklch(0.7 0.17 30);
+  --danger-bg: oklch(0.27 0.05 30);
+  --scrim: oklch(0.05 0.01 255 / 0.6);
+  --shadow: 0 24px 64px -12px oklch(0 0 0 / 0.7);
+}
