@@ -19,7 +19,9 @@ export interface ServerEnv {
   OIDC_SIGNUP?: string | undefined;
   OIDC_ADMIN_GROUPS?: string | undefined;
   OIDC_GROUPS_CLAIM?: string | undefined;
+  OIDC_TRUST_EMAIL?: string | undefined;
   PASSWORD_LOGIN?: string | undefined;
+  TRUSTED_IP_HEADERS?: string | undefined;
 }
 
 export interface ServerConfig {
@@ -74,7 +76,7 @@ export function readServerConfig(env: ServerEnv = process.env): ServerConfig {
   const publicUrlValue = env.PUBLIC_URL?.trim();
   const publicUrl = publicUrlValue ? httpUrl('PUBLIC_URL', publicUrlValue, problems) : baseUrl;
 
-  let auth: AuthConfig = { sso: null, passwordLogin: true };
+  let auth: AuthConfig = { sso: null, passwordLogin: true, ipAddressHeaders: null };
   try {
     auth = readAuthConfig(env);
   } catch (error) {

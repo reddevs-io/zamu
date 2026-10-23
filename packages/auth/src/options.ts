@@ -56,10 +56,13 @@ export function authOptions({
   secret,
   baseUrl,
   sso = null,
+  ipAddressHeaders = null,
 }: {
   secret: string;
   baseUrl: string;
   sso?: SsoConfig | null;
+  /** Headers with the client IP, in order (TRUSTED_IP_HEADERS). Null: Better Auth's default. */
+  ipAddressHeaders?: string[] | null;
 }) {
   return {
     appName: 'project-management',
@@ -89,6 +92,9 @@ export function authOptions({
     advanced: {
       // Postgres generates ids (uuidv7() defaults in the checked-in schema).
       database: { generateId: 'uuid' },
+      // Rate limiting and session records use the client IP. Behind a proxy it comes from the headers the
+      // proxy sets; only list headers a trusted proxy overwrites, since clients can send any header.
+      ...(ipAddressHeaders ? { ipAddress: { ipAddressHeaders } } : {}),
     },
     ...(sso ? { account: SSO_ACCOUNT_OPTIONS } : {}),
     telemetry: { enabled: false },

@@ -64,7 +64,7 @@ export function createAuth({ db, secret, baseUrl, config = DEFAULT_AUTH_CONFIG }
   const { sso, passwordLogin } = config;
   const transactions = new AsyncLocalStorage<Tx>();
   const gate = sso ? createSsoGate({ db, sso, transactions }) : null;
-  const options = authOptions({ secret, baseUrl, sso });
+  const options = authOptions({ secret, baseUrl, sso, ipAddressHeaders: config.ipAddressHeaders });
 
   const auth = betterAuth({
     ...options,

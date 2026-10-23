@@ -96,6 +96,7 @@ these variables the server uses email and password only.
 | `OIDC_SIGNUP`        | `invite`               | Who gets an account on first SSO sign-in: see below.                |
 | `OIDC_ADMIN_GROUPS`  | none                   | Comma-separated groups whose members are workspace admins.          |
 | `OIDC_GROUPS_CLAIM`  | `groups`               | Claim with the user's groups. Authentik sends `groups`.             |
+| `OIDC_TRUST_EMAIL`   | `false`                | `true`: treat the provider's email as verified. See below.          |
 | `PASSWORD_LOGIN`     | `enabled`              | `disabled`: SSO only. Needs the three `OIDC_*` credentials.         |
 
 SSO is on when `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are all set.
@@ -107,6 +108,12 @@ SSO is on when `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are all 
   re-applied at every SSO sign-in, so removing someone from the group demotes them at their next sign-in.
   Owners keep their role. If the provider stops sending the groups claim, everyone but the owner becomes a
   member.
+- `OIDC_TRUST_EMAIL=true`: the provider's email counts as verified even when its `email_verified` claim is
+  `false` or missing. Use it for providers that never mark emails as verified, such as Authentik with its
+  default mappings. The trade-off: SSO matches people by email (to sign in, to link an existing account, to
+  accept an invitation). If people can change their own email at the provider, someone you let in could set
+  another person's address and sign in as them. Turn it on only when emails at the provider are managed by
+  admins, or when everyone the provider admits is trusted.
 - `PASSWORD_LOGIN=disabled` removes the password form from sign-in, setup and invitations, and the server
   refuses password sign-in. API keys (agents, the CLI) keep working.
 
@@ -119,13 +126,14 @@ What SSO does:
 - **Invitations**: the invitation page offers SSO. The provider's verified email must be the invited address;
   otherwise the page explains the mismatch and nothing is created.
 - **Existing accounts** link to the SSO identity with the same verified email, so people invited before SSO
-  keep their account. Unverified emails are refused. Agents are never linked to an SSO identity; they keep
+  keep their account. Unverified emails are refused, unless `OIDC_TRUST_EMAIL=true`. Agents are never linked to an SSO identity; they keep
   using API keys.
 - **Signing out** ends the session here only, not at the provider.
 
 The server checks the configuration when it starts and exits with a message listing every problem, for
 example `PASSWORD_LOGIN=disabled` without SSO, only some of the three `OIDC_*` credentials, a malformed
-`OIDC_ISSUER`, or a `BETTER_AUTH_SECRET` shorter than 32 characters: `docker compose logs web` shows it.
+`OIDC_ISSUER`, an `OIDC_TRUST_EMAIL` other than `true` or `false`, an invalid `TRUSTED_IP_HEADERS`, or a
+`BETTER_AUTH_SECRET` shorter than 32 characters: `docker compose logs web` shows it.
 
 ### Authentik
 
@@ -145,6 +153,15 @@ example `PASSWORD_LOGIN=disabled` without SSO, only some of the three `OIDC_*` c
    PASSWORD_LOGIN=disabled
    ```
 
+Authentik's default `email` scope mapping always sends `email_verified: false`, so every sign-in is refused
+until you pick one of these:
+- Set `OIDC_TRUST_EMAIL=true` (read the trade-off above first).
+- Or send a verified claim yourself: Customization > Property Mappings > Create > Scope Mapping, with a scope
+  name such as `pm-email` and the expression
+  `return {"email": request.user.email, "email_verified": True}`. Add it to the provider's scopes, and request
+  it instead of `email`: `OIDC_SCOPES=openid profile pm-email`. Only do this if users cannot change their
+  own email in Authentik, for the same reason.
+
 ## Ports
 
 | Port | Service | Published                                                                |
@@ -157,6 +174,23 @@ on the same machine.
 
 For HTTPS, put a reverse proxy (Caddy, nginx, Traefik) in front of port 3000 and set `BETTER_AUTH_URL` and
 `PUBLIC_URL` to the public `https://` URL. Then `docker compose up -d` to apply the change.
+
+### Client IP behind a proxy
+
+Sign-in rate limits and the session list use the client's IP address. By default it comes from
+`X-Forwarded-For`, and only when that header holds a single address. Behind several proxies (a CDN, then an
+ingress) the header holds a chain, the server cannot tell who the client is, and the log says rate limiting
+"could not determine a client IP". Then all clients share one rate-limit bucket per path.
+
+`TRUSTED_IP_HEADERS` lists the headers to read instead, comma-separated, checked in order. Behind Cloudflare:
+
+```sh
+TRUSTED_IP_HEADERS=cf-connecting-ip,x-forwarded-for
+```
+
+Only list headers that your proxy sets or overwrites on every request. A client can send any header it likes,
+so a header that reaches the app straight from the client lets anyone pick their own IP and get around the
+rate limit. For example, list `cf-connecting-ip` only when the app can be reached through Cloudflare alone.
 
 ## Backups
 

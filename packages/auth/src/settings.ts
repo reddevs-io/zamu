@@ -4,8 +4,8 @@ import type { AuthConfig } from './config';
 
 const settingsByAuth = new WeakMap<object, AuthConfig>();
 
-/** M1 behaviour: passwords only. */
-export const DEFAULT_AUTH_CONFIG: AuthConfig = { sso: null, passwordLogin: true };
+/** M1 behaviour: passwords only, Better Auth's default client IP header. */
+export const DEFAULT_AUTH_CONFIG: AuthConfig = { sso: null, passwordLogin: true, ipAddressHeaders: null };
 
 export function registerAuthConfig(auth: object, config: AuthConfig): void {
   settingsByAuth.set(auth, config);

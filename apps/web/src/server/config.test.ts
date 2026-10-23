@@ -30,7 +30,7 @@ describe('readServerConfig', () => {
       secret: BASE.BETTER_AUTH_SECRET,
       baseUrl: 'https://projects.example.com',
       publicUrl: 'https://projects.example.com',
-      auth: { sso: null, passwordLogin: true },
+      auth: { sso: null, passwordLogin: true, ipAddressHeaders: null },
     });
   });
 
@@ -51,7 +51,31 @@ describe('readServerConfig', () => {
         adminGroups: ['reddevs-sso-admins'],
       }),
       passwordLogin: false,
+      ipAddressHeaders: null,
     });
+  });
+
+  it('reads OIDC_TRUST_EMAIL and TRUSTED_IP_HEADERS', () => {
+    const config = readServerConfig({
+      ...BASE,
+      ...SSO,
+      OIDC_TRUST_EMAIL: 'true',
+      TRUSTED_IP_HEADERS: 'cf-connecting-ip,x-forwarded-for',
+    });
+    expect(config.auth.sso?.trustEmail).toBe(true);
+    expect(config.auth.ipAddressHeaders).toEqual(['cf-connecting-ip', 'x-forwarded-for']);
+  });
+
+  it('refuses invalid OIDC_TRUST_EMAIL and TRUSTED_IP_HEADERS values', () => {
+    expect(problems({ ...BASE, ...SSO, OIDC_TRUST_EMAIL: 'maybe' })).toEqual([
+      expect.stringContaining('OIDC_TRUST_EMAIL must be "true" or "false"'),
+    ]);
+    expect(problems({ ...BASE, OIDC_TRUST_EMAIL: 'true' })).toEqual([
+      expect.stringContaining('single sign-on is not configured'),
+    ]);
+    expect(problems({ ...BASE, TRUSTED_IP_HEADERS: 'x-forwarded-for; rm' })).toEqual([
+      expect.stringContaining('TRUSTED_IP_HEADERS'),
+    ]);
   });
 
   it('refuses a missing or short BETTER_AUTH_SECRET', () => {

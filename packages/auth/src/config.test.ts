@@ -19,14 +19,13 @@ function problems(env: AuthEnv): string[] {
 
 describe('readAuthConfig', () => {
   it('keeps M1 behaviour without any variable', () => {
-    expect(readAuthConfig({})).toEqual({ sso: null, passwordLogin: true });
+    expect(readAuthConfig({})).toEqual({ sso: null, passwordLogin: true, ipAddressHeaders: null });
   });
 
   it('treats blank values as unset', () => {
-    expect(readAuthConfig({ OIDC_ISSUER: '', OIDC_CLIENT_ID: ' ', PASSWORD_LOGIN: '' })).toEqual({
-      sso: null,
-      passwordLogin: true,
-    });
+    expect(
+      readAuthConfig({ OIDC_ISSUER: '', OIDC_CLIENT_ID: ' ', PASSWORD_LOGIN: '', TRUSTED_IP_HEADERS: '' }),
+    ).toEqual({ sso: null, passwordLogin: true, ipAddressHeaders: null });
   });
 
   it('enables SSO with defaults when issuer, client ID and secret are set', () => {
@@ -40,8 +39,10 @@ describe('readAuthConfig', () => {
         signup: 'invite',
         adminGroups: [],
         groupsClaim: 'groups',
+        trustEmail: false,
       },
       passwordLogin: true,
+      ipAddressHeaders: null,
     });
   });
 
@@ -53,6 +54,7 @@ describe('readAuthConfig', () => {
       OIDC_SIGNUP: 'auto',
       OIDC_ADMIN_GROUPS: 'reddevs-sso-admins, ops ,',
       OIDC_GROUPS_CLAIM: 'roles',
+      OIDC_TRUST_EMAIL: 'TRUE',
       PASSWORD_LOGIN: 'disabled',
     });
     expect(config).toEqual({
@@ -62,8 +64,10 @@ describe('readAuthConfig', () => {
         signup: 'auto',
         adminGroups: ['reddevs-sso-admins', 'ops'],
         groupsClaim: 'roles',
+        trustEmail: true,
       }),
       passwordLogin: false,
+      ipAddressHeaders: null,
     });
   });
 
@@ -91,6 +95,43 @@ describe('readAuthConfig', () => {
   it('refuses an unknown OIDC_SIGNUP or PASSWORD_LOGIN value', () => {
     expect(problems({ ...SSO, OIDC_SIGNUP: 'open' })).toEqual([expect.stringContaining('OIDC_SIGNUP')]);
     expect(problems({ ...SSO, PASSWORD_LOGIN: 'off' })).toEqual([expect.stringContaining('PASSWORD_LOGIN')]);
+  });
+
+  it('reads OIDC_TRUST_EMAIL as true or false only', () => {
+    expect(readAuthConfig({ ...SSO, OIDC_TRUST_EMAIL: 'true' }).sso?.trustEmail).toBe(true);
+    expect(readAuthConfig({ ...SSO, OIDC_TRUST_EMAIL: 'false' }).sso?.trustEmail).toBe(false);
+    for (const value of ['yes', '1', 'on']) {
+      expect(problems({ ...SSO, OIDC_TRUST_EMAIL: value })).toEqual([
+        `OIDC_TRUST_EMAIL must be "true" or "false" (got "${value}").`,
+      ]);
+    }
+  });
+
+  it('refuses OIDC_TRUST_EMAIL without SSO', () => {
+    expect(problems({ OIDC_TRUST_EMAIL: 'true' })).toEqual([
+      expect.stringContaining('OIDC_TRUST_EMAIL is set, but single sign-on is not configured'),
+    ]);
+  });
+
+  it('reads TRUSTED_IP_HEADERS in order, lowercased, with or without SSO', () => {
+    expect(
+      readAuthConfig({ TRUSTED_IP_HEADERS: 'CF-Connecting-IP, x-forwarded-for' }).ipAddressHeaders,
+    ).toEqual(['cf-connecting-ip', 'x-forwarded-for']);
+    expect(readAuthConfig({ ...SSO, TRUSTED_IP_HEADERS: 'x-real-ip' }).ipAddressHeaders).toEqual([
+      'x-real-ip',
+    ]);
+  });
+
+  it('refuses TRUSTED_IP_HEADERS that are not header names', () => {
+    expect(problems({ TRUSTED_IP_HEADERS: 'cf-connecting-ip, x forwarded for' })).toEqual([
+      expect.stringContaining('invalid: "x forwarded for"'),
+    ]);
+    expect(problems({ TRUSTED_IP_HEADERS: 'x-forwarded-for,,x-real-ip' })).toEqual([
+      expect.stringContaining('invalid: ""'),
+    ]);
+    expect(problems({ TRUSTED_IP_HEADERS: 'x-real-ip:' })).toEqual([
+      expect.stringContaining('TRUSTED_IP_HEADERS must be comma-separated header names'),
+    ]);
   });
 
   it('refuses PASSWORD_LOGIN=disabled without SSO', () => {
