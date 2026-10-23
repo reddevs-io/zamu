@@ -4,7 +4,17 @@
 //   E2E_KEEP_STACK=1   leave the stack running after the run (see global-teardown.ts)
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { baseURL, cliPath, compose, composeProject, image, repoRoot, waitForHealthy } from './stack';
+import { forgejoNames, removeForgejo } from './forgejo';
+import {
+  baseURL,
+  cliPath,
+  compose,
+  composeProject,
+  image,
+  mainStack,
+  repoRoot,
+  waitForHealthy,
+} from './stack';
 
 export default async function globalSetup(): Promise<void> {
   const skipBuild = process.env.E2E_SKIP_BUILD === '1';
@@ -19,6 +29,8 @@ export default async function globalSetup(): Promise<void> {
   if (!existsSync(cliPath)) throw new Error(`CLI not built: ${cliPath}. Run pnpm --filter @pm/cli build.`);
 
   console.log(`[e2e] removing any previous ${composeProject} stack and its volume`);
+  // A kept run (E2E_KEEP_STACK=1) leaves the Backlog.md specs' Forgejo attached to the stack network.
+  for (const name of forgejoNames) removeForgejo(name, mainStack.network);
   compose(['down', '-v', '--remove-orphans'], { quiet: true });
 
   if (!skipBuild) {

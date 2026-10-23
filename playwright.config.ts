@@ -7,6 +7,20 @@ const isCI = Boolean(process.env.CI);
 const origin = new URL(baseURL);
 const isLocalhost = origin.hostname === 'localhost' || origin.hostname === '127.0.0.1';
 
+const backlogSpecs = /backlog-.*\.spec\.ts$/;
+
+const browser = {
+  ...devices['Desktop Chrome'],
+  viewport: { width: 1280, height: 800 },
+  // Full Chromium in new headless mode rather than the headless shell: only it honours the flag below.
+  channel: 'chromium',
+  // The test reads the copied key with navigator.clipboard, which needs a secure context. In CI the stack is
+  // http://docker:<port>, not localhost.
+  launchOptions: isLocalhost
+    ? undefined
+    : { args: [`--unsafely-treat-insecure-origin-as-secure=${origin.origin}`] },
+};
+
 export default defineConfig({
   testDir: './e2e',
   outputDir: './test-results',
@@ -28,20 +42,10 @@ export default defineConfig({
     // The flow uses its own page (see the spec), so failures attach a screenshot there; the trace has the rest.
     trace: 'retain-on-failure',
   },
+  // The M1 flow (person-and-agent) sets the server up through the first-run page, so it has to run first. The
+  // Backlog.md specs live in a second project, which runs after the first one (one worker, config order).
   projects: [
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 1280, height: 800 },
-        // Full Chromium in new headless mode rather than the headless shell: only it honours the flag below.
-        channel: 'chromium',
-        // The test reads the copied key with navigator.clipboard, which needs a secure context. In CI the stack is
-        // http://docker:<port>, not localhost.
-        launchOptions: isLocalhost
-          ? undefined
-          : { args: [`--unsafely-treat-insecure-origin-as-secure=${origin.origin}`] },
-      },
-    },
+    { name: 'chromium', testIgnore: backlogSpecs, use: browser },
+    { name: 'backlog-md', testMatch: backlogSpecs, use: browser },
   ],
 });

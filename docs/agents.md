@@ -78,7 +78,7 @@ can leave out `--project`: pm finds the project from the clone's git remote.
 
 ```sh
 cd payments                 # a clone of gitlab.com/reddevs/payments
-pm link --project PAY       # or set Repository in the project's Edit project dialog
+pm link --project PAY       # or set Repository in the project's settings on the web
 pm agents                   # write the pm instructions into AGENTS.md, naming PAY
 git add AGENTS.md && git commit -m "Add pm instructions for agents"
 ```
@@ -110,14 +110,19 @@ to narrow it to one or more projects.
 
 Tell the agent about the exit codes so it can react without parsing text:
 
-| Code | Meaning                                                              |
-| ---- | -------------------------------------------------------------------- |
-| 0    | OK                                                                   |
-| 1    | Usage error, or the server rejected the input (400, 409, 422)        |
-| 2    | Not logged in, or the key was refused (401): revoked or wrong        |
-| 3    | Not found (404)                                                      |
-| 4    | Forbidden: outside the key's scope, or a read-only key writing (403) |
-| 5    | Server unreachable, 5xx, or a response this CLI does not understand  |
+| Code | Meaning                                                                                |
+| ---- | -------------------------------------------------------------------------------------- |
+| 0    | OK                                                                                     |
+| 1    | Usage error, or the server rejected the input (400, 409, 422)                          |
+| 2    | Not logged in, or the key was refused (401): revoked or wrong                          |
+| 3    | Not found (404)                                                                        |
+| 4    | Forbidden: outside the key's scope, or a read-only key writing (403)                   |
+| 5    | Server unreachable, 5xx, or a response this CLI does not understand                    |
+| 6    | Backlog.md: the change belongs in the files, or the mirror is paused or detached (409) |
+
+Exit code 6 covers the problem codes `TASK_MIRRORED`, `MILESTONE_MIRRORED`, `PROJECT_MIRRORED`,
+`PROJECT_NOT_EMPTY`, `BACKLOG_PAUSED` and `BACKLOG_DETACHED`. Other conflicts, such as two edits racing,
+stay on 1. See [Backlog.md mirrors](#backlogmd-mirrors).
 
 ## Comments and mentions
 
@@ -149,7 +154,7 @@ their id.
 
 Projects can group tasks into milestones (a goal with an optional target date) and cycles (numbered,
 dated periods of work, usually two weeks). Both are on by default. Anyone who can edit a project can turn either off in
-its Edit project dialog in the web app; the data stays and comes back when you turn it on again.
+its settings (General) in the web app; the data stays and comes back when you turn it on again.
 
 Milestones go by name or id. Names are unique in a project and the CLI ignores case:
 
@@ -180,6 +185,56 @@ ends, early by hand or at midnight after its end date (in the server's `APP_TIME
 tasks move to the next cycle; the server creates one with the same length when none is planned.
 `pm cycles end --move-to none` takes them out of cycles instead. `--milestone none` and `--cycle none`
 clear the field on `pm tasks update` and filter tasks without one on `pm tasks list`.
+
+## Backlog.md mirrors
+
+A project can mirror the Backlog.md folder of its repository (see [backlog-md.md](backlog-md.md)). The files
+on the default branch stay the source of truth: agents keep working in them with the `backlog` CLI, and the
+project follows every push. Mirrored tasks keep their Backlog.md numbers, so `BACK-786.1` is `PAY-786.1` in
+a project with the key `PAY`.
+
+In a mirrored project:
+- Change a task by editing its file in `backlog/` (or the folder the project reads) and pushing to the default
+  branch, for example `backlog task edit 786 -s "In Progress"`. Changes on other branches show up once they
+  are merged.
+- `pm` reads the tasks, comments on them and sets their cycle. Every command that takes a task key also takes
+  the Backlog.md ID: `pm tasks show BACK-786.1`. IDs such as `TASK-12` can repeat across projects; add
+  `--project` when pm asks for it.
+- `pm` refuses to change the title, description, status, priority, assignee or milestone of a mirrored task,
+  to create tasks, and to change milestones. It exits with code 6 and says where the change belongs:
+
+  ```text
+  $ pm tasks update PAY-786 --status done
+  error: PAY-786 is mirrored from Backlog.md, so its status can't change here (task_mirrored).
+    file:  backlog/tasks/back-786 - Retry-failed-webhook-deliveries-with-exponential-backoff.md (main)
+    edit the file and push, or run: backlog task edit 786 -s Done
+    still allowed here: comments (pm comments add PAY-786) and cycles (pm tasks update PAY-786 --cycle 4)
+  ```
+
+  With `--json`, the error is the server's problem, with `field`, `file`, `backlogId` and `hint` (the
+  `backlog` command that makes the change).
+
+After a push, the project usually catches up within seconds through the git host's webhook. When an agent
+needs the change right away, for example before it reads the task back, it asks for a refresh and waits:
+
+```sh
+pm backlog refresh --wait --json   # reads the default branch now and waits for the result, up to 5 minutes
+pm backlog status                  # mode, state, branch, folder, last read and its commit, counts
+pm backlog status --problems       # every file skipped or read with a warning, and every unmapped value
+```
+
+`pm backlog refresh` needs a key that can write the project. With `--wait` it exits 0 whatever the read
+found, so check `data.status.state` in the JSON: `healthy`, `warnings` (some files were skipped or values fell
+back; `pm backlog status --problems` lists them), `failed` or `paused`. It exits with code 6 when the mirror
+is paused (`BACKLOG_PAUSED`: the git connection is missing, rejected or unreachable; an admin fixes it in the
+web app) or detached (`BACKLOG_DETACHED`).
+
+A task whose file is deleted from the default branch is hidden, not deleted: it leaves `pm tasks list`, and
+`pm tasks show` marks it "Hidden". It comes back with the same key when a file with its ID returns.
+
+Once a project is detached from Backlog.md, or was imported once, its tasks behave like any other: `pm`
+creates and updates them, and edits to the files no longer reach the project. Agents should stop editing
+`backlog/` then.
 
 ## --json output
 
@@ -215,6 +270,8 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 | `pm.v1.cycles.create`     | `Cycle`                                                                      |
 | `pm.v1.cycles.current`    | `Cycle`, or `null` when no cycle is running                                  |
 | `pm.v1.cycles.end`        | `Cycle` with its summary, plus `rollovers`: the tasks that moved and where   |
+| `pm.v1.backlog.status`    | `BacklogSourceStatus`: mode, state, source, last read, counts, problems      |
+| `pm.v1.backlog.refresh`   | The refresh request plus `outcome` and, with `--wait`, the final `status`    |
 | `pm.v1.link`              | `{ project, target, action, repository, file }`                              |
 | `pm.v1.agents`            | `{ file, action, project, block }`                                           |
 | `pm.v1.error`             | RFC 9457 problem: `{ type, title, status, code, detail, requestId, issues }` |

@@ -1,0 +1,185 @@
+// Backlog.md import end to end, against a real Forgejo (e2e/forgejo.ts): an empty project linked to a repository
+// whose root backlog.config.yml names the folder planning/, the five setup steps in import mode, and the
+// project afterwards: detached, every field editable by people and agents, numbering that continues, and no
+// more refreshes from the files.
+//
+// The tests build on each other, so they share one page and run in order. Forgejo starts in beforeAll and is
+// removed in afterAll. E2E_SKIP_BACKLOG=1 skips the spec; so does a missing Docker daemon.
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { createCli, parseJson } from './cli';
+import { addConnection, dockerAvailable, type Forgejo, readTree, startForgejo } from './forgejo';
+import { addAgent, api, collectPageErrors, settle, signInAsAdmin } from './session';
+import { baseURL, forgejoAliases, mainStack, repoRoot } from './stack';
+
+const repo = 'backlog-demo';
+const project = { name: 'Backlog Demo', key: 'DEMO' };
+const agentName = 'import-agent';
+/** Root backlog.config.yml naming planning/ as the folder, ISO timestamps, a subtask and a draft. */
+const fixture = `${repoRoot}/packages/backlog-md/test/fixtures/eras/2026-10-iso`;
+
+interface TaskShape {
+  key: string;
+  title: string;
+  status: string;
+  locked?: string[];
+  backlog: { id: string } | null;
+}
+interface SourceStatus {
+  mode: string;
+  state: string;
+  lastRead: { commit: string } | null;
+}
+
+test.describe.configure({ mode: 'serial' });
+test.skip(process.env.E2E_SKIP_BACKLOG === '1', 'E2E_SKIP_BACKLOG=1');
+test.skip(!dockerAvailable(), 'Docker is not available: the Backlog.md specs need it to run Forgejo.');
+
+let context: BrowserContext;
+let page: Page;
+let forgejo: Forgejo;
+const pageErrors: string[] = [];
+const cli = createCli();
+
+async function taskOf(key: string): Promise<TaskShape> {
+  return api<TaskShape>(page.request, 'GET', `/tasks/${key}`);
+}
+
+test.beforeAll(async ({ browser }) => {
+  test.setTimeout(5 * 60_000);
+  forgejo = await startForgejo('import', mainStack.network, forgejoAliases.import);
+  await forgejo.createRepository(repo, { 'README.md': '# Backlog demo\n', ...readTree(fixture) });
+
+  context = await browser.newContext({
+    permissions: ['clipboard-read', 'clipboard-write'],
+    timezoneId: 'UTC',
+  });
+  page = await context.newPage();
+  collectPageErrors(page, pageErrors, [
+    // The refused refresh of a detached source answers 409 on purpose.
+    /status of 409\b/,
+  ]);
+});
+
+// biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object pattern as the first argument.
+test.afterEach(async ({}, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus && page) {
+    await testInfo.attach('page at failure', { body: await page.screenshot(), contentType: 'image/png' });
+  }
+});
+
+test.afterAll(async () => {
+  await context?.close();
+  cli.dispose();
+  if (process.env.E2E_KEEP_STACK === '1') {
+    console.log('[e2e] leaving the import spec Forgejo running; the next pnpm e2e run removes it');
+    return;
+  }
+  forgejo?.stop();
+});
+
+test('import: the five setup steps on an empty project linked to the repository', async () => {
+  await signInAsAdmin(page);
+  await addConnection(page, forgejo, 'Forgejo · e2e import');
+  await api(page.request, 'POST', '/projects', { ...project, repository: forgejo.repositoryUrl(repo) });
+
+  await page.goto(`/p/${project.key}/backlog-setup?mode=import`);
+  await settle(page);
+  await expect(page.getByRole('heading', { name: `Import Backlog.md into ${project.name}` })).toBeVisible();
+
+  // 1. Mode
+  await expect(page.getByRole('radio', { name: /Import once/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  // 2. Source: the connection is picked by host, and the folder comes from backlog.config.yml.
+  await expect(page.getByText('planning/').first()).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  // 3. Mappings: every status matches by name.
+  const statusMapping = page.getByRole('group', { name: 'Status mapping' });
+  await expect(statusMapping.getByRole('button', { name: /In Progress maps to/ })).toHaveAccessibleName(
+    /^In progress/,
+  );
+  await page.getByRole('button', { name: 'Preview' }).click();
+
+  // 4. Preview: the task, its subtask and the draft.
+  await expect(page.getByRole('heading', { name: `Import 3 tasks into ${project.name}?` })).toBeVisible({
+    timeout: 20_000,
+  });
+  const sample = page.getByRole('region', { name: 'Sample' });
+  await expect(sample.getByRole('listitem').filter({ hasText: 'BACK-786.1' })).toContainText(
+    `${project.key}-786.1`,
+  );
+  await expect(sample.getByRole('listitem').filter({ hasText: 'DRAFT-14' })).toContainText(
+    `${project.key}-787`,
+  );
+
+  // 5. Read, then detach in the same job.
+  await page.getByRole('button', { name: 'Import 3 tasks' }).click();
+  await expect(page.getByText(`${project.name} imported`)).toBeVisible({ timeout: 60_000 });
+  await expect(
+    page.getByText('The project is detached from the files: every task is editable here.'),
+  ).toBeVisible();
+
+  const status = await api<SourceStatus>(page.request, 'GET', `/projects/${project.key}/backlog`);
+  expect(status).toMatchObject({ mode: 'import', state: 'detached' });
+  expect(status.lastRead?.commit).toBe(await forgejo.head(repo));
+});
+
+test('after the import every field is editable and the numbering continues', async () => {
+  const task = await taskOf(`${project.key}-786`);
+  expect(task).toMatchObject({ title: 'Mirror Backlog.md', status: 'in_progress', locked: [] });
+  // The Backlog.md record stays on the task, and its ID still finds it.
+  expect(task.backlog?.id).toBe('BACK-786');
+  expect((await taskOf('BACK-786.1')).key).toBe(`${project.key}-786.1`);
+
+  const updated = await api<TaskShape>(page.request, 'PATCH', `/tasks/${project.key}-786`, {
+    title: 'Mirror Backlog.md folders',
+    status: 'done',
+  });
+  expect(updated).toMatchObject({ title: 'Mirror Backlog.md folders', status: 'done' });
+
+  const milestones = await api<{ items: { id: string; name: string }[] }>(
+    page.request,
+    'GET',
+    `/projects/${project.key}/milestones`,
+  );
+  const milestone = milestones.items.find((item) => item.name === 'Agent CLI Workflow');
+  expect(milestone).toBeDefined();
+  await api(page.request, 'PATCH', `/milestones/${milestone?.id}`, { name: 'Agent CLI' });
+
+  // The draft took 787, so the next task is 788.
+  const created = await api<TaskShape>(page.request, 'POST', '/tasks', {
+    project: project.key,
+    title: 'Document the import',
+  });
+  expect(created.key).toBe(`${project.key}-788`);
+
+  await page.goto(`/p/${project.key}`);
+  await settle(page);
+  await expect(page.getByRole('button', { name: /^Backlog\.md: / })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^New/ }).first()).not.toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+});
+
+test('agents edit imported tasks with pm; the files no longer reach the project', async () => {
+  const apiKey = await addAgent(page, agentName, [project.key]);
+  const login = cli.run(['login', '--key', apiKey, '--url', baseURL, '--json']);
+  expect(login.code, login.stdout + login.stderr).toBe(0);
+
+  const update = cli.run(['tasks', 'update', 'BACK-786.1', '--status', 'in_progress', '--json']);
+  expect(update.code, update.stdout + update.stderr).toBe(0);
+  expect(parseJson<TaskShape>(update, 'pm.v1.tasks.update').status).toBe('in_progress');
+
+  // A push changes nothing, and a refresh is refused: the source is detached.
+  await forgejo.commit(repo, 'Rename the parent task', {
+    'planning/tasks/back-786 - Mirror-Backlog-md.md': readTree(fixture)[
+      'planning/tasks/back-786 - Mirror-Backlog-md.md'
+    ]?.replace('title: Mirror Backlog.md', 'title: Renamed in git') as string,
+  });
+  const refresh = cli.run(['backlog', 'refresh', '--project', project.key]);
+  expect(refresh.code, refresh.stdout + refresh.stderr).toBe(6);
+  expect((await taskOf(`${project.key}-786`)).title).toBe('Mirror Backlog.md folders');
+  expect(pageErrors).toEqual([]);
+});
