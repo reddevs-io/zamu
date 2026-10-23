@@ -9,6 +9,17 @@ export {
   UnassignedAvatar,
   type UnassignedAvatarProps,
 } from './Avatar';
+export {
+  BacklogBlock,
+  type BacklogBlockProps,
+  KeyValueRow,
+  type KeyValueRowProps,
+  LabelChip,
+  MissingTaskLink,
+  type MissingTaskLinkProps,
+  TaskLink,
+  type TaskLinkProps,
+} from './BacklogBlock';
 export { Banner, type BannerProps } from './Banner';
 export {
   BoardCard,
@@ -24,6 +35,8 @@ export {
   type BoardColumnHeaderProps,
   type BoardColumnProps,
   boardCardStyles,
+  ColumnRefusal,
+  type ColumnRefusalProps,
   DropLine,
   dropIndicatorClass,
   SwimlaneHeader,
@@ -37,6 +50,7 @@ export {
   type CheckboxGroupProps,
   type CheckboxProps,
 } from './Checkbox';
+export { Checklist, type ChecklistItem, type ChecklistProps, CheckMark } from './Checklist';
 export { Chip, type ChipProps } from './Chip';
 export { CodeBlock, type CodeBlockProps, copyText, InlineCode, useCopy } from './CodeBlock';
 export { ComboBox, type ComboBoxProps } from './ComboBox';
@@ -57,6 +71,22 @@ export {
   type ComposerProps,
   type ComposerTextAreaAttributes,
 } from './Composer';
+export {
+  CONNECTION_STATUS_LABELS,
+  CONNECTION_STATUSES,
+  type ConnectionStatus,
+  ConnectionStatusTag,
+  type ConnectionStatusTagProps,
+  GIT_PROVIDERS,
+  type GitProviderKind,
+  PROVIDER_LABELS,
+  ProviderBadge,
+  type ProviderBadgeProps,
+  StateTag,
+  type StateTagProps,
+  type StateTagTone,
+} from './Connection';
+export { CopyField, type CopyFieldProps } from './CopyField';
 export { cn, composeTw } from './cn';
 export {
   type DataColumn,
@@ -77,9 +107,17 @@ export {
   type ModalProps,
 } from './Dialog';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
+export { type Fact, FactList, type FactListProps } from './FactList';
 export { FieldDescription, FieldError, Label } from './Field';
 export { Kbd, type KbdProps } from './Kbd';
 export { ListBox, ListBoxItem, type OptionItem, OptionRow, Popover } from './ListBox';
+export {
+  DisabledCreateButton,
+  type DisabledCreateButtonProps,
+  lockedHatch,
+  OwnedFieldCaption,
+  type OwnedFieldCaptionProps,
+} from './Locked';
 export { type ActivityEntry, ActivityTimeline } from './layout/ActivityTimeline';
 export { AppFrame, type AppFrameProps } from './layout/AppFrame';
 export { FilterBar, type FilterBarProps, FilterValue } from './layout/FilterBar';
@@ -95,6 +133,13 @@ export {
   type UserMenuProps,
   type UserMenuSubItem,
 } from './layout/UserMenu';
+export {
+  type MappingHow,
+  MappingRow,
+  type MappingRowProps,
+  MappingTable,
+  type MappingTableProps,
+} from './Mapping';
 export { MentionChip, type MentionChipProps } from './MentionChip';
 export { Menu, MenuItem, type MenuItemProps, MenuSeparator, MenuTrigger, SubmenuTrigger } from './Menu';
 export {
@@ -132,6 +177,7 @@ export {
   type NoneGlyphProps,
 } from './PlanningGlyph';
 export { PriorityGlyph, type PriorityGlyphProps } from './PriorityGlyph';
+export { ProblemList, type ProblemListProps, ProblemRow, type ProblemRowProps } from './Problems';
 export {
   DaysLeftPill,
   type DaysLeftPillProps,
@@ -156,11 +202,37 @@ export {
   type SegmentedItem,
 } from './SegmentedControl';
 export { Select, type SelectProps } from './Select';
+export {
+  type SetupStep,
+  SetupSteps,
+  type SetupStepsProps,
+  StepMarker,
+  type StepMarkerProps,
+  type StepState,
+} from './SetupSteps';
 export { Skeleton, type SkeletonProps } from './Skeleton';
+export {
+  SOURCE_DOT_LABELS,
+  SOURCE_DOT_STATES,
+  SourceButton,
+  type SourceButtonProps,
+  type SourceDotState,
+  SourceStatusDot,
+  type SourceStatusDotProps,
+} from './SourceStatus';
+export {
+  NoticeStrip,
+  type NoticeStripProps,
+  SourceStrip,
+  type SourceStripProps,
+  TruncatedPath,
+  type TruncatedPathProps,
+} from './SourceStrip';
 export { StatStrip, type StatStripProps, StatTile, type StatTileProps } from './Stat';
 export { StatusBar, type StatusBarProps } from './StatusBar';
 export { StatusSquare, type StatusSquareProps } from './StatusSquare';
 export { Switch, type SwitchProps } from './Switch';
+export { SystemActorAvatar, type SystemActorAvatarProps, SystemActorDot } from './SystemActor';
 export { Tab, TabList, TabPanel, Tabs } from './Tabs';
 export { Tag, type TagProps } from './Tag';
 export {

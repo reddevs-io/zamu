@@ -34,6 +34,8 @@ import { Tooltip, TooltipTrigger } from '../Tooltip';
 import { useHotkeys } from '../useHotkeys';
 import { M2Gallery } from './M2Gallery';
 import { M2TokensSheet } from './M2TokensSheet';
+import { M3Gallery } from './M3Gallery';
+import { M3TokensSheet } from './M3TokensSheet';
 import {
   ASSIGNEE_OPTIONS,
   COLLAPSED_BY_DEFAULT,
@@ -45,8 +47,8 @@ import {
 import { TokensSheet } from './TokensSheet';
 
 /**
- * /__ui: the M1 tokens frame (1280×800) and the M2 tokens frame (1280 wide), both compared with their
- * design frames, then every component and state.
+ * /__ui: the M1 tokens frame (1280×800), the M2 tokens frame (1280 wide) and the M3 tokens frame
+ * (1280×800), each compared with its design frame, then every component and state.
  */
 export function UIGallery() {
   return (
@@ -55,7 +57,11 @@ export function UIGallery() {
       <div className="border-t border-line">
         <M2TokensSheet />
       </div>
+      <div className="border-t border-line">
+        <M3TokensSheet />
+      </div>
       <div className="flex w-[1280px] flex-col gap-12 border-t border-line px-10 py-10">
+        <M3Gallery />
         <M2Gallery />
         <ButtonsSection />
         <FieldsSection />
@@ -648,7 +654,7 @@ function LayoutSection() {
               projects={[
                 { key: 'PAY', name: 'Payments', openCount: 12, href: '/__ui', isCurrent: true },
                 { key: 'WEB', name: 'Web app', openCount: 27, href: '/__ui' },
-                { key: 'CLI', name: 'pm CLI', openCount: 9, href: '/__ui' },
+                { key: 'CLI', name: 'pm CLI', openCount: 9, href: '/__ui', mirrored: true },
                 { key: 'INF', name: 'Infra', openCount: 5, href: '/__ui' },
               ]}
               settings={{ href: '/__ui' }}

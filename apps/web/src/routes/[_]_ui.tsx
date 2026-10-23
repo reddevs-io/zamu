@@ -1,4 +1,5 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { cn } from '~/ui/cn';
 import { UIGallery } from '~/ui/gallery/UIGallery';
 import { UIProvider } from '~/ui/UIProvider';
@@ -20,6 +21,13 @@ export const Route = createFileRoute('/__ui')({
 
 function GalleryPage() {
   const { theme } = Route.useSearch();
+  // Popovers and tooltips render in a portal under <body>: put the forced theme on <html> too, as the app does.
+  useEffect(() => {
+    if (!theme) return;
+    const root = document.documentElement;
+    root.classList.add(theme);
+    return () => root.classList.remove(theme);
+  }, [theme]);
   return (
     <UIProvider>
       {/* ?theme=light|dark forces a theme; without it the gallery follows prefers-color-scheme. */}

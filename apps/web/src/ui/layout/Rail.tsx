@@ -20,6 +20,8 @@ export interface RailProject {
   openCount: number;
   href: string;
   isCurrent?: boolean;
+  /** Tasks come from a Backlog.md mirror: a small square at the top right and a note in the tooltip. */
+  mirrored?: boolean;
 }
 
 export interface RailUserAction {
@@ -101,17 +103,26 @@ export function Rail({
         <TooltipTrigger key={project.key}>
           <Link
             href={project.href}
-            aria-label={`${project.name}, ${project.openCount} open`}
+            aria-label={`${project.name}, ${project.openCount} open${project.mirrored ? ', mirrored from Backlog.md' : ''}`}
             aria-current={project.isCurrent ? 'page' : undefined}
+            data-mirrored={project.mirrored || undefined}
             className={cn(
-              'flex h-11 shrink-0 flex-col items-center justify-center gap-px font-mono text-[10.5px] font-medium outline-none focus-visible:focus-ring-inset',
+              'relative flex h-11 shrink-0 flex-col items-center justify-center gap-px font-mono text-[10.5px] font-medium outline-none focus-visible:focus-ring-inset',
               project.isCurrent ? 'bg-rail-on text-rail' : 'text-rail-fg hover:text-rail-on',
             )}
           >
+            {project.mirrored ? (
+              <span
+                aria-hidden
+                className="absolute top-[7px] right-[13px] size-[5px] bg-current opacity-75"
+              />
+            ) : null}
             <span>{project.key}</span>
             <span className="text-[9px] opacity-70">{project.openCount}</span>
           </Link>
-          <Tooltip placement="right">{project.name}</Tooltip>
+          <Tooltip placement="right">
+            {project.mirrored ? `${project.name} · mirrored from Backlog.md` : project.name}
+          </Tooltip>
         </TooltipTrigger>
       ))}
       <span className="flex-1" />

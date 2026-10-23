@@ -199,7 +199,7 @@ export function BoardColumnHeader({
   return (
     <div
       className={cn(
-        'flex h-[34px] shrink-0 items-center gap-2 border-b border-line-2 px-3',
+        'flex h-[34px] shrink-0 items-center gap-2 border-b border-line-2 px-3 whitespace-nowrap',
         columnCaption,
         className,
       )}
@@ -242,6 +242,12 @@ export interface BoardColumnProps {
   onFoldChange?: (folded: boolean) => void;
   /** A dragged card is over this column: --drop ground and dashed --drop-line outline. */
   isDropTarget?: boolean;
+  /**
+   * The column refuses the dragged card (a mirrored task cannot change status): hatched ground, cards at
+   * half strength and a band under the header. `true` draws the default ColumnRefusal text; a string
+   * replaces the text; any other node is drawn as the band.
+   */
+  refusal?: ReactNode;
   /** "+" in the header. */
   onAdd?: () => void;
   /** Dashed footer under the cards: "49 more · scroll or press J". */
@@ -259,6 +265,7 @@ export function BoardColumn({
   isFolded = false,
   onFoldChange,
   isDropTarget = false,
+  refusal,
   onAdd,
   more,
   children,
@@ -307,9 +314,11 @@ export function BoardColumn({
       aria-label={`${name}, ${count} tasks`}
       data-status={status}
       data-drop-target={isDropTarget || undefined}
+      data-refused={refusal ? true : undefined}
       className={cn(
         'flex min-h-0 min-w-0 flex-[1_1_0] flex-col border-r border-line-2',
         isDropTarget && 'bg-drop outline-[1.5px] -outline-offset-2 outline-drop-line outline-dashed',
+        refusal ? 'locked-hatch' : null,
         className,
       )}
     >
@@ -320,7 +329,19 @@ export function BoardColumn({
         onAdd={onAdd}
         onFold={onFoldChange ? () => onFoldChange(true) : undefined}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-2">
+      {refusal === true ? (
+        <ColumnRefusal />
+      ) : typeof refusal === 'string' ? (
+        <ColumnRefusal>{refusal}</ColumnRefusal>
+      ) : (
+        refusal
+      )}
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-2',
+          refusal ? 'opacity-50' : null,
+        )}
+      >
         {children}
         {more ? (
           <div className="flex h-7 shrink-0 items-center justify-center border border-dashed border-line text-[11.5px] text-muted">
@@ -329,6 +350,39 @@ export function BoardColumn({
         ) : null}
       </div>
     </section>
+  );
+}
+
+export interface ColumnRefusalProps {
+  /** Defaults to "Status comes from Backlog.md. Change it in the task file." */
+  children?: ReactNode;
+  className?: string;
+}
+
+/**
+ * Dashed band under a column header while a mirrored card is dragged: the drop is refused and this says
+ * why (ledger-m3.css .m3-colnot). BoardColumn draws it through its `refusal` prop.
+ */
+export function ColumnRefusal({
+  children = (
+    <>
+      Status comes from Backlog.md.
+      <br />
+      Change it in the task file.
+    </>
+  ),
+  className,
+}: ColumnRefusalProps) {
+  return (
+    <div
+      role="note"
+      className={cn(
+        'mx-2 mt-2 shrink-0 border border-dashed border-line bg-surface px-2 py-1.5 text-center text-[11.5px] leading-[1.4] text-muted',
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
