@@ -6,6 +6,7 @@ import { agents } from './commands/agents';
 import { login, logout, whoami } from './commands/auth';
 import { addComment, deleteComment, editComment, listComments } from './commands/comments';
 import { createCycle, currentCycle, endCycle, listCycles } from './commands/cycles';
+import { showDashboard } from './commands/dashboard';
 import { link } from './commands/link';
 import { createMilestone, listMilestones, updateMilestone } from './commands/milestones';
 import { listProjects } from './commands/projects';
@@ -95,6 +96,16 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       .option('--project <KEY>', "project to name in the instructions (default: this clone's)")
       .option('--print', 'print the instructions instead of writing a file'),
   ).action((options) => agents(context, options));
+
+  leaf(
+    program
+      .command('dashboard')
+      .description(
+        'what needs you now across every project: in review, mentions, stalled work and deadlines; ' +
+          'then projects and agents',
+      )
+      .option('--everyone', 'the whole workspace instead of your tasks, your agents and mentions of you'),
+  ).action((options: { everyone?: boolean }) => showDashboard(context, options));
 
   const projects = program.command('projects').description('list projects');
   leaf(projects.command('list').description('list projects with open task counts')).action(() =>

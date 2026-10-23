@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as authSetupRouteImport } from './routes/(auth)/setup'
 import { Route as authSigninRouteImport } from './routes/(auth)/signin'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppMyTasksRouteImport } from './routes/_app/my-tasks'
 import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/route'
 import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
@@ -55,6 +56,11 @@ const authSigninRoute = authSigninRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMyTasksRoute = AppMyTasksRouteImport.update({
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRouteRouteWithChildren
   '/setup': typeof authSetupRoute
   '/signin': typeof authSigninRoute
+  '/dashboard': typeof AppDashboardRoute
   '/my-tasks': typeof AppMyTasksRoute
   '/api/healthz': typeof ApiHealthzRoute
   '/invite/$id': typeof authInviteIdRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/__ui': typeof _uiRoute
   '/setup': typeof authSetupRoute
   '/signin': typeof authSigninRoute
+  '/dashboard': typeof AppDashboardRoute
   '/my-tasks': typeof AppMyTasksRoute
   '/api/healthz': typeof ApiHealthzRoute
   '/': typeof AppIndexRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRouteRouteWithChildren
   '/(auth)/setup': typeof authSetupRoute
   '/(auth)/signin': typeof authSigninRoute
+  '/_app/dashboard': typeof AppDashboardRoute
   '/_app/my-tasks': typeof AppMyTasksRoute
   '/api/healthz': typeof ApiHealthzRoute
   '/_app/': typeof AppIndexRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/signin'
+    | '/dashboard'
     | '/my-tasks'
     | '/api/healthz'
     | '/invite/$id'
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/__ui'
     | '/setup'
     | '/signin'
+    | '/dashboard'
     | '/my-tasks'
     | '/api/healthz'
     | '/'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/(auth)/setup'
     | '/(auth)/signin'
+    | '/_app/dashboard'
     | '/_app/my-tasks'
     | '/api/healthz'
     | '/_app/'
@@ -346,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/my-tasks': {
@@ -498,6 +517,7 @@ const AppSettingsRouteRouteWithChildren =
 
 interface AppRouteChildren {
   AppSettingsRouteRoute: typeof AppSettingsRouteRouteWithChildren
+  AppDashboardRoute: typeof AppDashboardRoute
   AppMyTasksRoute: typeof AppMyTasksRoute
   AppIndexRoute: typeof AppIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
@@ -511,6 +531,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppSettingsRouteRoute: AppSettingsRouteRouteWithChildren,
+  AppDashboardRoute: AppDashboardRoute,
   AppMyTasksRoute: AppMyTasksRoute,
   AppIndexRoute: AppIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,

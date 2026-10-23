@@ -9,11 +9,6 @@ export function byLastActivity<T extends Sortable>(projects: readonly T[]): T[] 
   );
 }
 
-/** Key of the most recently updated project, or undefined when there are none. */
-export function latestProjectKey(projects: readonly Sortable[]): string | undefined {
-  return byLastActivity(projects)[0]?.key;
-}
-
 /** Case-insensitive match on key, name and description. */
 export function filterProjects<T extends Pick<ProjectWithCounts, 'key' | 'name' | 'description'>>(
   projects: readonly T[],

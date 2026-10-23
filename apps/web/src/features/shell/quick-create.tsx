@@ -8,6 +8,11 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useSta
 export interface QuickCreateOptions {
   /** Status to preselect, e.g. the board column whose "+" opened the dialog. */
   status?: TaskStatus;
+  /**
+   * Open with no project chosen and the project picker focused, instead of guessing the most recently
+   * active project (the dashboard covers every project, so there is no good guess).
+   */
+  pickProject?: boolean;
 }
 
 interface QuickCreateState {
@@ -16,6 +21,8 @@ interface QuickCreateState {
   projectKey: string | undefined;
   /** Status to preselect for this opening; undefined uses the dialog's default. */
   status: TaskStatus | undefined;
+  /** This opening starts without a project; the dialog focuses its project picker. */
+  pickProject: boolean;
   open: (projectKey?: string, options?: QuickCreateOptions) => void;
   close: () => void;
 }
@@ -26,15 +33,17 @@ export function QuickCreateProvider({ children }: { children: ReactNode }) {
   const [isOpen, setOpen] = useState(false);
   const [projectKey, setProjectKey] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<TaskStatus | undefined>(undefined);
+  const [pickProject, setPickProject] = useState(false);
   const open = useCallback((key?: string, options?: QuickCreateOptions) => {
     setProjectKey(key);
     setStatus(options?.status);
+    setPickProject(key === undefined && options?.pickProject === true);
     setOpen(true);
   }, []);
   const close = useCallback(() => setOpen(false), []);
   const value = useMemo(
-    () => ({ isOpen, projectKey, status, open, close }),
-    [isOpen, projectKey, status, open, close],
+    () => ({ isOpen, projectKey, status, pickProject, open, close }),
+    [isOpen, projectKey, status, pickProject, open, close],
   );
   return <QuickCreateContext.Provider value={value}>{children}</QuickCreateContext.Provider>;
 }

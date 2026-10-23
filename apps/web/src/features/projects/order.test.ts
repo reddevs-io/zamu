@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byLastActivity, filterProjects, latestProjectKey } from './order';
+import { byLastActivity, filterProjects } from './order';
 import { shortAge } from './time';
 
 const projects = [
@@ -21,11 +21,6 @@ const projects = [
 describe('byLastActivity', () => {
   it('sorts the most recently updated first, then by key', () => {
     expect(byLastActivity(projects).map((p) => p.key)).toEqual(['CLI', 'WEB', 'PAY']);
-  });
-
-  it('gives the redirect target for "/"', () => {
-    expect(latestProjectKey(projects)).toBe('CLI');
-    expect(latestProjectKey([])).toBeUndefined();
   });
 });
 

@@ -8,15 +8,17 @@ import { NewProjectProvider, useNewProject } from './new-project';
 import { PageSearchProvider, usePageSearchRef } from './page-search';
 import { QuickCreateProvider, useQuickCreate } from './quick-create';
 
-function Probe({ projectKey }: { projectKey?: string }) {
-  useShellHotkeys(projectKey);
+function Probe({ projectKey, pickProject }: { projectKey?: string; pickProject?: boolean }) {
+  useShellHotkeys(projectKey, pickProject ? { pickProject } : undefined);
   const quickCreate = useQuickCreate();
   const newProject = useNewProject();
   const searchRef = usePageSearchRef();
   return (
     <main>
       <output aria-label="quick create">
-        {quickCreate.isOpen ? `open:${quickCreate.projectKey ?? 'none'}` : 'closed'}
+        {quickCreate.isOpen
+          ? `open:${quickCreate.projectKey ?? 'none'}${quickCreate.pickProject ? ':pick' : ''}`
+          : 'closed'}
       </output>
       <output aria-label="new project">{newProject.isOpen ? 'open' : 'closed'}</output>
       <SearchField aria-label="Search projects" inputRef={searchRef} />
@@ -62,6 +64,13 @@ describe('useShellHotkeys', () => {
     expect(screen.getByLabelText('quick create')).toHaveTextContent('open:none');
   });
 
+  it('C on a page that asks for a choice opens with the project picker', async () => {
+    const user = userEvent.setup();
+    render(<Probe pickProject />, { wrapper: Providers });
+    await user.keyboard('c');
+    expect(screen.getByLabelText('quick create')).toHaveTextContent('open:none:pick');
+  });
+
   it('P opens New project and / focuses the page search', async () => {
     const user = userEvent.setup();
     render(<Probe />, { wrapper: Providers });
@@ -89,8 +98,16 @@ describe('useShellHotkeys', () => {
   });
 });
 
-function GoTo({ onMyTasks, onM }: { onMyTasks: () => void; onM: () => void }) {
-  useGoToHotkeys({ m: onMyTasks });
+function GoTo({
+  onMyTasks,
+  onM,
+  onDashboard = () => {},
+}: {
+  onMyTasks: () => void;
+  onM: () => void;
+  onDashboard?: () => void;
+}) {
+  useGoToHotkeys({ d: onDashboard, m: onMyTasks });
   // A page shortcut on the same letter (M focuses the comment composer on task screens).
   useHotkeys({ m: onM });
   return (
@@ -115,6 +132,16 @@ describe('useGoToHotkeys', () => {
     await user.keyboard('m');
     expect(onMyTasks).toHaveBeenCalledTimes(1);
     expect(onM).toHaveBeenCalledTimes(1);
+  });
+
+  it('G then D goes to the dashboard', async () => {
+    const user = userEvent.setup();
+    const onDashboard = vi.fn();
+    const onMyTasks = vi.fn();
+    render(<GoTo onMyTasks={onMyTasks} onM={() => {}} onDashboard={onDashboard} />);
+    await user.keyboard('gd');
+    expect(onDashboard).toHaveBeenCalledTimes(1);
+    expect(onMyTasks).not.toHaveBeenCalled();
   });
 
   it('ignores the sequence while typing and after the window passes', async () => {
