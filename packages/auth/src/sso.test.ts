@@ -535,3 +535,108 @@ describe('SSO: password sign-in disabled', () => {
     expect(await usersByEmail(database, 'lee@example.com')).toEqual([]);
   });
 });
+
+describe('SSO: OIDC_TRUST_EMAIL', () => {
+  let database: TestDatabase;
+  let strict: ReturnType<typeof createAuth>;
+  let trusting: ReturnType<typeof createAuth>;
+  let adminHeaders: Headers;
+  let workspaceId: string;
+  let adminId: string;
+
+  // Authentik's managed email mapping always sends email_verified: false.
+  const unverified = (email: string, extra: Partial<MockIdentity> = {}) =>
+    person(email, { email_verified: false, ...extra });
+
+  async function invite(email: string) {
+    return strict.api.createInvitation({
+      headers: adminHeaders,
+      body: { email, role: 'member', organizationId: workspaceId },
+    });
+  }
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    const options = { db: database.db, secret: TEST_SECRET, baseUrl: TEST_BASE_URL };
+    strict = createAuth({ ...options, config: ssoConfig(mock) });
+    trusting = createAuth({ ...options, config: ssoConfig(mock, { OIDC_TRUST_EMAIL: 'true' }) });
+    const result = await bootstrapAdmin(
+      { auth: strict, db: database.db },
+      { name: 'Ada', email: 'ada@example.com', password: PASSWORD, workspaceName: 'Reddevs' },
+    );
+    workspaceId = result.workspaceId;
+    adminId = result.userId;
+    const signIn = await strict.api.signInEmail({
+      body: { email: 'ada@example.com', password: PASSWORD },
+      returnHeaders: true,
+    });
+    adminHeaders = cookieHeaders(signIn.headers);
+  });
+
+  afterAll(async () => {
+    await database?.drop();
+  });
+
+  it('links an existing person only when the email is trusted', async () => {
+    const refused = await ssoSignIn(strict, mock, unverified('ada@example.com'));
+    expect(refused.error).toBe('account_not_linked');
+    expect(await oidcAccounts(database, adminId)).toEqual([]);
+
+    const linked = await ssoSignIn(trusting, mock, unverified('ada@example.com'));
+    expect(linked.error).toBeNull();
+    expect(await oidcAccounts(database, adminId)).toHaveLength(1);
+    const actor = await getActorFromRequest(
+      { auth: trusting, db: database.db },
+      { headers: new Headers({ cookie: linked.cookie }) },
+    );
+    expect(actor).toMatchObject({ userId: adminId, role: 'owner', workspaceId });
+  });
+
+  it('accepts an invitation by its link only when the email is trusted, and still checks the address', async () => {
+    const invitation = await invite('tomas@example.com');
+    const flow = {
+      intent: 'invite' as const,
+      invitationId: invitation.id,
+      errorCallbackURL: `/invite/${invitation.id}`,
+    };
+
+    const refused = await ssoSignIn(strict, mock, unverified('tomas@example.com'), flow);
+    expect(refused.error).toBe('sso_email_not_verified');
+    expect(await usersByEmail(database, 'tomas@example.com')).toEqual([]);
+
+    const mismatch = await ssoSignIn(trusting, mock, unverified('tomas.other@example.com'), flow);
+    expect(mismatch.error).toBe('sso_invitation_email_mismatch');
+    expect(await usersByEmail(database, 'tomas.other@example.com')).toEqual([]);
+
+    const accepted = await ssoSignIn(trusting, mock, unverified('tomas@example.com'), flow);
+    expect(accepted.error).toBeNull();
+    const [tomas] = await usersByEmail(database, 'tomas@example.com');
+    if (!tomas) throw new Error('no tomas');
+    expect(await membership(database, tomas.id)).toEqual([{ organizationId: workspaceId, role: 'member' }]);
+  });
+
+  it('creates an invited account from the sign-in screen when email_verified is missing', async () => {
+    await invite('lee@example.com');
+    const refused = await ssoSignIn(
+      strict,
+      mock,
+      unverified('lee@example.com', { email_verified: undefined }),
+    );
+    expect(refused.error).toBe('sso_email_not_verified');
+
+    const accepted = await ssoSignIn(
+      trusting,
+      mock,
+      unverified('lee@example.com', { email_verified: undefined }),
+    );
+    expect(accepted.error).toBeNull();
+    const [lee] = await usersByEmail(database, 'lee@example.com');
+    expect(lee).toMatchObject({ kind: 'person', emailVerified: true });
+  });
+
+  it('still refuses identities without an invitation in invite mode', async () => {
+    const result = await ssoSignIn(trusting, mock, unverified('stranger@example.com'));
+    expect(result.error).toBe('sso_no_account');
+    expect(await usersByEmail(database, 'stranger@example.com')).toEqual([]);
+  });
+});

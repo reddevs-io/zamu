@@ -29,6 +29,11 @@ export interface SsoConfig {
   adminGroups: string[];
   /** Claim that holds the user's groups. */
   groupsClaim: string;
+  /**
+   * OIDC_TRUST_EMAIL=true: the provider's email counts as verified even when email_verified is false or
+   * missing (providers such as Authentik that never verify). See docs/self-hosting.md for the trade-off.
+   */
+  trustEmail: boolean;
 }
 
 export interface AuthConfig {
@@ -36,6 +41,11 @@ export interface AuthConfig {
   sso: SsoConfig | null;
   /** False when PASSWORD_LOGIN=disabled: sign-in, setup and invitations go through SSO only. */
   passwordLogin: boolean;
+  /**
+   * TRUSTED_IP_HEADERS: request headers that carry the client IP, checked in order (Better Auth's
+   * advanced.ipAddress.ipAddressHeaders). Null: Better Auth's default (x-forwarded-for).
+   */
+  ipAddressHeaders: string[] | null;
 }
 
 /** The variables readAuthConfig looks at. */
@@ -48,8 +58,13 @@ export interface AuthEnv {
   OIDC_SIGNUP?: string | undefined;
   OIDC_ADMIN_GROUPS?: string | undefined;
   OIDC_GROUPS_CLAIM?: string | undefined;
+  OIDC_TRUST_EMAIL?: string | undefined;
   PASSWORD_LOGIN?: string | undefined;
+  TRUSTED_IP_HEADERS?: string | undefined;
 }
+
+/** An HTTP header name (RFC 9110 token characters). */
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 
 /** Thrown for an invalid combination of variables. `problems` has one sentence per variable. */
 export class AuthConfigError extends Error {
@@ -125,9 +140,22 @@ export function readAuthConfig(env: AuthEnv): AuthConfig {
     .filter(Boolean);
   const groupsClaim = read(env, 'OIDC_GROUPS_CLAIM') ?? DEFAULT_OIDC_GROUPS_CLAIM;
 
+  const trustValue = (read(env, 'OIDC_TRUST_EMAIL') ?? 'false').toLowerCase();
+  if (trustValue !== 'true' && trustValue !== 'false') {
+    problems.push(`OIDC_TRUST_EMAIL must be "true" or "false" (got "${env.OIDC_TRUST_EMAIL}").`);
+  }
+  const trustEmail = trustValue === 'true';
+
   if (!ssoEnabled && credentialsSet === 0) {
     const extras = (
-      ['OIDC_PROVIDER_NAME', 'OIDC_SCOPES', 'OIDC_SIGNUP', 'OIDC_ADMIN_GROUPS', 'OIDC_GROUPS_CLAIM'] as const
+      [
+        'OIDC_PROVIDER_NAME',
+        'OIDC_SCOPES',
+        'OIDC_SIGNUP',
+        'OIDC_ADMIN_GROUPS',
+        'OIDC_GROUPS_CLAIM',
+        'OIDC_TRUST_EMAIL',
+      ] as const
     ).filter((name) => read(env, name));
     if (extras.length > 0) {
       problems.push(
@@ -147,6 +175,19 @@ export function readAuthConfig(env: AuthEnv): AuthConfig {
     );
   }
 
+  const ipHeaderValue = read(env, 'TRUSTED_IP_HEADERS');
+  let ipAddressHeaders: string[] | null = null;
+  if (ipHeaderValue) {
+    const names = ipHeaderValue.split(',').map((name) => name.trim());
+    const invalid = names.filter((name) => !HEADER_NAME.test(name));
+    if (invalid.length > 0) {
+      problems.push(
+        `TRUSTED_IP_HEADERS must be comma-separated header names, such as "cf-connecting-ip,x-forwarded-for" (invalid: ${invalid.map((name) => `"${name}"`).join(', ')}).`,
+      );
+    }
+    ipAddressHeaders = [...new Set(names.map((name) => name.toLowerCase()))];
+  }
+
   if (problems.length > 0) throw new AuthConfigError(problems);
 
   return {
@@ -161,9 +202,11 @@ export function readAuthConfig(env: AuthEnv): AuthConfig {
             signup,
             adminGroups,
             groupsClaim,
+            trustEmail,
           }
         : null,
     passwordLogin,
+    ipAddressHeaders,
   };
 }
 

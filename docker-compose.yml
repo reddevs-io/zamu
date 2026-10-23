@@ -29,7 +29,10 @@ x-app: &app
     OIDC_SIGNUP: ${OIDC_SIGNUP:-}
     OIDC_ADMIN_GROUPS: ${OIDC_ADMIN_GROUPS:-}
     OIDC_GROUPS_CLAIM: ${OIDC_GROUPS_CLAIM:-}
+    OIDC_TRUST_EMAIL: ${OIDC_TRUST_EMAIL:-}
     PASSWORD_LOGIN: ${PASSWORD_LOGIN:-}
+    # Client IP headers set by your reverse proxy, in order. See docs/self-hosting.md.
+    TRUSTED_IP_HEADERS: ${TRUSTED_IP_HEADERS:-}
 
 services:
   db:

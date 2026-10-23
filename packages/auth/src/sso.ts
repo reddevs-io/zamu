@@ -100,7 +100,12 @@ export function ssoPlugins(sso: SsoConfig, baseUrl: string): BetterAuthPlugin[] 
           redirectURI: `${trimSlash(baseUrl)}${OIDC_CALLBACK_PATH}`,
           // Signing out of this app does not sign people out of the provider (and their other apps).
           disableProviderLogout: true,
-          mapProfileToUser: (profile) => ({ name: displayName(profile) }),
+          // OIDC_TRUST_EMAIL=true: treat the provider's email as verified, so the verified-email rule (create,
+          // link to an existing person, invitation match) accepts providers that never send email_verified.
+          mapProfileToUser: (profile) => ({
+            name: displayName(profile),
+            ...(sso.trustEmail ? { emailVerified: true } : {}),
+          }),
         },
       ],
     }),
