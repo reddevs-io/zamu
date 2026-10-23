@@ -11,6 +11,18 @@ export interface RailNavItem {
   label: string;
   href: string;
   isCurrent?: boolean;
+  /**
+   * Count shown under the label in the accent badge (the Dashboard queue total). Above 0 the item grows
+   * to 46px; 0 or unset shows no badge and keeps the 38px item. Above 99 the badge reads "99+".
+   */
+  count?: number;
+  /** Wording of the count in the accessible name: "Dashboard, 8 items need you". Defaults to the number. */
+  countLabel?: (count: number) => string;
+}
+
+/** Badge text: the count, or "99+" above 99. */
+export function formatRailCount(count: number): string {
+  return count > 99 ? '99+' : String(count);
 }
 
 export interface RailProject {
@@ -85,14 +97,7 @@ export function Rail({
         </span>
       )}
       {nav.map((item) => (
-        <Link
-          key={item.id}
-          href={item.href}
-          aria-current={item.isCurrent ? 'page' : undefined}
-          className={navLink(item.isCurrent)}
-        >
-          {item.label}
-        </Link>
+        <RailNavLink key={item.id} item={item} />
       ))}
       {projects.length ? (
         <span aria-hidden className="mx-3.5 my-2 h-px shrink-0 bg-[oklch(1_0_0/0.12)]" />
@@ -130,6 +135,41 @@ export function Rail({
         <UserButton user={user} actions={userActions} />
       )}
     </nav>
+  );
+}
+
+function RailNavLink({ item }: { item: RailNavItem }) {
+  const count = item.count ?? 0;
+  if (count <= 0) {
+    return (
+      <Link
+        href={item.href}
+        aria-current={item.isCurrent ? 'page' : undefined}
+        className={navLink(item.isCurrent)}
+      >
+        {item.label}
+      </Link>
+    );
+  }
+  return (
+    <Link
+      href={item.href}
+      aria-label={`${item.label}, ${item.countLabel ? item.countLabel(count) : count}`}
+      aria-current={item.isCurrent ? 'page' : undefined}
+      data-count={count}
+      className={cn(
+        navLink(item.isCurrent),
+        'flex h-[46px] shrink-0 flex-col items-center justify-center gap-[3px]',
+      )}
+    >
+      <span>{item.label}</span>
+      <span
+        aria-hidden
+        className="grid h-3.5 min-w-[18px] place-items-center bg-accent px-1 font-mono text-[9px] leading-none font-medium text-on-accent"
+      >
+        {formatRailCount(count)}
+      </span>
+    </Link>
   );
 }
 

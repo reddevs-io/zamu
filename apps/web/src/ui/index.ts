@@ -85,7 +85,14 @@ export { AppFrame, type AppFrameProps } from './layout/AppFrame';
 export { FilterBar, type FilterBarProps, FilterValue } from './layout/FilterBar';
 export { PageHeader, type PageHeaderProps } from './layout/PageHeader';
 export { type Property, PropertyGrid } from './layout/PropertyGrid';
-export { Rail, type RailNavItem, type RailProject, type RailProps, type RailUserAction } from './layout/Rail';
+export {
+  formatRailCount,
+  Rail,
+  type RailNavItem,
+  type RailProject,
+  type RailProps,
+  type RailUserAction,
+} from './layout/Rail';
 export { SettingsNav, type SettingsNavSection } from './layout/SettingsNav';
 export {
   THEME_CHOICES,
@@ -142,6 +149,21 @@ export {
   type TimeBarProps,
 } from './Progress';
 export {
+  QUEUE_COLUMNS,
+  Queue,
+  type QueueAction,
+  QueueGroupFooter,
+  type QueueGroupFooterProps,
+  QueueGroupGlyph,
+  type QueueGroupGlyphProps,
+  QueueGroupHeader,
+  type QueueGroupHeaderProps,
+  type QueueGroupKind,
+  type QueueProps,
+  QueueRow,
+  type QueueRowProps,
+} from './Queue';
+export {
   Radio,
   RadioCard,
   type RadioCardProps,
@@ -185,3 +207,4 @@ export {
   useHotkeys,
 } from './useHotkeys';
 export { type ViewTab, ViewTabs, type ViewTabsProps } from './ViewTabs';
+export { WarnPill, type WarnPillProps } from './WarnPill';
