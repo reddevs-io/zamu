@@ -1,30 +1,51 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ActivityOrigin,
+  BACKLOG_MODE_LABELS,
+  BACKLOG_MODES,
+  BACKLOG_STATE_LABELS,
+  BACKLOG_STATES,
+  BACKLOG_TRIGGER_LABELS,
+  BACKLOG_TRIGGERS,
+  BacklogId,
   CalendarDate,
   CYCLE_STATE_LABELS,
   CYCLE_STATES,
   CycleNumber,
   CycleSelector,
   cycleLengthDays,
+  formatBacklogId,
   formatTaskKey,
+  GIT_CONNECTION_STATUS_LABELS,
+  GIT_CONNECTION_STATUSES,
+  GIT_PROVIDER_BADGES,
+  GIT_PROVIDER_LABELS,
+  GIT_PROVIDERS,
   isOpenStatus,
+  KeySuffix,
+  MILESTONE_OWNED_FIELDS,
   MILESTONE_STATUS_LABELS,
   MILESTONE_STATUSES,
   OPEN_TASK_STATUSES,
   PRIORITIES,
   PRIORITY_LABELS,
+  PROJECT_OWNED_FIELDS,
   Priority,
   ProjectKey,
   ProjectKeyInput,
+  parseBacklogId,
   parseTaskKey,
   priorityFromValue,
   priorityToValue,
   safeParseTaskKey,
+  splitTaskKey,
   suggestProjectKey,
+  TASK_OWNED_FIELDS,
   TASK_STATUS_LABELS,
   TASK_STATUSES,
   TaskKey,
   TaskKeyInput,
+  TaskRefInput,
   TaskStatus,
   THEME_LABELS,
   THEMES,
@@ -83,12 +104,12 @@ describe('suggestProjectKey', () => {
 
 describe('TaskKey', () => {
   it('parses into project key and number', () => {
-    expect(parseTaskKey('PAY-142')).toEqual({ projectKey: 'PAY', number: 142 });
-    expect(parseTaskKey('A1B2C3-7')).toEqual({ projectKey: 'A1B2C3', number: 7 });
+    expect(parseTaskKey('PAY-142')).toEqual({ projectKey: 'PAY', number: 142, suffix: null });
+    expect(parseTaskKey('A1B2C3-7')).toEqual({ projectKey: 'A1B2C3', number: 7, suffix: null });
   });
 
   it('accepts any case and surrounding spaces when parsing input', () => {
-    expect(parseTaskKey(' pay-142 ')).toEqual({ projectKey: 'PAY', number: 142 });
+    expect(parseTaskKey(' pay-142 ')).toEqual({ projectKey: 'PAY', number: 142, suffix: null });
     expect(TaskKeyInput.parse('web-1')).toBe('WEB-1');
   });
 
@@ -108,8 +129,14 @@ describe('TaskKey', () => {
     ['over int4', 'PAY-2147483648'],
     ['eleven digits', 'PAY-12345678901'],
     ['trailing text', 'PAY-1x'],
-    ['decimal', 'PAY-1.5'],
     ['empty', ''],
+    ['trailing dot', 'PAY-786.'],
+    ['zero suffix', 'PAY-786.0'],
+    ['zero-padded suffix', 'PAY-786.01'],
+    ['empty suffix part', 'PAY-786..1'],
+    ['suffix too long', 'PAY-786.123456'],
+    ['suffix after zero', 'PAY-0.1'],
+    ['letters in suffix', 'PAY-786.a'],
   ])('rejects %s', (_label, key) => {
     expect(safeParseTaskKey(key)).toBeNull();
     expect(() => parseTaskKey(key)).toThrow();
@@ -124,7 +151,120 @@ describe('TaskKey', () => {
   it('formats and parses back', () => {
     const key = formatTaskKey('PAY', 142);
     expect(key).toBe('PAY-142');
-    expect(parseTaskKey(key)).toEqual({ projectKey: 'PAY', number: 142 });
+    expect(parseTaskKey(key)).toEqual({ projectKey: 'PAY', number: 142, suffix: null });
+  });
+});
+
+describe('TaskKey with a Backlog.md subtask suffix', () => {
+  it.each([
+    ['PAY-786', { projectKey: 'PAY', number: 786, suffix: null }],
+    ['PAY-786.1', { projectKey: 'PAY', number: 786, suffix: '1' }],
+    ['PAY-786.1.2', { projectKey: 'PAY', number: 786, suffix: '1.2' }],
+    ['PAY-1.5', { projectKey: 'PAY', number: 1, suffix: '5' }],
+    ['PAY-786.99999', { projectKey: 'PAY', number: 786, suffix: '99999' }],
+  ])('parses %s', (key, parts) => {
+    expect(parseTaskKey(key)).toEqual(parts);
+    expect(splitTaskKey(key)).toEqual(parts);
+    expect(TaskKey.parse(key)).toBe(key);
+    expect(formatTaskKey(parts.projectKey, parts.number, parts.suffix)).toBe(key);
+  });
+
+  it('upper-cases input with a suffix', () => {
+    expect(TaskKeyInput.parse(' pay-786.1 ')).toBe('PAY-786.1');
+    expect(safeParseTaskKey('pay-786.1.2')).toEqual({ projectKey: 'PAY', number: 786, suffix: '1.2' });
+  });
+
+  it('splits only canonical keys and formats without an empty suffix', () => {
+    expect(splitTaskKey('pay-786.1')).toBeNull();
+    expect(splitTaskKey('PAY-786.')).toBeNull();
+    expect(formatTaskKey('PAY', 786, null)).toBe('PAY-786');
+    expect(formatTaskKey('PAY', 786, '')).toBe('PAY-786');
+  });
+
+  it('checks key suffixes on their own', () => {
+    expect(KeySuffix.safeParse('1').success).toBe(true);
+    expect(KeySuffix.safeParse('1.2').success).toBe(true);
+    for (const bad of ['', '0', '01', '1.', '.1', '1..2', '123456', 'a']) {
+      expect(KeySuffix.safeParse(bad).success, bad).toBe(false);
+    }
+  });
+});
+
+describe('Backlog.md ids', () => {
+  it.each([
+    ['BACK-786', 'BACK-786', { prefix: 'BACK', number: 786, suffix: null }],
+    ['back-786.1', 'BACK-786.1', { prefix: 'BACK', number: 786, suffix: '1' }],
+    ['task-12.1.3', 'TASK-12.1.3', { prefix: 'TASK', number: 12, suffix: '1.3' }],
+    ['BACK-007', 'BACK-7', { prefix: 'BACK', number: 7, suffix: null }],
+    ['back-0786.01', 'BACK-786.1', { prefix: 'BACK', number: 786, suffix: '1' }],
+    ['DRAFT-14', 'DRAFT-14', { prefix: 'DRAFT', number: 14, suffix: null }],
+    ['  Backlog-3  ', 'BACKLOG-3', { prefix: 'BACKLOG', number: 3, suffix: null }],
+  ])('normalises %s to %s', (input, canonical, parts) => {
+    expect(parseBacklogId(input)).toEqual(parts);
+    expect(BacklogId.parse(input)).toBe(canonical);
+    expect(formatBacklogId(parts)).toBe(canonical);
+  });
+
+  it.each([
+    ['zero', 'BACK-0'],
+    ['zero padding only', 'BACK-000'],
+    ['zero suffix', 'BACK-786.0'],
+    ['trailing dot', 'BACK-786.'],
+    ['no prefix', '-786'],
+    ['digits in prefix', 'B4CK-786'],
+    ['no number', 'BACK-'],
+    ['over int4', 'BACK-2147483648'],
+    ['suffix part over five digits', 'BACK-1.123456'],
+    ['spaces inside', 'BACK 786'],
+    ['milestone id', 'm-'],
+  ])('rejects %s', (_label, input) => {
+    expect(parseBacklogId(input)).toBeNull();
+    expect(BacklogId.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('TaskRefInput', () => {
+  it('keeps app keys, upper-cased', () => {
+    expect(TaskRefInput.parse('pay-786')).toBe('PAY-786');
+    expect(TaskRefInput.parse(' PAY-786.1.2 ')).toBe('PAY-786.1.2');
+  });
+
+  it('normalises Backlog.md ids that are not app keys', () => {
+    expect(TaskRefInput.parse('back-007')).toBe('BACK-7');
+    expect(TaskRefInput.parse('backlog-786.01')).toBe('BACKLOG-786.1');
+    expect(TaskRefInput.parse('TASK-12')).toBe('TASK-12');
+  });
+
+  it.each(['PAY-0', 'PAY-786.', 'PAY-786.0', 'PAY', '', 'PAY-1x', 'B4CK-01'])('rejects %j', (input) => {
+    expect(TaskRefInput.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('M3 enumerations', () => {
+  it('has a label for every provider, connection status, mode, state and trigger', () => {
+    expect(Object.keys(GIT_PROVIDER_LABELS)).toEqual([...GIT_PROVIDERS]);
+    expect(Object.keys(GIT_PROVIDER_BADGES)).toEqual([...GIT_PROVIDERS]);
+    expect(Object.keys(GIT_CONNECTION_STATUS_LABELS)).toEqual([...GIT_CONNECTION_STATUSES]);
+    expect(Object.keys(BACKLOG_MODE_LABELS)).toEqual([...BACKLOG_MODES]);
+    expect(Object.keys(BACKLOG_STATE_LABELS)).toEqual([...BACKLOG_STATES]);
+    expect(Object.keys(BACKLOG_TRIGGER_LABELS)).toEqual([...BACKLOG_TRIGGERS]);
+    expect(GIT_PROVIDER_LABELS.gitea).toBe('Gitea / Forgejo');
+    expect(GIT_CONNECTION_STATUS_LABELS.rejected).toBe('Token rejected');
+  });
+
+  it('lists the owned fields per object', () => {
+    expect(TASK_OWNED_FIELDS).toEqual([
+      'title',
+      'description',
+      'status',
+      'priority',
+      'assignee',
+      'milestone',
+      'createdAt',
+    ]);
+    expect(MILESTONE_OWNED_FIELDS).toEqual(['name', 'description', 'targetDate', 'status']);
+    expect(PROJECT_OWNED_FIELDS).toEqual(['key', 'repository', 'usesMilestones']);
+    expect(ActivityOrigin.options).toEqual(['app', 'backlog']);
   });
 });
 

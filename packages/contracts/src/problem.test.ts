@@ -2,9 +2,11 @@ import { ORPCError, ValidationError } from '@orpc/contract';
 import { describe, expect, it } from 'vitest';
 import { CreateTaskInput } from './inputs';
 import {
+  isMirroredProblemCode,
   PROBLEM_CODES,
   PROBLEM_STATUS,
   Problem,
+  ProblemData,
   problem,
   problemJsonSchema,
   toProblemIssues,
@@ -30,6 +32,45 @@ describe('problem()', () => {
       expect(Problem.parse(body)).toEqual(body);
       expect(body.status).toBe(PROBLEM_STATUS[code]);
     }
+  });
+
+  it('answers 409 for every Backlog.md code, with a title', () => {
+    for (const code of [
+      'TASK_MIRRORED',
+      'MILESTONE_MIRRORED',
+      'PROJECT_MIRRORED',
+      'PROJECT_NOT_EMPTY',
+      'BACKLOG_PAUSED',
+      'BACKLOG_DETACHED',
+    ] as const) {
+      expect(PROBLEM_CODES).toContain(code);
+      expect(problem(code)).toMatchObject({ status: 409, code, title: expect.any(String) });
+    }
+    expect(isMirroredProblemCode('TASK_MIRRORED')).toBe(true);
+    expect(isMirroredProblemCode('PROJECT_NOT_EMPTY')).toBe(false);
+  });
+
+  it('carries the mirror extensions: field, file, backlogId and hint', () => {
+    const body = problem('TASK_MIRRORED', 'status comes from Backlog.md', {
+      requestId: 'req_9',
+      field: 'status',
+      file: 'backlog/tasks/back-786 - Retry.md',
+      backlogId: 'BACK-786',
+      hint: 'backlog task edit 786 -s "In Progress"',
+    });
+    expect(Problem.parse(JSON.parse(JSON.stringify(body)))).toEqual(body);
+    expect(body).toMatchObject({
+      title: 'Field comes from Backlog.md',
+      field: 'status',
+      backlogId: 'BACK-786',
+    });
+    expect(ProblemData.parse({ field: 'status', file: 'f.md', backlogId: 'BACK-1', hint: 'h' })).toEqual({
+      field: 'status',
+      file: 'f.md',
+      backlogId: 'BACK-1',
+      hint: 'h',
+    });
+    expect(Problem.safeParse({ ...body, field: 3 }).success).toBe(false);
   });
 
   it('defaults type when parsing a minimal body', () => {
@@ -151,6 +192,29 @@ describe('encodeProblem / decodeProblem', () => {
     expect(decodeProblem({ defined: false, code: 'NOT_FOUND', status: 404, message: 'x' })).toBeNull();
     expect(decodeProblem('oops')).toBeNull();
     expect(decodeProblem(null)).toBeNull();
+  });
+});
+
+describe('mirrored problem extensions', () => {
+  it('round-trips field, file, backlogId and hint through encode and decode', () => {
+    const data = {
+      field: 'status',
+      file: 'backlog/tasks/back-786 - Add webhooks.md',
+      backlogId: 'BACK-786',
+      hint: 'backlog task edit 786 -s Done',
+    };
+    const body = encodeProblem(
+      new ORPCError('TASK_MIRRORED', { status: 409, message: 'Status comes from Backlog.md', data }),
+    );
+    expect(body).toMatchObject({ code: 'TASK_MIRRORED', status: 409, ...data });
+    const decoded = decodeProblem(body);
+    expect(decoded?.data).toMatchObject(data);
+  });
+
+  it('leaves the extensions out when they are not set', () => {
+    const body = encodeProblem(new ORPCError('CONFLICT', { status: 409, message: 'Taken' }));
+    expect(body).not.toHaveProperty('field');
+    expect(body).not.toHaveProperty('hint');
   });
 });
 

@@ -15,6 +15,20 @@ export const PROBLEM_CODES = [
   'TASK_CHANGED',
   'UNPROCESSABLE_CONTENT',
   'INTERNAL_SERVER_ERROR',
+  // M3: Backlog.md mirror. All 409; the body carries `field`, `file`, `backlogId` and `hint` where
+  // they apply (MirroredProblemExtensions).
+  /** A write to a field Backlog.md owns on a mirrored task (title, status, ...). */
+  'TASK_MIRRORED',
+  /** Creating, changing or deleting a milestone of a mirrored project. */
+  'MILESTONE_MIRRORED',
+  /** Creating a task in a mirrored project, or a project change the mirror forbids (key, milestones off). */
+  'PROJECT_MIRRORED',
+  /** Setting up Backlog.md on a project that already has tasks. */
+  'PROJECT_NOT_EMPTY',
+  /** Refreshing a mirror whose connection is missing, rejected or unreachable. */
+  'BACKLOG_PAUSED',
+  /** Refreshing or changing a source that was detached. */
+  'BACKLOG_DETACHED',
 ] as const;
 export const ProblemCode = z.enum(PROBLEM_CODES);
 export type ProblemCode = z.infer<typeof ProblemCode>;
@@ -28,6 +42,12 @@ export const PROBLEM_STATUS: Record<ProblemCode, number> = {
   TASK_CHANGED: 409,
   UNPROCESSABLE_CONTENT: 422,
   INTERNAL_SERVER_ERROR: 500,
+  TASK_MIRRORED: 409,
+  MILESTONE_MIRRORED: 409,
+  PROJECT_MIRRORED: 409,
+  PROJECT_NOT_EMPTY: 409,
+  BACKLOG_PAUSED: 409,
+  BACKLOG_DETACHED: 409,
 };
 
 export const PROBLEM_TITLES: Record<ProblemCode, string> = {
@@ -39,7 +59,37 @@ export const PROBLEM_TITLES: Record<ProblemCode, string> = {
   TASK_CHANGED: 'Task changed',
   UNPROCESSABLE_CONTENT: 'Invalid input',
   INTERNAL_SERVER_ERROR: 'Server error',
+  TASK_MIRRORED: 'Field comes from Backlog.md',
+  MILESTONE_MIRRORED: 'Milestone comes from Backlog.md',
+  PROJECT_MIRRORED: 'Project mirrors Backlog.md',
+  PROJECT_NOT_EMPTY: 'Project is not empty',
+  BACKLOG_PAUSED: 'Backlog.md mirror is paused',
+  BACKLOG_DETACHED: 'Backlog.md source is detached',
 };
+
+/** The codes of the Backlog.md mirror rules, for clients that treat them alike. */
+export const MIRRORED_PROBLEM_CODES = ['TASK_MIRRORED', 'MILESTONE_MIRRORED', 'PROJECT_MIRRORED'] as const;
+export type MirroredProblemCode = (typeof MIRRORED_PROBLEM_CODES)[number];
+
+export function isMirroredProblemCode(code: string): code is MirroredProblemCode {
+  return (MIRRORED_PROBLEM_CODES as readonly string[]).includes(code);
+}
+
+/**
+ * Extensions of TASK_MIRRORED, MILESTONE_MIRRORED and PROJECT_MIRRORED problems. The CLI prints
+ * them as "edit <file> on the default branch" with the hint; the web shows them next to the field.
+ */
+export const MirroredProblemExtensions = z.object({
+  /** The owned field the write touched: title, status, ... (contract names, e.g. createdAt). */
+  field: z.string().optional(),
+  /** Repository path of the file that owns the value, e.g. backlog/tasks/back-786 - Add webhooks.md. */
+  file: z.string().optional(),
+  /** The Backlog.md id of the task or milestone (BACK-786.1, m-3). */
+  backlogId: z.string().optional(),
+  /** What to do instead, e.g. "backlog task edit 786.1 -s \"In Progress\"". */
+  hint: z.string().optional(),
+});
+export type MirroredProblemExtensions = z.output<typeof MirroredProblemExtensions>;
 
 /** One failed validation rule. path is dotted (`assignee`, `scope.projects.0`); empty for the root. */
 export const ProblemIssue = z.object({
@@ -54,13 +104,14 @@ export const ProblemData = z.object({
   issues: z.array(ProblemIssue).optional(),
   /** TASK_CHANGED only: the task as it is now. */
   task: Task.optional(),
+  ...MirroredProblemExtensions.shape,
 });
 export type ProblemData = z.infer<typeof ProblemData>;
 
 /**
  * Error body of every /api/v1 response with a 4xx or 5xx status, after RFC 9457 (problem details)
- * with four extensions: `code`, `requestId`, `issues`, and `task` for TASK_CHANGED. The CLI prints
- * it under `pm.v1.error`.
+ * with these extensions: `code`, `requestId`, `issues`, `task` for TASK_CHANGED, and `field`,
+ * `file`, `backlogId`, `hint` for the *_MIRRORED codes (M3). The CLI prints it under `pm.v1.error`.
  */
 export const Problem = z.object({
   type: z.string().default('about:blank'),
@@ -73,6 +124,7 @@ export const Problem = z.object({
   issues: z.array(ProblemIssue).optional(),
   /** TASK_CHANGED only: the task as it is now, so the client can roll back to it. */
   task: Task.optional(),
+  ...MirroredProblemExtensions.shape,
 });
 export type Problem = z.output<typeof Problem>;
 
@@ -80,7 +132,12 @@ export type Problem = z.output<typeof Problem>;
 export function problem(
   code: ProblemCode,
   detail?: string,
-  extra: { requestId?: string; issues?: ProblemIssue[]; instance?: string; task?: Problem['task'] } = {},
+  extra: {
+    requestId?: string;
+    issues?: ProblemIssue[];
+    instance?: string;
+    task?: Problem['task'];
+  } & MirroredProblemExtensions = {},
 ): Problem {
   return {
     type: 'about:blank',

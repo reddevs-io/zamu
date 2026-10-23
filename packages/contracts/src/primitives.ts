@@ -150,23 +150,39 @@ export function suggestProjectKey(name: string): string | null {
 /** Largest task number: Postgres integer range. */
 export const MAX_TASK_NUMBER = 2_147_483_647;
 
-export const TASK_KEY_PATTERN = /^([A-Z][A-Z0-9]{1,5})-([1-9][0-9]{0,9})$/;
-const TASK_KEY_MESSAGE = 'Use a task key like PAY-142';
+/**
+ * A task key: project key, dash, number, and for Backlog.md subtasks one or more `.N` parts
+ * (PAY-142, PAY-786.1, PAY-786.1.2). Suffix parts are 1 to 99999 without leading zeros.
+ * Groups: 1 project key, 2 number, 3 suffix with its leading dot (or undefined).
+ */
+export const TASK_KEY_PATTERN = /^([A-Z][A-Z0-9]{1,5})-([1-9][0-9]{0,9})((?:\.[1-9][0-9]{0,4})+)?$/;
+const TASK_KEY_MESSAGE = 'Use a task key like PAY-142 or PAY-786.1';
+
+/** A key suffix without its leading dot: `1` or `1.2`. Stored in task.key_suffix. */
+export const KEY_SUFFIX_PATTERN = /^[1-9][0-9]{0,4}(?:\.[1-9][0-9]{0,4})*$/;
+export const KeySuffix = z.string().regex(KEY_SUFFIX_PATTERN, 'Use a suffix like 1 or 1.2');
 
 export interface TaskKeyParts {
   projectKey: string;
   number: number;
+  /** The subtask suffix without the leading dot (`1`, `1.2`); null for plain keys. */
+  suffix: string | null;
 }
 
-function splitTaskKey(value: string): TaskKeyParts | null {
+/**
+ * Splits a canonical (uppercase, trimmed) task key into project key, number and suffix. Returns
+ * null when the value is not a task key or the number is out of range. TaskKeyParts and
+ * parseTaskKey accept any case.
+ */
+export function splitTaskKey(value: string): TaskKeyParts | null {
   const match = TASK_KEY_PATTERN.exec(value);
   if (!match) return null;
   const number = Number(match[2]);
   if (!Number.isSafeInteger(number) || number > MAX_TASK_NUMBER) return null;
-  return { projectKey: match[1] as string, number };
+  return { projectKey: match[1] as string, number, suffix: match[3] ? match[3].slice(1) : null };
 }
 
-/** Canonical task key, e.g. PAY-142. Strict: no case folding. Use for outputs. */
+/** Canonical task key, e.g. PAY-142 or PAY-786.1. Strict: no case folding. Use for outputs. */
 export const TaskKey = z
   .string()
   .regex(TASK_KEY_PATTERN, TASK_KEY_MESSAGE)
@@ -184,7 +200,10 @@ export const TaskKeyInput = z
 /** Parses a task key (any case, surrounding spaces allowed) into its parts. */
 export const TaskKeyParts = TaskKeyInput.transform((value) => splitTaskKey(value) as TaskKeyParts);
 
-/** Parses `PAY-142` into `{ projectKey: 'PAY', number: 142 }`. Throws a ZodError on invalid input. */
+/**
+ * Parses `PAY-142` into `{ projectKey: 'PAY', number: 142, suffix: null }` and `PAY-786.1.2` into
+ * `{ projectKey: 'PAY', number: 786, suffix: '1.2' }`. Throws a ZodError on invalid input.
+ */
 export function parseTaskKey(value: string): TaskKeyParts {
   return TaskKeyParts.parse(value);
 }
@@ -195,9 +214,98 @@ export function safeParseTaskKey(value: string): TaskKeyParts | null {
   return result.success ? result.data : null;
 }
 
-export function formatTaskKey(projectKey: string, number: number): string {
-  return `${projectKey}-${number}`;
+/** `PAY-142`, or `PAY-786.1` with suffix `1`. A null, undefined or empty suffix gives the plain key. */
+export function formatTaskKey(projectKey: string, number: number, suffix?: string | null): string {
+  return suffix ? `${projectKey}-${number}.${suffix}` : `${projectKey}-${number}`;
 }
+
+// ---------------------------------------------------------------------------
+// Backlog.md ids
+// ---------------------------------------------------------------------------
+
+/**
+ * A Backlog.md task id as written in its files: a prefix of letters (task_prefix, default `task`;
+ * drafts use `draft`), a dash, the number and optional `.N` subtask parts. Any case; numbers may
+ * be zero-padded (zero_padded_ids). Groups: 1 prefix, 2 number, 3 suffix with its leading dot.
+ */
+export const BACKLOG_ID_PATTERN = /^([A-Za-z]{1,20})-([0-9]{1,12})((?:\.[0-9]{1,8})*)$/;
+const BACKLOG_ID_MESSAGE = 'Use a Backlog.md id like BACK-786 or back-786.1';
+
+export interface BacklogIdParts {
+  /** Uppercase prefix: BACK, TASK, DRAFT. */
+  prefix: string;
+  number: number;
+  /** Subtask suffix without the leading dot and without zero padding (`1`, `1.2`); null for top-level ids. */
+  suffix: string | null;
+}
+
+/** Drops zero padding from one numeric part; null when nothing is left above zero or it is too long. */
+function unpad(part: string, maxDigits: number): string | null {
+  const trimmed = part.replace(/^0+/, '');
+  if (trimmed === '' || trimmed.length > maxDigits) return null;
+  return trimmed;
+}
+
+/**
+ * Splits a Backlog.md id in any case into its normalised parts: uppercase prefix, number and
+ * suffix without zero padding (back-007.01 gives BACK, 7, '1'). Null when it is not a Backlog.md
+ * id, a part is zero, or the number does not fit a task number.
+ */
+export function parseBacklogId(value: string): BacklogIdParts | null {
+  const match = BACKLOG_ID_PATTERN.exec(value.trim());
+  if (!match) return null;
+  const number = unpad(match[2] as string, 10);
+  if (number === null || Number(number) > MAX_TASK_NUMBER) return null;
+  const parts = (match[3] as string).split('.').slice(1);
+  const suffix: string[] = [];
+  for (const part of parts) {
+    const unpadded = unpad(part, 5);
+    if (unpadded === null) return null;
+    suffix.push(unpadded);
+  }
+  return {
+    prefix: (match[1] as string).toUpperCase(),
+    number: Number(number),
+    suffix: suffix.length ? suffix.join('.') : null,
+  };
+}
+
+/** The canonical form of a Backlog.md id: uppercase, no zero padding (BACK-786.1). */
+export function formatBacklogId(parts: BacklogIdParts): string {
+  return formatTaskKey(parts.prefix, parts.number, parts.suffix);
+}
+
+/**
+ * A Backlog.md id in any case, normalised to the canonical form: `back-007.1` becomes `BACK-7.1`.
+ * task.backlog_id stores this form, and lookups compare against it.
+ */
+export const BacklogId = z
+  .string()
+  .trim()
+  .max(64)
+  .refine((value) => parseBacklogId(value) !== null, { message: BACKLOG_ID_MESSAGE })
+  .transform((value) => formatBacklogId(parseBacklogId(value) as BacklogIdParts));
+export type BacklogId = z.output<typeof BacklogId>;
+
+/**
+ * Addresses one task: its app key (PAY-786.1) or, in a project mirrored from Backlog.md, its
+ * Backlog.md id (BACK-786.1). Trimmed and upper-cased; Backlog.md ids also lose zero padding.
+ * Core tries the app key first, then the Backlog.md id. Every task route and CLI argument takes it.
+ */
+export const TaskRefInput = z
+  .string()
+  .trim()
+  .max(64)
+  .transform((value) => {
+    const upper = value.toUpperCase();
+    if (splitTaskKey(upper)) return upper;
+    const backlog = parseBacklogId(upper);
+    return backlog ? formatBacklogId(backlog) : upper;
+  })
+  .refine((value) => splitTaskKey(value) !== null || parseBacklogId(value) !== null, {
+    message: 'Use a task key like PAY-142, PAY-786.1, or a Backlog.md id like BACK-786',
+  });
+export type TaskRefInput = z.output<typeof TaskRefInput>;
 
 // ---------------------------------------------------------------------------
 // Milestones
@@ -266,6 +374,127 @@ export type CycleSelector = z.output<typeof CycleSelector>;
 export function cycleLengthDays(start: string, end: string): number {
   return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
 }
+
+// ---------------------------------------------------------------------------
+// Git connections and Backlog.md (M3)
+// ---------------------------------------------------------------------------
+
+export const GitConnectionId = RowId;
+export const BacklogSourceId = RowId;
+
+/** gitea covers Gitea and Forgejo (same API). */
+export const GIT_PROVIDERS = ['github', 'gitlab', 'gitea'] as const;
+export const GitProvider = z.enum(GIT_PROVIDERS);
+export type GitProvider = z.infer<typeof GitProvider>;
+
+export const GIT_PROVIDER_LABELS: Record<GitProvider, string> = {
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  gitea: 'Gitea / Forgejo',
+};
+
+/** Short badge text: GH, GL, FJ. */
+export const GIT_PROVIDER_BADGES: Record<GitProvider, string> = {
+  github: 'GH',
+  gitlab: 'GL',
+  gitea: 'FJ',
+};
+
+/** Result of the last token check. rejected and unreachable pause the mirrors that use it. */
+export const GIT_CONNECTION_STATUSES = ['unchecked', 'working', 'rejected', 'unreachable'] as const;
+export const GitConnectionStatus = z.enum(GIT_CONNECTION_STATUSES);
+export type GitConnectionStatus = z.infer<typeof GitConnectionStatus>;
+
+export const GIT_CONNECTION_STATUS_LABELS: Record<GitConnectionStatus, string> = {
+  unchecked: 'Not checked',
+  working: 'Working',
+  rejected: 'Token rejected',
+  unreachable: 'Host unreachable',
+};
+
+/** mirror keeps following the default branch; import reads once, then detaches. */
+export const BACKLOG_MODES = ['mirror', 'import'] as const;
+export const BacklogMode = z.enum(BACKLOG_MODES);
+export type BacklogMode = z.infer<typeof BacklogMode>;
+
+export const BACKLOG_MODE_LABELS: Record<BacklogMode, string> = {
+  mirror: 'Mirror',
+  import: 'Import',
+};
+
+/**
+ * setup: created, first read not finished. healthy: every file read and every value mapped.
+ * warnings: files skipped or values fell back. failed: the last refresh failed (last good state
+ * kept). paused: the connection is missing, rejected or unreachable. detached: for good.
+ */
+export const BACKLOG_STATES = [
+  'setup',
+  'reading',
+  'healthy',
+  'warnings',
+  'failed',
+  'paused',
+  'detached',
+] as const;
+export const BacklogState = z.enum(BACKLOG_STATES);
+export type BacklogState = z.infer<typeof BacklogState>;
+
+export const BACKLOG_STATE_LABELS: Record<BacklogState, string> = {
+  setup: 'Setting up',
+  reading: 'Refreshing',
+  healthy: 'Mirroring',
+  warnings: 'Mirroring, with problems',
+  failed: 'Last refresh failed',
+  paused: 'Paused',
+  detached: 'Detached',
+};
+
+/** What started a refresh. cli is pm backlog refresh (through the API); manual is Refresh now. */
+export const BACKLOG_TRIGGERS = ['setup', 'webhook', 'manual', 'cli', 'poll'] as const;
+export const BacklogTrigger = z.enum(BACKLOG_TRIGGERS);
+export type BacklogTrigger = z.infer<typeof BacklogTrigger>;
+
+export const BACKLOG_TRIGGER_LABELS: Record<BacklogTrigger, string> = {
+  setup: 'setup',
+  webhook: 'webhook',
+  manual: 'Refresh now',
+  cli: 'pm backlog refresh',
+  poll: 'hourly check',
+};
+
+/** Who wrote an activity row: the app (a person, an agent or the system) or a Backlog.md refresh. */
+export const ACTIVITY_ORIGINS = ['app', 'backlog'] as const;
+export const ActivityOrigin = z.enum(ACTIVITY_ORIGINS);
+export type ActivityOrigin = z.infer<typeof ActivityOrigin>;
+
+/** Name shown for activity a Backlog.md refresh wrote (actor null, origin backlog). */
+export const BACKLOG_ACTOR_NAME = 'Backlog.md';
+
+/** Task fields Backlog.md owns while the project mirrors. Contract field names. */
+export const TASK_OWNED_FIELDS = [
+  'title',
+  'description',
+  'status',
+  'priority',
+  'assignee',
+  'milestone',
+  'createdAt',
+] as const;
+export const TaskOwnedField = z.enum(TASK_OWNED_FIELDS);
+export type TaskOwnedField = z.infer<typeof TaskOwnedField>;
+
+/** Milestone fields Backlog.md owns while the project mirrors (create and delete are refused too). */
+export const MILESTONE_OWNED_FIELDS = ['name', 'description', 'targetDate', 'status'] as const;
+export const MilestoneOwnedField = z.enum(MILESTONE_OWNED_FIELDS);
+export type MilestoneOwnedField = z.infer<typeof MilestoneOwnedField>;
+
+/**
+ * Project fields the mirror constrains: the key (the project has tasks), the repository (clearing
+ * it pauses the mirror; see M3 plan section 5) and turning milestones off.
+ */
+export const PROJECT_OWNED_FIELDS = ['key', 'repository', 'usesMilestones'] as const;
+export const ProjectOwnedField = z.enum(PROJECT_OWNED_FIELDS);
+export type ProjectOwnedField = z.infer<typeof ProjectOwnedField>;
 
 // ---------------------------------------------------------------------------
 // Theme

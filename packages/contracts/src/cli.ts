@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   Activity,
+  BacklogRefreshResult,
+  BacklogSourceStatus,
   Comment,
   CommentList,
   Cycle,
@@ -45,6 +47,17 @@ export const ProjectFile = z.strictObject({ project: ProjectKeyInput });
 export type ProjectFile = z.output<typeof ProjectFile>;
 
 export const CLI_LINK_ACTIONS = ['linked', 'replaced', 'unchanged', 'cleared', 'created', 'updated'] as const;
+
+/**
+ * How pm backlog refresh ended: queued (no --wait), finished (the run ended within the wait), or
+ * timeout (--wait gave up after 5 minutes; the run may still finish).
+ */
+export const CLI_BACKLOG_REFRESH_OUTCOMES = ['queued', 'finished', 'timeout'] as const;
+export const CliBacklogRefreshOutcome = z.enum(CLI_BACKLOG_REFRESH_OUTCOMES);
+export type CliBacklogRefreshOutcome = z.infer<typeof CliBacklogRefreshOutcome>;
+
+/** Longest --wait of pm backlog refresh, in milliseconds. */
+export const CLI_BACKLOG_REFRESH_WAIT_MS = 5 * 60 * 1000;
 
 /** Data schema for each CLI result name. */
 export const cliDataSchemas = {
@@ -111,6 +124,19 @@ export const cliDataSchemas = {
     action: z.enum(['created', 'updated', 'unchanged', 'printed']),
     project: ProjectKey.nullable(),
     block: z.string(),
+  }),
+  /**
+   * pm backlog status [--problems]: the source status. Without --problems, problems.items holds
+   * the first page only.
+   */
+  'backlog.status': BacklogSourceStatus,
+  /**
+   * pm backlog refresh [--wait]: the refresh request, and with --wait the status after the run
+   * (null without --wait).
+   */
+  'backlog.refresh': BacklogRefreshResult.extend({
+    outcome: CliBacklogRefreshOutcome,
+    status: BacklogSourceStatus.nullable(),
   }),
   /** Any command that fails while --json is set (printed to stdout, exit code still non-zero). */
   error: Problem,

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { z } from 'zod';
 import {
+  CLI_BACKLOG_REFRESH_WAIT_MS,
   CLI_RESULT_NAMES,
   cliOutput,
   cliOutputSchemas,
@@ -7,6 +9,7 @@ import {
   ProjectFile,
   parseCliOutput,
 } from './cli';
+import type { BacklogSourceStatus } from './entities';
 import { problem } from './problem';
 import {
   activityFixture,
@@ -47,6 +50,8 @@ describe('CLI output', () => {
       'cycles.end',
       'link',
       'agents',
+      'backlog.status',
+      'backlog.refresh',
       'error',
     ]);
   });
@@ -121,6 +126,80 @@ describe('CLI output', () => {
     const parsed = parseCliOutput(JSON.parse(printed), name);
     expect(parsed).toEqual(JSON.parse(printed));
     expect(parseCliOutput(JSON.parse(printed)).schema).toBe(`pm.v1.${name}`);
+  });
+
+  it('describes pm backlog status and refresh', () => {
+    const status = {
+      id: '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4ad3',
+      project: { id: projectWithCountsFixture.id, key: 'PAY', name: 'Payments' },
+      mode: 'mirror',
+      state: 'healthy',
+      repository: 'git@gitlab.com:reddevs/payments.git',
+      defaultBranch: 'main',
+      folder: 'backlog',
+      folderOverride: null,
+      prefix: 'BACK',
+      connection: null,
+      headCommit: 'a1b2c3d',
+      lastRead: { at: new Date('2026-10-23T14:02:00Z'), trigger: 'cli', commit: 'a1b2c3d' },
+      lastAttemptAt: new Date('2026-10-23T14:02:00Z'),
+      lastTrigger: 'cli',
+      lastError: null,
+      nextPollAt: null,
+      webhookLastAt: null,
+      counts: { tasks: 3, open: 2, drafts: 0, archived: 1, subtasks: 1, milestones: 0, hidden: 0 },
+      problems: { items: [], nextCursor: null, counts: { files: 0, values: 0 } },
+      mappings: { status: [], priority: [], assignee: [] },
+      config: null,
+      createdBy: { id: meFixture.user.id, name: meFixture.user.name, kind: 'person' },
+      createdAt: new Date('2026-10-23T14:00:00Z'),
+      detachedAt: null,
+      detachedBy: null,
+      history: [],
+    } satisfies z.input<typeof BacklogSourceStatus>;
+    const shown = cliOutput('backlog.status', status);
+    expect(shown.schema).toBe('pm.v1.backlog.status');
+    expect(shown.data.lastRead?.at).toBe('2026-10-23T14:02:00.000Z');
+    expect(shown.data.lastRead?.commitUrl).toBeNull();
+
+    const queued = cliOutput('backlog.refresh', {
+      project: 'PAY',
+      state: 'healthy',
+      queued: true,
+      lastAttemptAt: null,
+      outcome: 'queued',
+      status: null,
+    });
+    expect(parseCliOutput(JSON.parse(JSON.stringify(queued)), 'backlog.refresh').data.outcome).toBe('queued');
+    const finished = cliOutput('backlog.refresh', {
+      project: 'PAY',
+      state: 'healthy',
+      queued: false,
+      lastAttemptAt: new Date('2026-10-23T14:02:00Z'),
+      outcome: 'finished',
+      status,
+    });
+    expect(finished.data.status?.counts.tasks).toBe(3);
+    expect(() => cliOutput('backlog.refresh', { ...finished.data, outcome: 'running' } as never)).toThrow();
+    expect(CLI_BACKLOG_REFRESH_WAIT_MS).toBe(300_000);
+  });
+
+  it('prints a TASK_MIRRORED error with its extensions', () => {
+    const error = cliOutput(
+      'error',
+      problem('TASK_MIRRORED', 'status comes from Backlog.md', {
+        field: 'status',
+        file: 'backlog/tasks/back-786 - Retry.md',
+        backlogId: 'BACK-786',
+        hint: 'backlog task edit 786 -s "In Progress"',
+      }),
+    );
+    expect(error.data).toMatchObject({
+      status: 409,
+      code: 'TASK_MIRRORED',
+      field: 'status',
+      backlogId: 'BACK-786',
+    });
   });
 
   it('rejects unknown versions and mismatched names', () => {

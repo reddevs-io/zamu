@@ -1,5 +1,6 @@
 import { ORPCError, ValidationError } from '@orpc/contract';
 import {
+  type MirroredProblemExtensions,
   PROBLEM_CODES,
   PROBLEM_TITLES,
   Problem,
@@ -20,7 +21,8 @@ function isProblemCode(code: string): code is ProblemCode {
 /**
  * Turns an ORPCError into a Problem body. Unknown codes fall back by status class. Validation
  * failures (an ORPCError caused by a ValidationError) list their issues. A `task` in the error
- * data (TASK_CHANGED) is copied into the body.
+ * data (TASK_CHANGED) and the mirrored-problem extensions (`field`, `file`, `backlogId`, `hint`)
+ * are copied into the body.
  */
 export function encodeProblem(error: ORPCError<string, unknown>, requestId?: string): Problem {
   const code: ProblemCode = isProblemCode(error.code)
@@ -37,6 +39,7 @@ export function encodeProblem(error: ORPCError<string, unknown>, requestId?: str
         : undefined;
   const id = requestId ?? (data.success ? data.data.requestId : undefined);
   const task = data.success ? data.data.task : undefined;
+  const mirrored = data.success ? pickMirrored(data.data) : {};
   return {
     type: 'about:blank',
     title: PROBLEM_TITLES[code],
@@ -46,7 +49,18 @@ export function encodeProblem(error: ORPCError<string, unknown>, requestId?: str
     ...(id ? { requestId: id } : {}),
     ...(issues?.length ? { issues } : {}),
     ...(task ? { task } : {}),
+    ...mirrored,
   };
+}
+
+/** The mirrored-problem extensions that are set, so absent ones stay absent in the body. */
+function pickMirrored(source: MirroredProblemExtensions): MirroredProblemExtensions {
+  const out: MirroredProblemExtensions = {};
+  if (source.field !== undefined) out.field = source.field;
+  if (source.file !== undefined) out.file = source.file;
+  if (source.backlogId !== undefined) out.backlogId = source.backlogId;
+  if (source.hint !== undefined) out.hint = source.hint;
+  return out;
 }
 
 /**
@@ -57,6 +71,7 @@ export function decodeProblem(body: unknown): ORPCError<ProblemCode, ProblemData
   const parsed = Problem.safeParse(body);
   if (!parsed.success) return null;
   const { code, status, title, detail, requestId, issues, task } = parsed.data;
+  const mirrored = pickMirrored(parsed.data);
   return new ORPCError(code, {
     defined: true,
     status,
@@ -65,6 +80,7 @@ export function decodeProblem(body: unknown): ORPCError<ProblemCode, ProblemData
       ...(requestId ? { requestId } : {}),
       ...(issues ? { issues } : {}),
       ...(task ? { task } : {}),
+      ...mirrored,
     },
   });
 }

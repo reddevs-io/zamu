@@ -1,0 +1,2005 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e52434c9-4414-465a-9e15-f5baed93e87f",
+  "prevIds": ["c85af1e1-a598-4686-81fa-5196e1722fbe"],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "backlog_file"],
+      "writes": [
+        "s|tbl|public.backlog_file",
+        "n|tbl|public.backlog_file",
+        "e|tbl|public.backlog_file",
+        "n|rel|public.backlog_file",
+        "n|type|public.backlog_file",
+        "n|rel|public.backlog_file_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "backlog_source"],
+      "writes": [
+        "s|tbl|public.backlog_source",
+        "n|tbl|public.backlog_source",
+        "e|tbl|public.backlog_source",
+        "n|rel|public.backlog_source",
+        "n|type|public.backlog_source",
+        "n|rel|public.backlog_source_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "git_connection"],
+      "writes": [
+        "s|tbl|public.git_connection",
+        "n|tbl|public.git_connection",
+        "e|tbl|public.git_connection",
+        "n|rel|public.git_connection",
+        "n|type|public.git_connection",
+        "n|rel|public.git_connection_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": ["index", "public", "task", "task_projectId_number_unique"],
+      "writes": [
+        "s|idx|public.task_projectId_number_unique",
+        "n|idx|public.task_projectId_number_unique",
+        "e|idx|public.task_projectId_number_unique",
+        "n|rel|public.task_projectId_number_unique"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "e|col|public.task.project_id",
+        "e|col|public.task.number"
+      ],
+      "sharedWrites": ["e|uniqueness|public.task.number.project_id"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "activity", "origin"],
+      "writes": [
+        "s|col|public.activity.origin",
+        "n|col|public.activity.origin",
+        "e|col|public.activity.origin"
+      ],
+      "reads": ["n|tbl|public.activity", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "activity", "origin_ref"],
+      "writes": [
+        "s|col|public.activity.origin_ref",
+        "n|col|public.activity.origin_ref",
+        "e|col|public.activity.origin_ref"
+      ],
+      "reads": ["n|tbl|public.activity", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "milestone", "backlog_id"],
+      "writes": [
+        "s|col|public.milestone.backlog_id",
+        "n|col|public.milestone.backlog_id",
+        "e|col|public.milestone.backlog_id"
+      ],
+      "reads": ["n|tbl|public.milestone", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "milestone", "hidden_at"],
+      "writes": [
+        "s|col|public.milestone.hidden_at",
+        "n|col|public.milestone.hidden_at",
+        "e|col|public.milestone.hidden_at"
+      ],
+      "reads": ["n|tbl|public.milestone", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "key_suffix"],
+      "writes": [
+        "s|col|public.task.key_suffix",
+        "n|col|public.task.key_suffix",
+        "e|col|public.task.key_suffix"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "backlog_id"],
+      "writes": [
+        "s|col|public.task.backlog_id",
+        "n|col|public.task.backlog_id",
+        "e|col|public.task.backlog_id"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "backlog_data"],
+      "writes": [
+        "s|col|public.task.backlog_data",
+        "n|col|public.task.backlog_data",
+        "e|col|public.task.backlog_data"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "hidden_at"],
+      "writes": ["s|col|public.task.hidden_at", "n|col|public.task.hidden_at", "e|col|public.task.hidden_at"],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_unique",
+      "statementTarget": ["table", "public", "task"],
+      "writes": [
+        "s|uq|public.task.task_projectId_number_keySuffix_unique",
+        "n|uq|public.task.task_projectId_number_keySuffix_unique",
+        "e|uq|public.task.task_projectId_number_keySuffix_unique",
+        "n|con|public.task.task_projectId_number_keySuffix_unique",
+        "n|rel|public.task_projectId_number_keySuffix_unique"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task.project_id",
+        "n|col|public.task.number",
+        "n|col|public.task.key_suffix"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "milestone", "milestone_projectId_backlogId_idx"],
+      "writes": [
+        "s|idx|public.milestone_projectId_backlogId_idx",
+        "n|idx|public.milestone_projectId_backlogId_idx",
+        "e|idx|public.milestone_projectId_backlogId_idx",
+        "n|rel|public.milestone_projectId_backlogId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.milestone",
+        "n|sch|public",
+        "n|col|public.milestone.project_id",
+        "n|col|public.milestone.backlog_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task", "task_projectId_backlogId_idx"],
+      "writes": [
+        "s|idx|public.task_projectId_backlogId_idx",
+        "n|idx|public.task_projectId_backlogId_idx",
+        "e|idx|public.task_projectId_backlogId_idx",
+        "n|rel|public.task_projectId_backlogId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task.project_id",
+        "n|col|public.task.backlog_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task", "task_projectId_hidden_idx"],
+      "writes": [
+        "s|idx|public.task_projectId_hidden_idx",
+        "n|idx|public.task_projectId_hidden_idx",
+        "e|idx|public.task_projectId_hidden_idx",
+        "n|rel|public.task_projectId_hidden_idx"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public", "n|col|public.task.project_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "backlog_file", "backlog_file_sourceId_backlogId_idx"],
+      "writes": [
+        "s|idx|public.backlog_file_sourceId_backlogId_idx",
+        "n|idx|public.backlog_file_sourceId_backlogId_idx",
+        "e|idx|public.backlog_file_sourceId_backlogId_idx",
+        "n|rel|public.backlog_file_sourceId_backlogId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_file",
+        "n|sch|public",
+        "n|col|public.backlog_file.source_id",
+        "n|col|public.backlog_file.backlog_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "backlog_file", "backlog_file_taskId_idx"],
+      "writes": [
+        "s|idx|public.backlog_file_taskId_idx",
+        "n|idx|public.backlog_file_taskId_idx",
+        "e|idx|public.backlog_file_taskId_idx",
+        "n|rel|public.backlog_file_taskId_idx"
+      ],
+      "reads": ["n|tbl|public.backlog_file", "n|sch|public", "n|col|public.backlog_file.task_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "backlog_file", "backlog_file_milestoneId_idx"],
+      "writes": [
+        "s|idx|public.backlog_file_milestoneId_idx",
+        "n|idx|public.backlog_file_milestoneId_idx",
+        "e|idx|public.backlog_file_milestoneId_idx",
+        "n|rel|public.backlog_file_milestoneId_idx"
+      ],
+      "reads": ["n|tbl|public.backlog_file", "n|sch|public", "n|col|public.backlog_file.milestone_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "backlog_source", "backlog_source_projectId_unique"],
+      "writes": [
+        "s|idx|public.backlog_source_projectId_unique",
+        "n|idx|public.backlog_source_projectId_unique",
+        "e|idx|public.backlog_source_projectId_unique",
+        "n|rel|public.backlog_source_projectId_unique"
+      ],
+      "reads": ["n|tbl|public.backlog_source", "n|sch|public", "n|col|public.backlog_source.project_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "backlog_source", "backlog_source_webhookId_unique"],
+      "writes": [
+        "s|idx|public.backlog_source_webhookId_unique",
+        "n|idx|public.backlog_source_webhookId_unique",
+        "e|idx|public.backlog_source_webhookId_unique",
+        "n|rel|public.backlog_source_webhookId_unique"
+      ],
+      "reads": ["n|tbl|public.backlog_source", "n|sch|public", "n|col|public.backlog_source.webhook_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "backlog_source", "backlog_source_connectionId_idx"],
+      "writes": [
+        "s|idx|public.backlog_source_connectionId_idx",
+        "n|idx|public.backlog_source_connectionId_idx",
+        "e|idx|public.backlog_source_connectionId_idx",
+        "n|rel|public.backlog_source_connectionId_idx"
+      ],
+      "reads": ["n|tbl|public.backlog_source", "n|sch|public", "n|col|public.backlog_source.connection_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "git_connection", "git_connection_workspaceId_name_unique"],
+      "writes": [
+        "s|idx|public.git_connection_workspaceId_name_unique",
+        "n|idx|public.git_connection_workspaceId_name_unique",
+        "e|idx|public.git_connection_workspaceId_name_unique",
+        "n|rel|public.git_connection_workspaceId_name_unique"
+      ],
+      "reads": ["n|tbl|public.git_connection", "n|sch|public", "n|col|public.git_connection.workspace_id"]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "backlog_file"],
+      "writes": [
+        "s|fk|public.backlog_file.backlog_file_source_id_backlog_source_id_fkey",
+        "n|fk|public.backlog_file.backlog_file_source_id_backlog_source_id_fkey",
+        "e|fk|public.backlog_file.backlog_file_source_id_backlog_source_id_fkey",
+        "n|con|public.backlog_file.backlog_file_source_id_backlog_source_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_file",
+        "n|sch|public",
+        "n|tbl|public.backlog_source",
+        "n|sch|public",
+        "n|col|public.backlog_file.source_id",
+        "n|col|public.backlog_source.id",
+        "e|uniqueness|public.backlog_source.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "backlog_file"],
+      "writes": [
+        "s|fk|public.backlog_file.backlog_file_task_id_task_id_fkey",
+        "n|fk|public.backlog_file.backlog_file_task_id_task_id_fkey",
+        "e|fk|public.backlog_file.backlog_file_task_id_task_id_fkey",
+        "n|con|public.backlog_file.backlog_file_task_id_task_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_file",
+        "n|sch|public",
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.backlog_file.task_id",
+        "n|col|public.task.id",
+        "e|uniqueness|public.task.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "backlog_file"],
+      "writes": [
+        "s|fk|public.backlog_file.backlog_file_milestone_id_milestone_id_fkey",
+        "n|fk|public.backlog_file.backlog_file_milestone_id_milestone_id_fkey",
+        "e|fk|public.backlog_file.backlog_file_milestone_id_milestone_id_fkey",
+        "n|con|public.backlog_file.backlog_file_milestone_id_milestone_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_file",
+        "n|sch|public",
+        "n|tbl|public.milestone",
+        "n|sch|public",
+        "n|col|public.backlog_file.milestone_id",
+        "n|col|public.milestone.id",
+        "e|uniqueness|public.milestone.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "backlog_source"],
+      "writes": [
+        "s|fk|public.backlog_source.backlog_source_project_id_project_id_fkey",
+        "n|fk|public.backlog_source.backlog_source_project_id_project_id_fkey",
+        "e|fk|public.backlog_source.backlog_source_project_id_project_id_fkey",
+        "n|con|public.backlog_source.backlog_source_project_id_project_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_source",
+        "n|sch|public",
+        "n|tbl|public.project",
+        "n|sch|public",
+        "n|col|public.backlog_source.project_id",
+        "n|col|public.project.id",
+        "e|uniqueness|public.project.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "backlog_source"],
+      "writes": [
+        "s|fk|public.backlog_source.backlog_source_connection_id_git_connection_id_fkey",
+        "n|fk|public.backlog_source.backlog_source_connection_id_git_connection_id_fkey",
+        "e|fk|public.backlog_source.backlog_source_connection_id_git_connection_id_fkey",
+        "n|con|public.backlog_source.backlog_source_connection_id_git_connection_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_source",
+        "n|sch|public",
+        "n|tbl|public.git_connection",
+        "n|sch|public",
+        "n|col|public.backlog_source.connection_id",
+        "n|col|public.git_connection.id",
+        "e|uniqueness|public.git_connection.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "backlog_source"],
+      "writes": [
+        "s|fk|public.backlog_source.backlog_source_detached_by_id_user_id_fkey",
+        "n|fk|public.backlog_source.backlog_source_detached_by_id_user_id_fkey",
+        "e|fk|public.backlog_source.backlog_source_detached_by_id_user_id_fkey",
+        "n|con|public.backlog_source.backlog_source_detached_by_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_source",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.backlog_source.detached_by_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "backlog_source"],
+      "writes": [
+        "s|fk|public.backlog_source.backlog_source_created_by_id_user_id_fkey",
+        "n|fk|public.backlog_source.backlog_source_created_by_id_user_id_fkey",
+        "e|fk|public.backlog_source.backlog_source_created_by_id_user_id_fkey",
+        "n|con|public.backlog_source.backlog_source_created_by_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.backlog_source",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.backlog_source.created_by_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "git_connection"],
+      "writes": [
+        "s|fk|public.git_connection.git_connection_workspace_id_organization_id_fkey",
+        "n|fk|public.git_connection.git_connection_workspace_id_organization_id_fkey",
+        "e|fk|public.git_connection.git_connection_workspace_id_organization_id_fkey",
+        "n|con|public.git_connection.git_connection_workspace_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.git_connection",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.git_connection.workspace_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "git_connection"],
+      "writes": [
+        "s|fk|public.git_connection.git_connection_created_by_id_user_id_fkey",
+        "n|fk|public.git_connection.git_connection_created_by_id_user_id_fkey",
+        "e|fk|public.git_connection.git_connection_created_by_id_user_id_fkey",
+        "n|con|public.git_connection.git_connection_created_by_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.git_connection",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.git_connection.created_by_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "activity"],
+      "writes": [
+        "s|ck|public.activity.activity_origin_check",
+        "n|ck|public.activity.activity_origin_check",
+        "e|ck|public.activity.activity_origin_check",
+        "n|con|public.activity.activity_origin_check"
+      ],
+      "reads": ["n|tbl|public.activity", "n|sch|public", "n|col|public.activity.origin"]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "task"],
+      "writes": [
+        "s|ck|public.task.task_key_suffix_check",
+        "n|ck|public.task.task_key_suffix_check",
+        "e|ck|public.task.task_key_suffix_check",
+        "n|con|public.task.task_key_suffix_check"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public", "n|col|public.task.key_suffix"]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "backlog_file",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "backlog_source",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "git_connection",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "activity",
+        "name": "origin",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'app'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "activity",
+        "name": "origin_ref",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "backlog_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "hidden_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "key_suffix",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "backlog_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "backlog_data",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "hidden_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "source_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "path",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "blob_sha",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "task_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "milestone_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "error",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "seen_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "uuidv7()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "project_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "connection_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "mode",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "state",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'setup'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "folder_override",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "folder",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "default_branch",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "prefix",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "config",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "mappings",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'{\"status\":[],\"priority\":[],\"assignee\":[]}'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "head_commit",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "last_read_commit",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "last_read_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "last_attempt_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "last_trigger",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "last_error",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "warnings",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'[]'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "webhook_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "webhook_secret_ciphertext",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "webhook_last_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "detached_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "detached_by_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "created_by_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "uuidv7()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "workspace_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "provider",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "host",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "api_base_url",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "token_ciphertext",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "token_hint",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'unchecked'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "checked_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "checked_login",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "checked_detail",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "created_by_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_projectId_backlogId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "backlog_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_projectId_backlogId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "backlog_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_projectId_hidden_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"hidden_at\" is not null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_sourceId_backlogId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "source_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "backlog_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_taskId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "task_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_milestoneId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "milestone_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_projectId_unique",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_webhookId_unique",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "webhook_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_connectionId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "connection_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_workspaceId_name_unique",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "workspace_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "lower(\"name\")",
+            "isExpression": true,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_source_id_backlog_source_id_fkey",
+        "nameExplicit": false,
+        "columns": ["source_id"],
+        "schemaTo": "public",
+        "tableTo": "backlog_source",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_task_id_task_id_fkey",
+        "nameExplicit": false,
+        "columns": ["task_id"],
+        "schemaTo": "public",
+        "tableTo": "task",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_milestone_id_milestone_id_fkey",
+        "nameExplicit": false,
+        "columns": ["milestone_id"],
+        "schemaTo": "public",
+        "tableTo": "milestone",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_project_id_project_id_fkey",
+        "nameExplicit": false,
+        "columns": ["project_id"],
+        "schemaTo": "public",
+        "tableTo": "project",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_connection_id_git_connection_id_fkey",
+        "nameExplicit": false,
+        "columns": ["connection_id"],
+        "schemaTo": "public",
+        "tableTo": "git_connection",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_detached_by_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["detached_by_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "RESTRICT",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_created_by_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["created_by_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "RESTRICT",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_workspace_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": ["workspace_id"],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_created_by_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["created_by_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "RESTRICT",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_pkey",
+        "columns": ["source_id", "path"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_pkey",
+        "columns": ["id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_pkey",
+        "columns": ["id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_projectId_number_keySuffix_unique",
+        "nameExplicit": true,
+        "columns": ["project_id", "number", "key_suffix"],
+        "nullsNotDistinct": true,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "activity",
+        "name": "activity_origin_check",
+        "value": "\"origin\" in ('app', 'backlog')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_key_suffix_check",
+        "value": "\"key_suffix\" ~ '^[1-9][0-9]{0,4}(\\.[1-9][0-9]{0,4})*$'",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_file",
+        "name": "backlog_file_kind_check",
+        "value": "\"kind\" in ('config', 'task', 'draft', 'archived', 'milestone', 'archived_milestone')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_mode_check",
+        "value": "\"mode\" in ('mirror', 'import')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_state_check",
+        "value": "\"state\" in ('setup', 'reading', 'healthy', 'warnings', 'failed', 'paused', 'detached')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_last_trigger_check",
+        "value": "\"last_trigger\" in ('setup', 'webhook', 'manual', 'cli', 'poll')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "backlog_source",
+        "name": "backlog_source_detached_check",
+        "value": "(\"state\" = 'detached') = (\"detached_at\" is not null)",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_name_check",
+        "value": "char_length(\"name\") between 1 and 100",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_provider_check",
+        "value": "\"provider\" in ('github', 'gitlab', 'gitea')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_status_check",
+        "value": "\"status\" in ('unchecked', 'working', 'rejected', 'unreachable')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "git_connection",
+        "name": "git_connection_host_check",
+        "value": "\"host\" = lower(\"host\") and \"host\" <> ''",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"task_projectId_number_unique\"]"
+    }
+  ]
+}

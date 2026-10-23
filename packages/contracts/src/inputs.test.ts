@@ -1,29 +1,48 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_COMMENT_LENGTH } from './entities';
 import {
+  BacklogFolder,
   CreateAgentInput,
   CreateApiKeyInput,
   CreateCommentInput,
   CreateCycleInput,
+  CreateGitConnectionInput,
   CreateInvitationInput,
   CreateMilestoneInput,
+  CreateProjectFromBacklogInput,
   CreateProjectInput,
   CreateTaskInput,
+  DEFAULT_BACKLOG_PROBLEM_LIMIT,
   DEFAULT_TASK_LIST_LIMIT,
   DeleteCommentInput,
+  DeleteGitConnectionInput,
   DeleteMilestoneInput,
+  DetachBacklogInput,
+  DetectBacklogInput,
+  DetectBacklogRepositoryInput,
   EndCycleInput,
+  GetBacklogStatusInput,
   GetCycleInput,
   GetMilestoneInput,
   GetTaskInput,
+  GitHost,
   ListCommentsInput,
   ListCyclesInput,
   ListMilestonesInput,
   ListTasksInput,
   ListTaskTimelineInput,
+  PreviewBacklogInput,
+  RefreshBacklogInput,
+  RefreshBacklogNowInput,
   RevokeApiKeyInput,
+  SetBacklogConnectionInput,
+  SetBacklogFolderInput,
+  StartBacklogInput,
+  TestGitConnectionInput,
+  UpdateBacklogMappingsInput,
   UpdateCommentInput,
   UpdateCycleInput,
+  UpdateGitConnectionInput,
   UpdateMeInput,
   UpdateMilestoneInput,
   UpdateProjectInput,
@@ -576,5 +595,291 @@ describe('settings inputs', () => {
     });
     expect(CreateInvitationInput.safeParse({ email: 'jo' }).success).toBe(false);
     expect(CreateInvitationInput.safeParse({ email: 'jo@example.com', role: 'owner' }).success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M3
+// ---------------------------------------------------------------------------
+
+const connectionId = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4ac2';
+const userId = '0190a1b2-0000-7000-8000-00000000c0c0';
+const mappings = {
+  status: [
+    { from: 'To Do', to: 'todo', how: 'name' },
+    { from: 'Blocked', to: 'todo', how: 'fallback' },
+  ],
+  priority: [{ from: 'high', to: 'high', how: 'name' }],
+  assignee: [
+    { from: '@claude', userId, how: 'name' },
+    { from: '@francis', userId: null, how: 'manual' },
+  ],
+};
+
+describe('task lookups by suffixed key or Backlog.md id', () => {
+  it.each([
+    ['pay-786', 'PAY-786'],
+    ['PAY-786.1', 'PAY-786.1'],
+    ['pay-786.1.2', 'PAY-786.1.2'],
+    ['back-786.1', 'BACK-786.1'],
+    ['BACK-007', 'BACK-7'],
+    ['backlog-12', 'BACKLOG-12'],
+  ])('GetTaskInput takes %s as %s', (key, canonical) => {
+    expect(GetTaskInput.parse({ key })).toEqual({ key: canonical });
+    expect(ListTaskTimelineInput.parse({ key }).key).toBe(canonical);
+    expect(ListCommentsInput.parse({ key }).key).toBe(canonical);
+  });
+
+  it.each(['PAY-786.', 'PAY-0', 'PAY-786.0', 'BACK-0.1', 'PAY', '786'])('refuses %j', (key) => {
+    expect(GetTaskInput.safeParse({ key }).success).toBe(false);
+    expect(UpdateTaskInput.safeParse({ key, title: 'x' }).success).toBe(false);
+    expect(CreateCommentInput.safeParse({ key, body: 'x' }).success).toBe(false);
+  });
+
+  it('narrows a Backlog.md id to a project when given', () => {
+    expect(GetTaskInput.parse({ key: 'task-12', project: 'pay' })).toEqual({
+      key: 'TASK-12',
+      project: 'PAY',
+    });
+    expect(GetTaskInput.safeParse({ key: 'TASK-12', project: 'p' }).success).toBe(false);
+    expect(UpdateTaskInput.parse({ key: 'back-786', project: 'PAY', cycle: 'current' })).toEqual({
+      key: 'BACK-786',
+      project: 'PAY',
+      cycle: 'current',
+    });
+    // project alone is not a change.
+    expect(UpdateTaskInput.safeParse({ key: 'BACK-786', project: 'PAY' }).success).toBe(false);
+    expect(CreateCommentInput.parse({ key: 'back-786.1', body: ' hi ' })).toEqual({
+      key: 'BACK-786.1',
+      body: 'hi',
+    });
+  });
+
+  it('places tasks before or after suffixed keys', () => {
+    expect(UpdateTaskInput.parse({ key: 'PAY-786.1', position: { before: 'pay-786.2' } }).position).toEqual({
+      before: 'PAY-786.2',
+    });
+  });
+});
+
+describe('ListTasksInput hidden filter', () => {
+  it('takes only or include, and leaves hidden tasks out by default', () => {
+    expect(ListTasksInput.parse({}).hidden).toBeUndefined();
+    expect(ListTasksInput.parse({ hidden: 'only' }).hidden).toBe('only');
+    expect(ListTasksInput.parse({ hidden: 'include' }).hidden).toBe('include');
+    expect(ListTasksInput.safeParse({ hidden: 'exclude' }).success).toBe(false);
+    expect(ListTasksInput.safeParse({ hidden: true }).success).toBe(false);
+  });
+});
+
+describe('git connection inputs', () => {
+  it.each([
+    ['gitlab.com', 'gitlab.com'],
+    [' GitLab.Example.COM ', 'gitlab.example.com'],
+    ['https://git.home.example.com/', 'git.home.example.com'],
+    ['http://localhost:3000', 'localhost:3000'],
+    ['forgejo:3000', 'forgejo:3000'],
+    ['10.0.0.5', '10.0.0.5'],
+  ])('normalises the host %j', (input, host) => {
+    expect(GitHost.parse(input)).toBe(host);
+  });
+
+  it.each([
+    ['a path', 'gitlab.com/reddevs'],
+    ['a user', 'ana@gitlab.com'],
+    ['spaces', 'git lab.com'],
+    ['empty', ''],
+    ['port zero', 'gitlab.com:0'],
+    ['port too long', 'gitlab.com:123456'],
+    ['leading dash', '-gitlab.com'],
+    ['query', 'gitlab.com?x=1'],
+  ])('refuses a host with %s', (_label, input) => {
+    expect(GitHost.safeParse(input).success).toBe(false);
+  });
+
+  it('creates a connection with a trimmed token and name', () => {
+    expect(
+      CreateGitConnectionInput.parse({
+        provider: 'gitea',
+        host: 'https://git.home.example.com',
+        name: ' Forgejo at home ',
+        token: ' 0123abcd \n',
+      }),
+    ).toEqual({ provider: 'gitea', host: 'git.home.example.com', name: 'Forgejo at home', token: '0123abcd' });
+  });
+
+  it('refuses bad providers, names and tokens', () => {
+    const base = { provider: 'github', host: 'github.com', name: 'GitHub', token: 'ghp_x' };
+    expect(CreateGitConnectionInput.safeParse({ ...base, provider: 'bitbucket' }).success).toBe(false);
+    expect(CreateGitConnectionInput.safeParse({ ...base, name: '  ' }).success).toBe(false);
+    expect(CreateGitConnectionInput.safeParse({ ...base, name: 'x'.repeat(101) }).success).toBe(false);
+    expect(CreateGitConnectionInput.safeParse({ ...base, token: '' }).success).toBe(false);
+    expect(CreateGitConnectionInput.safeParse({ ...base, token: 'two words' }).success).toBe(false);
+    expect(CreateGitConnectionInput.safeParse({ ...base, token: 'x'.repeat(4097) }).success).toBe(false);
+  });
+
+  it('updates the name or the token, at least one', () => {
+    expect(UpdateGitConnectionInput.parse({ id: connectionId, token: 'glpat-new' })).toEqual({
+      id: connectionId,
+      token: 'glpat-new',
+    });
+    expect(UpdateGitConnectionInput.safeParse({ id: connectionId }).success).toBe(false);
+    expect(UpdateGitConnectionInput.safeParse({ id: 'nope', name: 'x' }).success).toBe(false);
+    expect(DeleteGitConnectionInput.safeParse({ id: connectionId }).success).toBe(true);
+    expect(DeleteGitConnectionInput.safeParse({}).success).toBe(false);
+  });
+
+  it('tests an unsaved token, a saved connection, or a saved one with a new token', () => {
+    expect(TestGitConnectionInput.parse({ provider: 'gitlab', host: 'GitLab.com', token: 't' })).toEqual({
+      provider: 'gitlab',
+      host: 'gitlab.com',
+      token: 't',
+    });
+    expect(TestGitConnectionInput.parse({ id: connectionId })).toEqual({ id: connectionId });
+    expect(TestGitConnectionInput.parse({ id: connectionId, token: 't2' })).toEqual({
+      id: connectionId,
+      token: 't2',
+    });
+    expect(TestGitConnectionInput.safeParse({ provider: 'gitlab', host: 'gitlab.com' }).success).toBe(false);
+    expect(TestGitConnectionInput.safeParse({ id: connectionId, provider: 'gitlab' }).success).toBe(false);
+    expect(TestGitConnectionInput.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('Backlog.md API inputs', () => {
+  it('pages the problems of the status', () => {
+    expect(GetBacklogStatusInput.parse({ project: 'pay' })).toEqual({
+      project: 'PAY',
+      problemsLimit: DEFAULT_BACKLOG_PROBLEM_LIMIT,
+    });
+    expect(
+      GetBacklogStatusInput.parse({ project: 'PAY', problemsLimit: '10', problemsCursor: 'c1' }),
+    ).toEqual({
+      project: 'PAY',
+      problemsLimit: 10,
+      problemsCursor: 'c1',
+    });
+    expect(GetBacklogStatusInput.safeParse({ project: 'PAY', problemsLimit: 0 }).success).toBe(false);
+    expect(GetBacklogStatusInput.safeParse({ project: 'PAY', problemsLimit: 201 }).success).toBe(false);
+    expect(GetBacklogStatusInput.safeParse({ project: 'PAY', problemsCursor: '' }).success).toBe(false);
+    expect(GetBacklogStatusInput.safeParse({}).success).toBe(false);
+  });
+
+  it('refreshes a project by key', () => {
+    expect(RefreshBacklogInput.parse({ project: ' pay ' })).toEqual({ project: 'PAY' });
+    expect(RefreshBacklogInput.safeParse({ project: 'p' }).success).toBe(false);
+  });
+});
+
+describe('Backlog.md setup and settings inputs', () => {
+  it.each([
+    ['backlog', 'backlog'],
+    ['.backlog/', '.backlog'],
+    ['./docs/backlog//', 'docs/backlog'],
+    [' tasks ', 'tasks'],
+  ])('normalises the folder %j', (input, folder) => {
+    expect(BacklogFolder.parse(input)).toBe(folder);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['root slash', '/backlog'],
+    ['parent', '../backlog'],
+    ['parent inside', 'docs/../backlog'],
+    ['dot part', 'docs/./backlog'],
+    ['double slash', 'docs//backlog'],
+    ['backslash', 'docs\\backlog'],
+    ['too long', 'b'.repeat(201)],
+  ])('refuses a folder with %s', (_label, input) => {
+    expect(BacklogFolder.safeParse(input).success).toBe(false);
+  });
+
+  it('detects, previews and starts with the same source fields', () => {
+    const detect = DetectBacklogInput.parse({ projectKey: 'pay', connectionId });
+    expect(detect).toEqual({ projectKey: 'PAY', connectionId });
+    expect(
+      DetectBacklogInput.parse({ projectKey: 'PAY', connectionId, folderOverride: '.backlog/' })
+        .folderOverride,
+    ).toBe('.backlog');
+    expect(PreviewBacklogInput.parse({ ...detect, mappings }).mappings).toEqual(mappings);
+    expect(StartBacklogInput.parse({ ...detect, mappings, mode: 'import' }).mode).toBe('import');
+    expect(StartBacklogInput.safeParse({ ...detect, mappings, mode: 'sync' }).success).toBe(false);
+    expect(StartBacklogInput.safeParse({ ...detect, mode: 'mirror' }).success).toBe(false);
+    expect(PreviewBacklogInput.safeParse({ ...detect, mappings: { status: [] } }).success).toBe(false);
+    expect(DetectBacklogInput.safeParse({ projectKey: 'PAY', connectionId: 'abc' }).success).toBe(false);
+  });
+
+  it('refuses mappings with a duplicate value or an unknown target', () => {
+    const duplicate = {
+      ...mappings,
+      priority: [...mappings.priority, { from: 'HIGH', to: 'urgent', how: 'manual' }],
+    };
+    expect(UpdateBacklogMappingsInput.safeParse({ projectKey: 'PAY', mappings: duplicate }).success).toBe(
+      false,
+    );
+    const badStatus = { ...mappings, status: [{ from: 'Doing', to: 'doing', how: 'manual' }] };
+    expect(UpdateBacklogMappingsInput.safeParse({ projectKey: 'PAY', mappings: badStatus }).success).toBe(
+      false,
+    );
+    expect(UpdateBacklogMappingsInput.parse({ projectKey: 'pay', mappings }).projectKey).toBe('PAY');
+  });
+
+  it('detects a repository before the project exists', () => {
+    const input = { repository: ' git@gitlab.com:reddevs/payments.git ', connectionId };
+    expect(DetectBacklogRepositoryInput.parse(input)).toEqual({
+      repository: 'git@gitlab.com:reddevs/payments.git',
+      connectionId,
+    });
+    expect(
+      DetectBacklogRepositoryInput.parse({
+        repository: 'http://localhost:3300/pm-admin/notes-sync',
+        connectionId,
+        folderOverride: './docs/backlog/',
+      }).folderOverride,
+    ).toBe('docs/backlog');
+    expect(DetectBacklogRepositoryInput.safeParse({ ...input, repository: '' }).success).toBe(false);
+    expect(DetectBacklogRepositoryInput.safeParse({ ...input, repository: 'payments' }).success).toBe(false);
+    expect(DetectBacklogRepositoryInput.safeParse({ ...input, connectionId: 'abc' }).success).toBe(false);
+  });
+
+  it('creates a project from Backlog.md with a repository', () => {
+    const input = {
+      repository: 'git@gitlab.com:reddevs/payments.git',
+      connectionId,
+      name: ' Payments API ',
+      key: 'back',
+      mode: 'mirror',
+    };
+    expect(CreateProjectFromBacklogInput.parse(input)).toEqual({
+      ...input,
+      name: 'Payments API',
+      key: 'BACK',
+    });
+    expect(CreateProjectFromBacklogInput.safeParse({ ...input, repository: '' }).success).toBe(false);
+    expect(CreateProjectFromBacklogInput.safeParse({ ...input, repository: 'not a url' }).success).toBe(
+      false,
+    );
+    expect(CreateProjectFromBacklogInput.safeParse({ ...input, key: 'BACKLOGMD' }).success).toBe(false);
+  });
+
+  it('sets or clears the folder and switches the connection', () => {
+    expect(SetBacklogFolderInput.parse({ projectKey: 'PAY', folderOverride: null })).toEqual({
+      projectKey: 'PAY',
+      folderOverride: null,
+    });
+    expect(SetBacklogFolderInput.safeParse({ projectKey: 'PAY' }).success).toBe(false);
+    expect(SetBacklogConnectionInput.parse({ projectKey: 'pay', connectionId }).projectKey).toBe('PAY');
+    expect(RefreshBacklogNowInput.parse({ projectKey: 'pay' })).toEqual({ projectKey: 'PAY' });
+  });
+
+  it('detaches only when the typed key matches', () => {
+    expect(DetachBacklogInput.parse({ projectKey: 'PAY', confirmKey: ' pay ' })).toEqual({
+      projectKey: 'PAY',
+      confirmKey: 'PAY',
+    });
+    const wrong = DetachBacklogInput.safeParse({ projectKey: 'PAY', confirmKey: 'PA' });
+    expect(wrong.success).toBe(false);
+    expect(wrong.error?.issues[0]?.path).toEqual(['confirmKey']);
+    expect(DetachBacklogInput.safeParse({ projectKey: 'PAY' }).success).toBe(false);
   });
 });

@@ -14,7 +14,7 @@ function procedures(router: unknown, path: string[] = []): [string, AnyContractP
 const all = procedures(contract);
 
 describe('contract', () => {
-  it('exposes exactly the M1 and M2 routes under /api/v1', () => {
+  it('exposes exactly the M1, M2 and M3 routes under /api/v1', () => {
     const routes = Object.fromEntries(
       all.map(([name, procedure]) => {
         const { method, path } = procedure['~orpc'].route;
@@ -47,6 +47,8 @@ describe('contract', () => {
       'cycles.get': 'GET /api/v1/cycles/{project}/{number}',
       'cycles.update': 'PATCH /api/v1/cycles/{project}/{number}',
       'cycles.end': 'POST /api/v1/cycles/{project}/{number}/end',
+      'backlog.status': 'GET /api/v1/projects/{project}/backlog',
+      'backlog.refresh': 'POST /api/v1/projects/{project}/backlog/refresh',
       'members.list': 'GET /api/v1/members',
     });
     expect(API_PREFIX).toBe('/api/v1');
@@ -65,6 +67,12 @@ describe('contract', () => {
         'CONFLICT',
         'TASK_CHANGED',
         'UNPROCESSABLE_CONTENT',
+        'TASK_MIRRORED',
+        'MILESTONE_MIRRORED',
+        'PROJECT_MIRRORED',
+        'PROJECT_NOT_EMPTY',
+        'BACKLOG_PAUSED',
+        'BACKLOG_DETACHED',
       ]),
     );
   });
@@ -81,7 +89,7 @@ describe('contract', () => {
     }
   });
 
-  it('returns 201 from creates, 204 from milestone deletes and 200 otherwise', () => {
+  it('returns 201 from creates, 202 from backlog refreshes, 204 from milestone deletes and 200 otherwise', () => {
     const created = all
       .filter(([, procedure]) => procedure['~orpc'].route.successStatus === 201)
       .map(([name]) => name);
@@ -93,6 +101,7 @@ describe('contract', () => {
       'tasks.create',
     ]);
     expect(contract.milestones.delete['~orpc'].route.successStatus).toBe(204);
+    expect(contract.backlog.refresh['~orpc'].route.successStatus).toBe(202);
     // Comment deletes are soft and return the comment, so the CLI can print it.
     expect(contract.comments.delete['~orpc'].route.successStatus).toBeUndefined();
   });
@@ -104,6 +113,40 @@ describe('contract', () => {
     const task = taskFixture;
     const parsed = TASK_CHANGED.data.parse({ requestId: 'r1', task });
     expect(parsed.task.key).toBe(task.key);
+  });
+
+  it('declares the M3 problem codes as 409s that carry the mirrored extensions', () => {
+    for (const code of [
+      'TASK_MIRRORED',
+      'MILESTONE_MIRRORED',
+      'PROJECT_MIRRORED',
+      'PROJECT_NOT_EMPTY',
+      'BACKLOG_PAUSED',
+      'BACKLOG_DETACHED',
+    ] as const) {
+      expect(apiErrors[code].status, code).toBe(409);
+    }
+    const data = apiErrors.TASK_MIRRORED.data.parse({
+      requestId: 'r1',
+      field: 'status',
+      file: 'backlog/tasks/back-786 - Mirror.md',
+      backlogId: 'BACK-786',
+      hint: 'backlog task edit 786 -s "Done"',
+    });
+    expect(data).toMatchObject({ field: 'status', backlogId: 'BACK-786' });
+  });
+
+  it('accepts suffixed keys and Backlog.md ids on task routes and pages backlog problems', () => {
+    const get = contract.tasks.get['~orpc'].inputSchema as z.ZodType;
+    expect(get.parse({ key: 'pay-786.1' })).toMatchObject({ key: 'PAY-786.1' });
+    expect(get.parse({ key: 'back-007.01' })).toMatchObject({ key: 'BACK-7.1' });
+    expect(get.safeParse({ key: 'PAY-786.' }).success).toBe(false);
+    const status = contract.backlog.status['~orpc'].inputSchema as z.ZodType;
+    expect(status.parse({ project: 'back', problemsLimit: '10' })).toEqual({
+      project: 'BACK',
+      problemsLimit: 10,
+    });
+    expect(status.parse({ project: 'BACK' })).toMatchObject({ problemsLimit: 50 });
   });
 
   it('accepts cycle selectors and task keys as path parameters (text in URLs)', () => {
