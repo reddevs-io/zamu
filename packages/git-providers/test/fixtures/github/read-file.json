@@ -1,0 +1,53 @@
+{
+  "description": "readFile at a branch: the root tree by ref name, then the blob.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/big/git/trees/main"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "00000000000000000000000000000000000000c1",
+          "truncated": false,
+          "tree": [
+            {
+              "path": "backlog.config.yml",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b5",
+              "size": 28,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b5"
+            },
+            {
+              "path": "planning",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "00000000000000000000000000000000000000a4",
+              "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b5"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "00000000000000000000000000000000000000b5",
+          "size": 28,
+          "content": "YmFja2xvZ19kaXJlY3Rvcnk6IHBsYW5uaW5nCg==",
+          "encoding": "base64"
+        }
+      }
+    }
+  ]
+}

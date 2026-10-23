@@ -1,0 +1,51 @@
+{
+  "description": "A renamed repository answers 301 to /repositories/{id} on the same host; a redirect to another host is refused.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/old-name"
+      },
+      "response": {
+        "status": 301,
+        "headers": {
+          "location": "https://api.github.com/repositories/42"
+        },
+        "json": {
+          "message": "Moved Permanently",
+          "url": "https://api.github.com/repositories/42"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repositories/42"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "id": 42,
+          "full_name": "acme/new-name",
+          "html_url": "https://github.com/acme/new-name",
+          "default_branch": "trunk"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/elsewhere"
+      },
+      "response": {
+        "status": 302,
+        "headers": {
+          "location": "https://evil.example.com/steal"
+        },
+        "text": ""
+      }
+    }
+  ]
+}

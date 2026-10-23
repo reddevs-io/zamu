@@ -1,0 +1,31 @@
+# Throwaway Forgejo for the git-providers integration tests and the M3 end-to-end tests.
+# Start it with setup.sh (creates an admin and a token), stop it with teardown.sh.
+# Nothing is persisted: the data volume is anonymous and teardown removes it.
+name: ${FORGEJO_PROJECT:-pm-forgejo}
+
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:17.0.0
+    environment:
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__database__DB_TYPE: sqlite3
+      FORGEJO__server__ROOT_URL: http://localhost:${FORGEJO_PORT:-3300}/
+      FORGEJO__server__HTTP_PORT: "3000"
+      FORGEJO__server__DISABLE_SSH: "true"
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__repository__DEFAULT_BRANCH: main
+      # Small pages so tests exercise tree pagination (the server default is 1000).
+      FORGEJO__api__DEFAULT_GIT_TREES_PER_PAGE: ${FORGEJO_TREES_PER_PAGE:-10}
+      # Webhooks go to the test process on the Docker host, a private address.
+      FORGEJO__webhook__ALLOWED_HOST_LIST: "*"
+      FORGEJO__webhook__DELIVER_TIMEOUT: "10"
+      FORGEJO__log__LEVEL: Warn
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:${FORGEJO_PORT:-3300}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/healthz"]
+      interval: 2s
+      timeout: 5s
+      retries: 60

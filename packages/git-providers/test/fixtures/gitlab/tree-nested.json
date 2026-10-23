@@ -1,0 +1,112 @@
+{
+  "description": "A subgroup project and a nested folder: one listing per level, then the recursive call. Links point at another origin (a proxy) and are moved onto the configured one.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/group%2Fsub%2Fapp/repository/tree?ref=0000000000000000000000000000000000000001&per_page=100&pagination=keyset"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": [
+          {
+            "id": "0000000000000000000000000000000000000002",
+            "name": "docs",
+            "type": "tree",
+            "path": "docs",
+            "mode": "040000"
+          },
+          {
+            "id": "0000000000000000000000000000000000000003",
+            "name": "README.md",
+            "type": "blob",
+            "path": "README.md",
+            "mode": "100644"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/group%2Fsub%2Fapp/repository/tree?ref=0000000000000000000000000000000000000001&path=docs&per_page=100&pagination=keyset"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": [
+          {
+            "id": "0000000000000000000000000000000000000004",
+            "name": "backlog",
+            "type": "tree",
+            "path": "docs/backlog",
+            "mode": "040000"
+          },
+          {
+            "id": "0000000000000000000000000000000000000005",
+            "name": "notes.md",
+            "type": "blob",
+            "path": "docs/notes.md",
+            "mode": "100644"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/group%2Fsub%2Fapp/repository/tree?ref=0000000000000000000000000000000000000001&path=docs%2Fbacklog&recursive=true&per_page=100&pagination=keyset"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "link": "<http://gitlab-internal:8080/api/v4/projects/group%2Fsub%2Fapp/repository/tree?id=group%2Fsub%2Fapp&page_token=abc&pagination=keyset&path=docs%2Fbacklog&per_page=100&recursive=true&ref=0000000000000000000000000000000000000001>; rel=\"next\""
+        },
+        "json": [
+          {
+            "id": "0000000000000000000000000000000000000006",
+            "name": "config.yml",
+            "type": "blob",
+            "path": "docs/backlog/config.yml",
+            "mode": "100644"
+          },
+          {
+            "id": "0000000000000000000000000000000000000007",
+            "name": "tasks",
+            "type": "tree",
+            "path": "docs/backlog/tasks",
+            "mode": "040000"
+          },
+          {
+            "id": "0000000000000000000000000000000000000008",
+            "name": "current",
+            "type": "blob",
+            "path": "docs/backlog/current",
+            "mode": "120000"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/group%2Fsub%2Fapp/repository/tree?id=group%2Fsub%2Fapp&page_token=abc&pagination=keyset&path=docs%2Fbacklog&per_page=100&recursive=true&ref=0000000000000000000000000000000000000001"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": [
+          {
+            "id": "0000000000000000000000000000000000000009",
+            "name": "task-1 - One.md",
+            "type": "blob",
+            "path": "docs/backlog/tasks/task-1 - One.md",
+            "mode": "100644"
+          }
+        ]
+      }
+    }
+  ]
+}

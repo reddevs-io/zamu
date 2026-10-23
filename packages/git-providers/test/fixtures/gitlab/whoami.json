@@ -1,0 +1,42 @@
+{
+  "description": "GET /user, then GET /projects?membership=true for the X-Total count.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/user"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "id": 1,
+          "username": "john_smith",
+          "name": "John Smith",
+          "state": "active"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects?membership=true&simple=true&per_page=1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "x-total": "12",
+          "x-per-page": "1",
+          "x-page": "1"
+        },
+        "json": [
+          {
+            "id": 3,
+            "path_with_namespace": "john_smith/app"
+          }
+        ]
+      }
+    }
+  ]
+}

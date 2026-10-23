@@ -1,0 +1,41 @@
+{
+  "description": "GET /user, then GET /user/repos?limit=1 for the X-Total-Count header.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/user"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "id": 1,
+          "login": "forgejo-admin",
+          "full_name": "",
+          "email": "admin@example.com",
+          "is_admin": true
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/user/repos?limit=1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "x-total-count": "5"
+        },
+        "json": [
+          {
+            "id": 3,
+            "full_name": "forgejo-admin/app"
+          }
+        ]
+      }
+    }
+  ]
+}

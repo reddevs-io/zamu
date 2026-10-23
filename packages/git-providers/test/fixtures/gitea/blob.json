@@ -1,0 +1,23 @@
+{
+  "description": "GET /repos/{owner}/{repo}/git/blobs/{sha}: base64 content.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/repos/forgejo/docs/git/blobs/4f638b14b1a436658c78cfadc7e9bacd7c3c88d2"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "content": "ewogICIkc2NoZW1hIjogImh0dHBzOi8vZG9jcy5yZW5vdmF0ZWJvdC5jb20vcmVub3ZhdGUtc2NoZW1hLmpzb24iLAogICJleHRlbmRzIjogWyJsb2NhbD5mb3JnZWpvL3Jlbm92YXRlLWNvbmZpZyJdLAogICJwYWNrYWdlUnVsZXMiOiBbCiAgICB7CiAgICAgICJtYXRjaFVwZGF0ZVR5cGVzIjogWyJtaW5vciIsICJwYXRjaCJdLAogICAgICAibWF0Y2hDdXJyZW50VmVyc2lvbiI6ICIhL14wLyIsCiAgICAgICJhdXRvbWVyZ2UiOiB0cnVlCiAgICB9LAogICAgewogICAgICAibWF0Y2hEZXBUeXBlcyI6IFsiZGV2RGVwZW5kZW5jaWVzIl0sCiAgICAgICJtYXRjaFBhY2thZ2VOYW1lcyI6IFsiL2xpbnQvIiwgIi9wcmV0dGllci8iXSwKICAgICAgImF1dG9tZXJnZSI6IHRydWUKICAgIH0KICBdLAogICJsb2NrRmlsZU1haW50ZW5hbmNlIjogewogICAgImVuYWJsZWQiOiB0cnVlLAogICAgImF1dG9tZXJnZSI6IHRydWUKICB9Cn0K",
+          "encoding": "base64",
+          "url": "https://codeberg.org/api/v1/repos/forgejo/docs/git/blobs/4f638b14b1a436658c78cfadc7e9bacd7c3c88d2",
+          "sha": "4f638b14b1a436658c78cfadc7e9bacd7c3c88d2",
+          "size": 471
+        }
+      }
+    }
+  ]
+}

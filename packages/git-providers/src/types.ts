@@ -1,0 +1,109 @@
+import type { HostPolicy } from './hosts';
+
+/** `gitea` covers Gitea and Forgejo: same API under /api/v1. */
+export type ProviderKind = 'github' | 'gitlab' | 'gitea';
+
+export const PROVIDER_KINDS: readonly ProviderKind[] = ['github', 'gitlab', 'gitea'];
+
+export interface Whoami {
+  login: string;
+  /** Repositories the account has, when the provider offers a count. */
+  repoCount?: number;
+}
+
+export interface RepositoryInfo {
+  defaultBranch: string;
+  /** Repository page in a browser, as the provider reports it. */
+  webUrl: string;
+}
+
+export interface TreeEntry {
+  /** Full path from the repository root, e.g. `backlog/tasks/back-1 - Title.md`. */
+  path: string;
+  /** Git blob hash. Unchanged content keeps the same hash, so callers can skip re-reading it. */
+  blobSha: string;
+  /** Size in bytes. Null on GitLab, whose tree listing does not report sizes. */
+  size: number | null;
+}
+
+export interface FileContent {
+  content: string;
+  blobSha: string;
+}
+
+/** Header bag as received by a server route. Names are matched case-insensitively. */
+export type WebhookHeaders = Headers | Record<string, string | string[] | undefined>;
+
+export type WebhookRefusal = 'missing_signature' | 'bad_signature' | 'bad_payload';
+
+export type WebhookVerification =
+  | { ok: false; reason: WebhookRefusal }
+  | {
+      ok: true;
+      /** `push` for branch and tag pushes, `ping` for GitHub's hook test, `other` for any other event. */
+      event: 'push' | 'ping' | 'other';
+      /** Provider event name as sent (`push`, `Push Hook`, `ping`…). */
+      eventName: string;
+      /** Branch name for pushes to `refs/heads/…`; absent for tags and other events. */
+      branch?: string;
+      /** Commit the branch points at after the push; absent when the push deleted the branch. */
+      headCommit?: string;
+      /** True when the push deleted the ref. */
+      deleted?: boolean;
+    };
+
+/**
+ * One repository host behind one token. `path` is `owner/name` (GitLab: the full namespace path,
+ * `group/subgroup/name`). Every method throws a GitProviderError subclass on failure.
+ */
+export interface GitProvider {
+  readonly provider: ProviderKind;
+  /** Normalised host, `host` or `host:port`. */
+  readonly host: string;
+  readonly apiBaseUrl: string;
+  readonly webBaseUrl: string;
+
+  /** The token's account, used to test a connection. */
+  whoami(): Promise<Whoami>;
+  /** Default branch (follows renames) and web URL. */
+  getRepository(path: string): Promise<RepositoryInfo>;
+  /** Commit hash the branch points at. */
+  getBranchHead(path: string, branch: string): Promise<string>;
+  /**
+   * Every file under `folder` at `commit`, recursively, all pages. Blobs only: directories,
+   * submodules and symlinks are left out. Empty when the folder does not exist at that commit.
+   * `folder` is relative to the repository root; '' lists the whole repository.
+   */
+  listTree(path: string, commit: string, folder: string): Promise<TreeEntry[]>;
+  /** Blob content decoded as UTF-8 (a byte-order mark is dropped). */
+  readBlob(path: string, blobSha: string): Promise<string>;
+  /** One file at `ref` (commit or branch), or null when there is no file at that path. */
+  readFile(path: string, ref: string, filePath: string): Promise<FileContent | null>;
+  /** Link to a file on the branch in the provider's web UI, for "Open file". */
+  fileUrl(path: string, branch: string, filePath: string): string;
+  /** Checks a webhook delivery against the source's secret. Same as the standalone verifyWebhook. */
+  verifyWebhook(headers: WebhookHeaders, rawBody: string | Uint8Array, secret: string): WebhookVerification;
+}
+
+export type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+export interface CreateProviderOptions {
+  provider: ProviderKind;
+  /** Host as stored on the connection (normalised by normalizeHost; a typed URL is accepted too). */
+  host: string;
+  /** Access token. An empty string sends no Authorization header (public repositories only). */
+  token: string;
+  /** Replaces the global fetch, for tests. */
+  fetch?: FetchFn;
+  /** Use http:// (hosts listed in GIT_HTTP_HOSTS). Ignored for github.com. */
+  allowHttp?: boolean;
+  /**
+   * When set, every request (and every redirect hop) first runs isAllowedHost on the host it is
+   * about to call and throws GitHostRefused when the policy refuses it. Core always sets this.
+   */
+  hostPolicy?: Omit<HostPolicy, 'httpHosts'>;
+  /** Per-request timeout. Default 30 seconds. */
+  timeoutMs?: number;
+  /** Clock for rate-limit reset headers, for tests. */
+  now?: () => number;
+}

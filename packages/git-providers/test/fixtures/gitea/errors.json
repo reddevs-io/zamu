@@ -1,0 +1,49 @@
+{
+  "description": "Error statuses recorded on Codeberg. The 401 body echoes the token it was sent (here the fixture token).",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/user"
+      },
+      "response": {
+        "status": 401,
+        "headers": {},
+        "json": {
+          "message": "token is malformed: token contains an invalid number of segments\naccess token does not exist [sha: fixture-token-123]",
+          "url": "https://codeberg.org/api/swagger"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/repos/forgejo/nothing-xyz"
+      },
+      "response": {
+        "status": 404,
+        "headers": {},
+        "json": {
+          "message": "The target couldn't be found.",
+          "url": "https://codeberg.org/api/swagger",
+          "errors": []
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/repos/forgejo/docs/git/blobs/0000000000000000000000000000000000000001"
+      },
+      "response": {
+        "status": 400,
+        "headers": {},
+        "json": {
+          "message": "sha not found [0000000000000000000000000000000000000001]",
+          "url": "https://codeberg.org/api/swagger"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "description": "Error statuses. 401 and 404 bodies recorded; 403 and 429 from the docs.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed and extended by hand.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/user"
+      },
+      "response": {
+        "status": 401,
+        "headers": {},
+        "json": {
+          "message": "401 Unauthorized"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/acme%2Fmissing"
+      },
+      "response": {
+        "status": 404,
+        "headers": {},
+        "json": {
+          "message": "404 Project Not Found"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/acme%2Fforbidden"
+      },
+      "response": {
+        "status": 403,
+        "headers": {},
+        "json": {
+          "message": "403 Forbidden"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/acme%2Flimited"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "retry-after": "45",
+          "ratelimit-remaining": "0",
+          "ratelimit-reset": "1792773840"
+        },
+        "text": "Retry later"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/acme%2Fdown"
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "content-type": "text/plain"
+        },
+        "text": "Service Unavailable"
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "description": "readFile at a branch: the root listing by ref name, then the raw blob.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/acme%2Fapp/repository/tree?ref=main&per_page=100&pagination=keyset"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": [
+          {
+            "id": "0000000000000000000000000000000000000014",
+            "name": "backlog.config.yml",
+            "type": "blob",
+            "path": "backlog.config.yml",
+            "mode": "100644"
+          },
+          {
+            "id": "0000000000000000000000000000000000000015",
+            "name": "planning",
+            "type": "tree",
+            "path": "planning",
+            "mode": "040000"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/acme%2Fapp/repository/blobs/0000000000000000000000000000000000000014/raw"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/plain; charset=utf-8"
+        },
+        "text": "backlog_directory: planning\n"
+      }
+    }
+  ]
+}
