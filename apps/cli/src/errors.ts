@@ -122,9 +122,10 @@ export function toCliError(error: unknown, url?: string): CliError {
       }),
       status: status >= 400 && status <= 599 ? status : 500,
     };
-    const hints = (issues ?? []).map((issue) =>
-      issue.path ? `${issue.path}: ${issue.message}` : issue.message,
-    );
+    // An issue that only repeats the message (a conflict on one field) adds nothing to it.
+    const hints = (issues ?? [])
+      .filter((issue) => issue.message !== error.message)
+      .map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message));
     if (requestId) hints.push(`Request id: ${requestId}`);
     // The server's 401 text speaks to HTTP clients; people at a terminal get the CLI's version.
     const message =

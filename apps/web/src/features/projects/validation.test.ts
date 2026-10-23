@@ -1,5 +1,6 @@
+import { REPOSITORY_URL_HINT } from '@pm/contracts';
 import { describe, expect, it } from 'vitest';
-import { normalizeKeyInput, suggestKey, validateNewProject } from './validation';
+import { normalizeKeyInput, repositoryError, suggestKey, validateNewProject } from './validation';
 
 describe('suggestKey', () => {
   it.each([
@@ -29,18 +30,22 @@ describe('normalizeKeyInput', () => {
 
 describe('validateNewProject', () => {
   it('returns the contract input with a trimmed name and no empty description', () => {
-    expect(validateNewProject({ name: '  Billing  ', key: 'bil', description: '   ' })).toEqual({
+    expect(
+      validateNewProject({ name: '  Billing  ', key: 'bil', description: '   ', repository: '' }),
+    ).toEqual({
       ok: true,
       input: { name: 'Billing', key: 'BIL' },
     });
-    expect(validateNewProject({ name: 'Billing', key: 'BIL', description: ' Stripe payouts ' })).toEqual({
+    expect(
+      validateNewProject({ name: 'Billing', key: 'BIL', description: ' Stripe payouts ', repository: '' }),
+    ).toEqual({
       ok: true,
       input: { name: 'Billing', key: 'BIL', description: 'Stripe payouts' },
     });
   });
 
   it('reports one message per field', () => {
-    expect(validateNewProject({ name: ' ', key: '', description: '' })).toEqual({
+    expect(validateNewProject({ name: ' ', key: '', description: '', repository: '' })).toEqual({
       ok: false,
       errors: {
         name: 'Enter a project name.',
@@ -50,16 +55,58 @@ describe('validateNewProject', () => {
   });
 
   it.each(['B', '1AB', 'AB-C', 'ABCDEFG'])('rejects the key %j', (key) => {
-    const result = validateNewProject({ name: 'Billing', key, description: '' });
+    const result = validateNewProject({ name: 'Billing', key, description: '', repository: '' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(Object.keys(result.errors)).toEqual(['key']);
   });
 
   it('rejects names over 100 and descriptions over 2,000 characters', () => {
-    const result = validateNewProject({ name: 'x'.repeat(101), key: 'BIL', description: 'y'.repeat(2001) });
+    const result = validateNewProject({
+      name: 'x'.repeat(101),
+      key: 'BIL',
+      description: 'y'.repeat(2001),
+      repository: '',
+    });
     expect(result).toEqual({
       ok: false,
       errors: { name: 'Use 100 characters or fewer.', description: 'Use 2,000 characters or fewer.' },
     });
+  });
+
+  it('sends a trimmed repository and leaves out an empty one', () => {
+    const values = { name: 'Billing', key: 'BIL', description: '' };
+    expect(validateNewProject({ ...values, repository: ' git@gitlab.com:reddevs/billing.git ' })).toEqual({
+      ok: true,
+      input: { name: 'Billing', key: 'BIL', repository: 'git@gitlab.com:reddevs/billing.git' },
+    });
+    expect(validateNewProject({ ...values, repository: '  ' })).toEqual({
+      ok: true,
+      input: { name: 'Billing', key: 'BIL' },
+    });
+  });
+
+  it('rejects a repository that is not a clone URL', () => {
+    const result = validateNewProject({
+      name: 'Billing',
+      key: 'BIL',
+      description: '',
+      repository: 'reddevs/billing',
+    });
+    expect(result).toEqual({ ok: false, errors: { repository: REPOSITORY_URL_HINT } });
+  });
+});
+
+describe('repositoryError', () => {
+  it('accepts empty values and clone URLs', () => {
+    expect(repositoryError('')).toBeUndefined();
+    expect(repositoryError('https://gitlab.com/reddevs/payments.git')).toBeUndefined();
+    expect(repositoryError('ssh://git@gitlab.com:2222/reddevs/payments')).toBeUndefined();
+  });
+
+  it('explains the expected form, or the length limit', () => {
+    expect(repositoryError('reddevs/billing')).toBe(REPOSITORY_URL_HINT);
+    expect(repositoryError(`https://gitlab.com/${'a/'.repeat(260)}repo`)).toBe(
+      'Use 500 characters or fewer.',
+    );
   });
 });

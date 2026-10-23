@@ -129,6 +129,7 @@ export function createFakeBoardApi({
               usesMilestones,
               usesCycles,
               currentCycle: null,
+              repository: null,
               createdAt: new Date(base).toISOString(),
               updatedAt: new Date(base).toISOString(),
               openCounts: {

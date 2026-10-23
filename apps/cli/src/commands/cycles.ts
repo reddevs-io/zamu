@@ -9,6 +9,7 @@ import {
 } from '@pm/contracts';
 import { type CommandContext, emit } from '../context';
 import { cycleDates, cycleLabel, cycleStateLabel, fields, formatTime, statusLabel, table } from '../format';
+import { requireProject } from '../project';
 import { normalizeCycle, parseInput } from './shared';
 
 /** "3 days left", "1 day left" or "" for cycles that are not current. */
@@ -60,8 +61,8 @@ function cycleFields(context: CommandContext, cycle: Cycle): string {
 // pm cycles list
 // ---------------------------------------------------------------------------
 
-export async function listCycles(context: CommandContext, options: { project: string }): Promise<void> {
-  const input = parseInput(ListCyclesInput, { project: options.project });
+export async function listCycles(context: CommandContext, options: { project?: string }): Promise<void> {
+  const input = parseInput(ListCyclesInput, { project: await requireProject(context, options.project) });
   const client = await context.client();
   const cycles = await client.cycles.list(input);
   emit(context, 'cycles.list', cycles, (data) => {
@@ -89,7 +90,7 @@ export async function listCycles(context: CommandContext, options: { project: st
 // ---------------------------------------------------------------------------
 
 export interface CreateCycleOptions {
-  project: string;
+  project?: string;
   starts?: string;
   ends?: string;
   name?: string;
@@ -97,7 +98,7 @@ export interface CreateCycleOptions {
 
 export async function createCycle(context: CommandContext, options: CreateCycleOptions): Promise<void> {
   const input = parseInput(CreateCycleInput, {
-    project: options.project,
+    project: await requireProject(context, options.project),
     ...(options.starts !== undefined ? { startsOn: options.starts } : {}),
     ...(options.ends !== undefined ? { endsOn: options.ends } : {}),
     ...(options.name !== undefined ? { name: options.name } : {}),
@@ -114,8 +115,11 @@ export async function createCycle(context: CommandContext, options: CreateCycleO
 // pm cycles current
 // ---------------------------------------------------------------------------
 
-export async function currentCycle(context: CommandContext, options: { project: string }): Promise<void> {
-  const input = parseInput(ListCyclesInput, { project: options.project, state: 'current' });
+export async function currentCycle(context: CommandContext, options: { project?: string }): Promise<void> {
+  const input = parseInput(ListCyclesInput, {
+    project: await requireProject(context, options.project),
+    state: 'current',
+  });
   const client = await context.client();
   // cycles.get with `current` answers 404 when there is none; the list answers an empty list.
   const { items } = CycleList.parse(await client.cycles.list(input));
@@ -130,7 +134,7 @@ export async function currentCycle(context: CommandContext, options: { project: 
 // ---------------------------------------------------------------------------
 
 export interface EndCycleOptions {
-  project: string;
+  project?: string;
   moveTo?: string;
 }
 
@@ -157,7 +161,7 @@ export async function endCycle(
   options: EndCycleOptions,
 ): Promise<void> {
   const input = parseInput(EndCycleInput, {
-    project: options.project,
+    project: await requireProject(context, options.project),
     number: number === undefined ? 'current' : normalizeCycle(number),
     ...(options.moveTo !== undefined ? { moveTo: normalizeCycle(options.moveTo) } : {}),
   });

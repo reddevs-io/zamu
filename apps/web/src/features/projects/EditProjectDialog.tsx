@@ -16,18 +16,31 @@ import {
   useHotkeys,
 } from '~/ui';
 import { editProjectFailure } from './errors';
+import { useSubmitHint } from './NewProjectDialog';
+import { editRepositoryHint, RepositoryField } from './RepositoryField';
+import { repositoryError, repositoryMessage } from './validation';
 
-// Edit project: name, description, and the M2 feature switches. Turning milestones or cycles off hides
-// their tab, filter and task fields; the data stays and comes back when the switch goes on again.
-// Not in the design: it follows the New project dialog.
+// Edit project: name, description, repository (M2.1 frames 3a to 3c) and the M2 feature switches.
+// Turning milestones or cycles off hides their tab, filter and task fields; the data stays and comes
+// back when the switch goes on again. Clearing the repository unlinks it.
 
-export type EditProjectField = 'name' | 'description';
+export type EditProjectField = 'name' | 'description' | 'repository';
 
 export interface EditProjectChanges {
   name?: string;
   description?: string | null;
   usesMilestones?: boolean;
   usesCycles?: boolean;
+  /** null unlinks the repository. */
+  repository?: string | null;
+}
+
+interface EditProjectValues {
+  name: string;
+  description: string;
+  repository: string;
+  usesMilestones: boolean;
+  usesCycles: boolean;
 }
 
 export interface EditProjectFailure {
@@ -38,7 +51,7 @@ export interface EditProjectFailure {
 export interface EditProjectDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  project: Pick<Project, 'key' | 'name' | 'description' | 'usesMilestones' | 'usesCycles'>;
+  project: Pick<Project, 'key' | 'name' | 'description' | 'usesMilestones' | 'usesCycles' | 'repository'>;
   /** Saves the changed fields; resolves to null on success or to the error to show. */
   onSubmit: (changes: EditProjectChanges) => Promise<EditProjectFailure | null>;
 }
@@ -63,13 +76,15 @@ export function EditProjectDialog({ isOpen, onClose, project, onSubmit }: EditPr
 /** Only the fields that differ from the project. */
 export function projectChanges(
   project: EditProjectDialogProps['project'],
-  values: { name: string; description: string; usesMilestones: boolean; usesCycles: boolean },
+  values: EditProjectValues,
 ): EditProjectChanges {
   const name = values.name.trim();
   const description = values.description.trim() || null;
+  const repository = values.repository.trim() || null;
   return {
     ...(name !== project.name ? { name } : {}),
     ...(description !== (project.description ?? null) ? { description } : {}),
+    ...(repository !== (project.repository ?? null) ? { repository } : {}),
     ...(values.usesMilestones !== project.usesMilestones ? { usesMilestones: values.usesMilestones } : {}),
     ...(values.usesCycles !== project.usesCycles ? { usesCycles: values.usesCycles } : {}),
   };
@@ -84,16 +99,24 @@ interface FormProps {
 function EditProjectForm({ project, onCancel, onSubmit }: FormProps) {
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? '');
+  const [repository, setRepository] = useState(project.repository ?? '');
   const [usesMilestones, setUsesMilestones] = useState(project.usesMilestones);
   const [usesCycles, setUsesCycles] = useState(project.usesCycles);
   const [errors, setErrors] = useState<Partial<Record<EditProjectField, string>>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const repositoryRef = useRef<HTMLInputElement>(null);
+  const submitHint = useSubmitHint();
+
+  const focusField = (field: EditProjectField | undefined) => {
+    if (field === 'name') nameRef.current?.focus();
+    if (field === 'repository') repositoryRef.current?.focus();
+  };
 
   const submit = async () => {
     if (pending) return;
-    const changes = projectChanges(project, { name, description, usesMilestones, usesCycles });
+    const changes = projectChanges(project, { name, description, repository, usesMilestones, usesCycles });
     if (!Object.keys(changes).length) {
       onCancel();
       return;
@@ -106,9 +129,10 @@ function EditProjectForm({ project, onCancel, onSubmit }: FormProps) {
         if (field === 'name')
           next.name ??= issue.code === 'too_small' ? 'Enter a project name.' : 'Use 100 characters or fewer.';
         if (field === 'description') next.description ??= 'Use 2,000 characters or fewer.';
+        if (field === 'repository') next.repository ??= repositoryMessage(issue.code);
       }
       setErrors(next);
-      if (next.name) nameRef.current?.focus();
+      focusField(next.name ? 'name' : next.repository ? 'repository' : undefined);
       return;
     }
     setErrors({});
@@ -117,8 +141,12 @@ function EditProjectForm({ project, onCancel, onSubmit }: FormProps) {
     try {
       const error = await onSubmit(changes);
       if (!error) return;
-      if (error.field) setErrors({ [error.field]: error.message });
-      else setFailure(error.message);
+      if (error.field) {
+        setErrors({ [error.field]: error.message });
+        focusField(error.field);
+      } else {
+        setFailure(error.message);
+      }
     } finally {
       setPending(false);
     }
@@ -175,6 +203,21 @@ function EditProjectForm({ project, onCancel, onSubmit }: FormProps) {
           errorMessage={errors.description}
           validationBehavior="aria"
         />
+        <RepositoryField
+          inputRef={repositoryRef}
+          value={repository}
+          onChange={(value) => {
+            setRepository(value);
+            setErrors((current) => ({ ...current, repository: undefined }));
+            setFailure(null);
+          }}
+          onBlur={() => {
+            const error = repositoryError(repository);
+            if (error) setErrors((current) => ({ ...current, repository: error }));
+          }}
+          description={editRepositoryHint(repository, project)}
+          error={errors.repository}
+        />
         <fieldset className="m-0 flex flex-col gap-2.5 border-0 p-0">
           <legend className="mb-1.5 p-0 text-[12px] font-semibold text-fg">Planning</legend>
           <FeatureSwitch
@@ -198,7 +241,12 @@ function EditProjectForm({ project, onCancel, onSubmit }: FormProps) {
         <Button variant="secondary" onPress={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" aria-keyshortcuts="Meta+Enter Control+Enter" isPending={pending}>
+        <Button
+          type="submit"
+          kbd={submitHint}
+          aria-keyshortcuts="Meta+Enter Control+Enter"
+          isPending={pending}
+        >
           Save
         </Button>
       </DialogFooter>

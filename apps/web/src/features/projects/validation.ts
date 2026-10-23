@@ -1,4 +1,10 @@
-import { CreateProjectInput, suggestProjectKey } from '@pm/contracts';
+import {
+  CreateProjectInput,
+  MAX_REPOSITORY_URL_LENGTH,
+  ProjectRepository,
+  REPOSITORY_URL_HINT,
+  suggestProjectKey,
+} from '@pm/contracts';
 
 // Validation of the New project dialog. The contract schema is the source of truth; this module only
 // turns its issues into one message per field and keeps the copy short.
@@ -7,6 +13,8 @@ export interface NewProjectValues {
   name: string;
   key: string;
   description: string;
+  /** Clone URL, '' for none. */
+  repository: string;
 }
 
 export type NewProjectField = keyof NewProjectValues;
@@ -16,7 +24,7 @@ export type NewProjectValidation =
   | { ok: true; input: CreateProjectInput }
   | { ok: false; errors: NewProjectErrors };
 
-const FIELDS: readonly NewProjectField[] = ['name', 'key', 'description'];
+const FIELDS: readonly NewProjectField[] = ['name', 'key', 'description', 'repository'];
 
 function messageFor(field: NewProjectField, code: string, message: string): string {
   if (field === 'name') {
@@ -25,16 +33,31 @@ function messageFor(field: NewProjectField, code: string, message: string): stri
   }
   if (field === 'key') return 'Use 2 to 6 letters or digits, starting with a letter.';
   if (field === 'description' && code === 'too_big') return 'Use 2,000 characters or fewer.';
+  if (field === 'repository') return repositoryMessage(code);
   return message;
 }
 
-/** Validates the form with CreateProjectInput; an empty description is left out. */
+/** Message for a repository issue: too long, or not a clone URL. */
+export function repositoryMessage(code: string): string {
+  return code === 'too_big' ? `Use ${MAX_REPOSITORY_URL_LENGTH} characters or fewer.` : REPOSITORY_URL_HINT;
+}
+
+/** Error for a repository field value, or undefined when it is empty or a clone URL. */
+export function repositoryError(value: string): string | undefined {
+  const result = ProjectRepository.safeParse(value);
+  if (result.success) return undefined;
+  return repositoryMessage(result.error.issues[0]?.code ?? '');
+}
+
+/** Validates the form with CreateProjectInput; an empty description or repository is left out. */
 export function validateNewProject(values: NewProjectValues): NewProjectValidation {
   const description = values.description.trim();
+  const repository = values.repository.trim();
   const result = CreateProjectInput.safeParse({
     name: values.name,
     key: values.key,
     ...(description ? { description } : {}),
+    ...(repository ? { repository } : {}),
   });
   if (result.success) return { ok: true, input: result.data };
   const errors: NewProjectErrors = {};

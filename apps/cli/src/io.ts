@@ -12,6 +12,8 @@ export interface CliIo {
   env: Record<string, string | undefined>;
   /** Home directory, used when XDG_CONFIG_HOME is not set. */
   homeDir: string;
+  /** Working directory: where pm looks for .pm.json, the git remote and AGENTS.md. */
+  cwd: string;
   /** stdout is a terminal: colour and column truncation are allowed. */
   isTTY: boolean;
   /** Terminal width when stdout is a terminal. */
@@ -33,6 +35,7 @@ export function processIo(): CliIo {
     readStdin: () => readAll(process.stdin),
     env: process.env,
     homeDir: homedir(),
+    cwd: process.cwd(),
     isTTY: process.stdout.isTTY === true,
     ...(process.stdout.isTTY && process.stdout.columns ? { columns: process.stdout.columns } : {}),
   };

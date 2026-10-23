@@ -266,6 +266,7 @@ export function createFakeApi({
               usesMilestones,
               usesCycles,
               currentCycle: null,
+              repository: null,
               createdAt: new Date(now - 86_400_000).toISOString(),
               updatedAt: new Date(now).toISOString(),
               openCounts: {

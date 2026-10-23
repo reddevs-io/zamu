@@ -7,3 +7,4 @@ export * from './inputs';
 export * from './primitives';
 export * from './problem';
 export * from './problem-codec';
+export * from './repository';

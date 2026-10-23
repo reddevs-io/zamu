@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<style>
+.rp-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.rp-g{grid-template-columns:72px minmax(0,1fr) 220px 56px 110px 56px 40px}
+.rp-gc{grid-template-columns:72px minmax(0,1fr) 210px 220px 56px 110px 56px 40px}
+.rp-row{height:52px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);position:relative}
+.rp-tall{height:64px}
+.rp-cell{min-width:0;display:flex;flex-direction:column;gap:2px}
+.rp-name{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rp-desc{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rp-line{display:flex;align-items:baseline;gap:6px;min-width:0}
+.rp-dot{color:var(--faint);flex:none;font-size:12px}
+.rp-link{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;direction:rtl;text-align:left}
+.rp-link>span{direction:ltr;unicode-bidi:isolate}
+.rp-linkhov{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.rp-shrink{flex:0 1 auto}
+.rp-grow{flex:0 100 auto;max-width:60%}
+.rp-dlink{flex:0 0 auto;max-width:45%}
+.rp-nameline{display:flex;align-items:baseline;gap:10px;min-width:0}
+.rp-none{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--faint)}
+.rp-stack{display:flex;gap:3px}
+.rp-num{font-family:"Martian Mono",ui-monospace,monospace;font-size:11px;text-align:right}
+.rp-edit{font-size:12px;color:var(--muted);text-align:right}
+.rp-tip{position:absolute;z-index:3;top:calc(100% - 4px);padding:5px 8px;background:var(--fg);color:var(--bg);font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;white-space:nowrap;box-shadow:var(--shadow)}
+.rp-legend{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--muted)}
+.rp-li{display:flex;gap:6px;align-items:center}
+.rp-short{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--fg)}
+.rp-fs{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;border:0}
+.rp-legendt{font-size:12px;font-weight:600;margin-bottom:2px}
+.rp-sw{display:flex;flex-direction:column;gap:2px}
+.rp-swl{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.rp-swd{padding-left:34px;font-size:11.5px;color:var(--muted)}
+.rp-ph{color:var(--faint)}
+.rp-opt{font-weight:400;color:var(--faint);margin-left:4px}
+.rp-val{font-family:"Martian Mono",ui-monospace,monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rp-code{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--fg);background:var(--band);padding:1px 4px;white-space:nowrap}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnavon" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <sc-for list="{{ railProjects }}" as="p" hint-placeholder-count="4">
+        <a class="lg-rk" href="#"><span>{{ p.key }}</span><span class="lg-rn">{{ p.open }}</span></a>
+      </sc-for>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="rp-main">
+      <header class="lg-head">
+        <div><h1 class="lg-h1">Projects</h1><div class="lg-sub">6 projects in Reddevs</div></div>
+        <div class="lg-headr">
+          <div class="lg-search"><span>Search</span><span class="lg-kbd">/</span></div>
+          <button class="lg-btn">New project<span class="lg-btnk">P</span></button>
+        </div>
+      </header>
+      <div class="lg-bar">
+        <div class="rp-legend">
+          <span class="rp-li"><span class="lg-sq lg-s-prog"></span>In progress</span>
+          <span class="rp-li"><span class="lg-sq lg-s-review"></span>In review</span>
+          <span class="rp-li"><span class="lg-sq lg-s-todo"></span>Todo</span>
+          <span class="rp-li"><span class="lg-sq lg-s-backlog"></span>Backlog</span>
+        </div>
+        <span class="lg-sp"></span><span>Sorted by last update</span>
+      </div>
+      <div class="{{ thCls }}">
+        <span>Key</span><span>Project</span>
+        <sc-if value="{{ isC }}" hint-placeholder-val="{{ false }}"><span>Repository</span></sc-if>
+        <span>Open tasks by status</span><span class="lg-right">Open</span><span>Members</span><span class="lg-right">Upd</span><span></span>
+      </div>
+      <sc-for list="{{ projects }}" as="p" hint-placeholder-count="6">
+        <div class="{{ rowCls }}">
+          <span class="lg-key">{{ p.key }}</span>
+
+          <sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}">
+            <div class="rp-cell">
+              <div class="rp-name">{{ p.name }}</div>
+              <sc-if value="{{ p.hasLine }}" hint-placeholder-val="{{ true }}">
+                <div class="rp-line">
+                  <sc-if value="{{ p.hasDesc }}" hint-placeholder-val="{{ true }}"><span class="rp-desc rp-shrink">{{ p.desc }}</span></sc-if>
+                  <sc-if value="{{ p.both }}" hint-placeholder-val="{{ true }}"><span class="rp-dot">·</span></sc-if>
+                  <sc-if value="{{ p.hasRepo }}" hint-placeholder-val="{{ true }}"><a class="{{ p.linkCls }}" href="#" title="{{ p.url }}"><span>{{ p.repo }}</span></a></sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isB }}" hint-placeholder-val="{{ false }}">
+            <div class="rp-cell">
+              <div class="rp-name">{{ p.name }}</div>
+              <sc-if value="{{ p.hasDesc }}" hint-placeholder-val="{{ true }}"><div class="rp-desc">{{ p.desc }}</div></sc-if>
+              <sc-if value="{{ p.hasRepo }}" hint-placeholder-val="{{ true }}"><a class="{{ p.linkCls }}" href="#" title="{{ p.url }}"><span>{{ p.repo }}</span></a></sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isC }}" hint-placeholder-val="{{ false }}">
+            <div class="rp-cell">
+              <div class="rp-name">{{ p.name }}</div>
+              <sc-if value="{{ p.hasDesc }}" hint-placeholder-val="{{ true }}"><div class="rp-desc">{{ p.desc }}</div></sc-if>
+            </div>
+            <div style="min-width:0;display:flex">
+              <sc-if value="{{ p.hasRepo }}" hint-placeholder-val="{{ true }}"><a class="{{ p.linkCls }}" href="#" title="{{ p.url }}"><span>{{ p.repo }}</span></a></sc-if>
+              <sc-if value="{{ p.noRepo }}" hint-placeholder-val="{{ false }}"><span class="rp-none">—</span></sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isD }}" hint-placeholder-val="{{ false }}">
+            <div class="rp-cell">
+              <div class="rp-nameline">
+                <span class="rp-name rp-shrink">{{ p.name }}</span>
+                <sc-if value="{{ p.hasRepo }}" hint-placeholder-val="{{ true }}"><a class="{{ p.linkClsD }}" href="#" title="{{ p.url }}"><span>{{ p.repo }}</span></a></sc-if>
+              </div>
+              <sc-if value="{{ p.hasDesc }}" hint-placeholder-val="{{ true }}"><div class="rp-desc">{{ p.desc }}</div></sc-if>
+            </div>
+          </sc-if>
+
+          <div class="lg-bars" style="width:200px">
+            <span class="lg-s-prog" style="flex:{{ p.prog }}"></span>
+            <span class="lg-s-review" style="flex:{{ p.review }}"></span>
+            <span class="lg-s-todo" style="flex:{{ p.todo }};box-sizing:border-box"></span>
+            <span class="lg-s-backlog" style="flex:{{ p.backlog }};box-sizing:border-box"></span>
+          </div>
+          <span class="rp-num">{{ p.open }}</span>
+          <span class="rp-stack"><sc-for list="{{ p.members }}" as="m" hint-placeholder-count="3"><span class="{{ m.cls }}" style="--h:{{ m.hue }}">{{ m.ini }}</span></sc-for></span>
+          <span class="lg-upd">{{ p.upd }}</span>
+          <span class="rp-edit">Edit</span>
+          <sc-if value="{{ p.tip }}" hint-placeholder-val="{{ false }}"><div class="rp-tip" style="left:{{ tipLeft }}">{{ p.url }}  ↗</div></sc-if>
+        </div>
+      </sc-for>
+    </section>
+  </div>
+
+  <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:96px;width:500px" data-screen-label="New project dialog">
+      <div class="lg-dh"><span style="font-weight:600">New project</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db">
+        <div class="lg-field"><span class="lg-label">Name</span><div class="lg-input">Billing reconciliation</div></div>
+        <div class="lg-field"><span class="lg-label">Key</span><div class="lg-input" style="width:140px"><span class="lg-mono">BIL</span></div><span class="lg-hint">Task IDs will look like BIL-1.</span></div>
+        <div class="lg-field"><span class="lg-label">Description<span class="rp-opt">optional</span></span><div class="lg-input"><span class="rp-ph">What this project covers</span></div></div>
+        <div class="lg-field">
+          <span class="lg-label">Repository<span class="rp-opt">optional</span></span>
+          <div class="{{ repoInputCls }}">
+            <sc-if value="{{ repoEmpty }}" hint-placeholder-val="{{ true }}"><span class="lg-caret"></span><span class="rp-ph lg-mono" style="font-size:12px;margin-left:-8px">https://gitlab.com/team/repo.git</span></sc-if>
+            <sc-if value="{{ repoFilled }}" hint-placeholder-val="{{ false }}"><span class="rp-val">{{ repoValue }}</span><sc-if value="{{ repoFocus }}" hint-placeholder-val="{{ false }}"><span class="lg-caret"></span></sc-if></sc-if>
+          </div>
+          <sc-if value="{{ hintPlain }}" hint-placeholder-val="{{ true }}"><span class="lg-hint">The URL you clone from, HTTPS or SSH. Inside a clone of it, pm picks this project without <span class="rp-code">--project</span>.</span></sc-if>
+          <sc-if value="{{ hintMatch }}" hint-placeholder-val="{{ false }}"><span class="lg-hint">Matches clones of <span class="rp-short">{{ repoShort }}</span>, over HTTPS or SSH.</span></sc-if>
+          <sc-if value="{{ hintInvalid }}" hint-placeholder-val="{{ false }}"><span class="lg-err">Not a clone URL. Use the form https://host/owner/repo or git@host:owner/repo.</span></sc-if>
+          <sc-if value="{{ hintConflict }}" hint-placeholder-val="{{ false }}"><span class="lg-err">{{ conflictText }}</span></sc-if>
+        </div>
+      </div>
+      <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">Create project<span class="lg-btnk">⌘↵</span></button></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:72px;width:500px" data-screen-label="Edit project dialog">
+      <div class="lg-dh"><span class="lg-key">PAY</span><span style="font-weight:600">Edit project</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db">
+        <div class="lg-field"><span class="lg-label">Name</span><div class="lg-input">Payments</div></div>
+        <div class="lg-field"><span class="lg-label">Description<span class="rp-opt">optional</span></span><div class="lg-input">Checkout, refunds, webhooks and payouts</div></div>
+        <div class="lg-field">
+          <span class="lg-label">Repository<span class="rp-opt">optional</span></span>
+          <div class="{{ repoInputCls }}">
+            <sc-if value="{{ repoEmpty }}" hint-placeholder-val="{{ false }}"><span class="lg-caret"></span><span class="rp-ph lg-mono" style="font-size:12px;margin-left:-8px">https://gitlab.com/team/repo.git</span></sc-if>
+            <sc-if value="{{ repoFilled }}" hint-placeholder-val="{{ true }}"><span class="rp-val">{{ repoValue }}</span><sc-if value="{{ repoFocus }}" hint-placeholder-val="{{ false }}"><span class="lg-caret"></span></sc-if></sc-if>
+          </div>
+          <sc-if value="{{ hintMatch }}" hint-placeholder-val="{{ true }}"><span class="lg-hint">Matches clones of <span class="rp-short">{{ repoShort }}</span>, over HTTPS or SSH. From a clone, <span class="rp-code">pm link --project PAY</span> sets it too.</span></sc-if>
+          <sc-if value="{{ hintCleared }}" hint-placeholder-val="{{ false }}"><span class="lg-hint">Saving unlinks <span class="rp-short">gitlab.com/reddevs/payments</span>. In that clone, pm commands need <span class="rp-code">--project PAY</span> again.</span></sc-if>
+          <sc-if value="{{ hintConflict }}" hint-placeholder-val="{{ false }}"><span class="lg-err">{{ conflictText }}</span></sc-if>
+        </div>
+        <fieldset class="rp-fs">
+          <legend class="rp-legendt">Planning</legend>
+          <div class="rp-sw"><span class="rp-swl"><span class="lg-toggleon"></span>Use milestones</span><span class="rp-swd">Group tasks toward a goal with a target date.</span></div>
+          <div class="rp-sw"><span class="rp-swl"><span class="lg-toggleon"></span>Use cycles</span><span class="rp-swd">Plan work in fixed-length cycles that roll unfinished tasks over.</span></div>
+          <span class="lg-hint">Turning one off hides its tab, filter and task fields. Nothing is deleted.</span>
+        </fieldset>
+      </div>
+      <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">Save<span class="lg-btnk">⌘↵</span></button></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "option": { "editor": "enum", "options": ["a", "b", "c", "d"], "default": "a" },
+  "state": { "editor": "enum", "options": ["table", "new", "new-ssh", "new-invalid", "new-conflict", "edit", "edit-cleared", "edit-conflict"], "default": "table" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const option = this.props.option ?? 'a';
+    const state = this.props.state ?? 'table';
+    const H = (ini, hue) => ({ ini, hue, cls: 'lg-av' });
+    const A = (ini) => ({ ini, hue: 0, cls: 'lg-ag' });
+    const table = state === 'table';
+    const rows = [
+      { key: 'PAY', name: 'Payments', desc: 'Checkout, refunds, webhooks and payouts', repo: 'gitlab.com/reddevs/payments', prog: 3, review: 2, todo: 4, backlog: 3, upd: '3m', members: [H('AR', 25), H('TB', 220), A('C'), A('X')] },
+      { key: 'WEB', name: 'Web app', desc: 'The customer-facing dashboard', repo: 'github.com/reddevs/web-app', prog: 5, review: 3, todo: 9, backlog: 10, upd: '20m', members: [H('TB', 220), H('MO', 140), A('C')] },
+      { key: 'CLI', name: 'pm CLI', desc: '', repo: 'gitlab.com/reddevs/tooling/pm-cli', prog: 2, review: 1, todo: 4, backlog: 2, upd: '1h', members: [H('AR', 25), A('X')] },
+      { key: 'DOCS', name: 'Customer-facing documentation, onboarding guides and the public API reference', desc: 'Guides, migration notes for v1 customers and the API reference', repo: 'git.example.com/documentation/customer-facing/onboarding-and-migration-guides', prog: 0, review: 1, todo: 2, backlog: 6, upd: '2d', members: [H('MO', 140)], hov: table },
+      { key: 'INF', name: 'Infra', desc: 'Servers, backups and deploys', repo: '', prog: 1, review: 0, todo: 2, backlog: 2, upd: '4d', members: [H('AR', 25)] },
+      { key: 'OPS', name: 'Ops runbooks', desc: '', repo: '', prog: 0, review: 0, todo: 1, backlog: 3, upd: '1w', members: [H('TB', 220)] }
+    ];
+    const projects = rows.map((p) => {
+      const hasDesc = Boolean(p.desc);
+      const hasRepo = Boolean(p.repo);
+      const link = 'rp-link' + (p.hov ? ' rp-linkhov' : '');
+      return {
+        ...p,
+        open: p.prog + p.review + p.todo + p.backlog,
+        hasDesc,
+        hasRepo,
+        noRepo: !hasRepo,
+        both: hasDesc && hasRepo,
+        hasLine: hasDesc || hasRepo,
+        url: hasRepo ? 'https://' + p.repo : '',
+        linkCls: link + (hasDesc && option === 'a' ? ' rp-grow' : ''),
+        linkClsD: link + ' rp-dlink',
+        tip: Boolean(p.hov)
+      };
+    });
+    const tall = option === 'b';
+    const grid = option === 'c' ? 'rp-gc' : 'rp-g';
+    const tipLeft = { a: '468px', b: '108px', c: '440px', d: '400px' }[option];
+
+    const isNew = state.startsWith('new');
+    const isEdit = state.startsWith('edit');
+    const v = {
+      'new': { cls: 'lg-inputf', value: '', short: '' },
+      'new-ssh': { cls: 'lg-inputf', value: 'git@gitlab.com:reddevs/billing.git', short: 'gitlab.com/reddevs/billing' },
+      'new-invalid': { cls: 'lg-inpute', value: 'reddevs/billing', short: '' },
+      'new-conflict': { cls: 'lg-inpute', value: 'https://gitlab.com/reddevs/payments.git', short: '' },
+      'edit': { cls: 'lg-input', value: 'https://gitlab.com/reddevs/payments.git', short: 'gitlab.com/reddevs/payments' },
+      'edit-cleared': { cls: 'lg-inputf', value: '', short: '' },
+      'edit-conflict': { cls: 'lg-inpute', value: 'git@github.com:reddevs/web-app.git', short: '' }
+    }[state] || { cls: 'lg-input', value: '', short: '' };
+    const conflictText = state === 'new-conflict'
+      ? 'Payments (PAY) already uses gitlab.com/reddevs/payments. A repository can belong to one project.'
+      : 'Web app (WEB) already uses github.com/reddevs/web-app. A repository can belong to one project.';
+    const labels = { table: 'Projects · repository option ' + option, new: 'New project · repository empty', 'new-ssh': 'New project · SSH URL', 'new-invalid': 'New project · invalid URL', 'new-conflict': 'New project · repository taken', edit: 'Edit project · linked', 'edit-cleared': 'Edit project · cleared', 'edit-conflict': 'Edit project · repository taken' };
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: labels[state],
+      isA: option === 'a', isB: option === 'b', isC: option === 'c', isD: option === 'd',
+      thCls: 'lg-th ' + grid,
+      rowCls: 'rp-row ' + grid + (tall ? ' rp-tall' : ''),
+      tipLeft,
+      projects,
+      railProjects: rows.filter((p) => p.key !== 'DOCS').map((p) => ({ key: p.key, open: p.prog + p.review + p.todo + p.backlog })),
+      isNew, isEdit,
+      repoInputCls: v.cls,
+      repoValue: v.value,
+      repoShort: v.short,
+      repoEmpty: !v.value,
+      repoFilled: Boolean(v.value),
+      repoFocus: v.cls === 'lg-inputf',
+      hintPlain: state === 'new',
+      hintMatch: state === 'new-ssh' || state === 'edit',
+      hintInvalid: state === 'new-invalid',
+      hintConflict: state === 'new-conflict' || state === 'edit-conflict',
+      hintCleared: state === 'edit-cleared',
+      conflictText
+    };
+  }
+}
+</script>
+</body>
+</html>

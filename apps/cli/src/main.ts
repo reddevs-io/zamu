@@ -2,9 +2,11 @@
 // can run any command in-process with a fake CliIo and the API handler as fetch.
 import { Command, CommanderError } from 'commander';
 import pkg from '../package.json' with { type: 'json' };
+import { agents } from './commands/agents';
 import { login, logout, whoami } from './commands/auth';
 import { addComment, deleteComment, editComment, listComments } from './commands/comments';
 import { createCycle, currentCycle, endCycle, listCycles } from './commands/cycles';
+import { link } from './commands/link';
 import { createMilestone, listMilestones, updateMilestone } from './commands/milestones';
 import { listProjects } from './commands/projects';
 import { collectKeys, collectList } from './commands/shared';
@@ -16,6 +18,7 @@ import type { CliIo } from './io';
 const STATUS_HELP = 'backlog, todo, in_progress, in_review, done, canceled';
 const PRIORITY_HELP = 'none, low, medium, high, urgent';
 const MILESTONE_STATUS_HELP = 'planned, active, completed';
+const PROJECT_HELP = "project key, e.g. PAY (default: PM_PROJECT, .pm.json or this clone's linked project)";
 
 /** True when --json appears before a `--` separator. */
 function wantsJson(argv: readonly string[]): boolean {
@@ -51,6 +54,9 @@ export function buildProgram(context: CommandContext): Command {
 Credentials: pm login stores the server URL and key in $XDG_CONFIG_HOME/pm/config.json
 (~/.config/pm/config.json). PM_URL and PM_KEY override it.
 
+Project: commands that need one take --project, then PM_PROJECT, then the nearest .pm.json, then
+the project linked to this clone's git remote (pm link). pm whoami shows which one applies here.
+
 Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
     );
 
@@ -66,9 +72,29 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
 
   leaf(program.command('logout').description('remove the stored URL and key')).action(() => logout(context));
 
-  leaf(program.command('whoami').description('show the user, workspace and key scope')).action(() =>
-    whoami(context),
-  );
+  leaf(
+    program.command('whoami').description('show the user, workspace, key scope and the project used here'),
+  ).action(() => whoami(context));
+
+  leaf(
+    program
+      .command('link')
+      .description("link a project to this clone's git remote, so pm picks it in every clone")
+      .option('--project <KEY>', 'project to link (default: PM_PROJECT or .pm.json)')
+      .option('--force', 'replace a different repository already linked to the project')
+      .option('--clear', "unlink the project's repository (default project: this clone's)")
+      .option('--file', 'write .pm.json at the repository root instead of linking on the server')
+      .option('--here', 'with --file: write .pm.json in this folder (monorepo subprojects)'),
+  ).action((options) => link(context, options));
+
+  leaf(
+    program
+      .command('agents')
+      .description('write pm usage instructions into AGENTS.md (or CLAUDE.md) between pm markers')
+      .option('--file <path>', 'file to write (default: AGENTS.md, else CLAUDE.md, at the repository root)')
+      .option('--project <KEY>', "project to name in the instructions (default: this clone's)")
+      .option('--print', 'print the instructions instead of writing a file'),
+  ).action((options) => agents(context, options));
 
   const projects = program.command('projects').description('list projects');
   leaf(projects.command('list').description('list projects with open task counts')).action(() =>
@@ -92,7 +118,10 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
         collectList,
       )
       .option('--assignee <who>', 'me, agents, or a member name, email or id')
-      .option('--milestone <name>', 'milestone name (needs one --project) or id; none for tasks without one')
+      .option(
+        '--milestone <name>',
+        "milestone name (in one --project, else this clone's project) or id; none for tasks without one",
+      )
       .option('--cycle <cycle>', 'cycle number, current, next, or none for tasks without one')
       .option('--limit <n>', 'tasks per page, 1 to 200 (default 50)')
       .option('--cursor <cursor>', 'next page, from the previous result'),
@@ -110,7 +139,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       .command('create')
       .description('create a task')
       .argument('<title...>', 'task title (quote it, or pass the words)')
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .option('--project <KEY>', PROJECT_HELP)
       .option('--description <text>', 'Markdown description; "-" reads it from stdin')
       .option('--priority <priority>', PRIORITY_HELP)
       .option('--assignee <who>', 'me, or a member name, email or id')
@@ -170,7 +199,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
     milestones
       .command('list')
       .description('list the milestones of a project with progress')
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY'),
+      .option('--project <KEY>', PROJECT_HELP),
   ).action((options) => listMilestones(context, options));
 
   leaf(
@@ -178,7 +207,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       .command('create')
       .description('create a milestone (starts Planned)')
       .argument('<name...>', 'milestone name (quote it, or pass the words)')
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .option('--project <KEY>', PROJECT_HELP)
       .option('--target <date>', 'target date, YYYY-MM-DD')
       .option('--description <text>', 'Markdown description; "-" reads it from stdin'),
   ).action((name: string[], options) => createMilestone(context, name, options));
@@ -188,7 +217,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       .command('update')
       .description('change a milestone; send only what changes')
       .argument('<id-or-name>', 'milestone id, or its name (case-insensitive) with --project')
-      .option('--project <KEY>', 'project key, needed to find the milestone by name')
+      .option('--project <KEY>', "project to find the milestone name in (default: this clone's)")
       .option('--name <name>', 'new name')
       .option('--target <date>', 'target date, YYYY-MM-DD; none clears it')
       .option('--status <status>', `${MILESTONE_STATUS_HELP}; leaving completed reopens it as active`)
@@ -200,14 +229,14 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
     cycles
       .command('list')
       .description('list the cycles of a project, oldest first')
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY'),
+      .option('--project <KEY>', PROJECT_HELP),
   ).action((options) => listCycles(context, options));
 
   leaf(
     cycles
       .command('create')
       .description('create a cycle; dates default to the day after the last cycle, same length')
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .option('--project <KEY>', PROJECT_HELP)
       .option('--starts <date>', 'first day, YYYY-MM-DD')
       .option('--ends <date>', 'last day, YYYY-MM-DD (1 to 56 days in all)')
       .option('--name <name>', 'optional name'),
@@ -217,7 +246,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
     cycles
       .command('current')
       .description("show the project's current cycle (null with --json when there is none)")
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY'),
+      .option('--project <KEY>', PROJECT_HELP),
   ).action((options) => currentCycle(context, options));
 
   leaf(
@@ -225,7 +254,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       .command('end')
       .description('end a cycle now; unfinished tasks move to the next cycle')
       .argument('[number]', 'cycle number (default: the current cycle)')
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .option('--project <KEY>', PROJECT_HELP)
       .option(
         '--move-to <cycle>',
         'cycle number for unfinished tasks, or none (default: next upcoming cycle, else a new one)',

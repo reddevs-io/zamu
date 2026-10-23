@@ -1,5 +1,13 @@
 // pm login, pm logout, pm whoami.
-import { ApiKeySecret, type Me, Me as MeSchema, toProblemIssues } from '@pm/contracts';
+import { relative } from 'node:path';
+import {
+  ApiKeySecret,
+  type CliResolvedProject,
+  type Me,
+  Me as MeSchema,
+  parseRepositoryUrl,
+  toProblemIssues,
+} from '@pm/contracts';
 import { createApiClient } from '../client';
 import {
   configPath,
@@ -13,6 +21,7 @@ import {
 import { type CommandContext, emit } from '../context';
 import { usageError } from '../errors';
 import { fields, personLabel, scopeLabel } from '../format';
+import { resolveProject } from '../project';
 
 export interface LoginOptions {
   key: string;
@@ -25,13 +34,26 @@ function whoLine(me: Me): string {
   return `${personLabel(me.user)} (${me.user.kind === 'agent' ? 'agent' : (me.user.email ?? 'person')})`;
 }
 
-function meFields(context: CommandContext, me: Me, url: string): string {
+/** "PAY (from .pm.json)", for whoami. */
+function projectLabel(context: CommandContext, project: CliResolvedProject | null | undefined): string {
+  if (!project) return 'none here: pass --project, or run pm link in a clone';
+  const from = {
+    flag: '--project',
+    env: 'PM_PROJECT',
+    file: project.from ? relative(context.io.cwd, project.from) || project.from : '.pm.json',
+    remote: `git remote ${parseRepositoryUrl(project.from ?? '')?.short ?? project.from ?? ''}`,
+  }[project.source];
+  return `${project.key} (from ${from})`;
+}
+
+function meFields(context: CommandContext, me: Me, url: string, project?: CliResolvedProject | null): string {
   return fields(
     [
       ['Workspace', me.workspace.name],
       ['Role', me.role],
       ['Access', me.auth.scope ? `API key: ${scopeLabel(me.auth.scope)}` : 'Session: full member rights'],
       ['Server', url],
+      ...(project === undefined ? [] : [['Project', projectLabel(context, project)] as [string, string]]),
     ],
     context.style,
   );
@@ -80,10 +102,11 @@ export async function whoami(context: CommandContext): Promise<void> {
   const client = await context.client();
   const me = await client.me.get();
   const url = context.url as string;
+  const project = await resolveProject(context);
   emit(
     context,
     'whoami',
-    me,
-    (data) => `${context.style.bold(whoLine(data))}\n${meFields(context, data, url)}`,
+    { ...me, project },
+    (data) => `${context.style.bold(whoLine(data))}\n${meFields(context, data, url, data.project ?? null)}`,
   );
 }
