@@ -1,0 +1,82 @@
+// TanStack Query wiring for project settings. The source status and Refresh now are shared with the
+// project header (backlogStatusQuery, useBacklogStatus and useRefreshNow in features/project-header),
+// so the header button and this page read one cache. Settings-only data (webhook secret, detach, another
+// connection) goes through the server functions in features/backlog/server.ts, loaded on first use so
+// that jsdom tests of these screens do not pull server-only modules in.
+import type { BacklogProblemPage, BacklogWebhookInfo } from '@pm/contracts';
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { client, orpc } from '~/lib/orpc';
+import { connectionsKey } from '../connections/queries';
+import { SettingsError, unwrap } from '../settings/result';
+
+export const backlogSettingsKey = (projectKey: string) => ['backlog-settings', projectKey] as const;
+
+const retry = (failures: number, error: unknown) => !(error instanceof SettingsError) && failures < 2;
+
+const backlogServer = () => import('../backlog/server');
+
+/** Webhook URL, secret (admins) and last delivery; the webhook dialog polls it every 5 seconds. */
+export const webhookInfoQuery = (projectKey: string) =>
+  queryOptions({
+    queryKey: [...backlogSettingsKey(projectKey), 'webhook'],
+    queryFn: async (): Promise<BacklogWebhookInfo> => {
+      const { backlogWebhookInfoFn } = await backlogServer();
+      return unwrap(backlogWebhookInfoFn({ data: { projectKey } }));
+    },
+    retry,
+  });
+
+/** Whether the project has any task at all, hidden ones included (its key is fixed then). */
+export const hasTasksQuery = (projectKey: string) =>
+  orpc.tasks.list.queryOptions({
+    input: { project: projectKey, limit: 1, hidden: 'include' },
+    select: (data) => data.items.length > 0,
+  });
+
+/** A further page of problems, through GET /projects/{project}/backlog. */
+export async function loadProblemPage(projectKey: string, cursor: string): Promise<BacklogProblemPage> {
+  const status = await client.backlog.status({ project: projectKey, problemsCursor: cursor });
+  return status.problems;
+}
+
+/** Refetches the section and every shape that carries the source summary. */
+export function useInvalidateBacklog(projectKey: string) {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: backlogSettingsKey(projectKey) }),
+      queryClient.invalidateQueries({ queryKey: orpc.projects.key() }),
+      queryClient.invalidateQueries({ queryKey: orpc.backlog.key() }),
+    ]);
+}
+
+export function useDetach(projectKey: string) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateBacklog(projectKey);
+  return useMutation({
+    mutationFn: async (confirmKey: string) => {
+      const { detachBacklogFn } = await backlogServer();
+      return unwrap(detachBacklogFn({ data: { projectKey, confirmKey } }));
+    },
+    onSuccess: () =>
+      Promise.all([
+        invalidate(),
+        // Every task and milestone unlocks.
+        queryClient.invalidateQueries({ queryKey: orpc.tasks.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.milestones.key() }),
+        queryClient.invalidateQueries({ queryKey: connectionsKey }),
+      ]),
+  });
+}
+
+export function useSetConnection(projectKey: string) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateBacklog(projectKey);
+  return useMutation({
+    mutationFn: async (connectionId: string) => {
+      const { setBacklogConnectionFn } = await backlogServer();
+      return unwrap(setBacklogConnectionFn({ data: { projectKey, connectionId } }));
+    },
+    onSuccess: () => Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: connectionsKey })]),
+  });
+}

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { NewFromBacklogDialogHost } from '~/features/backlog-setup/NewFromBacklogDialogHost';
+import { projectSettingsHref } from '~/features/backlog-setup/paths';
 import { useNewProject } from '~/features/shell/new-project';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import { projectHref } from '~/features/shell/paths';
@@ -14,7 +16,6 @@ import {
   SearchField,
   StatusSquare,
 } from '~/ui';
-import { EditProjectDialogHost } from './EditProjectDialog';
 import { byLastActivity, filterProjects } from './order';
 import { ProjectsTable } from './ProjectsTable';
 import { meQuery, projectsQuery } from './queries';
@@ -52,8 +53,14 @@ export function ProjectsPage() {
   const isEmpty = count === 0;
 
   const openProject = (key: string) => void router.navigate({ href: projectHref(key) });
-  const [editing, setEditing] = useState<string | null>(null);
-  const editedProject = projects.data?.items.find((project) => project.key === editing);
+  // Edit opens the project's settings page (General).
+  const editProject = (key: string) => void router.navigate({ href: projectSettingsHref(key) });
+  const [newFromBacklog, setNewFromBacklog] = useState(false);
+  const newFromBacklogButton = (
+    <Button variant="secondary" onPress={() => setNewFromBacklog(true)}>
+      New from Backlog.md
+    </Button>
+  );
   const newProjectButton = (
     <Button kbd="P" aria-keyshortcuts="P" onPress={newProject.open}>
       New project
@@ -74,6 +81,7 @@ export function ProjectsPage() {
               onChange={setSearch}
               aria-keyshortcuts="/"
             />
+            {newFromBacklogButton}
             {newProjectButton}
           </>
         }
@@ -95,7 +103,12 @@ export function ProjectsPage() {
           <EmptyState
             title="No projects yet"
             text="A project holds tasks. Each one gets a short key that prefixes its task IDs, like PAY-42."
-            action={newProjectButton}
+            action={
+              <span className="flex gap-2">
+                {newProjectButton}
+                {newFromBacklogButton}
+              </span>
+            }
             cli={{ label: 'Or from the CLI', command: 'pm projects create --name "Payments" --key PAY' }}
           />
         </div>
@@ -109,16 +122,11 @@ export function ProjectsPage() {
             isLoading={projects.isPending}
             emptyMessage={query.trim() ? `No projects match “${query.trim()}”.` : undefined}
             onOpen={openProject}
-            onEdit={setEditing}
+            onEdit={editProject}
           />
         </>
       )}
-      <EditProjectDialogHost
-        key={editing ?? 'none'}
-        project={editedProject}
-        isOpen={editing != null && editedProject != null}
-        onClose={() => setEditing(null)}
-      />
+      <NewFromBacklogDialogHost isOpen={newFromBacklog} onClose={() => setNewFromBacklog(false)} />
     </section>
   );
 }

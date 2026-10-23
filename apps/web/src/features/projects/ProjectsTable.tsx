@@ -1,8 +1,18 @@
 import { type ProjectWithCounts, parseRepositoryUrl } from '@pm/contracts';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-aria-components';
+import { isDetached, isMirrored, SOURCE_TITLES, sourceDotState } from '~/features/project-header/mirror';
 import { projectHref } from '~/features/shell/paths';
-import { Avatar, Button, type DataColumn, DataTable, StatusBar, Tooltip, TooltipTrigger } from '~/ui';
+import {
+  Avatar,
+  Button,
+  type DataColumn,
+  DataTable,
+  SourceStatusDot,
+  StatusBar,
+  Tooltip,
+  TooltipTrigger,
+} from '~/ui';
 import { shortAge } from './time';
 
 const MAX_AVATARS = 4;
@@ -75,6 +85,25 @@ function Members({ project }: { project: ProjectWithCounts }) {
   );
 }
 
+/**
+ * "Tasks come from" (frame 4j): a Backlog.md mirror with its state dot, "This app · imported" after an
+ * import, "This app · detached" after a detached mirror, or "This app".
+ */
+export function TasksSource({ project }: { project: ProjectWithCounts }) {
+  const backlog = project.backlog;
+  if (backlog && isMirrored(project)) {
+    const state = sourceDotState(backlog.state);
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11.5px] whitespace-nowrap text-muted">
+        <SourceStatusDot state={state} label={SOURCE_TITLES[backlog.state]} />
+        Backlog.md {backlog.mode === 'import' ? 'import' : 'mirror'}
+      </span>
+    );
+  }
+  const note = isDetached(project) ? (backlog?.mode === 'import' ? ' · imported' : ' · detached') : '';
+  return <span className="text-[11.5px] whitespace-nowrap text-faint">This app{note}</span>;
+}
+
 const BASE_COLUMNS: readonly DataColumn<ProjectWithCounts>[] = [
   {
     id: 'key',
@@ -110,6 +139,13 @@ const BASE_COLUMNS: readonly DataColumn<ProjectWithCounts>[] = [
     width: 56,
     align: 'end',
     cell: (project) => <span className="font-mono text-[11px] font-medium">{project.openCount}</span>,
+  },
+  {
+    id: 'source',
+    header: 'Tasks come from',
+    width: 150,
+    skeleton: 100,
+    cell: (project) => <TasksSource project={project} />,
   },
   {
     id: 'members',
@@ -167,13 +203,14 @@ export interface ProjectsTableProps {
   /** Shown in the body when `projects` is empty (search without matches). */
   emptyMessage?: string;
   onOpen: (key: string) => void;
-  /** Opens the Edit project dialog (name, description, milestones and cycles switches). */
+  /** Opens the project's settings (General: name, key, description, repository, switches). */
   onEdit?: (key: string) => void;
 }
 
 /**
  * Projects table from frame 03 with the M2.1 repository line (option 1b): key, name, description and
- * repository, open-task bar, open count, members, age.
+ * repository, open-task bar, open count, where tasks come from (M3), members, age. When a project
+ * mirrors Backlog.md, a line under the rows explains the rail's marker.
  */
 export function ProjectsTable({ projects, isLoading, emptyMessage, onOpen, onEdit }: ProjectsTableProps) {
   const editRef = useRef(onEdit);
@@ -181,7 +218,8 @@ export function ProjectsTable({ projects, isLoading, emptyMessage, onOpen, onEdi
   const hasEdit = onEdit != null;
   // Stable columns: DataTable re-renders every row when they change.
   const columns = useMemo(() => columnsFor(hasEdit ? (key) => editRef.current?.(key) : undefined), [hasEdit]);
-  return (
+  const anyMirrored = !isLoading && projects.some((project) => isMirrored(project));
+  const table = (
     <DataTable
       aria-label="Projects"
       columns={columns}
@@ -196,6 +234,16 @@ export function ProjectsTable({ projects, isLoading, emptyMessage, onOpen, onEdi
         emptyMessage ? () => <p className="m-0 px-6 py-4 text-muted">{emptyMessage}</p> : undefined
       }
       rowClassName={() => 'cursor-pointer'}
+      className={anyMirrored ? 'flex-[0_1_auto]' : undefined}
     />
+  );
+  if (!anyMirrored) return table;
+  return (
+    <>
+      {table}
+      <p className="m-0 shrink-0 px-6 py-3.5 text-[11.5px] text-muted">
+        The small square next to a project key in the sidebar marks a Backlog.md mirror.
+      </p>
+    </>
   );
 }

@@ -18,9 +18,11 @@ import {
 } from '~/ui';
 
 // Filters of a project's tasks, shared by the list and the board: Status, Priority, Assignee,
-// Milestone and Cycle (when the project uses them), Lanes (board only). Plus the List / Board switch.
+// Milestone and Cycle (when the project uses them), Lanes (board only), Removed from Backlog.md (list
+// of a mirrored project). Plus the List / Board switch.
 
 const ANY = 'any';
+const HIDDEN_OFF = 'hidden';
 
 export interface TaskFilterBarProps {
   projectKey: string;
@@ -32,6 +34,11 @@ export interface TaskFilterBarProps {
   usesCycles: boolean;
   /** Shows the Lanes filter. */
   showLanes?: boolean;
+  /**
+   * Mirrored projects, list only: the number of tasks removed from Backlog.md. Shows the "Removed from
+   * Backlog.md" filter (Hidden · 9 / 9 shown).
+   */
+  hiddenCount?: number;
 }
 
 /** The filter Selects, for ProjectHeader's `filters` slot. */
@@ -42,6 +49,7 @@ export function TaskFilterBar({
   usesMilestones,
   usesCycles,
   showLanes = false,
+  hiddenCount,
 }: TaskFilterBarProps) {
   const members = useQuery(membersQuery()).data?.items;
   const milestones = useQuery({
@@ -118,6 +126,14 @@ export function TaskFilterBar({
     [usesMilestones],
   );
 
+  const hiddenItems = useMemo<OptionItem[]>(
+    () => [
+      { id: HIDDEN_OFF, label: `Hidden · ${hiddenCount ?? 0}` },
+      { id: 'only', label: `${hiddenCount ?? 0} shown` },
+    ],
+    [hiddenCount],
+  );
+
   return (
     <>
       <Select
@@ -180,6 +196,21 @@ export function TaskFilterBar({
           value={search.cycle === undefined ? ANY : String(search.cycle)}
           onChange={(key) =>
             onChange((previous) => ({ ...previous, cycle: toCycleFilter(key == null ? ANY : String(key)) }))
+          }
+        />
+      ) : null}
+      {hiddenCount != null ? (
+        <Select
+          label="Removed from Backlog.md"
+          variant="filter"
+          items={hiddenItems}
+          value={search.hidden ?? HIDDEN_OFF}
+          onChange={(key) =>
+            onChange((previous) =>
+              key === 'only'
+                ? { ...previous, hidden: 'only', status: undefined }
+                : { ...previous, hidden: undefined },
+            )
           }
         />
       ) : null}

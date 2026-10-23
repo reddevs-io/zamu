@@ -10,11 +10,26 @@ import {
   useRef,
   useState,
 } from 'react';
-import { ProjectHeader, TaskFilterBar, useProjectSummary, ViewSwitch } from '~/features/project-header';
+import {
+  DetachedToast,
+  DRAG_REFUSAL_TEXT,
+  isDetached,
+  isMirrored,
+  MirrorCreateButton,
+  MirrorEmptyState,
+  MirrorFailedBanner,
+  ProjectHeader,
+  statusRefusalText,
+  TaskFilterBar,
+  useProjectSummary,
+  ViewSwitch,
+} from '~/features/project-header';
 import { useSearchText } from '~/features/project-header/useSearchText';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';
+import { useNow } from '~/features/tasks/clock';
 import { describeError } from '~/features/tasks/errors';
+import { formatDay } from '~/features/tasks/format';
 import { rememberListSearch, rememberView } from '~/features/tasks/list-memory';
 import { membersQuery } from '~/features/tasks/queries';
 import {
@@ -30,7 +45,18 @@ import {
 import { useUrlSelection } from '~/features/tasks/selection';
 import { RequestHint, TaskDetailPane } from '~/features/tasks/TaskDetailPane';
 import { orpc } from '~/lib/orpc';
-import { Banner, Button, cn, EmptyState, isEditableTarget, SearchField, Toast, useHotkeys } from '~/ui';
+import {
+  Banner,
+  Button,
+  cn,
+  EmptyState,
+  isEditableTarget,
+  Kbd,
+  SearchField,
+  STATUS_LABELS,
+  Toast,
+  useHotkeys,
+} from '~/ui';
 import { BoardColumns, BoardLanes, BoardSkeleton } from './BoardColumns';
 import type { Placement } from './board-cache';
 import type { CardDrop } from './CardList';
@@ -43,6 +69,9 @@ import { type LanePatch, useBoardMoves } from './moves';
 // /p/$projectKey?view=board: one column per status, cards in hand-made order, the selected card in the
 // task panel at the right. Keyboard: H/L columns, J/K cards, Shift+H/L change status, Shift+J/K reorder,
 // Enter opens the panel, Esc closes it, Ctrl/Cmd+Z undoes the last move, V switches to the list.
+// Mirrored projects (frames 4f to 4h): a card's status comes from Backlog.md, so while one is dragged
+// the other columns hatch and refuse the drop; Shift+H/L explain instead of moving; Shift+J/K and
+// drops within the column still reorder. Swimlane drops that would change a Backlog.md field refuse too.
 
 export interface BoardScreenProps {
   projectKey: string;
@@ -50,6 +79,14 @@ export interface BoardScreenProps {
 }
 
 const TOAST_MS = 6000;
+
+/** A toast that explains a refused move (mirrored projects). */
+interface Notice {
+  id: number;
+  text: string;
+  /** Adds "⇧J/K reorders" after the text. */
+  reorderHint?: boolean;
+}
 
 const isApple = () =>
   typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
@@ -60,6 +97,8 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
   const project = useProjectSummary(projectKey);
   const usesMilestones = project?.usesMilestones ?? false;
   const usesCycles = project?.usesCycles ?? false;
+  const mirrored = isMirrored(project);
+  const detached = isDetached(project);
 
   const searchKey = JSON.stringify(filtersOf(search));
   // biome-ignore lint/correctness/useExhaustiveDependencies: searchKey stands for the filter values
@@ -101,6 +140,16 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
     setSearch((previous) => ({ view: previous.view, lanes: previous.lanes }));
   };
   const newTask = () => quickCreate?.open(projectKey);
+
+  // ---- Refusals (mirrored projects) ----------------------------------------------------------------
+  const noticeId = useRef(0);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const showNotice = useCallback((text: string, reorderHint = false) => {
+    noticeId.current++;
+    setNotice({ id: noticeId.current, text, reorderHint });
+  }, []);
+  /** Status of the mirrored card being dragged: the other columns refuse it. */
+  const [refuseFrom, setRefuseFrom] = useState<TaskStatus | null>(null);
 
   // ---- Columns -----------------------------------------------------------------------------------
   const statusKey = filters.status?.join(',') ?? '';
@@ -145,6 +194,26 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
       for (const card of column?.cards ?? []) map.set(card.key, card);
     return map;
   }, [data.columns]);
+  const cardsRef = useRef(cardsByKey);
+  cardsRef.current = cardsByKey;
+  /** The card's field comes from Backlog.md (its own lock list, or the project's while mirrored). */
+  const isLocked = useCallback(
+    (card: TaskListItem, field: 'status' | 'assignee' | 'milestone') =>
+      card.locked ? card.locked.includes(field) : mirrored,
+    [mirrored],
+  );
+  const isLockedRef = useRef(isLocked);
+  isLockedRef.current = isLocked;
+  const onCardDragStart = useCallback(
+    (key: string) => {
+      const card = cardsRef.current.get(key);
+      if (!card || !isLockedRef.current(card, 'status')) return;
+      setRefuseFrom(card.status);
+      showNotice(DRAG_REFUSAL_TEXT);
+    },
+    [showNotice],
+  );
+  const onCardDragEnd = useCallback(() => setRefuseFrom(null), []);
 
   const lanes = useMemo<Lane[] | null>(() => {
     if (!lanesMode) return null;
@@ -244,9 +313,19 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
   };
 
   const onDrop = (drop: CardDrop, status: TaskStatus, laneId: string | null) => {
+    setRefuseFrom(null);
     const card = cardsByKey.get(drop.key);
     if (!card || drop.target?.key === drop.key) return;
     focusedRef.current = card.key;
+    if (status !== card.status && isLocked(card, 'status')) {
+      showNotice(statusRefusalText(card.key, STATUS_LABELS[card.status]), true);
+      return;
+    }
+    if (laneId !== null && lanesMode && laneOf(lanesMode, card) !== laneId && isLocked(card, lanesMode)) {
+      showNotice(`${card.key} keeps its ${lanesMode}: it comes from Backlog.md.`);
+      return;
+    }
+    setNotice(null);
     const placement: Placement = drop.target
       ? drop.target.position === 'before'
         ? { before: drop.target.key }
@@ -263,6 +342,11 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
     if (!card) return;
     const to = statusStep(statuses, card.status, direction);
     if (!to) return;
+    if (isLocked(card, 'status')) {
+      showNotice(statusRefusalText(card.key, STATUS_LABELS[card.status]), true);
+      return;
+    }
+    setNotice(null);
     if (isFolded(to)) setFolded(to, false);
     let placement: Placement = 'top';
     if (lanesMode && lanes) {
@@ -279,6 +363,7 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
     if (!card) return;
     const placement = reorderPlacement(navRef.current, card.key, direction);
     if (!placement) return;
+    setNotice(null);
     if (moves.move({ key: card.key, to: card.status, placement, via: 'keyboard' })) focusCard(card.key);
   };
 
@@ -392,10 +477,16 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
     }),
     [members, milestones],
   );
+  const now = useNow();
+  const detachedAt = detached ? project?.backlog?.detachedAt : null;
+  const viewNote =
+    detachedAt && now != null
+      ? `detached from Backlog.md on ${formatDay(detachedAt, new Date(now))}`
+      : 'board';
   const subtitle = filtered
     ? `filtered: ${describeFilters(filters, names).join(', ')}`
     : project
-      ? `${project.openCount} open · board`
+      ? `${project.openCount} open · ${viewNote}`
       : 'board';
   const loadError = data.error ? describeError(data.error) : null;
 
@@ -421,6 +512,7 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
       );
     }
     if (data.isLoading) return <BoardSkeleton columns={open.size} />;
+    if (total === 0 && !filtered && mirrored && project) return <MirrorEmptyState project={project} />;
     if (total === 0) {
       return (
         <div className="flex px-6 py-12">
@@ -433,9 +525,11 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
                   <Button variant="secondary" onPress={clearFilters}>
                     Clear filters
                   </Button>
-                  <Button kbd="C" onPress={newTask}>
-                    New task
-                  </Button>
+                  {mirrored ? null : (
+                    <Button kbd="C" onPress={newTask}>
+                      New task
+                    </Button>
+                  )}
                 </div>
               }
             />
@@ -466,9 +560,15 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
         select(key);
       },
       onDrop,
-      // The column's "+" preselects that column's status.
-      onAdd: quickCreate ? (status: TaskStatus) => quickCreate.open(projectKey, { status }) : undefined,
+      // The column's "+" preselects that column's status. Mirrored projects take no new tasks.
+      onAdd:
+        quickCreate && !mirrored
+          ? (status: TaskStatus) => quickCreate.open(projectKey, { status })
+          : undefined,
       features,
+      refuseFrom,
+      onCardDragStart,
+      onCardDragEnd,
     };
     return lanes ? (
       <BoardLanes
@@ -522,9 +622,17 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
                   }
                 }}
               />
-              <Button kbd="C" onPress={newTask} aria-keyshortcuts="c">
-                New
-              </Button>
+              {mirrored ? (
+                <MirrorCreateButton
+                  projectName={project?.name ?? projectKey}
+                  onPress={newTask}
+                  aria-keyshortcuts="c"
+                />
+              ) : (
+                <Button kbd="C" onPress={newTask} aria-keyshortcuts="c">
+                  New
+                </Button>
+              )}
             </>
           }
           filters={
@@ -541,6 +649,7 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
             <ViewSwitch view="board" onChange={setView} onClear={filtered ? clearFilters : undefined} />
           }
         />
+        <MirrorFailedBanner project={project} />
         {problem ? (
           <div className="border-b border-line px-6 py-3">
             <Banner
@@ -563,7 +672,21 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
         >
           {renderBody()}
         </div>
-        {toast ? (
+        {notice ? (
+          <Toast key={`notice-${notice.id}`} floating timeout={TOAST_MS} onDismiss={() => setNotice(null)}>
+            {notice.text}
+            {notice.reorderHint ? (
+              <>
+                <Kbd variant="inverse" aria-hidden className="ml-3 border-[oklch(0.6_0_0/0.5)]">
+                  ⇧J/K
+                </Kbd>
+                <span className="ml-2 opacity-75">
+                  <span className="sr-only">Shift J and K </span>reorders
+                </span>
+              </>
+            ) : null}
+          </Toast>
+        ) : toast ? (
           <Toast
             key={toast.id}
             floating
@@ -575,7 +698,9 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
             {toast.text}
             <span className="sr-only">{toast.detail}</span>
           </Toast>
-        ) : null}
+        ) : (
+          <DetachedToast project={project} />
+        )}
       </section>
       {selected ? (
         <section aria-label="Task detail" className="flex min-h-0 min-w-0 flex-col border-l border-line">

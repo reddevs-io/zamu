@@ -1,16 +1,17 @@
 import { cycleLengthDays, type ProjectWithCounts } from '@pm/contracts';
 import { CycleGlyph, MilestoneGlyph, type ViewTab } from '~/ui';
 
-// Tabs of the project header: Tasks always, Milestones and Cycles when the project uses them.
+// Tabs of the project header: Tasks, Milestones and Cycles when the project uses them, then Settings
+// (project details and the Backlog.md source).
 
-export type ProjectView = 'tasks' | 'milestones' | 'cycles';
+export type ProjectView = 'tasks' | 'milestones' | 'cycles' | 'settings';
 
 export type ProjectTabsInput = Pick<
   ProjectWithCounts,
   'key' | 'usesMilestones' | 'usesCycles' | 'currentCycle'
 > & { openCount?: number };
 
-/** Page of a project view: /p/PAY, /p/PAY/milestones, /p/PAY/cycles. */
+/** Page of a project view: /p/PAY, /p/PAY/milestones, /p/PAY/cycles, /p/PAY/settings. */
 export function projectViewHref(projectKey: string, view: ProjectView): string {
   const base = `/p/${encodeURIComponent(projectKey)}`;
   return view === 'tasks' ? base : `${base}/${view}`;
@@ -29,12 +30,8 @@ export function cycleElapsed(currentCycle: NonNullable<ProjectTabsInput['current
   return Math.max(0, Math.min(1, (length - currentCycle.daysLeft) / length));
 }
 
-/**
- * The header tabs. Empty when the project uses neither milestones nor cycles: the header then shows
- * no tab row at all.
- */
+/** The header tabs: always Tasks and Settings, Milestones and Cycles when the project uses them. */
 export function projectTabs(project: ProjectTabsInput, milestoneCount?: number): ViewTab[] {
-  if (!project.usesMilestones && !project.usesCycles) return [];
   const tabs: ViewTab[] = [
     {
       id: 'tasks',
@@ -63,5 +60,6 @@ export function projectTabs(project: ProjectTabsInput, milestoneCount?: number):
       ...(note ? { note } : {}),
     });
   }
+  tabs.push({ id: 'settings', label: 'Settings', href: projectViewHref(project.key, 'settings') });
   return tabs;
 }

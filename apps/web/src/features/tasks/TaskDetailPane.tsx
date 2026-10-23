@@ -1,13 +1,40 @@
-import type { Activity, AssigneeRef, Task, TaskListItem } from '@pm/contracts';
+import type { Activity, AssigneeRef, Task, TaskListItem, TaskOwnedField } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { CommentComposer } from '~/features/comments/CommentComposer';
 import { TaskTimeline } from '~/features/comments/TaskTimeline';
-import { type ActivityEntry, Banner, Button, cn, Kbd, PageHeader, Skeleton, useHotkeys } from '~/ui';
+import {
+  type ActivityEntry,
+  Banner,
+  Button,
+  cn,
+  Kbd,
+  lockedHatch,
+  OwnedFieldCaption,
+  PageHeader,
+  PriorityGlyph,
+  Skeleton,
+  StatusSquare,
+  useHotkeys,
+} from '~/ui';
 import { useNow } from './clock';
 import { describeError } from './errors';
 import { atTime, describeActivity, findCheckboxes, formatDay } from './format';
+import {
+  BacklogIdTag,
+  backlogHistoryQuery,
+  extraAssignees,
+  LockedValue,
+  MirroredCreated,
+  MirroredDescription,
+  OwnedFieldNote,
+  RemovedBanner,
+  TaskBacklogBlock,
+  TaskSourceStrip,
+  useBacklogSummary,
+} from './MirroredTask';
+import { commentPlaceholder, milestoneBacklogId, mirroredProblem, mirrorOf } from './mirror';
 import {
   CyclePicker,
   CycleValue,
@@ -17,6 +44,7 @@ import {
 } from './PlanningFields';
 import { membersQuery, projectsQuery, type TaskPatch, taskQuery, useUpdateTask } from './queries';
 import {
+  AssigneeLabel,
   AssigneePicker,
   EditableDescription,
   EditableTitle,
@@ -56,6 +84,27 @@ function useSettled(ms: number): boolean {
 
 type OpenPicker = 'milestone' | 'cycle' | null;
 
+/** The owned-field note that is open, with the server's answer when a write was refused. */
+export interface OpenNote {
+  field: TaskOwnedField;
+  problem?: { hint?: string; file?: string; message?: string } | null;
+}
+
+/**
+ * State of the owned-field note: which field it explains, and opening it for a write the server refused
+ * with 409 TASK_MIRRORED (the UI blocks owned fields up front, so this only happens on stale data).
+ */
+export function useOwnedFieldNote(updateError: unknown, resetUpdate: () => void) {
+  const [note, setNote] = useState<OpenNote | null>(null);
+  useEffect(() => {
+    const problem = mirroredProblem(updateError);
+    if (!problem) return;
+    setNote({ field: problem.field, problem });
+    resetUpdate();
+  }, [updateError, resetUpdate]);
+  return { note, setNote };
+}
+
 export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProject }: TaskDetailPaneProps) {
   // While J/K races through rows the pane shows the list row; the full task loads once the selection rests.
   const settled = useSettled(SETTLE_MS);
@@ -73,18 +122,49 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProj
   const [revealId, setRevealId] = useState<string | null>(null);
   const milestoneCell = useRef<HTMLDivElement>(null);
   const cycleCell = useRef<HTMLDivElement>(null);
+  const statusCell = useRef<HTMLDivElement>(null);
+  const priorityCell = useRef<HTMLDivElement>(null);
+  const assigneeCell = useRef<HTMLDivElement>(null);
+  const createdCell = useRef<HTMLDivElement>(null);
+  const { summary, projectName: mirrorProjectName } = useBacklogSummary(projectKey);
+  const { note, setNote } = useOwnedFieldNote(update.error, update.reset);
 
   const task = taskResult.data;
   const shown = task ?? preview;
+  const mirror = mirrorOf(shown);
+  const isLocked = (field: TaskOwnedField) => mirror.locked.has(field);
+  const history = useQuery({
+    ...backlogHistoryQuery(projectKey),
+    enabled: settled && task?.backlog != null,
+  }).data;
+  const noteRefs: Record<TaskOwnedField, RefObject<HTMLDivElement | null>> = {
+    status: statusCell,
+    priority: priorityCell,
+    assignee: assigneeCell,
+    milestone: milestoneCell,
+    createdAt: createdCell,
+    title: statusCell,
+    description: statusCell,
+  };
+  const openNote = (field: TaskOwnedField) => {
+    setOpenPicker(null);
+    setNote({ field });
+  };
 
   useHotkeys({
-    'Shift+M': shown && planning.usesMilestones ? () => setOpenPicker('milestone') : null,
+    'Shift+M':
+      shown && planning.usesMilestones
+        ? isLocked('milestone')
+          ? () => openNote('milestone')
+          : () => setOpenPicker('milestone')
+        : null,
     'Shift+C': shown && planning.usesCycles ? () => setOpenPicker('cycle') : null,
   });
 
   const header = (
     <PageHeader>
       <span className="font-mono text-[13px] text-fg">{taskKey}</span>
+      {mirror.backlogId ? <BacklogIdTag backlogId={mirror.backlogId} /> : null}
       {showProject && projectName ? <span className="truncate text-muted">in {projectName}</span> : null}
       <span className="flex-1" />
       <Link
@@ -134,31 +214,77 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProj
   const pickerOpenChange = (picker: Exclude<OpenPicker, null>) => (isOpen: boolean) =>
     setOpenPicker((current) => (isOpen ? picker : current === picker ? null : current));
 
+  // Owned fields of a mirrored task: hatched, "· file" in the caption, and a press opens the note.
+  const lockedCell = (field: TaskOwnedField) =>
+    isLocked(field)
+      ? {
+          locked: true,
+          dim: mirror.isHidden,
+          cellRef: noteRefs[field],
+          isActive: note?.field === field,
+        }
+      : {};
   const cells: PropertyCellProps[] = [
     {
       id: 'status',
       label: 'Status',
-      children: <StatusPicker value={shown.status} onChange={(status) => save({ status })} />,
+      ...lockedCell('status'),
+      children: isLocked('status') ? (
+        <LockedValue field="status" onOpen={openNote}>
+          <StatusSquare status={shown.status} withLabel />
+        </LockedValue>
+      ) : (
+        <StatusPicker value={shown.status} onChange={(status) => save({ status })} />
+      ),
     },
     {
       id: 'priority',
       label: 'Priority',
-      children: <PriorityPicker value={shown.priority} onChange={(priority) => save({ priority })} />,
+      ...lockedCell('priority'),
+      children: isLocked('priority') ? (
+        <LockedValue field="priority" onOpen={openNote}>
+          <PriorityGlyph priority={shown.priority} withLabel />
+        </LockedValue>
+      ) : (
+        <PriorityPicker value={shown.priority} onChange={(priority) => save({ priority })} />
+      ),
     },
     {
       id: 'assignee',
       label: 'Assignee',
-      children: (
+      ...lockedCell('assignee'),
+      children: isLocked('assignee') ? (
+        <LockedValue field="assignee" onOpen={openNote}>
+          {shown.assignee ? (
+            <AssigneeLabel assignee={shown.assignee} className="min-w-0" />
+          ) : (
+            <span className="font-normal text-faint">No assignee</span>
+          )}
+        </LockedValue>
+      ) : (
         <AssigneePicker
           value={shown.assignee}
           members={members}
           onChange={(assignee) => save({ assignee })}
         />
       ),
-      sub: forLine(shown.assignee),
+      sub: (task ? extraAssignees(task) : undefined) ?? forLine(shown.assignee),
     },
   ];
-  if (planning.usesMilestones) {
+  if (planning.usesMilestones && isLocked('milestone')) {
+    const backlogMilestone = milestoneBacklogId(shown.milestone, planning.milestones);
+    cells.push({
+      id: 'milestone',
+      label: 'Milestone',
+      ...lockedCell('milestone'),
+      children: (
+        <LockedValue field="milestone" onOpen={openNote}>
+          <MilestoneValue value={shown.milestone} milestones={undefined} />
+        </LockedValue>
+      ),
+      sub: backlogMilestone ?? undefined,
+    });
+  } else if (planning.usesMilestones) {
     cells.push({
       id: 'milestone',
       label: 'Milestone',
@@ -201,26 +327,50 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProj
     });
   }
   cells.push(
-    task
+    task && isLocked('createdAt')
       ? {
           id: 'created',
           label: 'Created',
-          children: <span className="truncate">{task.createdBy.name}</span>,
-          sub: createdSub(task, atTime(formatDay, now)),
+          ...lockedCell('createdAt'),
+          children: (
+            <LockedValue field="createdAt" onOpen={openNote}>
+              <MirroredCreated task={task} />
+            </LockedValue>
+          ),
         }
-      : {
-          id: 'created',
-          label: 'Created',
-          children: <Skeleton width={70} />,
-        },
+      : task?.backlog
+        ? // Detached or imported: the file's reporter and date, not who set up the mirror.
+          { id: 'created', label: 'Created', children: <MirroredCreated task={task} /> }
+        : task
+          ? {
+              id: 'created',
+              label: 'Created',
+              children: <span className="truncate">{task.createdBy.name}</span>,
+              sub: createdSub(task, atTime(formatDay, now)),
+            }
+          : {
+              id: 'created',
+              label: 'Created',
+              ...lockedCell('createdAt'),
+              children: <Skeleton width={70} />,
+            },
   );
 
   return (
     <>
       {header}
       <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-7 pt-[22px] pb-5">
-        <EditableTitle key={`${taskKey}:title`} value={shown.title} onSave={(title) => save({ title })} />
-        {update.isError ? (
+        {task && mirror.isHidden ? (
+          <RemovedBanner task={task} branch={summary?.defaultBranch} />
+        ) : task ? (
+          <TaskSourceStrip task={task} mirror={mirror} summary={summary} className="-mb-1" />
+        ) : null}
+        <EditableTitle
+          key={`${taskKey}:title`}
+          value={shown.title}
+          onSave={isLocked('title') ? undefined : (title) => save({ title })}
+        />
+        {update.isError && !mirroredProblem(update.error) ? (
           <Banner
             action={
               <Button variant="secondary" size="sm" onPress={() => update.reset()}>
@@ -232,7 +382,19 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProj
           </Banner>
         ) : null}
         <PropertyCells cells={cells} />
-        {task ? (
+        <OwnedFieldNote
+          field={note?.field ?? null}
+          problem={note?.problem}
+          task={task}
+          milestones={planning.milestones}
+          branch={summary?.defaultBranch}
+          triggerRef={note ? noteRefs[note.field] : statusCell}
+          onClose={() => setNote(null)}
+          milestoneShortcut={planning.usesMilestones && isLocked('milestone')}
+        />
+        {task && isLocked('description') ? (
+          <MirroredDescription key={`${taskKey}:description`} source={task.description} />
+        ) : task ? (
           <DescriptionSection
             key={`${taskKey}:description`}
             value={task.description}
@@ -245,10 +407,24 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProj
             <Skeleton width="70%" />
           </div>
         )}
-        <TaskTimeline taskKey={taskKey} members={members} enabled={settled} revealId={revealId} />
+        {task?.backlog ? <TaskBacklogBlock task={task} projectKey={projectKey} mirror={mirror} /> : null}
+        <TaskTimeline
+          taskKey={taskKey}
+          members={members}
+          enabled={settled}
+          revealId={revealId}
+          projectHistory={task?.backlog ? history : undefined}
+          projectName={mirrorProjectName ?? projectKey}
+          branch={summary?.defaultBranch}
+        />
       </div>
       <div className="shrink-0 border-t border-line bg-bg px-7 pt-3 pb-4">
-        <CommentComposer taskKey={taskKey} members={members} onSent={setRevealId} />
+        <CommentComposer
+          taskKey={taskKey}
+          members={members}
+          onSent={setRevealId}
+          placeholder={commentPlaceholder(mirror)}
+        />
       </div>
     </>
   );
@@ -269,6 +445,10 @@ interface PropertyCellProps {
   /** The picker of this cell is open: focus outline and selection ground. */
   isActive?: boolean;
   cellRef?: RefObject<HTMLDivElement | null>;
+  /** Backlog.md owns the value: hatched ground and "· file" after the caption. */
+  locked?: boolean;
+  /** Faded (a hidden task's owned values). */
+  dim?: boolean;
 }
 
 /**
@@ -284,20 +464,29 @@ function PropertyCells({ cells }: { cells: readonly PropertyCellProps[] }) {
             key={cell.id}
             ref={cell.cellRef}
             data-cell={cell.id}
+            data-locked={cell.locked || undefined}
             className={cn(
               'flex min-w-0 flex-col gap-[3px] border-r border-b border-line px-2.5 pt-[7px] pb-2',
-              cell.isActive && 'bg-sel outline-2 -outline-offset-2 outline-focus',
+              cell.locked && lockedHatch,
+              cell.isActive && !cell.locked && 'bg-sel',
+              cell.isActive && 'outline-2 -outline-offset-2 outline-focus',
             )}
           >
-            <dt className="caps flex items-center gap-1.5">
+            <dt className={cn('caps flex items-center gap-1.5', cell.dim && 'opacity-60')}>
               {cell.label}
+              {cell.locked ? <OwnedFieldCaption /> : null}
               {cell.kbd ? (
                 <Kbd aria-hidden className="tracking-normal">
                   {cell.kbd}
                 </Kbd>
               ) : null}
             </dt>
-            <dd className="m-0 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium">
+            <dd
+              className={cn(
+                'm-0 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium',
+                cell.dim && 'opacity-60',
+              )}
+            >
               <span className="flex max-w-full min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
                 {cell.children}
               </span>

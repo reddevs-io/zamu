@@ -1,6 +1,6 @@
 // Settings area: the 220px settings nav and the current settings page beside it. Sits in the content
-// area right of the app rail: Members and API keys (admins) for the workspace; Your API keys and
-// Appearance for you.
+// area right of the app rail: Members, API keys (admins) and Git connections for the workspace; Your
+// API keys and Appearance for you.
 import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
@@ -11,6 +11,7 @@ import { meQuery } from './queries';
 export const SETTINGS_PATHS = {
   members: '/settings/members',
   apiKeys: '/settings/api-keys',
+  connections: '/settings/connections',
   myKeys: '/settings/my-keys',
   appearance: '/settings/appearance',
 } as const;
@@ -28,6 +29,7 @@ export function settingsSections(pathname: string, isAdmin: boolean): SettingsNa
       items: [
         item('members', 'Members', SETTINGS_PATHS.members),
         ...(isAdmin ? [item('api-keys', 'API keys', SETTINGS_PATHS.apiKeys)] : []),
+        item('connections', 'Git connections', SETTINGS_PATHS.connections),
       ],
     },
     {

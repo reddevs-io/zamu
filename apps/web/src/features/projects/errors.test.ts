@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client';
 import { describe, expect, it } from 'vitest';
-import { editProjectFailure, newProjectFailure } from './errors';
+import { newProjectFailure } from './errors';
 
 const repositoryMessage =
   'Payments (PAY) already uses gitlab.com/reddevs/payments. A repository can belong to one project.';
@@ -35,20 +35,5 @@ describe('newProjectFailure', () => {
       data: { issues: [{ path: 'repository', message: 'Not a clone URL.' }] },
     });
     expect(newProjectFailure(error, 'BIL')).toEqual({ field: 'repository', message: 'Not a clone URL.' });
-  });
-});
-
-describe('editProjectFailure', () => {
-  it('puts a taken repository on the repository field', () => {
-    expect(editProjectFailure(conflict([{ path: 'repository', message: repositoryMessage }]))).toEqual({
-      field: 'repository',
-      message: repositoryMessage,
-    });
-  });
-
-  it('shows other conflicts in the banner', () => {
-    expect(editProjectFailure(conflict())).toEqual({
-      message: 'Project key BIL is already used in this workspace',
-    });
   });
 });

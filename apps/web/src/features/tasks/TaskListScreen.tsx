@@ -2,14 +2,27 @@ import type { TaskListItem } from '@pm/contracts';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { ProjectHeader, TaskFilterBar, useProjectSummary, ViewSwitch } from '~/features/project-header';
+import {
+  DetachedToast,
+  HiddenTasksStrip,
+  isDetached,
+  isMirrored,
+  MirrorCreateButton,
+  MirrorEmptyState,
+  MirrorFailedBanner,
+  ProjectHeader,
+  TaskFilterBar,
+  useProjectSummary,
+  ViewSwitch,
+} from '~/features/project-header';
 import { useSearchText } from '~/features/project-header/useSearchText';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';
 import { Banner, Button, DataTable, EmptyState, SearchField, useHotkeys } from '~/ui';
 import { useNow } from './clock';
 import { describeError } from './errors';
-import { buildGroups, visibleKeys } from './groups';
+import { formatDay } from './format';
+import { buildGroups, buildHiddenGroup, visibleKeys } from './groups';
 import { rememberListSearch, rememberView } from './list-memory';
 import { type TaskListData, taskListQuery, taskQuery } from './queries';
 import {
@@ -17,6 +30,7 @@ import {
   eagerStatuses,
   filtersOf,
   hasFilters,
+  hiddenStatuses,
   LAZY_STATUSES,
   listInput,
   type TaskListFilters,
@@ -31,6 +45,9 @@ import { taskColumns } from './TaskTable';
 // /p/$projectKey: the task table grouped by status, with the selected task in a permanent pane.
 // Selection and filters live in the URL (?task=PAY-142&q=…), so reloads and shared links restore them.
 // V switches to the board (?view=board), which the project then remembers.
+// A project that mirrors Backlog.md (frames 4a to 4n) has a disabled New (C refuses with the same
+// text), suffixed keys with "sub of" hints, the "Removed from Backlog.md" filter (?hidden=only shows
+// the hidden tasks as one group under a strip), the failed-refresh banner and its own empty state.
 
 export interface TaskListScreenProps {
   projectKey: string;
@@ -45,6 +62,9 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   const project = useProjectSummary(projectKey);
   const usesMilestones = project?.usesMilestones ?? false;
   const usesCycles = project?.usesCycles ?? false;
+  const mirrored = isMirrored(project);
+  const detached = isDetached(project);
+  const wideKeys = project?.backlog != null;
   const searchKey = JSON.stringify(filtersOf(search));
   // biome-ignore lint/correctness/useExhaustiveDependencies: searchKey stands for the filter values
   const filters = useMemo(() => applyProjectFeatures(filtersOf(search), project), [searchKey, project]);
@@ -69,8 +89,14 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
 
   // ---- Data ---------------------------------------------------------------------------------------
   const [collapsed, setCollapsed] = useCollapsedGroups(filters);
-  const eager = useQuery(taskListQuery(listInput(projectKey, filters, eagerStatuses(filters))));
-  const lazyStatuses = filters.status ? [] : LAZY_STATUSES.filter((status) => !collapsed.has(status));
+  const showHidden = filters.hidden === 'only';
+  const eager = useQuery(
+    taskListQuery(
+      listInput(projectKey, filters, showHidden ? hiddenStatuses(filters) : eagerStatuses(filters)),
+    ),
+  );
+  const lazyStatuses =
+    filters.status || showHidden ? [] : LAZY_STATUSES.filter((status) => !collapsed.has(status));
   const lazyItems = useQueries({
     queries: lazyStatuses.map((status) => taskListQuery(listInput(projectKey, filters, [status]))),
     combine: pickItems,
@@ -81,12 +107,14 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: lazyKey stands for lazyItems' contents
   const groups = useMemo(
     () =>
-      buildGroups(
-        [eager.data?.items ?? [], ...lazyItems.map((items) => items ?? [])],
-        visibleStatuses(filters),
-        counts,
-      ),
-    [eager.data, lazyKey, filters, counts],
+      showHidden
+        ? buildHiddenGroup(eager.data?.items ?? [])
+        : buildGroups(
+            [eager.data?.items ?? [], ...lazyItems.map((items) => items ?? [])],
+            visibleStatuses(filters),
+            counts,
+          ),
+    [eager.data, lazyKey, filters, counts, showHidden],
   );
   const itemsByKey = useMemo(() => {
     const map = new Map<string, TaskListItem>();
@@ -178,12 +206,20 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   };
   const setView = (view: TaskView) => {
     rememberView(projectKey, view);
-    setSearch((previous) => ({ ...previous, view: view === 'board' ? 'board' : undefined }));
+    // The board has no hidden-tasks view.
+    setSearch((previous) => ({
+      ...previous,
+      hidden: undefined,
+      view: view === 'board' ? 'board' : undefined,
+    }));
   };
 
   // ---- Rendering ----------------------------------------------------------------------------------
   const now = useNow();
-  const columns = useMemo(() => taskColumns(now), [now]);
+  const columns = useMemo(
+    () => taskColumns(now, { wideKeys, hidden: showHidden }),
+    [now, wideKeys, showHidden],
+  );
   const total = counts ? Object.values(counts).reduce((sum, value) => sum + value, 0) : undefined;
   const filtered = hasFilters(search);
   const isEmptyProject = total === 0 && !filtered;
@@ -217,6 +253,24 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
         </div>
       );
     }
+    if (showHidden) {
+      return (
+        <div className="flex flex-col items-start gap-2 px-6 py-8 text-muted">
+          <span>
+            No tasks were removed from Backlog.md
+            {hasFilters({ ...search, hidden: undefined }) ? ' under these filters' : ''}.
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onPress={() => setSearch((previous) => ({ ...previous, hidden: undefined }))}
+          >
+            Show the other tasks
+          </Button>
+        </div>
+      );
+    }
+    if (isEmptyProject && mirrored && project) return <MirrorEmptyState project={project} />;
     if (isEmptyProject) {
       return (
         <div className="flex px-6 py-12">
@@ -265,11 +319,22 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
     setView,
   };
   const openCount = project?.openCount;
+  const detachedAt = detached ? project?.backlog?.detachedAt : null;
+  const detachedNote =
+    detachedAt && now != null ? `detached from Backlog.md on ${formatDay(detachedAt, new Date(now))}` : null;
   const subtitleText = isEmptyProject
     ? 'no tasks yet'
     : openCount != null
-      ? `${openCount} open · grouped by status`
-      : 'grouped by status';
+      ? `${openCount} open · ${detachedNote ?? 'grouped by status'}`
+      : (detachedNote ?? 'grouped by status');
+  const projectName = project?.name ?? projectKey;
+  const hiddenCount = mirrored
+    ? showHidden
+      ? (eager.data?.items.length ?? project?.backlog?.hidden ?? 0)
+      : (project?.backlog?.hidden ?? 0)
+    : showHidden
+      ? (eager.data?.items.length ?? 0)
+      : undefined;
   // `search` changes with the selection; searchKey holds the filter values the header shows.
   // biome-ignore lint/correctness/useExhaustiveDependencies: searchKey stands for the filters in `search`
   const header = useMemo(
@@ -281,7 +346,7 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
         actions={
           <>
             <SearchField
-              width={140}
+              width={mirrored ? 120 : 140}
               value={query}
               onChange={setQuery}
               inputRef={searchRef}
@@ -295,9 +360,17 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
                 }
               }}
             />
-            <Button kbd="C" onPress={() => actions.current.newTask()} aria-keyshortcuts="c">
-              New
-            </Button>
+            {mirrored ? (
+              <MirrorCreateButton
+                projectName={projectName}
+                onPress={() => actions.current.newTask()}
+                aria-keyshortcuts="c"
+              />
+            ) : (
+              <Button kbd="C" onPress={() => actions.current.newTask()} aria-keyshortcuts="c">
+                New
+              </Button>
+            )}
           </>
         }
         filters={
@@ -307,6 +380,7 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
             onChange={(update) => actions.current.setSearch(update)}
             usesMilestones={usesMilestones}
             usesCycles={usesCycles}
+            hiddenCount={hiddenCount}
           />
         }
         filtersEnd={
@@ -318,13 +392,29 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
         }
       />
     ),
-    [projectKey, subtitleText, query, searchRef, filtered, searchKey, usesMilestones, usesCycles],
+    [
+      projectKey,
+      subtitleText,
+      query,
+      searchRef,
+      filtered,
+      searchKey,
+      usesMilestones,
+      usesCycles,
+      mirrored,
+      projectName,
+      hiddenCount,
+    ],
   );
 
   return (
     <div className="grid h-dvh min-h-0 flex-1 grid-cols-[600px_minmax(0,1fr)] bg-bg text-fg">
-      <section aria-label="Tasks" className="flex min-h-0 min-w-0 flex-col border-r border-line">
+      <section aria-label="Tasks" className="relative flex min-h-0 min-w-0 flex-col border-r border-line">
         {header}
+        <MirrorFailedBanner project={project} />
+        {showHidden && groups.length ? (
+          <HiddenTasksStrip count={hiddenCount ?? 0} branch={project?.backlog?.defaultBranch ?? null} />
+        ) : null}
         <div ref={tableRef} onKeyDownCapture={onTableKeyDownCapture} className="flex min-h-0 flex-1 flex-col">
           <DataTable
             aria-label={`Tasks in ${project?.name ?? projectKey}`}
@@ -340,6 +430,7 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
             renderEmptyState={renderEmpty}
           />
         </div>
+        <DetachedToast project={project} />
       </section>
       <section aria-label="Task detail" className="flex min-h-0 min-w-0 flex-col">
         {selected ? (

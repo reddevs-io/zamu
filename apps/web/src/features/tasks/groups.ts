@@ -47,3 +47,16 @@ export function visibleKeys(
 ): string[] {
   return groups.flatMap((group) => (collapsed.has(group.id) ? [] : group.items.map((item) => item.key)));
 }
+
+/** Id and label of the one group the hidden-tasks list shows. */
+export const HIDDEN_GROUP_ID = 'hidden';
+export const HIDDEN_GROUP_LABEL = 'Removed from Backlog.md';
+
+/** Hidden tasks (their Backlog.md file is gone) as one group, most recently removed first. */
+export function buildHiddenGroup(items: readonly TaskListItem[]): DataGroup<TaskListItem>[] {
+  if (!items.length) return [];
+  const sorted = [...items].sort(
+    (a, b) => (b.hiddenAt ?? '').localeCompare(a.hiddenAt ?? '') || compareTasks(a, b),
+  );
+  return [{ id: HIDDEN_GROUP_ID, label: HIDDEN_GROUP_LABEL, count: sorted.length, items: sorted }];
+}

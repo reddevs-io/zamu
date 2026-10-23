@@ -6,6 +6,8 @@ import type {
   Me,
   Member,
   MilestoneWithProgress,
+  ProjectActivity,
+  ProjectBacklogSummary,
   ProjectWithCounts,
   StatusCounts,
   Task,
@@ -206,6 +208,12 @@ export function createFakeApi({
     },
   ];
 
+  /** M3: the project's Backlog.md summary and project-level history (see `mirrorTask`). */
+  const mirror = {
+    summary: null as ProjectBacklogSummary | null,
+    history: [] as ProjectActivity[],
+  };
+
   const calls = {
     update: [] as Input[],
     create: [] as Input[],
@@ -278,6 +286,7 @@ export function createFakeApi({
               openCount: open.length,
               lastActivityAt: new Date(now).toISOString(),
               assignees: [],
+              backlog: mirror.summary,
             },
           ],
         };
@@ -356,16 +365,21 @@ export function createFakeApi({
       timeline: async (input: Input): Promise<{ items: TimelineItem[] }> => {
         const task = find(input.key);
         const items: TimelineItem[] = [
-          {
-            id: `40000000-0000-4000-8000-${String(task.number).padStart(12, '0')}`,
-            type: 'task.created',
-            taskKey: task.key,
-            actor: people.ana,
-            onBehalfOf: null,
-            changes: [],
-            createdAt: task.createdAt,
-            kind: 'activity',
-          },
+          // Tasks of a Backlog.md first read have no "created" entry: the project-level one stands in.
+          ...(task.backlog
+            ? []
+            : [
+                {
+                  id: `40000000-0000-4000-8000-${String(task.number).padStart(12, '0')}`,
+                  type: 'task.created' as const,
+                  taskKey: task.key,
+                  actor: people.ana,
+                  onBehalfOf: null,
+                  changes: [],
+                  createdAt: task.createdAt,
+                  kind: 'activity' as const,
+                },
+              ]),
           ...activity
             .filter((item) => item.taskKey === task.key)
             .map((item) => ({ ...item, kind: 'activity' as const })),
@@ -407,6 +421,13 @@ export function createFakeApi({
     },
     milestones: {
       list: async (): Promise<{ items: MilestoneWithProgress[] }> => structuredClone({ items: milestones }),
+    },
+    backlog: {
+      /** Only the history: the task screens read nothing else from the source status. */
+      status: async (): Promise<{ history: ProjectActivity[] }> => {
+        if (!mirror.summary) throw new ORPCError('NOT_FOUND', { message: 'No Backlog.md source' });
+        return structuredClone({ history: mirror.history });
+      },
     },
     cycles: {
       list: async (): Promise<{ items: Cycle[] }> => structuredClone({ items: cycles }),
@@ -466,7 +487,7 @@ export function createFakeApi({
     return release;
   };
 
-  return { client, calls, control, hold, tasks, activity, comments, milestones, cycles };
+  return { client, calls, control, hold, tasks, activity, comments, milestones, cycles, mirror };
 }
 
 export type FakeApi = ReturnType<typeof createFakeApi>;

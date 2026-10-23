@@ -1,6 +1,7 @@
 import {
   MILESTONE_STATUS_LABELS,
   MILESTONE_STATUSES,
+  type MilestoneOwnedField,
   type MilestoneStatus,
   type MilestoneWithProgress,
   milestoneProgressRatio,
@@ -8,18 +9,27 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useDeferredValue, useMemo, useState } from 'react';
-import { ProjectHeader, useProjectSummary } from '~/features/project-header';
+import {
+  isMirrored,
+  MilestoneRefusal,
+  MirrorCreateButton,
+  ProjectHeader,
+  useProjectSummary,
+} from '~/features/project-header';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import {
   Button,
   cn,
   EmptyState,
   isMilestoneFilled,
+  lockedHatch,
   MilestoneGlyph,
+  NoticeStrip,
   type OptionItem,
   ProgressBar,
   SearchField,
   Select,
+  SystemActorAvatar,
   Tag,
 } from '~/ui';
 import { describeTarget, formatDay } from './dates';
@@ -42,6 +52,8 @@ import { DEFAULT_MILESTONE_STATUSES, type MilestoneSort, type MilestonesSearch }
 
 // /p/PAY/milestones (frames 14 to 21): open milestones with status, target and progress, the completed
 // ones folded at the bottom; New milestone dialog; empty, loading and error states.
+// Mirrored projects (M3): milestones come from Backlog.md files, so New milestone explains instead of
+// creating, a strip says where they come from, and name, status and target carry the hatch.
 
 const TEMPLATE = 'minmax(0,1fr) 96px 132px 240px 24px';
 const HEADERS = ['Milestone', 'Status', 'Target', 'Progress', ''];
@@ -111,6 +123,8 @@ export function MilestonesScreen({ projectKey, search }: MilestonesScreenProps) 
   const [completedOpen, setCompletedOpen] = useState<boolean | null>(null);
 
   const isOff = project != null && !project.usesMilestones;
+  const mirrored = isMirrored(project);
+  const projectName = project?.name ?? projectKey;
   const sort = search.sort ?? 'target';
   const statuses = search.status ?? DEFAULT_MILESTONE_STATUSES;
   const items = milestones.data?.items;
@@ -135,7 +149,13 @@ export function MilestonesScreen({ projectKey, search }: MilestonesScreenProps) 
 
   const showCompleted = completedOpen ?? statuses.includes('completed');
   const isEmpty = items?.length === 0;
-  const newButton = <Button onPress={() => setCreating(true)}>New milestone</Button>;
+  const newButton = mirrored ? (
+    <MirrorCreateButton projectName={projectName} kind="milestone" kbd="">
+      New milestone
+    </MirrorCreateButton>
+  ) : (
+    <Button onPress={() => setCreating(true)}>New milestone</Button>
+  );
 
   const body = () => {
     if (isOff) return <FeatureOff projectKey={projectKey} feature="milestones" />;
@@ -157,6 +177,17 @@ export function MilestonesScreen({ projectKey, search }: MilestonesScreenProps) 
         />
       );
     }
+    if (isEmpty && mirrored) {
+      return (
+        <div className="flex px-6 py-12">
+          <EmptyState
+            className="max-w-[640px]"
+            title="No milestones in Backlog.md yet"
+            text={<MilestoneRefusal projectName={projectName} />}
+          />
+        </div>
+      );
+    }
     if (isEmpty) {
       return (
         <div className="flex px-6 py-12">
@@ -175,6 +206,16 @@ export function MilestonesScreen({ projectKey, search }: MilestonesScreenProps) 
     const noMatch = !open.length && !completed.length;
     return (
       <div className="min-h-0 flex-1 overflow-auto">
+        {mirrored ? (
+          <div className="border-b border-line px-6 py-2.5">
+            <NoticeStrip marker={<SystemActorAvatar decorative />}>
+              <span className="leading-normal">
+                <MilestoneRefusal projectName={projectName} /> Hatched fields change in those files; progress
+                counts the tasks here.
+              </span>
+            </NoticeStrip>
+          </div>
+        ) : null}
         <ListHead template={TEMPLATE} headers={HEADERS} />
         <ListTable label={`Milestones of ${project?.name ?? projectKey}`}>
           {open.map((milestone) => (
@@ -290,9 +331,12 @@ function MilestoneRow({ projectKey, milestone, today }: MilestoneRowProps) {
   const href = milestoneHref(projectKey, milestone.id);
   const { progress } = milestone;
   const target = targetText(milestone, today);
+  const locked = new Set<MilestoneOwnedField>(milestone.locked ?? []);
+  const hatch = (field: MilestoneOwnedField) =>
+    locked.has(field) ? cn(lockedHatch, '-my-1 py-1') : undefined;
   return (
     <ListRow template={TEMPLATE} href={href}>
-      <ListCell className="flex flex-col gap-0.5">
+      <ListCell className={cn('flex flex-col gap-0.5', hatch('name'))}>
         <span className="flex min-w-0 items-center gap-2">
           <MilestoneGlyph filled={isMilestoneFilled(milestone.status)} />
           <RowLink href={href} className="text-[13.5px]">
@@ -303,12 +347,12 @@ function MilestoneRow({ projectKey, milestone, today }: MilestoneRowProps) {
           {firstLine(milestone.description) || 'No description'}
         </span>
       </ListCell>
-      <ListCell>
+      <ListCell className={hatch('status')}>
         <Tag tone={milestone.status === 'active' ? 'accent' : 'default'}>
           {MILESTONE_STATUS_LABELS[milestone.status]}
         </Tag>
       </ListCell>
-      <ListCell className="flex flex-col gap-0.5">
+      <ListCell className={cn('flex flex-col gap-0.5', hatch('targetDate'))}>
         <span
           className={cn(
             target.tone === 'warn' ? 'text-warn' : target.tone === 'faint' ? 'text-faint' : 'text-fg',

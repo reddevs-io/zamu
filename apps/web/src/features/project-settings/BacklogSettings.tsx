@@ -1,0 +1,907 @@
+// Project settings, Backlog.md (frames 2b to 2o): not set up, mirroring, refreshing, warnings with the
+// paged problem list, failed, paused, imported with its history, the member view and loading. Owners
+// and admins refresh (⇧R), open the webhook setup, edit mappings in the setup route and detach.
+import {
+  type BacklogMappingsView,
+  type BacklogProblem,
+  type BacklogSourceStatus,
+  type ProjectActivity,
+  type ProjectWithCounts,
+  parseRepositoryUrl,
+} from '@pm/contracts';
+import { useQuery } from '@tanstack/react-query';
+import { type ReactNode, useEffect, useState } from 'react';
+import { Link } from 'react-aria-components';
+import { useBacklogStatus, useProjectSummary, useRefreshNow } from '~/features/project-header';
+import { isAdminRole } from '~/features/settings/format';
+import { errorMessage } from '~/features/settings/result';
+import { useNow } from '~/features/tasks/clock';
+import { meQuery } from '~/features/tasks/queries';
+import {
+  Banner,
+  Button,
+  buttonStyles,
+  ConnectionStatusTag,
+  type Fact,
+  FactList,
+  InlineCode,
+  Kbd,
+  MappingRow,
+  MappingTable,
+  NoticeStrip,
+  type OptionItem,
+  PRIORITIES,
+  PRIORITY_LABELS,
+  PriorityGlyph,
+  ProblemList,
+  ProblemRow,
+  ProviderBadge,
+  Skeleton,
+  SourceStatusDot,
+  STATUS_LABELS,
+  StatusSquare,
+  SystemActorDot,
+  TASK_STATUSES,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  useHotkeys,
+} from '~/ui';
+import { DetachDialog } from './DetachDialog';
+import {
+  contentsText,
+  detachedBanner,
+  failedBanner,
+  isDetached,
+  modeText,
+  nextCheckText,
+  pausedBanner,
+  problemCount,
+  problemRow,
+  readText,
+  shortCommit,
+  sourceDot,
+  stampText,
+  statusHeading,
+  webhookText,
+} from './format';
+import { hasTasksQuery, loadProblemPage, useDetach, useSetConnection } from './queries';
+import { UseConnectionDialog } from './UseConnectionDialog';
+import { WebhookDialog } from './WebhookDialog';
+
+/** Setup route of M3-10: `?mode=mirror|import` starts it, `?step=mappings&edit=1` edits mappings. */
+export function setupHref(projectKey: string, search: Record<string, string>): string {
+  return `/p/${encodeURIComponent(projectKey)}/backlog-setup?${new URLSearchParams(search).toString()}`;
+}
+
+/** Hidden tasks of a project in the task list. */
+export function hiddenTasksHref(projectKey: string): string {
+  return `/p/${encodeURIComponent(projectKey)}?hidden=only`;
+}
+
+export interface BacklogSettingsProps {
+  projectKey: string;
+  /** The webhook dialog is a search param (`?webhook=1`) so setup can open it after the first read. */
+  webhookOpen: boolean;
+  onWebhookOpenChange: (isOpen: boolean) => void;
+}
+
+/**
+ * The Backlog.md section. The status and Refresh now are the project header's (one cache for the
+ * header button and this page); the header leaves ⇧R to this page here.
+ */
+export function BacklogSettings({ projectKey, webhookOpen, onWebhookOpenChange }: BacklogSettingsProps) {
+  const project = useProjectSummary(projectKey);
+  const me = useQuery(meQuery());
+  const canManage = isAdminRole(me.data?.role);
+  const hasSource = Boolean(project?.backlog);
+  const [detachOpen, setDetachOpen] = useState(false);
+  const [connectionOpen, setConnectionOpen] = useState(false);
+
+  const refresh = useRefreshNow(projectKey);
+  const status = useBacklogStatus(projectKey, hasSource, refresh.isRefreshing);
+  const hasTasks = useQuery({
+    ...hasTasksQuery(projectKey),
+    enabled: project !== undefined && !hasSource,
+  }).data;
+  const detach = useDetach(projectKey);
+  const setConnection = useSetConnection(projectKey);
+
+  const data = status.data;
+  const canRefresh =
+    canManage &&
+    data !== undefined &&
+    !refresh.isRefreshing &&
+    (data.state === 'healthy' || data.state === 'warnings' || data.state === 'failed');
+  const onRefresh = () => {
+    if (canRefresh) refresh.refresh();
+  };
+
+  useHotkeys({ 'Shift+r': { enabled: canRefresh, handler: onRefresh } });
+
+  if (!project) return <BacklogSkeleton />;
+  if (!project.backlog) {
+    return <NoSource project={project} hasTasks={hasTasks} canManage={canManage} />;
+  }
+  if (status.error) {
+    return (
+      <Banner
+        action={
+          <Button variant="secondary" size="sm" onPress={() => void status.refetch()}>
+            Try again
+          </Button>
+        }
+      >
+        Couldn't load the Backlog.md settings. {loadErrorText(status.error)}
+      </Banner>
+    );
+  }
+  if (!data) return <BacklogSkeleton />;
+
+  const repository = data.repository ? (parseRepositoryUrl(data.repository)?.short ?? data.repository) : null;
+
+  return (
+    <>
+      <BacklogStatusView
+        status={data}
+        projectName={project.name}
+        canManage={canManage}
+        queued={refresh.isRefreshing}
+        canRefresh={canRefresh}
+        actionError={refresh.error}
+        onDismissError={refresh.reset}
+        onRefresh={onRefresh}
+        onOpenWebhook={() => onWebhookOpenChange(true)}
+        onDetach={() => setDetachOpen(true)}
+        onUseAnotherConnection={() => setConnectionOpen(true)}
+      />
+      {canManage && !isDetached(data) ? (
+        <>
+          <WebhookDialog
+            projectKey={projectKey}
+            isOpen={webhookOpen}
+            onOpenChange={onWebhookOpenChange}
+            repository={repository}
+            defaultBranch={data.defaultBranch}
+          />
+          <DetachDialog
+            isOpen={detachOpen}
+            onOpenChange={setDetachOpen}
+            status={data}
+            projectName={project.name}
+            onDetach={(confirmKey) => detach.mutateAsync(confirmKey)}
+          />
+          <UseConnectionDialog
+            isOpen={connectionOpen}
+            onOpenChange={setConnectionOpen}
+            status={data}
+            onPick={(connectionId) => setConnection.mutateAsync(connectionId)}
+          />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** Message of a failed status load (an API error carries its own message). */
+function loadErrorText(error: unknown): string {
+  if (error instanceof Error && error.name !== 'TypeError' && error.message) return error.message;
+  return errorMessage(error);
+}
+
+// ---------------------------------------------------------------------------
+// Not set up (frame 2b)
+// ---------------------------------------------------------------------------
+
+export function NoSource({
+  project,
+  hasTasks,
+  canManage,
+}: {
+  project: Pick<ProjectWithCounts, 'key' | 'repository'>;
+  hasTasks: boolean | undefined;
+  canManage: boolean;
+}) {
+  const repository = project.repository
+    ? (parseRepositoryUrl(project.repository)?.short ?? project.repository)
+    : null;
+  const blocked = hasTasks === true || !repository || !canManage;
+  const linkClass = (variant: 'primary' | 'secondary') =>
+    buttonStyles({ variant, size: 'md', className: 'mt-1.5 self-start' });
+  const action = (mode: 'mirror' | 'import', label: string, variant: 'primary' | 'secondary') =>
+    blocked ? (
+      <Button variant={variant} className="mt-1.5 self-start" isDisabled>
+        {label}
+      </Button>
+    ) : (
+      <Link href={setupHref(project.key, { mode })} className={linkClass(variant)}>
+        {label}
+      </Link>
+    );
+
+  let note: ReactNode;
+  if (!repository) {
+    note = 'Add the repository under General first. Works on a project with no tasks.';
+  } else if (hasTasks) {
+    note = (
+      <>
+        Repository: {repository}, from General. This project already has tasks, so it can't read Backlog.md;
+        use New project from Backlog.md on the Projects page instead.
+      </>
+    );
+  } else {
+    note = <>Repository: {repository}, from General. Works on a project with no tasks.</>;
+  }
+
+  return (
+    <div className="flex max-w-[600px] flex-col items-start gap-3 pt-3">
+      <h2 className="m-0 text-[19px] leading-tight font-semibold tracking-[-0.015em]">
+        Bring in tasks from Backlog.md
+      </h2>
+      <p className="m-0 leading-[1.55] text-muted">
+        If the repository keeps tasks as Markdown files in a <InlineCode>backlog/</InlineCode> folder, this
+        project can read them from the default branch.
+      </p>
+      <div className="grid w-full grid-cols-2 gap-4">
+        <div className="flex flex-col items-start gap-1.5 border border-line p-3.5">
+          <b className="font-semibold">Mirror</b>
+          <span className="text-[12px] leading-normal text-muted">
+            Keeps following the repository. Agents keep editing the files; the project updates on every push.
+            Comments and cycles stay editable here.
+          </span>
+          {action('mirror', 'Set up a mirror', 'primary')}
+        </div>
+        <div className="flex flex-col items-start gap-1.5 border border-line p-3.5">
+          <b className="font-semibold">Import once</b>
+          <span className="text-[12px] leading-normal text-muted">
+            Reads the files one time, then the project is yours to edit. Use it to move off Backlog.md.
+          </span>
+          {action('import', 'Import', 'secondary')}
+        </div>
+      </div>
+      <span className="text-[11.5px] text-muted">{note}</span>
+      {!canManage ? (
+        <span className="text-[11.5px] text-muted">Only owners and admins can set up Backlog.md.</span>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// A source (frames 2d to 2n)
+// ---------------------------------------------------------------------------
+
+export interface BacklogStatusViewProps {
+  status: BacklogSourceStatus;
+  projectName: string;
+  /** Owners and admins. */
+  canManage: boolean;
+  /** A refresh was asked for and has not finished yet. */
+  queued?: boolean;
+  canRefresh: boolean;
+  actionError?: string | null;
+  onDismissError?: () => void;
+  onRefresh: () => void;
+  onOpenWebhook: () => void;
+  onDetach: () => void;
+  onUseAnotherConnection: () => void;
+}
+
+export function BacklogStatusView({
+  status,
+  projectName,
+  canManage,
+  queued = false,
+  canRefresh,
+  actionError,
+  onDismissError,
+  onRefresh,
+  onOpenWebhook,
+  onDetach,
+  onUseAnotherConnection,
+}: BacklogStatusViewProps) {
+  const now = useNow();
+  const detached = isDetached(status);
+  const reading = status.state === 'reading' || status.state === 'setup';
+  const heading = statusHeading(status, now, { queued });
+  const canAct = canManage && !detached;
+  const showProblems = !detached && status.state !== 'failed';
+
+  let banner: ReactNode = null;
+  if (status.state === 'failed') {
+    banner = (
+      <Banner
+        action={
+          canManage ? (
+            <Button variant="secondary" size="sm" onPress={onRefresh} isDisabled={!canRefresh}>
+              Refresh now
+            </Button>
+          ) : null
+        }
+      >
+        <span className="leading-normal">{failedBanner(status, now)}</span>
+      </Banner>
+    );
+  } else if (status.state === 'paused') {
+    banner = (
+      <NeutralBanner
+        action={
+          canManage && status.repository ? (
+            <Button variant="secondary" size="sm" onPress={onUseAnotherConnection}>
+              Use another connection
+            </Button>
+          ) : null
+        }
+      >
+        {pausedBanner(status, now)}
+      </NeutralBanner>
+    );
+  } else if (detached) {
+    banner = <NeutralBanner>{detachedBanner(status, now)}</NeutralBanner>;
+  } else if (!canManage) {
+    banner = (
+      <NeutralBanner>
+        You can read this page. Owners and admins can refresh, change mappings or detach. You can still
+        comment on tasks and put them in cycles.
+      </NeutralBanner>
+    );
+  }
+
+  return (
+    <>
+      {actionError ? (
+        <Banner
+          action={
+            <Button variant="secondary" size="sm" onPress={onDismissError}>
+              Dismiss
+            </Button>
+          }
+        >
+          {actionError}
+        </Banner>
+      ) : null}
+      {banner}
+      <Section
+        aria-label="Source"
+        title={
+          <>
+            <SourceStatusDot state={queued && !reading ? 'reading' : sourceDot(status.state)} decorative />
+            <b className="font-semibold">{heading.title}</b>
+            {heading.note ? <span className="text-[12px] text-faint">{heading.note}</span> : null}
+          </>
+        }
+        actions={
+          canAct ? (
+            <>
+              <Kbd aria-hidden>⇧R</Kbd>
+              <Button
+                variant="secondary"
+                size="sm"
+                onPress={onRefresh}
+                isDisabled={!canRefresh}
+                aria-keyshortcuts="Shift+R"
+              >
+                {queued || reading ? 'Refreshing…' : 'Refresh now'}
+              </Button>
+            </>
+          ) : null
+        }
+      >
+        <FactList items={sourceFacts(status, now, { canManage, onOpenWebhook })} />
+      </Section>
+      {reading && status.headCommit ? (
+        <NoticeStrip marker={<SourceStatusDot state="reading" decorative />}>
+          <span>
+            Reading commit{' '}
+            <span className="font-mono text-[11px] text-fg">{shortCommit(status.headCommit)}</span>
+            {status.defaultBranch ? <> at the head of {status.defaultBranch}</> : null}. Tasks update when the
+            whole folder is read.
+          </span>
+        </NoticeStrip>
+      ) : null}
+      {showProblems ? <ProblemsSection status={status} /> : null}
+      <MappingsSection status={status} canEdit={canAct} />
+      {detached ? <HistorySection status={status} projectName={projectName} /> : null}
+      {canAct && status.mode === 'mirror' ? (
+        <div className="flex items-center gap-4 border border-line px-4 py-3.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+            <b className="font-semibold">Stop mirroring and detach</b>
+            <span className="text-[12px] leading-normal text-muted">
+              Every task and milestone becomes editable here and the mirror stops for good. Use it when you
+              move off Backlog.md.
+            </span>
+          </div>
+          <Button variant="destructive" size="md" onPress={onDetach}>
+            Detach…
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function NeutralBanner({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div role="note" className="flex items-center gap-3 border border-line bg-band px-3.5 py-2.5 text-fg">
+      <SourceStatusDot state="paused" decorative />
+      <div className="min-w-0 flex-1 leading-normal">{children}</div>
+      {action}
+    </div>
+  );
+}
+
+function Section({
+  title,
+  actions,
+  children,
+  ...props
+}: {
+  'aria-label': string;
+  title: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-label={props['aria-label']} className="flex flex-col border border-line bg-surface">
+      <div className="flex min-h-[53px] items-center gap-2.5 border-b border-line-2 px-4 py-3">
+        {title}
+        {actions ? <span className="ml-auto flex items-center gap-2">{actions}</span> : null}
+      </div>
+      <div className="flex flex-col gap-3 px-4 py-3.5">{children}</div>
+    </section>
+  );
+}
+
+const mono = 'font-mono text-[11.5px]';
+
+function sourceFacts(
+  status: BacklogSourceStatus,
+  now: number | null,
+  { canManage, onOpenWebhook }: { canManage: boolean; onOpenWebhook: () => void },
+): Fact[] {
+  const detached = isDetached(status);
+  const repo = status.repository ? parseRepositoryUrl(status.repository) : null;
+  const facts: Fact[] = [{ id: 'mode', label: 'Mode', value: modeText(status) }];
+  facts.push({
+    id: 'repository',
+    label: 'Repository',
+    value: repo ? (
+      <Link
+        href={repo.webUrl}
+        target="_blank"
+        rel="noreferrer"
+        className={`${mono} text-fg outline-none hover:underline focus-visible:focus-ring`}
+      >
+        {repo.short}
+      </Link>
+    ) : (
+      <span className="text-muted">{status.repository ?? 'None. Add it under General.'}</span>
+    ),
+  });
+  if (!detached) {
+    const connection = status.connection;
+    facts.push({
+      id: 'connection',
+      label: 'Connection',
+      value: connection ? (
+        <span className="flex items-center gap-2">
+          <ProviderBadge provider={connection.provider} size="sm" decorative />
+          {connection.name}
+          {connection.status === 'rejected' || connection.status === 'unreachable' ? (
+            <ConnectionStatusTag status={connection.status} withDot={false} />
+          ) : null}
+        </span>
+      ) : (
+        <span className="text-muted">Deleted. Pick another connection to resume.</span>
+      ),
+    });
+  }
+  facts.push({
+    id: 'branch',
+    label: 'Branch and folder',
+    value: (
+      <span>
+        <span className={mono}>{status.defaultBranch ?? 'default branch'}</span>{' '}
+        <span className="text-faint">(default branch)</span> ·{' '}
+        <span className={mono}>{status.folder ? `${status.folder}/` : 'not found yet'}</span>{' '}
+        <span className="text-faint">({status.folderOverride ? 'set by hand' : 'found automatically'})</span>
+      </span>
+    ),
+  });
+  const read = status.lastRead;
+  facts.push({
+    id: 'read',
+    label: detached ? 'Read from' : 'Last good read',
+    value:
+      now === null ? (
+        <Skeleton width={220} />
+      ) : read ? (
+        <span>
+          {readText(status, now)}{' '}
+          {read.commitUrl ? (
+            <Link
+              href={read.commitUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={`${mono} text-fg outline-none hover:underline focus-visible:focus-ring`}
+            >
+              {shortCommit(read.commit)}
+            </Link>
+          ) : (
+            <span className={mono}>{shortCommit(read.commit)}</span>
+          )}{' '}
+          {read.commitTitle ? <span className="text-faint">{read.commitTitle}</span> : null}
+        </span>
+      ) : (
+        <span className="text-muted">Not read yet</span>
+      ),
+  });
+  if (!detached && status.mode === 'mirror') {
+    facts.push({
+      id: 'next',
+      label: 'Next check',
+      value: now === null ? <Skeleton width={140} /> : nextCheckText(status, now),
+    });
+    facts.push({
+      id: 'webhook',
+      label: 'Webhook',
+      value: (
+        <span>
+          {now === null ? '' : webhookText(status.webhookLastAt, now)}
+          {canManage ? (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={onOpenWebhook}
+                className="cursor-pointer border-0 bg-transparent p-0 text-accent outline-none hover:underline focus-visible:focus-ring"
+              >
+                Setup
+              </button>
+            </>
+          ) : null}
+        </span>
+      ),
+    });
+  }
+  const hidden = status.counts.hidden;
+  facts.push({
+    id: 'contents',
+    label: 'Contents',
+    value: (
+      <span>
+        {contentsText(status)}
+        {!detached && hidden ? (
+          <>
+            {' · '}
+            <Link
+              href={hiddenTasksHref(status.project.key)}
+              className="text-fg underline decoration-line outline-none focus-visible:focus-ring"
+            >
+              {hidden} hidden, removed from Backlog.md
+            </Link>
+          </>
+        ) : null}
+      </span>
+    ),
+  });
+  return facts;
+}
+
+// ---------------------------------------------------------------------------
+// Problems (frame 2g)
+// ---------------------------------------------------------------------------
+
+function ProblemsSection({ status }: { status: BacklogSourceStatus }) {
+  const [more, setMore] = useState<{ items: BacklogProblem[]; cursor: string | null } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // A new first page (after a refresh) starts the list over.
+  const firstPage = status.problems;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the first page changes
+  useEffect(() => setMore(null), [firstPage]);
+
+  const items = [...firstPage.items, ...(more?.items ?? [])];
+  const cursor = more ? more.cursor : firstPage.nextCursor;
+  const count = problemCount(status);
+
+  const loadMore = async () => {
+    if (!cursor || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await loadProblemPage(status.project.key, cursor);
+      setMore((current) => ({ items: [...(current?.items ?? []), ...page.items], cursor: page.nextCursor }));
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section aria-label="Problems in the last refresh" className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-2.5">
+        <h2 className="caps m-0">Problems in the last refresh</h2>
+        <span className="font-mono text-[10px] text-faint">{count}</span>
+        {count ? (
+          <span className="ml-auto text-[11.5px] text-muted">
+            Skipped files keep their last good version, if they had one.
+          </span>
+        ) : null}
+      </div>
+      {count === 0 ? (
+        <NoticeStrip marker={<SourceStatusDot state="healthy" decorative />}>
+          None. Every file was read and every value is mapped.
+        </NoticeStrip>
+      ) : (
+        <>
+          <ProblemList aria-label="Problems in the last refresh">
+            {items.map((problem) => {
+              const row = problemRow(problem);
+              return (
+                <ProblemRow key={`${problem.kind}:${row.file}`} severity={row.severity} file={row.file}>
+                  {row.text}
+                </ProblemRow>
+              );
+            })}
+          </ProblemList>
+          {error ? <Banner>Couldn't load more problems. {error}</Banner> : null}
+          {cursor ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="self-start"
+              onPress={() => void loadMore()}
+              isPending={loading}
+            >
+              Show more ({count - items.length} left)
+            </Button>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mappings
+// ---------------------------------------------------------------------------
+
+const STATUS_ITEMS: OptionItem[] = TASK_STATUSES.map((status) => ({
+  id: status,
+  label: STATUS_LABELS[status],
+  prefix: <StatusSquare status={status} />,
+}));
+
+const PRIORITY_ITEMS: OptionItem[] = PRIORITIES.map((priority) => ({
+  id: priority,
+  label: PRIORITY_LABELS[priority],
+  prefix: <PriorityGlyph priority={priority} />,
+}));
+
+const NO_ONE = '__none__';
+
+function assigneeItems(mappings: BacklogMappingsView): OptionItem[] {
+  const items = new Map<string, OptionItem>([[NO_ONE, { id: NO_ONE, label: 'No one' }]]);
+  for (const row of mappings.assignee) {
+    if (row.user && !items.has(row.user.id)) {
+      items.set(row.user.id, {
+        id: row.user.id,
+        label: row.user.name,
+        avatar: { name: row.user.name, kind: row.user.kind },
+      });
+    }
+  }
+  return [...items.values()];
+}
+
+function MappingsSection({ status, canEdit }: { status: BacklogSourceStatus; canEdit: boolean }) {
+  const { mappings } = status;
+  const detached = isDetached(status);
+  const people = assigneeItems(mappings);
+  const empty = (what: string) => (
+    <p className="m-0 py-1.5 text-[12.5px] text-muted">No {what} seen in the files.</p>
+  );
+  return (
+    <Section
+      aria-label="Mappings"
+      title={
+        <>
+          <b className="font-semibold">Mappings</b>
+          <span className="text-[12px] text-faint">
+            {detached ? 'used for the import' : 'applied on every refresh'}
+          </span>
+        </>
+      }
+      actions={
+        canEdit ? (
+          <Link
+            href={setupHref(status.project.key, { step: 'mappings', edit: '1' })}
+            className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+          >
+            Edit mappings
+          </Link>
+        ) : null
+      }
+    >
+      <Tabs defaultSelectedKey="status">
+        <div className="border-b border-line-2">
+          <TabList aria-label="Mapping kind">
+            <Tab id="status" count={mappings.status.length} className="h-8">
+              Status
+            </Tab>
+            <Tab id="priority" count={mappings.priority.length} className="h-8">
+              Priority
+            </Tab>
+            <Tab id="assignee" count={mappings.assignee.length} className="h-8">
+              Assignees
+            </Tab>
+          </TabList>
+        </div>
+        <TabPanel id="status">
+          {mappings.status.length ? (
+            <MappingTable aria-label="Status mapping" variant="summary">
+              {mappings.status.map((row) => (
+                <MappingRow
+                  key={row.from}
+                  from={row.from}
+                  items={STATUS_ITEMS}
+                  value={row.to}
+                  how={row.how}
+                  count={row.count}
+                  isReadOnly
+                />
+              ))}
+            </MappingTable>
+          ) : (
+            empty('statuses')
+          )}
+        </TabPanel>
+        <TabPanel id="priority">
+          {mappings.priority.length ? (
+            <MappingTable aria-label="Priority mapping" variant="summary">
+              {mappings.priority.map((row) => (
+                <MappingRow
+                  key={row.from}
+                  from={row.from}
+                  items={PRIORITY_ITEMS}
+                  value={row.to}
+                  how={row.how}
+                  count={row.count}
+                  isReadOnly
+                />
+              ))}
+            </MappingTable>
+          ) : (
+            empty('priorities')
+          )}
+        </TabPanel>
+        <TabPanel id="assignee">
+          {mappings.assignee.length ? (
+            <MappingTable aria-label="Assignee mapping" variant="summary">
+              {mappings.assignee.map((row) => (
+                <MappingRow
+                  key={row.from}
+                  from={row.from}
+                  items={people}
+                  value={row.userId ?? NO_ONE}
+                  how={row.how}
+                  count={row.count}
+                  isReadOnly
+                />
+              ))}
+            </MappingTable>
+          ) : (
+            empty('assignees')
+          )}
+        </TabPanel>
+      </Tabs>
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// History (frame 2j)
+// ---------------------------------------------------------------------------
+
+function HistorySection({ status, projectName }: { status: BacklogSourceStatus; projectName: string }) {
+  const now = useNow();
+  if (!status.history.length) return null;
+  return (
+    <Section
+      aria-label="History"
+      title={
+        <>
+          <b className="font-semibold">History</b>
+          <span className="text-[12px] text-faint">project-level entries</span>
+        </>
+      }
+    >
+      <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+        {status.history.map((entry) => (
+          <li
+            key={entry.id}
+            className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 text-[12.5px] text-muted"
+          >
+            {entry.actor ? (
+              <span aria-hidden className="size-[7px] justify-self-center rounded-full bg-line" />
+            ) : (
+              <SystemActorDot />
+            )}
+            <span className="min-w-0 [&_b]:font-semibold [&_b]:text-fg">
+              {historyText(entry, projectName)}
+            </span>
+            <span className="font-mono text-[10px] text-faint">
+              {now === null ? '' : stampText(entry.createdAt, now)}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Section>
+  );
+}
+
+function historyText(entry: ProjectActivity, projectName: string): ReactNode {
+  const who = <b>{entry.actor?.name ?? 'Backlog.md'}</b>;
+  const { tasks, milestones, repository } = entry.details;
+  if (entry.type === 'project.backlog_imported') {
+    const what = [
+      tasks != null ? `${tasks} ${tasks === 1 ? 'task' : 'tasks'}` : null,
+      milestones != null ? `${milestones} ${milestones === 1 ? 'milestone' : 'milestones'}` : null,
+    ]
+      .filter(Boolean)
+      .join(' and ');
+    return (
+      <>
+        {who} imported {what || 'the files'}
+        {repository ? ` from ${repository}` : ''}
+        {entry.originRef ? (
+          <>
+            {' '}
+            <span className="font-mono text-[11px] text-fg">{shortCommit(entry.originRef)}</span>
+          </>
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <>
+      {who} detached {projectName} from Backlog.md. Every field is editable now.
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading (frame 2o)
+// ---------------------------------------------------------------------------
+
+export function BacklogSkeleton() {
+  return (
+    <div aria-busy className="flex flex-col gap-4">
+      <div className="flex flex-col border border-line bg-surface">
+        <div className="border-b border-line-2 px-4 py-3">
+          <Skeleton width={140} />
+        </div>
+        <div className="flex flex-col gap-3 px-4 py-3.5">
+          {[220, 160, 260, 180, 200, 140].map((width) => (
+            <div key={width} className="grid grid-cols-[140px_minmax(0,1fr)] gap-4">
+              <Skeleton width={90} />
+              <Skeleton width={width} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col border border-line bg-surface">
+        <div className="border-b border-line-2 px-4 py-3">
+          <Skeleton width={100} />
+        </div>
+        <div className="flex flex-col gap-3 px-4 py-3.5">
+          <Skeleton width="60%" />
+          <Skeleton width="40%" />
+        </div>
+      </div>
+    </div>
+  );
+}

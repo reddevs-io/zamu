@@ -22,16 +22,22 @@ import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/ind
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsApiKeysRouteImport } from './routes/_app/settings/api-keys'
 import { Route as AppSettingsAppearanceRouteImport } from './routes/_app/settings/appearance'
+import { Route as AppSettingsConnectionsRouteImport } from './routes/_app/settings/connections'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as AppSettingsMyKeysRouteImport } from './routes/_app/settings/my-keys'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AppPProjectKeyIndexRouteImport } from './routes/_app/p/$projectKey/index'
 import { Route as AppPProjectKeyTaskKeyRouteImport } from './routes/_app/p/$projectKey/$taskKey'
+import { Route as AppPProjectKeyBacklogSetupRouteImport } from './routes/_app/p/$projectKey/backlog-setup'
+import { Route as AppPProjectKeySettingsRouteRouteImport } from './routes/_app/p/$projectKey/settings/route'
+import { Route as ApiWebhooksBacklogWebhookIdRouteImport } from './routes/api/webhooks/backlog/$webhookId'
 import { Route as AppPProjectKeyCyclesIndexRouteImport } from './routes/_app/p/$projectKey/cycles/index'
 import { Route as AppPProjectKeyCyclesCycleNumberRouteImport } from './routes/_app/p/$projectKey/cycles/$cycleNumber'
 import { Route as AppPProjectKeyMilestonesIndexRouteImport } from './routes/_app/p/$projectKey/milestones/index'
 import { Route as AppPProjectKeyMilestonesMilestoneIdRouteImport } from './routes/_app/p/$projectKey/milestones/$milestoneId'
+import { Route as AppPProjectKeySettingsIndexRouteImport } from './routes/_app/p/$projectKey/settings/index'
+import { Route as AppPProjectKeySettingsBacklogRouteImport } from './routes/_app/p/$projectKey/settings/backlog'
 
 const _uiRoute = _uiRouteImport.update({
   id: '/__ui',
@@ -97,6 +103,11 @@ const AppSettingsAppearanceRoute = AppSettingsAppearanceRouteImport.update({
   path: '/appearance',
   getParentRoute: () => AppSettingsRouteRoute,
 } as any)
+const AppSettingsConnectionsRoute = AppSettingsConnectionsRouteImport.update({
+  id: '/connections',
+  path: '/connections',
+  getParentRoute: () => AppSettingsRouteRoute,
+} as any)
 const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -127,6 +138,24 @@ const AppPProjectKeyTaskKeyRoute = AppPProjectKeyTaskKeyRouteImport.update({
   path: '/p/$projectKey/$taskKey',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPProjectKeyBacklogSetupRoute =
+  AppPProjectKeyBacklogSetupRouteImport.update({
+    id: '/p/$projectKey/backlog-setup',
+    path: '/p/$projectKey/backlog-setup',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppPProjectKeySettingsRouteRoute =
+  AppPProjectKeySettingsRouteRouteImport.update({
+    id: '/p/$projectKey/settings',
+    path: '/p/$projectKey/settings',
+    getParentRoute: () => AppRoute,
+  } as any)
+const ApiWebhooksBacklogWebhookIdRoute =
+  ApiWebhooksBacklogWebhookIdRouteImport.update({
+    id: '/api/webhooks/backlog/$webhookId',
+    path: '/api/webhooks/backlog/$webhookId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppPProjectKeyCyclesIndexRoute =
   AppPProjectKeyCyclesIndexRouteImport.update({
     id: '/p/$projectKey/cycles/',
@@ -151,6 +180,18 @@ const AppPProjectKeyMilestonesMilestoneIdRoute =
     path: '/p/$projectKey/milestones/$milestoneId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppPProjectKeySettingsIndexRoute =
+  AppPProjectKeySettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppPProjectKeySettingsRouteRoute,
+  } as any)
+const AppPProjectKeySettingsBacklogRoute =
+  AppPProjectKeySettingsBacklogRouteImport.update({
+    id: '/backlog',
+    path: '/backlog',
+    getParentRoute: () => AppPProjectKeySettingsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/__ui': typeof _uiRoute
@@ -163,18 +204,24 @@ export interface FileRoutesByFullPath {
   '/invite/$id': typeof authInviteIdRoute
   '/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/settings/appearance': typeof AppSettingsAppearanceRoute
+  '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/my-keys': typeof AppSettingsMyKeysRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/p/$projectKey/settings': typeof AppPProjectKeySettingsRouteRouteWithChildren
   '/p/$projectKey/$taskKey': typeof AppPProjectKeyTaskKeyRoute
+  '/p/$projectKey/backlog-setup': typeof AppPProjectKeyBacklogSetupRoute
+  '/api/webhooks/backlog/$webhookId': typeof ApiWebhooksBacklogWebhookIdRoute
   '/p/$projectKey/': typeof AppPProjectKeyIndexRoute
   '/p/$projectKey/cycles/$cycleNumber': typeof AppPProjectKeyCyclesCycleNumberRoute
   '/p/$projectKey/milestones/$milestoneId': typeof AppPProjectKeyMilestonesMilestoneIdRoute
+  '/p/$projectKey/settings/backlog': typeof AppPProjectKeySettingsBacklogRoute
   '/p/$projectKey/cycles/': typeof AppPProjectKeyCyclesIndexRoute
   '/p/$projectKey/milestones/': typeof AppPProjectKeyMilestonesIndexRoute
+  '/p/$projectKey/settings/': typeof AppPProjectKeySettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/__ui': typeof _uiRoute
@@ -186,6 +233,7 @@ export interface FileRoutesByTo {
   '/invite/$id': typeof authInviteIdRoute
   '/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/settings/appearance': typeof AppSettingsAppearanceRoute
+  '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/my-keys': typeof AppSettingsMyKeysRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -193,11 +241,15 @@ export interface FileRoutesByTo {
   '/projects': typeof AppProjectsIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/p/$projectKey/$taskKey': typeof AppPProjectKeyTaskKeyRoute
+  '/p/$projectKey/backlog-setup': typeof AppPProjectKeyBacklogSetupRoute
+  '/api/webhooks/backlog/$webhookId': typeof ApiWebhooksBacklogWebhookIdRoute
   '/p/$projectKey': typeof AppPProjectKeyIndexRoute
   '/p/$projectKey/cycles/$cycleNumber': typeof AppPProjectKeyCyclesCycleNumberRoute
   '/p/$projectKey/milestones/$milestoneId': typeof AppPProjectKeyMilestonesMilestoneIdRoute
+  '/p/$projectKey/settings/backlog': typeof AppPProjectKeySettingsBacklogRoute
   '/p/$projectKey/cycles': typeof AppPProjectKeyCyclesIndexRoute
   '/p/$projectKey/milestones': typeof AppPProjectKeyMilestonesIndexRoute
+  '/p/$projectKey/settings': typeof AppPProjectKeySettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -212,18 +264,24 @@ export interface FileRoutesById {
   '/(auth)/invite/$id': typeof authInviteIdRoute
   '/_app/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/_app/settings/appearance': typeof AppSettingsAppearanceRoute
+  '/_app/settings/connections': typeof AppSettingsConnectionsRoute
   '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/settings/my-keys': typeof AppSettingsMyKeysRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/p/$projectKey/settings': typeof AppPProjectKeySettingsRouteRouteWithChildren
   '/_app/p/$projectKey/$taskKey': typeof AppPProjectKeyTaskKeyRoute
+  '/_app/p/$projectKey/backlog-setup': typeof AppPProjectKeyBacklogSetupRoute
+  '/api/webhooks/backlog/$webhookId': typeof ApiWebhooksBacklogWebhookIdRoute
   '/_app/p/$projectKey/': typeof AppPProjectKeyIndexRoute
   '/_app/p/$projectKey/cycles/$cycleNumber': typeof AppPProjectKeyCyclesCycleNumberRoute
   '/_app/p/$projectKey/milestones/$milestoneId': typeof AppPProjectKeyMilestonesMilestoneIdRoute
+  '/_app/p/$projectKey/settings/backlog': typeof AppPProjectKeySettingsBacklogRoute
   '/_app/p/$projectKey/cycles/': typeof AppPProjectKeyCyclesIndexRoute
   '/_app/p/$projectKey/milestones/': typeof AppPProjectKeyMilestonesIndexRoute
+  '/_app/p/$projectKey/settings/': typeof AppPProjectKeySettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -238,18 +296,24 @@ export interface FileRouteTypes {
     | '/invite/$id'
     | '/settings/api-keys'
     | '/settings/appearance'
+    | '/settings/connections'
     | '/settings/members'
     | '/settings/my-keys'
     | '/api/auth/$'
     | '/api/v1/$'
     | '/projects/'
     | '/settings/'
+    | '/p/$projectKey/settings'
     | '/p/$projectKey/$taskKey'
+    | '/p/$projectKey/backlog-setup'
+    | '/api/webhooks/backlog/$webhookId'
     | '/p/$projectKey/'
     | '/p/$projectKey/cycles/$cycleNumber'
     | '/p/$projectKey/milestones/$milestoneId'
+    | '/p/$projectKey/settings/backlog'
     | '/p/$projectKey/cycles/'
     | '/p/$projectKey/milestones/'
+    | '/p/$projectKey/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/__ui'
@@ -261,6 +325,7 @@ export interface FileRouteTypes {
     | '/invite/$id'
     | '/settings/api-keys'
     | '/settings/appearance'
+    | '/settings/connections'
     | '/settings/members'
     | '/settings/my-keys'
     | '/api/auth/$'
@@ -268,11 +333,15 @@ export interface FileRouteTypes {
     | '/projects'
     | '/settings'
     | '/p/$projectKey/$taskKey'
+    | '/p/$projectKey/backlog-setup'
+    | '/api/webhooks/backlog/$webhookId'
     | '/p/$projectKey'
     | '/p/$projectKey/cycles/$cycleNumber'
     | '/p/$projectKey/milestones/$milestoneId'
+    | '/p/$projectKey/settings/backlog'
     | '/p/$projectKey/cycles'
     | '/p/$projectKey/milestones'
+    | '/p/$projectKey/settings'
   id:
     | '__root__'
     | '/__ui'
@@ -286,18 +355,24 @@ export interface FileRouteTypes {
     | '/(auth)/invite/$id'
     | '/_app/settings/api-keys'
     | '/_app/settings/appearance'
+    | '/_app/settings/connections'
     | '/_app/settings/members'
     | '/_app/settings/my-keys'
     | '/api/auth/$'
     | '/api/v1/$'
     | '/_app/projects/'
     | '/_app/settings/'
+    | '/_app/p/$projectKey/settings'
     | '/_app/p/$projectKey/$taskKey'
+    | '/_app/p/$projectKey/backlog-setup'
+    | '/api/webhooks/backlog/$webhookId'
     | '/_app/p/$projectKey/'
     | '/_app/p/$projectKey/cycles/$cycleNumber'
     | '/_app/p/$projectKey/milestones/$milestoneId'
+    | '/_app/p/$projectKey/settings/backlog'
     | '/_app/p/$projectKey/cycles/'
     | '/_app/p/$projectKey/milestones/'
+    | '/_app/p/$projectKey/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -309,6 +384,7 @@ export interface RootRouteChildren {
   authInviteIdRoute: typeof authInviteIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
+  ApiWebhooksBacklogWebhookIdRoute: typeof ApiWebhooksBacklogWebhookIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -404,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsAppearanceRouteImport
       parentRoute: typeof AppSettingsRouteRoute
     }
+    '/_app/settings/connections': {
+      id: '/_app/settings/connections'
+      path: '/connections'
+      fullPath: '/settings/connections'
+      preLoaderRoute: typeof AppSettingsConnectionsRouteImport
+      parentRoute: typeof AppSettingsRouteRoute
+    }
     '/_app/settings/members': {
       id: '/_app/settings/members'
       path: '/members'
@@ -446,6 +529,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectKeyTaskKeyRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/p/$projectKey/backlog-setup': {
+      id: '/_app/p/$projectKey/backlog-setup'
+      path: '/p/$projectKey/backlog-setup'
+      fullPath: '/p/$projectKey/backlog-setup'
+      preLoaderRoute: typeof AppPProjectKeyBacklogSetupRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/p/$projectKey/settings': {
+      id: '/_app/p/$projectKey/settings'
+      path: '/p/$projectKey/settings'
+      fullPath: '/p/$projectKey/settings'
+      preLoaderRoute: typeof AppPProjectKeySettingsRouteRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/api/webhooks/backlog/$webhookId': {
+      id: '/api/webhooks/backlog/$webhookId'
+      path: '/api/webhooks/backlog/$webhookId'
+      fullPath: '/api/webhooks/backlog/$webhookId'
+      preLoaderRoute: typeof ApiWebhooksBacklogWebhookIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/p/$projectKey/cycles/': {
       id: '/_app/p/$projectKey/cycles/'
       path: '/p/$projectKey/cycles'
@@ -474,12 +578,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectKeyMilestonesMilestoneIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/p/$projectKey/settings/': {
+      id: '/_app/p/$projectKey/settings/'
+      path: '/'
+      fullPath: '/p/$projectKey/settings/'
+      preLoaderRoute: typeof AppPProjectKeySettingsIndexRouteImport
+      parentRoute: typeof AppPProjectKeySettingsRouteRoute
+    }
+    '/_app/p/$projectKey/settings/backlog': {
+      id: '/_app/p/$projectKey/settings/backlog'
+      path: '/backlog'
+      fullPath: '/p/$projectKey/settings/backlog'
+      preLoaderRoute: typeof AppPProjectKeySettingsBacklogRouteImport
+      parentRoute: typeof AppPProjectKeySettingsRouteRoute
+    }
   }
 }
 
 interface AppSettingsRouteRouteChildren {
   AppSettingsApiKeysRoute: typeof AppSettingsApiKeysRoute
   AppSettingsAppearanceRoute: typeof AppSettingsAppearanceRoute
+  AppSettingsConnectionsRoute: typeof AppSettingsConnectionsRoute
   AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppSettingsMyKeysRoute: typeof AppSettingsMyKeysRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
@@ -488,6 +607,7 @@ interface AppSettingsRouteRouteChildren {
 const AppSettingsRouteRouteChildren: AppSettingsRouteRouteChildren = {
   AppSettingsApiKeysRoute: AppSettingsApiKeysRoute,
   AppSettingsAppearanceRoute: AppSettingsAppearanceRoute,
+  AppSettingsConnectionsRoute: AppSettingsConnectionsRoute,
   AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppSettingsMyKeysRoute: AppSettingsMyKeysRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
@@ -496,12 +616,30 @@ const AppSettingsRouteRouteChildren: AppSettingsRouteRouteChildren = {
 const AppSettingsRouteRouteWithChildren =
   AppSettingsRouteRoute._addFileChildren(AppSettingsRouteRouteChildren)
 
+interface AppPProjectKeySettingsRouteRouteChildren {
+  AppPProjectKeySettingsBacklogRoute: typeof AppPProjectKeySettingsBacklogRoute
+  AppPProjectKeySettingsIndexRoute: typeof AppPProjectKeySettingsIndexRoute
+}
+
+const AppPProjectKeySettingsRouteRouteChildren: AppPProjectKeySettingsRouteRouteChildren =
+  {
+    AppPProjectKeySettingsBacklogRoute: AppPProjectKeySettingsBacklogRoute,
+    AppPProjectKeySettingsIndexRoute: AppPProjectKeySettingsIndexRoute,
+  }
+
+const AppPProjectKeySettingsRouteRouteWithChildren =
+  AppPProjectKeySettingsRouteRoute._addFileChildren(
+    AppPProjectKeySettingsRouteRouteChildren,
+  )
+
 interface AppRouteChildren {
   AppSettingsRouteRoute: typeof AppSettingsRouteRouteWithChildren
   AppMyTasksRoute: typeof AppMyTasksRoute
   AppIndexRoute: typeof AppIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
+  AppPProjectKeySettingsRouteRoute: typeof AppPProjectKeySettingsRouteRouteWithChildren
   AppPProjectKeyTaskKeyRoute: typeof AppPProjectKeyTaskKeyRoute
+  AppPProjectKeyBacklogSetupRoute: typeof AppPProjectKeyBacklogSetupRoute
   AppPProjectKeyIndexRoute: typeof AppPProjectKeyIndexRoute
   AppPProjectKeyCyclesCycleNumberRoute: typeof AppPProjectKeyCyclesCycleNumberRoute
   AppPProjectKeyMilestonesMilestoneIdRoute: typeof AppPProjectKeyMilestonesMilestoneIdRoute
@@ -514,7 +652,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppMyTasksRoute: AppMyTasksRoute,
   AppIndexRoute: AppIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
+  AppPProjectKeySettingsRouteRoute:
+    AppPProjectKeySettingsRouteRouteWithChildren,
   AppPProjectKeyTaskKeyRoute: AppPProjectKeyTaskKeyRoute,
+  AppPProjectKeyBacklogSetupRoute: AppPProjectKeyBacklogSetupRoute,
   AppPProjectKeyIndexRoute: AppPProjectKeyIndexRoute,
   AppPProjectKeyCyclesCycleNumberRoute: AppPProjectKeyCyclesCycleNumberRoute,
   AppPProjectKeyMilestonesMilestoneIdRoute:
@@ -534,6 +675,7 @@ const rootRouteChildren: RootRouteChildren = {
   authInviteIdRoute: authInviteIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
+  ApiWebhooksBacklogWebhookIdRoute: ApiWebhooksBacklogWebhookIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

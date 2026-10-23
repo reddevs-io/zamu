@@ -15,6 +15,7 @@ import {
 // URL state of a project's tasks, list and board:
 //   /p/PAY?task=PAY-142&q=webhook&status=todo,in_progress&priority=high&assignee=me
 //          &milestone=<id>|none&cycle=12|current|next|none&view=board&lanes=assignee
+//          &hidden=only   (mirrored projects: tasks whose Backlog.md file is gone; list only)
 // Everything lives in the URL so a reload, a shared link or the back button restores the same view.
 
 /** Swimlanes of the board. */
@@ -43,6 +44,8 @@ export interface TaskListSearch {
   view?: 'board';
   /** Board only: swimlanes by assignee or by milestone. */
   lanes?: BoardLanes;
+  /** List only: show the tasks removed from Backlog.md instead of the visible ones. */
+  hidden?: 'only';
 }
 
 /** Display order of the groups: active work first, then the collapsed ones. */
@@ -107,6 +110,7 @@ export function parseTaskListSearch(search: Record<string, unknown>): TaskListSe
   if (typeof search.lanes === 'string' && (BOARD_LANES as readonly string[]).includes(search.lanes)) {
     result.lanes = search.lanes as BoardLanes;
   }
+  if (search.hidden === 'only') result.hidden = 'only';
   return result;
 }
 
@@ -117,7 +121,8 @@ export function hasFilters(search: TaskListSearch): boolean {
       search.priority ||
       search.assignee ||
       search.milestone ||
-      search.cycle !== undefined,
+      search.cycle !== undefined ||
+      search.hidden,
   );
 }
 
@@ -154,7 +159,7 @@ function filterInput(filters: TaskListFilters) {
   };
 }
 
-/** tasks.list input for a set of statuses under the current filters. */
+/** tasks.list input for a set of statuses under the current filters (hidden tasks when asked). */
 export function listInput(
   projectKey: string,
   filters: TaskListFilters,
@@ -165,7 +170,13 @@ export function listInput(
     order: 'list',
     status: [...statuses],
     ...filterInput(filters),
+    ...(filters.hidden ? { hidden: filters.hidden } : {}),
   };
+}
+
+/** Statuses of the hidden-tasks list: all of them, or the status filter. */
+export function hiddenStatuses(filters: TaskListFilters): TaskStatus[] {
+  return filters.status ? GROUP_ORDER.filter((status) => filters.status?.includes(status)) : [...GROUP_ORDER];
 }
 
 /** tasks.list input of one board column: board order (rank), one status, the current filters. */

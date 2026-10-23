@@ -1,4 +1,10 @@
-import type { Activity, Comment as CommentEntity, Member } from '@pm/contracts';
+import {
+  type Activity,
+  BACKLOG_ACTOR_NAME,
+  type Comment as CommentEntity,
+  type Member,
+  type ProjectActivity,
+} from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNow } from '~/features/tasks/clock';
@@ -10,15 +16,34 @@ import {
   formatPageTime,
   formatPaneTime,
 } from '~/features/tasks/format';
+import {
+  describeBacklogFields,
+  describeProjectEntry,
+  describeVisibilityChange,
+  projectRowsForTask,
+  shortCommit,
+} from '~/features/tasks/mirror';
 import { meQuery, timelineQuery } from '~/features/tasks/queries';
-import { Banner, Button, Comment, CommentDeleted, CommentEditor, cn, Skeleton, Switch } from '~/ui';
+import {
+  Banner,
+  Button,
+  Comment,
+  CommentDeleted,
+  CommentEditor,
+  cn,
+  Skeleton,
+  Switch,
+  SystemActorDot,
+} from '~/ui';
 import { CommentMarkdown } from './CommentMarkdown';
 import { useDeleteComment, useUpdateComment } from './queries';
 import { useMentionPicker } from './useMentionPicker';
 
 // A task's history: one-line activity entries and boxed comments in time order, with a "Comments only"
 // switch. Authors edit their comments in place and delete them after a confirmation; deleted comments
-// leave a dashed line. Times render after hydration.
+// leave a dashed line. Times render after hydration. Entries a Backlog.md refresh wrote show the
+// Backlog.md actor (a filled square) and the commit; a mirrored task also shows the project's first
+// read and the detach.
 
 /** "Comments only" stays as set while moving between tasks. */
 let commentsOnlyChoice = false;
@@ -37,6 +62,12 @@ export interface TaskTimelineProps {
   enabled?: boolean;
   /** Comment to bring into view, such as the one just sent. */
   revealId?: string | null;
+  /** Project-level Backlog.md entries (first read, detach) of a task that came from Backlog.md. */
+  projectHistory?: readonly ProjectActivity[];
+  /** Project name for the detach line. */
+  projectName?: string;
+  /** The mirror's default branch, for the hidden and restored lines. */
+  branch?: string | null;
   className?: string;
 }
 
@@ -46,6 +77,9 @@ export function TaskTimeline({
   size = 'pane',
   enabled = true,
   revealId,
+  projectHistory,
+  projectName = '',
+  branch,
   className,
 }: TaskTimelineProps) {
   const result = useQuery({ ...timelineQuery(taskKey), enabled });
@@ -58,7 +92,12 @@ export function TaskTimeline({
     setCommentsOnlyState(value);
   };
 
-  const items = result.data?.items;
+  const taskItems = result.data?.items;
+  const items = taskItems
+    ? [...taskItems, ...projectRowsForTask(projectHistory, taskItems)].sort(
+        (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+      )
+    : undefined;
   const shown = items && commentsOnly ? items.filter((item) => item.kind === 'comment') : items;
 
   // Bring a just-sent comment into view once it is in the list.
@@ -91,8 +130,10 @@ export function TaskTimeline({
                 key={`${item.kind}:${item.id}`}
                 id={item.kind === 'comment' ? commentDomId(item.id) : undefined}
               >
-                {item.kind === 'activity' ? (
-                  <ActivityLine activity={item} time={time} />
+                {item.kind === 'project' ? (
+                  <ProjectLine entry={item.entry} projectName={projectName} time={time} />
+                ) : item.kind === 'activity' ? (
+                  <ActivityLine activity={item} time={time} branch={branch} />
                 ) : (
                   <TimelineComment
                     comment={item}
@@ -123,20 +164,63 @@ const commentDomId = (id: string) => `comment-${id}`;
 // Activity
 // ---------------------------------------------------------------------------
 
+const lineClass =
+  'grid grid-cols-[18px_minmax(0,1fr)_auto] items-baseline gap-2.5 px-0.5 text-[12.5px] text-muted';
+
+/** "a1b2c3d" after a Backlog.md line. */
+function CommitRef({ commit }: { commit: string | null | undefined }) {
+  if (!commit) return null;
+  return (
+    <>
+      {' '}
+      <span title={`Commit ${commit}`} className="font-mono text-[11.5px] text-muted">
+        {shortCommit(commit)}
+      </span>
+    </>
+  );
+}
+
+/** What a Backlog.md refresh did to the task: the mapped changes, then the block-only fields. */
+function describeBacklogActivity(activity: Activity, branch: string | null | undefined): string {
+  const visibility = describeVisibilityChange(activity.type, branch);
+  if (visibility) return visibility;
+  if (activity.type === 'task.created') return 'added the task';
+  const phrases = [
+    activity.changes.length ? describeActivity(activity) : null,
+    describeBacklogFields(activity.backlogFields),
+  ].filter((phrase): phrase is string => phrase != null);
+  return phrases.join(' and ') || 'updated the task';
+}
+
 function ActivityLine({
   activity,
   time,
+  branch,
 }: {
   activity: Activity & { kind: 'activity' };
   time: (value: string) => string;
+  branch?: string | null;
 }) {
   const isAgent = activity.actor?.kind === 'agent';
   const isSystem = activity.type === 'cycle.ended' && activity.actor == null;
+  if (activity.origin === 'backlog' && activity.actor == null) {
+    return (
+      <div data-activity={activity.type} data-origin="backlog" className={lineClass}>
+        <SystemActorDot className="translate-y-[-1px]" />
+        <span className="min-w-0">
+          <b className="font-semibold text-fg">{BACKLOG_ACTOR_NAME}</b>{' '}
+          {describeBacklogActivity(activity, branch)}
+          <CommitRef commit={activity.originRef} />
+        </span>
+        <time dateTime={activity.createdAt} className="font-mono text-[10px] text-faint">
+          {time(activity.createdAt)}
+        </time>
+      </div>
+    );
+  }
+  const visibility = describeVisibilityChange(activity.type, branch);
   return (
-    <div
-      data-activity={activity.type}
-      className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-baseline gap-2.5 px-0.5 text-[12.5px] text-muted"
-    >
+    <div data-activity={activity.type} className={lineClass}>
       <span
         aria-hidden
         className={cn(
@@ -145,7 +229,11 @@ function ActivityLine({
         )}
       />
       <span className="min-w-0">
-        {isSystem || !activity.actor ? (
+        {visibility ? (
+          <>
+            <b className="font-semibold text-fg">{activity.actor?.name ?? 'System'}</b> {visibility}
+          </>
+        ) : isSystem || !activity.actor ? (
           activity.type === 'cycle.ended' ? (
             describeCycleEnded(activity)
           ) : (
@@ -162,6 +250,45 @@ function ActivityLine({
       </span>
       <time dateTime={activity.createdAt} className="font-mono text-[10px] text-faint">
         {time(activity.createdAt)}
+      </time>
+    </div>
+  );
+}
+
+/** A project-level entry in a task's history: the first read of Backlog.md, or the detach. */
+function ProjectLine({
+  entry,
+  projectName,
+  time,
+}: {
+  entry: ProjectActivity;
+  projectName: string;
+  time: (value: string) => string;
+}) {
+  const isBacklog = entry.origin === 'backlog' && entry.actor == null;
+  const isAgent = entry.actor?.kind === 'agent';
+  return (
+    <div data-activity={entry.type} data-origin={entry.origin} className={lineClass}>
+      {isBacklog ? (
+        <SystemActorDot className="translate-y-[-1px]" />
+      ) : (
+        <span
+          aria-hidden
+          className={cn(
+            'size-[7px] translate-y-[-1px] justify-self-center',
+            isAgent ? 'bg-accent' : 'rounded-full bg-line',
+          )}
+        />
+      )}
+      <span className="min-w-0">
+        <b className="font-semibold text-fg">
+          {isBacklog ? BACKLOG_ACTOR_NAME : (entry.actor?.name ?? 'System')}
+        </b>
+        {entry.onBehalfOf ? ` for ${entry.onBehalfOf.name}` : null} {describeProjectEntry(entry, projectName)}
+        {isBacklog ? <CommitRef commit={entry.originRef} /> : null}
+      </span>
+      <time dateTime={entry.createdAt} className="font-mono text-[10px] text-faint">
+        {time(entry.createdAt)}
       </time>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   BoardColumnHeader,
   cn,
   isMilestoneFilled,
+  lockedHatch,
   MilestoneGlyph,
   Skeleton,
   STATUS_LABELS,
@@ -34,6 +35,14 @@ export interface BoardBodyProps {
   onDrop: (drop: CardDrop, status: TaskStatus, lane: string | null) => void;
   onAdd?: (status: TaskStatus) => void;
   features: CardFeatures;
+  /**
+   * Mirrored projects: while a card whose status comes from Backlog.md is dragged, its status. Every
+   * other column hatches, dims its cards, shows the refusal band and refuses the drop.
+   */
+  refuseFrom?: TaskStatus | null;
+  /** A card drag started (any column). */
+  onCardDragStart?: (key: string) => void;
+  onCardDragEnd?: () => void;
 }
 
 const COLUMN_MIN = 'min-w-[220px]';
@@ -63,16 +72,19 @@ function FoldedColumn({
   count,
   onExpand,
   onDropCard,
+  isRefused = false,
 }: {
   status: TaskStatus;
   count: number;
   onExpand: () => void;
   onDropCard: (key: string) => void;
+  /** A mirrored card is dragged from another column: no drop here. */
+  isRefused?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const { dropProps, isDropTarget } = useDrop({
     ref,
-    getDropOperation: (types) => (types.has(CARD_DRAG_TYPE) ? 'move' : 'cancel'),
+    getDropOperation: (types) => (!isRefused && types.has(CARD_DRAG_TYPE) ? 'move' : 'cancel'),
     onDrop: async (event) => {
       const item = event.items.find(
         (candidate) => isTextDropItem(candidate) && candidate.types.has(CARD_DRAG_TYPE),
@@ -83,7 +95,7 @@ function FoldedColumn({
     },
   });
   return (
-    <div ref={ref} {...dropProps} className="flex shrink-0">
+    <div ref={ref} {...dropProps} className={cn('flex shrink-0', isRefused && lockedHatch)}>
       <BoardColumn
         status={status}
         count={count}
@@ -108,11 +120,15 @@ export function BoardColumns({
   onDrop,
   onAdd,
   features,
+  refuseFrom = null,
+  onCardDragStart,
+  onCardDragEnd,
 }: BoardBodyProps) {
   return (
     <div className="flex min-h-0 flex-1 overflow-x-auto">
       {statuses.map((status) => {
         const count = countOf(status);
+        const refused = refuseFrom != null && status !== refuseFrom;
         if (isFolded(status)) {
           return (
             <FoldedColumn
@@ -121,6 +137,7 @@ export function BoardColumns({
               count={count}
               onExpand={() => onFoldChange(status, false)}
               onDropCard={(key) => onDrop({ key, target: null }, status, null)}
+              isRefused={refused}
             />
           );
         }
@@ -130,6 +147,7 @@ export function BoardColumns({
             key={status}
             status={status}
             count={count}
+            refusal={refused || undefined}
             onFoldChange={(folded) => onFoldChange(status, folded)}
             onAdd={onAdd ? () => onAdd(status) : undefined}
             more={column?.hasMore ? <MoreFooter column={column} count={count} /> : undefined}
@@ -147,6 +165,9 @@ export function BoardColumns({
                 onOpen={onOpen}
                 onDrop={(drop) => onDrop(drop, status, null)}
                 features={features}
+                refuseDrops={refused}
+                onDragStart={onCardDragStart}
+                onDragEnd={onCardDragEnd}
               />
             ) : (
               <ColumnSkeleton cards={Math.min(Math.max(count, 1), 3)} />
@@ -213,6 +234,9 @@ export function BoardLanes({
   lanes,
   collapsed,
   onCollapsedChange,
+  refuseFrom = null,
+  onCardDragStart,
+  onCardDragEnd,
 }: BoardLanesProps) {
   const open = statuses.filter((status) => !isFolded(status));
   const folded = statuses.filter((status) => isFolded(status));
@@ -258,27 +282,35 @@ export function BoardLanes({
             />
             {isOpen ? (
               <div className="flex">
-                {open.map((status) => (
-                  <div
-                    key={status}
-                    className={cn(
-                      'flex flex-[1_1_0] flex-col border-r border-line-2 p-2',
-                      COLUMN_MIN,
-                      'has-[[data-drop-target]]:bg-drop',
-                    )}
-                  >
-                    <CardList
-                      label={`${STATUS_LABELS[status]}, ${lane.title}`}
-                      status={status}
-                      cards={lane.cells[status] ?? []}
-                      selected={selected}
-                      onOpen={onOpen}
-                      onDrop={(drop) => onDrop(drop, status, lane.id)}
-                      features={features}
-                      className="min-h-12"
-                    />
-                  </div>
-                ))}
+                {open.map((status) => {
+                  const refused = refuseFrom != null && status !== refuseFrom;
+                  return (
+                    <div
+                      key={status}
+                      data-refused={refused || undefined}
+                      className={cn(
+                        'flex flex-[1_1_0] flex-col border-r border-line-2 p-2',
+                        COLUMN_MIN,
+                        'has-[[data-drop-target]]:bg-drop',
+                        refused && lockedHatch,
+                      )}
+                    >
+                      <CardList
+                        label={`${STATUS_LABELS[status]}, ${lane.title}`}
+                        status={status}
+                        cards={lane.cells[status] ?? []}
+                        selected={selected}
+                        onOpen={onOpen}
+                        onDrop={(drop) => onDrop(drop, status, lane.id)}
+                        features={features}
+                        refuseDrops={refused}
+                        onDragStart={onCardDragStart}
+                        onDragEnd={onCardDragEnd}
+                        className={cn('min-h-12', refused && 'opacity-50')}
+                      />
+                    </div>
+                  );
+                })}
                 {folded.length ? <div aria-hidden className="w-10 shrink-0 bg-band" /> : null}
               </div>
             ) : null}
