@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif;color:#1a1a1a}
+a{color:#1a1a1a}
+a:hover{color:#2a78d6}
+.dv-turn{padding:36px 44px 28px;border-bottom:1px solid rgba(0,0,0,0.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 15px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-desc{margin:0 0 18px;max-width:900px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.65);text-wrap:pretty}
+.dv-opts{display:flex;flex-wrap:wrap;gap:24px 24px;align-items:flex-start;max-width:2600px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:8px;scroll-margin-top:16px}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 12px/1.3 system-ui,sans-serif;color:rgba(0,0,0,0.6)}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,0.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden}
+.dv-intro{display:grid;grid-template-columns:repeat(3,minmax(0,420px));gap:32px;font:12.5px/1.6 system-ui,sans-serif;color:rgba(0,0,0,0.72)}
+.dv-intro h3{margin:0 0 6px;font:600 12.5px/1.3 system-ui,sans-serif;color:#1a1a1a}
+.dv-intro ul{margin:0;padding-left:16px}
+.dv-intro p{margin:0 0 8px;text-wrap:pretty}
+.dv-h{font:700 22px/1.2 system-ui,sans-serif;margin:0 0 6px}
+.dv-lead{font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.6);margin:0 0 24px;max-width:900px}
+.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,0.5)}
+</style>
+</helmet>
+<section class="dv-turn" id="intro" data-screen-label="M2.1 screens · overview">
+  <h1 class="dv-h">M2.1 screens · repository link</h1>
+  <p class="dv-lead">A project can be linked to one git repository so the pm CLI finds the project inside a clone. Three places change: the projects table, the New project dialog and the Edit project dialog. Ledger direction, no new tokens. The M1 and M2 screens live in their own canvases.</p>
+  <div class="dv-intro">
+    <div>
+      <h3>Rules kept</h3>
+      <ul>
+        <li>Repository text uses the mono 10.5px faint style already used for keys and dates. It turns accent and underlined on hover, like every other link.</li>
+        <li>The short form drops the protocol, user and .git: gitlab.com/reddevs/payments. The link opens https://host/path in a new tab and never opens the project row.</li>
+        <li>Long paths are cut from the left, so the repository name at the end stays visible. The full URL shows on hover.</li>
+        <li>No provider logos: the same instance may use GitHub, GitLab, Gitea or Forgejo.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Calls I made on the brief</h3>
+      <ul>
+        <li>Repository sits last in both dialogs, after Description, because it is optional and most people fill it later or with pm link.</li>
+        <li>Under a filled field, the hint shows the short form the URL matches, so an SSH paste reads back the same as the table.</li>
+        <li>Format errors show as you leave the field; the conflict shows after submit and names the project that has the repository.</li>
+        <li>Clearing the field in Edit project says what saving will do instead of asking for confirmation.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Recommendation: 1a</h3>
+      <p>Rows keep their 52px height and the table keeps its columns, so nothing changes at 1024px. The repository joins the other secondary text of the row.</p>
+      <p>Runner-up: 1c, if scanning repositories down a column matters more than width. It takes 210px from the project name and would hide below about 1180px.</p>
+      <p>1b adds 12px to every row, linked or not. 1d makes long names truncate sooner and puts two kinds of text on the name line.</p>
+    </div>
+  </div>
+</section>
+<section class="dv-turn" id="t1" data-screen-label="Projects table options">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Projects table: where the repository goes</span></div>
+  <p class="dv-desc">Same six projects in every option: description and repository (PAY, WEB), repository only (CLI), a long name and path with the link hovered (DOCS), description only (INF), neither (OPS).</p>
+  <div class="dv-opts">
+    <div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>On the description line, after a dot · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="a" state="table" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="1a-dark"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="a" state="table" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Third line, rows grow to 64px · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="b" state="table" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="1b-dark"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="b" state="table" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Its own Repository column · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="c" state="table" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="1c-dark"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="c" state="table" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>On the name line · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="d" state="table" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="1d-dark"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="d" state="table" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+  <p class="dv-next">Try next: "<a class="dv-oid" href="#1a">1a</a> but with the repository before the description" · "<a class="dv-oid" href="#1c">1c</a> with the column hidden below 1180px"</p>
+</section>
+<section class="dv-turn" id="t2" data-screen-label="New project dialog">
+  <div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">New project: Repository field</span></div>
+  <p class="dv-desc">Optional, last in the form. The placeholder shows the shape of a clone URL; the hint explains what the link is for.</p>
+  <div class="dv-opts">
+    <div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Empty, focused · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="{{ opt }}" state="new" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>SSH URL, reads back the short form · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="{{ opt }}" state="new-ssh" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Not a clone URL · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="{{ opt }}" state="new-invalid" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Repository taken, after submit · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="{{ opt }}" state="new-conflict" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="t3" data-screen-label="Edit project dialog">
+  <div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Edit project: Repository field</span></div>
+  <p class="dv-desc">Between Description and the Planning switches. The hint mentions pm link, the terminal way to set the same field.</p>
+  <div class="dv-opts">
+    <div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Linked · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="{{ opt }}" state="edit" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="3a-dark"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="{{ opt }}" state="edit" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="3b"><div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>Cleared: saving unlinks · light</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="light" option="{{ opt }}" state="edit-cleared" hint-size="1280px,800px"></dc-import></div></div>
+    <div class="dv-opt" id="3c"><div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>Repository taken · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M21Projects" theme="dark" option="{{ opt }}" state="edit-conflict" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { opt: 'a' };
+  }
+}
+</script>
+</body>
+</html>
