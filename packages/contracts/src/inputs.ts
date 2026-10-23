@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ApiKeyScope, BacklogMappings, MAX_COMMENT_LENGTH } from './entities';
+import { ApiKeyScope, BacklogMappings, DashboardScope, MAX_COMMENT_LENGTH } from './entities';
 import {
   AuthId,
   BacklogMode,
@@ -238,6 +238,23 @@ export const UpdateTaskInput = z
     },
   );
 export type UpdateTaskInput = z.output<typeof UpdateTaskInput>;
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_DASHBOARD_SCOPE = 'mine' satisfies DashboardScope;
+
+/**
+ * GET /dashboard?scope=mine|everyone. DashboardScope lives in entities because Dashboard echoes it.
+ * The whole input may be omitted: a bare GET reads the default scope.
+ */
+export const GetDashboardInput = z
+  .object({
+    scope: DashboardScope.default(DEFAULT_DASHBOARD_SCOPE),
+  })
+  .prefault({});
+export type GetDashboardInput = z.output<typeof GetDashboardInput>;
 
 // ---------------------------------------------------------------------------
 // Me

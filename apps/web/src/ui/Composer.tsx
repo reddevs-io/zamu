@@ -91,6 +91,10 @@ export function Composer({
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
           submit();
+        } else if (event.key === 'Escape' && event.target instanceof HTMLTextAreaElement) {
+          // Leave the box and keep the text, so the next Esc reaches the page (closing the side panel).
+          // Page hotkeys ignore keys typed in text fields, so without this focus could only leave by mouse.
+          event.target.blur();
         }
       }}
     >

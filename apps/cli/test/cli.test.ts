@@ -1213,6 +1213,32 @@ describe('output conventions', () => {
   });
 });
 
+describe('pm dashboard', () => {
+  it('reads GET /dashboard for Mine and Everyone', async () => {
+    const mine = parsed(await as(keys.agent, ['dashboard', '--json']), 'dashboard').data;
+    expect(mine.scope).toBe('mine');
+    expect(mine.projects.map((p) => p.key).sort()).toEqual(['PAY', 'WEB']);
+
+    const everyone = parsed(
+      await as(keys.adminRead, ['dashboard', '--everyone', '--json']),
+      'dashboard',
+    ).data;
+    expect(everyone.scope).toBe('everyone');
+    // The base seed leaves tasks in review; Everyone sees them all.
+    expect(everyone.groups.review.total).toBeGreaterThan(0);
+    expect(everyone.groups.review.total).toBeGreaterThanOrEqual(mine.groups.review.total);
+    expect(everyone.agents.map((a) => a.agent.name)).toContain(agentName);
+
+    const human = await as(keys.admin, ['dashboard', '--everyone']);
+    expect(human.code, human.stderr).toBe(0);
+    expect(human.stdout).toMatch(/^Needs someone · \d+\n\nIn review · \d+\n/);
+    expect(human.stdout).toMatch(
+      /\nProjects · 2\n {2}KEY\s+NAME\s+OPEN\s+DOING\s+REVIEW\s+CYCLE\s+NEXT MILESTONE\s+ACTIVE\n/,
+    );
+    expect(human.stdout).toMatch(new RegExp(`\\nAgents · \\d+\\n[^]*\\n {2}${agentName} {2}`));
+  });
+});
+
 /** A git repository in the temporary home with an origin remote (or none). */
 async function clone(name: string, remote?: string): Promise<string> {
   const dir = join(home, name);

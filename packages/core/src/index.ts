@@ -7,6 +7,7 @@ export * from './backlog';
 export * from './comments';
 export * from './context';
 export * from './cycles';
+export * from './dashboard';
 export * from './errors';
 export * from './git-connections';
 export * from './invitations';

@@ -11,6 +11,8 @@ import {
   endCycle,
   getBacklogStatus,
   getCycle,
+  getDashboard,
+  getDashboardCounts,
   getMe,
   getMilestone,
   getTask,
@@ -103,6 +105,10 @@ export const router = api.router({
     refresh: api.backlog.refresh.handler(({ context, input }) =>
       requestBacklogRefresh(context.core, context.actor, input),
     ),
+  },
+  dashboard: {
+    get: api.dashboard.get.handler(({ context, input }) => getDashboard(context.core, context.actor, input)),
+    counts: api.dashboard.counts.handler(({ context }) => getDashboardCounts(context.core, context.actor)),
   },
   members: {
     list: api.members.list.handler(({ context }) => listMembers(context.core, context.actor)),

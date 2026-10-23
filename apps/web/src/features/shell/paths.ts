@@ -1,5 +1,6 @@
 // URLs the shell links to. Task screens own /p/$projectKey; settings own /settings/*.
 
+export const DASHBOARD_HREF = '/dashboard';
 export const PROJECTS_HREF = '/projects';
 export const MY_TASKS_HREF = '/my-tasks';
 export const SETTINGS_HREF = '/settings/members';

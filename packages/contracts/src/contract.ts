@@ -8,6 +8,8 @@ import {
   CommentList,
   CycleDetail,
   CycleList,
+  Dashboard,
+  DashboardCounts,
   Me,
   MemberList,
   MilestoneList,
@@ -29,6 +31,7 @@ import {
   EndCycleInput,
   GetBacklogStatusInput,
   GetCycleInput,
+  GetDashboardInput,
   GetMilestoneInput,
   GetTaskInput,
   ListCommentsInput,
@@ -387,6 +390,33 @@ export const contract = base.prefix(API_PREFIX).router({
       })
       .input(RefreshBacklogInput)
       .output(BacklogRefreshResult),
+  },
+  dashboard: {
+    get: base
+      .route({
+        method: 'GET',
+        path: '/dashboard',
+        tags: ['dashboard'],
+        summary: 'Get the dashboard',
+        description:
+          'What needs someone now, across every readable project: tasks in review, unanswered ' +
+          'mentions, stalled work and close deadlines, each with its total and up to 50 items; then ' +
+          "one row per project and the agents. scope=mine (default) covers your tasks, your agents' " +
+          'tasks and mentions of you; scope=everyone covers the whole workspace.',
+      })
+      .input(GetDashboardInput)
+      .output(Dashboard),
+    counts: base
+      .route({
+        method: 'GET',
+        path: '/dashboard/counts',
+        tags: ['dashboard'],
+        summary: 'Count the dashboard queue',
+        description:
+          'The totals of the four queue groups for scope=mine and their sum, without items, ' +
+          'projects or agents.',
+      })
+      .output(DashboardCounts),
   },
   members: {
     list: base

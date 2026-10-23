@@ -14,7 +14,7 @@ function procedures(router: unknown, path: string[] = []): [string, AnyContractP
 const all = procedures(contract);
 
 describe('contract', () => {
-  it('exposes exactly the M1, M2 and M3 routes under /api/v1', () => {
+  it('exposes exactly the M1, M2, M3 and M4 routes under /api/v1', () => {
     const routes = Object.fromEntries(
       all.map(([name, procedure]) => {
         const { method, path } = procedure['~orpc'].route;
@@ -49,6 +49,8 @@ describe('contract', () => {
       'cycles.end': 'POST /api/v1/cycles/{project}/{number}/end',
       'backlog.status': 'GET /api/v1/projects/{project}/backlog',
       'backlog.refresh': 'POST /api/v1/projects/{project}/backlog/refresh',
+      'dashboard.get': 'GET /api/v1/dashboard',
+      'dashboard.counts': 'GET /api/v1/dashboard/counts',
       'members.list': 'GET /api/v1/members',
     });
     expect(API_PREFIX).toBe('/api/v1');
@@ -156,5 +158,16 @@ describe('contract', () => {
     expect(get.safeParse({ project: 'PAY', number: 'last' }).success).toBe(false);
     const end = contract.cycles.end['~orpc'].inputSchema as z.ZodType;
     expect(end.parse({ project: 'PAY', number: '3', moveTo: 'none' })).toMatchObject({ moveTo: 'none' });
+  });
+
+  it('reads the dashboard scope from the query, mine when omitted', () => {
+    const get = contract.dashboard.get['~orpc'];
+    expect(get.route.method).toBe('GET');
+    const input = get.inputSchema as z.ZodType;
+    expect(input.parse(undefined)).toEqual({ scope: 'mine' });
+    expect(input.parse({})).toEqual({ scope: 'mine' });
+    expect(input.parse({ scope: 'everyone' })).toEqual({ scope: 'everyone' });
+    expect(input.safeParse({ scope: 'all' }).success).toBe(false);
+    expect(contract.dashboard.counts['~orpc'].inputSchema).toBeUndefined();
   });
 });

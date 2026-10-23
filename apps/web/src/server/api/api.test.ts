@@ -140,6 +140,8 @@ describe('OpenAPI document', () => {
       '/api/v1/comments/{id}',
       '/api/v1/cycles/{project}/{number}',
       '/api/v1/cycles/{project}/{number}/end',
+      '/api/v1/dashboard',
+      '/api/v1/dashboard/counts',
       '/api/v1/me',
       '/api/v1/members',
       '/api/v1/milestones/{id}',
@@ -157,7 +159,7 @@ describe('OpenAPI document', () => {
     ]);
     // Every operation has an id, a summary and a tag; ids are unique.
     const operations = Object.values(result.body.paths).flatMap((item) => Object.values(item as object));
-    expect(operations).toHaveLength(28);
+    expect(operations).toHaveLength(30);
     const ids = operations.map((op: { operationId: string }) => op.operationId);
     expect(new Set(ids).size).toBe(ids.length);
     for (const op of operations) {
@@ -165,6 +167,18 @@ describe('OpenAPI document', () => {
       expect(op.tags, op.operationId).toHaveLength(1);
     }
     expect(result.body.paths['/api/v1/me'].patch).toBeDefined();
+    // The dashboard scope is a query parameter; the counts take no input.
+    const dashboard = result.body.paths['/api/v1/dashboard'].get;
+    expect(dashboard.tags).toEqual(['dashboard']);
+    expect(dashboard.parameters).toEqual([
+      expect.objectContaining({
+        name: 'scope',
+        in: 'query',
+        schema: expect.objectContaining({ enum: ['mine', 'everyone'], default: 'mine' }),
+      }),
+    ]);
+    expect(dashboard.parameters[0].required).toBeFalsy();
+    expect(result.body.paths['/api/v1/dashboard/counts'].get.parameters ?? []).toEqual([]);
     expect(Object.keys(result.body.paths['/api/v1/milestones/{id}'].delete.responses)).toContain('204');
     expect(Object.keys(result.body.paths['/api/v1/tasks/{key}/comments'].post.responses)).toContain('201');
     // TASK_CHANGED shares the 409 response (and its Problem body) with CONFLICT.
@@ -1158,5 +1172,146 @@ describe('M2: clients', () => {
       defined: true,
       data: { task: { key: task.key, title: 'Changed elsewhere' } },
     });
+  });
+});
+
+describe('M4: dashboard', () => {
+  type Item = { task: { key: string; project: { key: string } }; assignee?: { id: string } | null };
+  const groupNames = ['review', 'mentions', 'stalled', 'deadlines'] as const;
+  const allItems = (body: { groups: Record<string, { items: Item[] }> }) =>
+    groupNames.flatMap((name) => body.groups[name]?.items ?? []);
+  const totals = (body: { groups: Record<string, { total: number }> }) =>
+    Object.fromEntries(groupNames.map((name) => [name, body.groups[name]?.total]));
+
+  it('GET /dashboard with a session: Mine by default, Everyone on request, totals match /dashboard/counts', async () => {
+    // An agent task in review and an agent question for its person.
+    const created = await call('POST', '/api/v1/tasks', {
+      auth: key('agent'),
+      body: { project: 'WEB', title: 'Dashboard review', status: 'in_review', assignee: 'me' },
+    });
+    expect(created.status).toBe(201);
+    const asked = await call('POST', `/api/v1/tasks/${created.body.key}/comments`, {
+      auth: key('agent'),
+      body: { body: `@${adminEmail} can you review this?` },
+    });
+    expect(asked.status).toBe(201);
+
+    const mine = await call('GET', '/api/v1/dashboard', { auth: session() });
+    expect(mine.status, JSON.stringify(mine.body)).toBe(200);
+    expect(mine.body).toMatchObject({ scope: 'mine', generatedAt: expect.any(String) });
+    const review = mine.body.groups.review.items as Item[];
+    expect(review.map((item) => item.task.key)).toContain(created.body.key);
+    expect(review.every((item) => [admin.userId, agentId].includes(item.assignee?.id ?? ''))).toBe(true);
+    expect(mine.body.groups.mentions.items).toContainEqual(
+      expect.objectContaining({
+        task: expect.objectContaining({ key: created.body.key }),
+        comment: {
+          id: asked.body.id,
+          excerpt: '@Ana Ruiz can you review this?',
+          createdAt: asked.body.createdAt,
+        },
+        author: { id: agentId, name: 'claude-dev', kind: 'agent' },
+        onBehalfOf: expect.objectContaining({ id: admin.userId }),
+        mentioned: expect.objectContaining({ id: admin.userId, responsible: null }),
+      }),
+    );
+    expect(mine.body.projects.map((p: { key: string }) => p.key)).toEqual(
+      expect.arrayContaining(['PAY', 'WEB']),
+    );
+    expect(mine.body.agents.map((a: { agent: { id: string } }) => a.agent.id)).toContain(agentId);
+
+    const counts = await call('GET', '/api/v1/dashboard/counts', { auth: session() });
+    expect(counts.status).toBe(200);
+    expect(counts.body).toEqual({
+      ...totals(mine.body),
+      total: Object.values(totals(mine.body)).reduce((sum: number, n) => sum + (n ?? 0), 0),
+    });
+
+    const everyone = await call('GET', '/api/v1/dashboard?scope=everyone', { auth: session() });
+    expect(everyone.status).toBe(200);
+    expect(everyone.body.scope).toBe('everyone');
+    expect(everyone.body.groups.review.total).toBeGreaterThanOrEqual(mine.body.groups.review.total);
+  });
+
+  it('with an agent key, Mine is the agent; both routes answer', async () => {
+    const result = await call('GET', '/api/v1/dashboard', { auth: key('agent') });
+    expect(result.status).toBe(200);
+    const review = result.body.groups.review.items as Item[];
+    expect(review.length).toBeGreaterThan(0);
+    expect(review.every((item) => item.assignee?.id === agentId)).toBe(true);
+    expect(result.body.groups.mentions.total).toBe(0);
+    expect(result.body.agents).toEqual([]);
+    const counts = await call('GET', '/api/v1/dashboard/counts', { auth: key('agent') });
+    expect(counts.status).toBe(200);
+    expect(counts.body.review).toBe(result.body.groups.review.total);
+  });
+
+  it('a read-only key may call both routes', async () => {
+    expect((await call('GET', '/api/v1/dashboard?scope=everyone', { auth: key('adminRead') })).status).toBe(
+      200,
+    );
+    expect((await call('GET', '/api/v1/dashboard/counts', { auth: key('adminRead') })).status).toBe(200);
+  });
+
+  it('a project-scoped key sees only its projects', async () => {
+    const result = await call('GET', '/api/v1/dashboard?scope=everyone', { auth: key('agentPayOnly') });
+    expect(result.status).toBe(200);
+    expect(result.body.projects.map((p: { key: string }) => p.key)).toEqual(['PAY']);
+    const items = allItems(result.body);
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((item) => item.task === undefined || item.task.project.key === 'PAY')).toBe(true);
+    const all = await call('GET', '/api/v1/dashboard?scope=everyone', { auth: key('agent') });
+    expect(
+      allItems(all.body).some((item) => item.task !== undefined && item.task.project.key !== 'PAY'),
+    ).toBe(true);
+  });
+
+  it('the dev seed with planning and dashboard data fills every group for the admin', async () => {
+    const fresh = await createTestDatabase({ prefix: 'pm_web_seed' });
+    fresh.pool.on('error', () => {});
+    try {
+      const freshCore: CoreContext = {
+        db: fresh.db,
+        auth: createAuth({ db: fresh.db, secret: SECRET, baseUrl: ORIGIN }),
+        publicUrl: ORIGIN,
+      };
+      const seeded = await seedDevData(freshCore, { planning: true, dashboard: true });
+      expect(seeded.member).toMatchObject({ name: 'Tomás Berg' });
+      const freshHandle = createApiFetchHandler(freshCore);
+      const get = async (path: string) => {
+        const response = await freshHandle(
+          new Request(`${ORIGIN}${path}`, { headers: { authorization: `Bearer ${seeded.adminKey}` } }),
+        );
+        expect(response.status).toBe(200);
+        return response.json();
+      };
+      const result = await get('/api/v1/dashboard');
+      expect(totals(result)).toEqual({ review: 3, mentions: 2, stalled: 1, deadlines: 3 });
+      const keysOf = (name: (typeof groupNames)[number]) =>
+        (result.groups[name].items as Item[]).map((item) => item.task.key).sort();
+      expect(keysOf('review')).toEqual(['PAY-3', 'PAY-5', 'WEB-3']);
+      expect(keysOf('mentions')).toEqual(['PAY-8', 'WEB-3']);
+      expect(keysOf('stalled')).toEqual(['WEB-1']);
+      expect(result.groups.deadlines.items).toEqual([
+        expect.objectContaining({
+          kind: 'milestone',
+          milestone: expect.objectContaining({ name: 'PCI audit' }),
+        }),
+        expect.objectContaining({ kind: 'cycle', project: { key: 'WEB', name: 'Web app' }, daysLeft: 2 }),
+        expect.objectContaining({ kind: 'cycle', project: { key: 'PAY', name: 'Payments' }, daysLeft: 3 }),
+      ]);
+      expect(result.agents).toEqual([
+        expect.objectContaining({ stalled: true, currentTask: expect.objectContaining({ key: 'WEB-1' }) }),
+      ]);
+      expect(await get('/api/v1/dashboard/counts')).toEqual({ ...totals(result), total: 9 });
+    } finally {
+      await fresh.drop();
+    }
+  }, 60_000);
+
+  it('rejects an unknown scope and requests without credentials', async () => {
+    expectProblem(await call('GET', '/api/v1/dashboard?scope=all', { auth: session() }), 400, 'BAD_REQUEST');
+    expectProblem(await call('GET', '/api/v1/dashboard'), 401, 'UNAUTHORIZED');
+    expectProblem(await call('GET', '/api/v1/dashboard/counts'), 401, 'UNAUTHORIZED');
   });
 });

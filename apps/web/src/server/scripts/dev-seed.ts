@@ -20,6 +20,7 @@ async function main() {
       workspaceName: process.env.SEED_WORKSPACE || SEED_DEFAULTS.workspaceName,
       planning: process.env.SEED_PLANNING !== '0',
       backlog: process.env.SEED_BACKLOG === '1',
+      dashboard: process.env.SEED_PLANNING !== '0',
     });
     const log = (line = '') => process.stderr.write(`${line}\n`);
     log(result.bootstrapped ? 'Set up the instance (first run).' : 'Instance already set up; added to it.');
@@ -30,6 +31,7 @@ async function main() {
         : `Admin:     ${result.admin.name} <${result.admin.email}> (existing password)`,
     );
     log(`Agent:     ${result.agent.name}, acting for ${result.admin.name}`);
+    if (result.member) log(`Member:    ${result.member.name} <${result.member.email}>`);
     log(
       result.createdProjects.length
         ? `Projects:  ${result.createdProjects.map((p) => `${p.key} (${p.tasks} tasks)`).join(', ')}`

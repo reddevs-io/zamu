@@ -30,7 +30,7 @@ type Segment =
 const FENCE = /^(?:[ \t]*>)*[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)*(`{3,}|~{3,})(.*)$/;
 
 /** Splits a body into fenced code blocks and the prose between them. */
-function splitFences(body: string): Segment[] {
+export function splitFences(body: string): Segment[] {
   const segments: Segment[] = [];
   const lines = body.split(/(?<=\n)/);
   let prose = '';
@@ -80,7 +80,7 @@ function matchAt(pattern: RegExp, text: string, index: number): RegExpExecArray 
 }
 
 /** Splits prose into inline code spans, links and plain text. */
-function splitInline(prose: string): Segment[] {
+export function splitInline(prose: string): Segment[] {
   const segments: Segment[] = [];
   let text = '';
   const flush = () => {

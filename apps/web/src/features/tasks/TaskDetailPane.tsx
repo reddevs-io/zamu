@@ -42,7 +42,14 @@ import {
   MilestoneValue,
   useProjectPlanning,
 } from './PlanningFields';
-import { membersQuery, projectsQuery, type TaskPatch, taskQuery, useUpdateTask } from './queries';
+import {
+  membersQuery,
+  projectsQuery,
+  type TaskPatch,
+  taskQuery,
+  timelineQuery,
+  useUpdateTask,
+} from './queries';
 import {
   AssigneeLabel,
   AssigneePicker,
@@ -68,6 +75,11 @@ export interface TaskDetailPaneProps {
    * default.
    */
   showProject?: boolean;
+  /**
+   * Scrolls the history to the newest comment once it loads (the dashboard opens mentions this way, so the
+   * question sits next to the reply box). Off by default.
+   */
+  revealNewestComment?: boolean;
 }
 
 const SETTLE_MS = 120;
@@ -105,7 +117,14 @@ export function useOwnedFieldNote(updateError: unknown, resetUpdate: () => void)
   return { note, setNote };
 }
 
-export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProject }: TaskDetailPaneProps) {
+export function TaskDetailPane({
+  projectKey,
+  taskKey,
+  preview,
+  onClose,
+  showProject,
+  revealNewestComment = false,
+}: TaskDetailPaneProps) {
   // While J/K races through rows the pane shows the list row; the full task loads once the selection rests.
   const settled = useSettled(SETTLE_MS);
   const taskResult = useQuery({ ...taskQuery(taskKey), enabled: settled });
@@ -120,6 +139,7 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProj
   const now = useNow();
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [revealId, setRevealId] = useState<string | null>(null);
+  useRevealNewestComment(taskKey, revealNewestComment && settled, setRevealId);
   const milestoneCell = useRef<HTMLDivElement>(null);
   const cycleCell = useRef<HTMLDivElement>(null);
   const statusCell = useRef<HTMLDivElement>(null);
@@ -428,6 +448,21 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProj
       </div>
     </>
   );
+}
+
+/** Once the timeline has loaded, hands its newest comment to `reveal`, one time per pane. */
+function useRevealNewestComment(taskKey: string, enabled: boolean, reveal: (id: string) => void) {
+  const newestId = useQuery({
+    ...timelineQuery(taskKey),
+    enabled,
+    select: (data) => data.items.findLast((item) => item.kind === 'comment' && !item.deletedAt)?.id ?? null,
+  }).data;
+  const done = useRef(false);
+  useEffect(() => {
+    if (!enabled || done.current || newestId === undefined) return;
+    done.current = true;
+    if (newestId) reveal(newestId);
+  }, [enabled, newestId, reveal]);
 }
 
 // ---------------------------------------------------------------------------

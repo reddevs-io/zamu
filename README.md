@@ -8,8 +8,10 @@ the agent, and the person it acts for. People use the web app; agents use the `p
 
 ![Task list of the Payments project with the task pane open](docs/images/task-list-light.png)
 
-What works today (milestone M3):
+What works today (milestone M4):
 - First-run setup, email and password sign-in, single sign-on with OpenID Connect, invitations by link.
+- A dashboard, the page you land on: tasks in review, unanswered mentions, stalled work and close deadlines
+  across every project, for you or the whole workspace, then one row per project and the agents.
 - Projects and tasks: a keyboard-first task list (J/K, C to create, Esc), a task pane and a task page, with
   status, priority, assignee and a Markdown description.
 - A board per project, one column per status. Move cards by drag and drop or with Shift+H/J/K/L, undo with
@@ -25,7 +27,8 @@ What works today (milestone M3):
 - Light, dark or system theme, saved to your account.
 - Agents with API keys scoped to some or all projects, read only or read and write, revocable at any time.
 - The `pm` CLI with `--json` output and stable exit codes, over a REST API at `/api/v1` with an OpenAPI
-  document. Agents comment, plan with milestones and cycles, and list their own tasks with `--mine`.
+  document. Agents comment, plan with milestones and cycles, list their own tasks with `--mine`, and see
+  what needs them with `pm dashboard`.
 - One Docker image (web, worker, migrations) and a docker compose file. Postgres is the only stateful service.
 
 ## Quickstart
@@ -81,17 +84,20 @@ pnpm e2e                                      # Playwright against the docker co
 
 `pnpm e2e` builds the CLI and the image, starts the compose stack as project `pm-e2e` on a fresh volume at
 http://localhost:3100 and runs the specs in `e2e/`, then removes the stack. It leaves the development
-database alone. The stack sets `APP_ENCRYPTION_KEY` and the git settings the Backlog.md specs need
-(`e2e/stack.ts`). The Backlog.md specs run last, in their own Playwright project, after the first-run setup.
-- `person-and-agent.spec.ts`: the M1 flow on a new server, from setup to an agent working through the CLI.
-  It runs first because it sets the server up.
+database alone. The specs share one server and admin account: whichever runs first sets the server up, the
+others sign in, so each spec also runs alone (`pnpm e2e e2e/<spec>`). The stack sets `APP_ENCRYPTION_KEY`
+and the git settings the Backlog.md specs need (`e2e/stack.ts`).
+- `dashboard.spec.ts`: the dashboard. An agent puts a task in review and mentions its person from the CLI,
+  the person answers the mention from the dashboard with the keyboard, the rail count follows, and
+  `pm dashboard --json` matches the API.
+- `person-and-agent.spec.ts`: the M1 flow, from setup (or sign-in) to an agent working through the CLI.
 - `upgrade.spec.ts`: starts a second stack (`pm-e2e-upgrade`, port 3101) on release 0.1.1 and adds data,
   switches it to M2.1 (0.3.0) and adds more, then switches it to the new image and checks that every key
   and route still works. The older images come from `E2E_M1_IMAGE` and `E2E_M2_1_IMAGE` (pulled when
   missing), or are built once from git as `project-management:m1-0.1.1` and `project-management:m2.1-<ref>`,
   which takes a few minutes each the first time.
 - `work-views.spec.ts`: the board, milestones, cycles, comments with mentions from the web and the CLI,
-  My tasks and the theme. It also runs alone: `pnpm e2e e2e/work-views.spec.ts`.
+  My tasks and the theme.
 - `backlog-mirror.spec.ts` and `backlog-import.spec.ts` (Playwright project `backlog-md`, after the others):
   each starts its own Forgejo container from `docker/forgejo/`, attaches it to the stack's network and
   removes it at the end. They cover connections, setup, the mirrored views, webhooks, refreshes, `pm backlog`,

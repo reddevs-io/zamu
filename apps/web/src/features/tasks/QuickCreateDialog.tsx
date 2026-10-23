@@ -60,7 +60,7 @@ export function QuickCreateDialog() {
 }
 
 function QuickCreateForm({ onClose }: { onClose: () => void }) {
-  const { projectKey: requestedProject, status: requestedStatus } = useQuickCreate();
+  const { projectKey: requestedProject, status: requestedStatus, pickProject } = useQuickCreate();
   const navigate = useNavigate();
   // Read once: the page the dialog opened on decides the milestone and cycle defaults.
   const location = useRouterState({ select: (state) => state.location });
@@ -72,9 +72,10 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
   const me = useQuery(meQuery()).data;
   const create = useCreateTask();
 
-  // Projects come most recently active first, so the first one is the best guess without a current project.
+  // Projects come most recently active first, so the first one is the best guess without a current project,
+  // unless the opener asked for a choice (pickProject): then nothing is chosen until the person picks.
   const [project, setProject] = useState<string | undefined>(requestedProject);
-  const projectKey = project ?? projects?.[0]?.key;
+  const projectKey = project ?? (pickProject ? undefined : projects?.[0]?.key);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<TaskStatus>(requestedStatus ?? DEFAULT_STATUS);
@@ -84,6 +85,7 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
   const [created, setCreated] = useState<string | null>(null);
   const [titleError, setTitleError] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const projectPickerRef = useRef<HTMLSpanElement>(null);
 
   // Milestone and cycle: undefined follows the page default, null is "none", a string is the picked id.
   const planning = useProjectPlanning(projectKey);
@@ -109,10 +111,14 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
     setOpenPicker((current) => (isOpen ? picker : current === picker ? null : current));
 
   useEffect(() => {
-    // The Modal's focus scope runs after mount; focus the title once it settles.
-    const frame = requestAnimationFrame(() => titleRef.current?.focus());
+    // The Modal's focus scope runs after mount; focus the title (or the project picker when the opener
+    // left the project to choose) once it settles.
+    const frame = requestAnimationFrame(() => {
+      if (pickProject) projectPickerRef.current?.querySelector<HTMLElement>('button')?.focus();
+      else titleRef.current?.focus();
+    });
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [pickProject]);
 
   const assignToMe = () => {
     if (me) setAssignee(me.user.id);
@@ -180,31 +186,35 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
   return (
     <Dialog aria-label="New task">
       <DialogHeader>
-        <Select
-          aria-label="Project"
-          variant="chip"
-          items={projectItems}
-          value={projectKey ?? null}
-          onChange={(key) => {
-            if (key == null || String(key) === projectKey) return;
-            setProject(String(key));
-            // Milestones and cycles belong to one project: start over in the new one.
-            setMilestoneId(undefined);
-            setCycleId(undefined);
-          }}
-          placeholder="Project"
-          renderValue={(selected) => {
-            const [item] = selected;
-            return item ? (
-              <span className="flex items-center gap-[7px]">
-                <span className="font-mono text-[10px]">{item.id}</span>
-                {item.label}
-              </span>
-            ) : (
-              <span className="text-faint">Project</span>
-            );
-          }}
-        />
+        <span ref={projectPickerRef} className="contents">
+          <Select
+            aria-label="Project"
+            variant="chip"
+            items={projectItems}
+            value={projectKey ?? null}
+            onChange={(key) => {
+              if (key == null || String(key) === projectKey) return;
+              // The first pick of a dialog opened without a project moves on to the title.
+              if (projectKey === undefined) setTimeout(() => titleRef.current?.focus(), 0);
+              setProject(String(key));
+              // Milestones and cycles belong to one project: start over in the new one.
+              setMilestoneId(undefined);
+              setCycleId(undefined);
+            }}
+            placeholder="Project"
+            renderValue={(selected) => {
+              const [item] = selected;
+              return item ? (
+                <span className="flex items-center gap-[7px]">
+                  <span className="font-mono text-[10px]">{item.id}</span>
+                  {item.label}
+                </span>
+              ) : (
+                <span className="text-faint">Project</span>
+              );
+            }}
+          />
+        </span>
         <span className="text-faint">New task</span>
         {created ? <span className="text-[12px] text-muted">Created {created}</span> : null}
       </DialogHeader>

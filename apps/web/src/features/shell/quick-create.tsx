@@ -13,6 +13,11 @@ import { Toast } from '~/ui';
 export interface QuickCreateOptions {
   /** Status to preselect, e.g. the board column whose "+" opened the dialog. */
   status?: TaskStatus;
+  /**
+   * Open with no project chosen and the project picker focused, instead of guessing the most recently
+   * active project (the dashboard covers every project, so there is no good guess).
+   */
+  pickProject?: boolean;
 }
 
 interface QuickCreateState {
@@ -23,6 +28,8 @@ interface QuickCreateState {
   status: TaskStatus | undefined;
   /** Why the last open() did nothing (a mirrored project); null otherwise. */
   refusal: string | null;
+  /** This opening starts without a project; the dialog focuses its project picker. */
+  pickProject: boolean;
   open: (projectKey?: string, options?: QuickCreateOptions) => void;
   close: () => void;
 }
@@ -49,6 +56,7 @@ export function QuickCreateProvider({ children, refuse }: QuickCreateProviderPro
   const refuseRef = useRef(refuse);
   refuseRef.current = refuse;
   const toastId = useRef(0);
+  const [pickProject, setPickProject] = useState(false);
   const open = useCallback((key?: string, options?: QuickCreateOptions) => {
     const reason = key ? (refuseRef.current?.(key) ?? null) : null;
     if (reason) {
@@ -59,13 +67,14 @@ export function QuickCreateProvider({ children, refuse }: QuickCreateProviderPro
     setRefusal(null);
     setProjectKey(key);
     setStatus(options?.status);
+    setPickProject(key === undefined && options?.pickProject === true);
     setOpen(true);
   }, []);
   const close = useCallback(() => setOpen(false), []);
   const refusalText = refusal?.text ?? null;
   const value = useMemo(
-    () => ({ isOpen, projectKey, status, refusal: refusalText, open, close }),
-    [isOpen, projectKey, status, refusalText, open, close],
+    () => ({ isOpen, projectKey, status, pickProject, refusal: refusalText, open, close }),
+    [isOpen, projectKey, status, pickProject, refusalText, open, close],
   );
   return (
     <QuickCreateContext.Provider value={value}>

@@ -95,6 +95,10 @@ pm agents --print              # print the block instead
 ## Commands
 
 ```sh
+pm dashboard                                    # Mine: your tasks, your agents' tasks and mentions of you
+pm dashboard --everyone                         # the whole workspace
+pm dashboard --json                             # { schema: 'pm.v1.dashboard', data: Dashboard }
+
 pm projects list                                # with each project's linked repository
 
 pm tasks list                                   # every project you can read
@@ -167,6 +171,39 @@ pm backlog refresh --wait                       # wait for it (up to 5 minutes) 
   `--move-to` (a cycle number, or `none`), else the next upcoming cycle, else a new cycle of the same
   length.
 
+### Dashboard
+
+- `pm dashboard` prints what needs someone now. Four groups (In review, Mentions, Stalled, Deadlines),
+  each with its total and up to 10 lines, then `… N more`. Then one row per project (open, doing, review,
+  current cycle, next milestone, last activity) and the agents (who they work for, current task or Idle,
+  stalled marker).
+- Mine covers your tasks, the tasks of the agents you are responsible for, and mentions of you. For an
+  agent's key, Mine means the agent's own tasks and mentions of it. `--everyone` covers every project
+  the key can read.
+- Use `--json` for every item (up to 50 per group); each group's `total` counts them all.
+
+With an agent's key:
+
+```text
+$ pm dashboard
+Needs you · 5
+
+In review · 1
+  PAY-5  Webhook signature check accepts expired timestamps  claude-dev for Ana Ruiz  in review 3h
+
+Mentions · 1
+  PAY-1  Ana Ruiz  Thanks @claude-dev, looks good.  25m ago
+
+Stalled · 1
+  WEB-1  Dark mode flickers on first load  claude-dev for Ana Ruiz  no update 26h
+
+Deadlines · 2
+  WEB  Cycle 1 · Settings polish   0/3 done  3 open  ends tomorrow
+  PAY  Cycle 1 · Checkout rewrite  0/6 done  6 open  ends in 2 days
+```
+
+The projects table and the agents follow. An empty group prints one line, `Mentions · none`.
+
 ### Comments
 
 - Comment bodies are Markdown, up to 20,000 characters. `@agent-name` and `@email` mention workspace
@@ -226,6 +263,7 @@ Every command takes `--json` and prints one versioned result:
 | `pm login`             | `pm.v1.login`             |
 | `pm logout`            | `pm.v1.logout`            |
 | `pm whoami`            | `pm.v1.whoami`            |
+| `pm dashboard`         | `pm.v1.dashboard`         |
 | `pm projects list`     | `pm.v1.projects.list`     |
 | `pm tasks list`        | `pm.v1.tasks.list`        |
 | `pm tasks show`        | `pm.v1.tasks.show`        |

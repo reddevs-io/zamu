@@ -8,6 +8,7 @@ import {
   Cycle,
   CycleDetail,
   CycleList,
+  Dashboard,
   Me,
   MilestoneList,
   MilestoneWithProgress,
@@ -138,6 +139,8 @@ export const cliDataSchemas = {
     outcome: CliBacklogRefreshOutcome,
     status: BacklogSourceStatus.nullable(),
   }),
+  /** pm dashboard [--everyone] */
+  dashboard: Dashboard,
   /** Any command that fails while --json is set (printed to stdout, exit code still non-zero). */
   error: Problem,
 } as const;

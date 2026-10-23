@@ -1,7 +1,14 @@
 // Development data: a workspace with projects PAY and WEB, a few tasks, the agent claude-dev acting
-// for the admin, fresh API keys, and with `backlog` the mirrored Backlog.md project BACK. Everything goes through @pm/auth and @pm/core, like real use.
+// for the admin, fresh API keys, and with `backlog` the mirrored Backlog.md project BACK. Everything goes
+// through @pm/auth and @pm/core, like real use, except backdating one task for the dashboard's Stalled group.
 // Re-running is safe: existing projects and the agent are kept, and new keys are issued each time.
-import { bootstrapAdmin, getActorFromRequest, isFirstRun } from '@pm/auth';
+import {
+  AcceptInvitationError,
+  acceptInvitationWithSignUp,
+  bootstrapAdmin,
+  getActorFromRequest,
+  isFirstRun,
+} from '@pm/auth';
 import type { CreateTaskInput, Priority, TaskStatus } from '@pm/contracts';
 import {
   type Actor,
@@ -12,9 +19,11 @@ import {
   createApiKey,
   createComment,
   createCycle,
+  createInvitation,
   createMilestone,
   createProject,
   createTask,
+  formatMention,
   listMembers,
   todayIn,
   toWorkspaceRole,
@@ -31,11 +40,20 @@ export interface SeedOptions {
    * Needs APP_ENCRYPTION_KEY in the context. Default false.
    */
   backlog?: boolean;
+  /**
+   * With planning, when PAY and WEB are both new: fill every dashboard queue group for the admin.
+   * Adds the member Tomás Berg, a WEB cycle that ends tomorrow, two unanswered mentions of the
+   * admin (by the agent and by Tomás) and an agent task in progress without an update for 26 hours.
+   */
+  dashboard?: boolean;
   adminName?: string;
   adminEmail?: string;
   adminPassword?: string;
   workspaceName?: string;
   agentName?: string;
+  memberName?: string;
+  memberEmail?: string;
+  memberPassword?: string;
 }
 
 export interface SeedResult {
@@ -44,6 +62,8 @@ export interface SeedResult {
   bootstrapped: boolean;
   admin: { id: string; name: string; email: string; password: string | null };
   agent: { id: string; name: string };
+  /** The second person, when the dashboard data was added. Their password is memberPassword. */
+  member: { id: string; name: string; email: string } | null;
   /** Projects this run created, with how many tasks each got. Existing projects are left alone. */
   createdProjects: { key: string; tasks: number }[];
   /** claude-dev's new key: all projects, read and write. */
@@ -58,9 +78,16 @@ export const SEED_DEFAULTS = {
   adminPassword: 'dev-password-1234',
   workspaceName: 'Reddevs',
   agentName: 'claude-dev',
+  memberName: 'Tomás Berg',
+  memberEmail: 'tomas@example.com',
+  memberPassword: 'dev-password-1234',
   planning: false,
   backlog: false,
+  dashboard: false,
 } satisfies Required<SeedOptions>;
+
+/** How long ago the seed's stalled agent task was last updated: past the 24-hour agent threshold. */
+const STALLED_SEED_HOURS = 26;
 
 type Who = 'admin' | 'agent' | null;
 interface SeedTask {
@@ -270,6 +297,11 @@ export async function seedDevData(ctx: CoreContext, options: SeedOptions = {}): 
     createdProjects.push({ key: spec.key, tasks: spec.tasks.length });
     if (opts.planning && spec.key === 'PAY') await seedPlanning(ctx, admin, agent);
   }
+  const created = new Set(createdProjects.map((p) => p.key));
+  const member =
+    opts.planning && opts.dashboard && created.has('PAY') && created.has('WEB')
+      ? await seedDashboard(ctx, admin, agent, { name: user.name, opts })
+      : null;
 
   if (opts.backlog) {
     const backlog = await seedBacklogProject(ctx, admin);
@@ -288,6 +320,7 @@ export async function seedDevData(ctx: CoreContext, options: SeedOptions = {}): 
       password: bootstrapped ? opts.adminPassword : null,
     },
     agent: { id: agentId, name: opts.agentName },
+    member,
     createdProjects,
     agentKey,
     adminKey: adminKey.key,
@@ -335,4 +368,84 @@ async function seedPlanning(ctx: CoreContext, admin: Actor, agent: Actor): Promi
     body: 'Done. 429 now waits for Retry-After and does not use an attempt.\n\n- 4xx stops retrying, except 408 and 429\n- Tests: 14 new cases',
   });
   await createComment(ctx, admin, { key: 'PAY-1', body: 'Thanks @claude-dev, looks good.' });
+}
+
+/** The seed's second person: invited and signed up like a real member. Null when password login is off. */
+async function seedMember(ctx: CoreContext, admin: Actor, opts: Required<SeedOptions>) {
+  const email = opts.memberEmail.toLowerCase();
+  try {
+    const invitation = await createInvitation(ctx, admin, { email, role: 'member' });
+    await acceptInvitationWithSignUp(ctx, {
+      invitationId: invitation.id,
+      name: opts.memberName,
+      password: opts.memberPassword,
+    });
+  } catch (error) {
+    if (error instanceof AcceptInvitationError && error.code === 'PASSWORD_LOGIN_DISABLED') return null;
+    if (!(error instanceof Conflict)) throw error;
+  }
+  const row = await ctx.db.query.user.findFirst({
+    columns: { id: true, name: true, email: true },
+    where: { email },
+  });
+  if (!row) throw new Error(`The seed member ${email} was not created`);
+  return row;
+}
+
+/**
+ * M4 dashboard data, on top of seedPlanning: every queue group has an item for the admin in Mine.
+ * - In review: PAY-3 and WEB-3 (admin) and PAY-5 (moved there by the agent), from the base seed.
+ * - Mentions: the agent asks the admin on PAY-8, Tomás asks the admin on WEB-3.
+ * - Stalled: WEB-1, the agent's task in progress, last updated 26 hours ago.
+ * - Deadlines: PCI audit is overdue (PAY-6 is the admin's), the PAY cycle ends in two days and the
+ *   new WEB cycle ends tomorrow.
+ * Runs after every other write to these tasks, so nothing answers the mentions or touches WEB-1.
+ */
+async function seedDashboard(
+  ctx: CoreContext,
+  admin: Actor,
+  agent: Actor,
+  { name, opts }: { name: string; opts: Required<SeedOptions> },
+): Promise<SeedResult['member']> {
+  const today = todayIn(ctx);
+  await createCycle(ctx, admin, {
+    project: 'WEB',
+    name: 'Settings polish',
+    startsOn: addCalendarDays(today, -6),
+    endsOn: addCalendarDays(today, 1),
+  });
+  for (const key of ['WEB-1', 'WEB-2', 'WEB-3']) await updateTask(ctx, admin, { key, cycle: 'current' });
+
+  const you = formatMention(name, admin.userId);
+  await createComment(ctx, agent, {
+    key: 'PAY-8',
+    body: `${you} should deliveries keep retrying past 24 hours, or stop and alert the merchant? The backoff caps at 6 attempts either way.`,
+  });
+  const member = await seedMember(ctx, admin, opts);
+  if (member) {
+    const memberActor: Actor = {
+      userId: member.id,
+      kind: 'person',
+      workspaceId: admin.workspaceId,
+      role: 'member',
+      onBehalfOfId: null,
+    };
+    await createComment(ctx, memberActor, {
+      key: 'WEB-3',
+      body: `${you} the sidebar collapses below \`900px\`. Fine to ship, or do you want a drawer on mobile?`,
+    });
+  }
+
+  // No service sets updated_at: backdate WEB-1 directly so it reads as stalled.
+  const web = await ctx.db.query.project.findFirst({
+    columns: { id: true },
+    where: { workspaceId: admin.workspaceId, key: 'WEB' },
+  });
+  const stalled = web
+    ? await ctx.db.query.task.findFirst({ columns: { id: true }, where: { projectId: web.id, number: 1 } })
+    : undefined;
+  if (!stalled) throw new Error('WEB-1 not found');
+  const since = new Date(Date.now() - STALLED_SEED_HOURS * 3_600_000).toISOString();
+  await ctx.db.execute(`update task set updated_at = '${since}' where id = '${stalled.id}'`);
+  return member;
 }

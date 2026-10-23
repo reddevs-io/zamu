@@ -23,3 +23,8 @@ export function useNewProject(): NewProjectState {
   if (!value) throw new Error('useNewProject must be used inside NewProjectProvider');
   return value;
 }
+
+/** New project state, or null outside a NewProjectProvider (screens rendered without the shell). */
+export function useOptionalNewProject(): NewProjectState | null {
+  return useContext(NewProjectContext);
+}

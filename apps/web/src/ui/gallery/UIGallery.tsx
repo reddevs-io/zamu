@@ -36,6 +36,7 @@ import { M2Gallery } from './M2Gallery';
 import { M2TokensSheet } from './M2TokensSheet';
 import { M3Gallery } from './M3Gallery';
 import { M3TokensSheet } from './M3TokensSheet';
+import { M4Gallery } from './M4Gallery';
 import {
   ASSIGNEE_OPTIONS,
   COLLAPSED_BY_DEFAULT,
@@ -47,8 +48,8 @@ import {
 import { TokensSheet } from './TokensSheet';
 
 /**
- * /__ui: the M1 tokens frame (1280×800), the M2 tokens frame (1280 wide) and the M3 tokens frame
- * (1280×800), each compared with its design frame, then every component and state.
+ * /__ui: the M1 tokens frame (1280×800), the M2 tokens frame and the M4 kit frame (1280 wide) and the M3
+ * tokens frame (1280×800), each compared with its design frame, then every component and state.
  */
 export function UIGallery() {
   return (
@@ -59,6 +60,7 @@ export function UIGallery() {
       </div>
       <div className="border-t border-line">
         <M3TokensSheet />
+        <M4Gallery />
       </div>
       <div className="flex w-[1280px] flex-col gap-12 border-t border-line px-10 py-10">
         <M3Gallery />

@@ -52,6 +52,7 @@ describe('CLI output', () => {
       'agents',
       'backlog.status',
       'backlog.refresh',
+      'dashboard',
       'error',
     ]);
   });
@@ -120,6 +121,21 @@ describe('CLI output', () => {
     ['cycles.current', cycleFixture],
     ['cycles.current', null],
     ['cycles.end', completedCycleFixture],
+    [
+      'dashboard',
+      {
+        scope: 'mine',
+        generatedAt: new Date('2026-10-23T09:00:00.000Z'),
+        groups: {
+          review: { total: 0, items: [] },
+          mentions: { total: 0, items: [] },
+          stalled: { total: 0, items: [] },
+          deadlines: { total: 0, items: [] },
+        },
+        projects: [],
+        agents: [],
+      },
+    ],
     ['error', problem('FORBIDDEN', 'This key is read-only')],
   ] as const)('%s round-trips through JSON', (name, data) => {
     const printed = JSON.stringify(cliOutput(name, data as never));

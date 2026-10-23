@@ -22,6 +22,8 @@ export interface Style {
   dim: (text: string) => string;
   status: (status: TaskStatus, text: string) => string;
   priority: (priority: Priority, text: string) => string;
+  /** Needs attention: overdue, stalled, ending soon. */
+  warn: (text: string) => string;
 }
 
 const sgr = (open: number, close: number) => (text: string) => `\u001b[${open}m${text}\u001b[${close}m`;
@@ -45,10 +47,11 @@ const PRIORITY_COLOR: Record<Priority, ((text: string) => string) | null> = {
 };
 
 export function createStyle(color: boolean): Style {
-  if (!color) return { bold: plain, dim: plain, status: (_s, t) => t, priority: (_p, t) => t };
+  if (!color) return { bold: plain, dim: plain, status: (_s, t) => t, priority: (_p, t) => t, warn: plain };
   return {
     bold: sgr(1, 22),
     dim: sgr(2, 22),
+    warn: sgr(33, 39),
     status: (status, text) => STATUS_COLOR[status]?.(text) ?? text,
     priority: (priority, text) => PRIORITY_COLOR[priority]?.(text) ?? text,
   };
@@ -103,6 +106,78 @@ export function table<Row>(rows: Row[], columns: Column<Row>[], style: Style, ma
     lines.push(line.trimEnd());
   });
   return `${lines.join('\n')}\n`;
+}
+
+export interface GridColumn<Row> extends Column<Row> {
+  /** Gives up width so the line fits the terminal (one column per grid). */
+  flex?: boolean;
+}
+
+export interface GridOptions {
+  /** Prints the dim header line (default true). */
+  header?: boolean;
+  /** Prefix of every line, e.g. two spaces under a section heading. */
+  indent?: string;
+  maxWidth?: number;
+}
+
+/**
+ * Like table(), but the column marked flex (a title or an excerpt, anywhere in the row) is the one
+ * cut to fit the terminal width, so the columns after it stay visible.
+ */
+export function grid<Row>(
+  rows: Row[],
+  columns: GridColumn<Row>[],
+  style: Style,
+  { header = true, indent = '', maxWidth }: GridOptions = {},
+): string {
+  const cells = rows.map((row) => columns.map((column) => column.value(row)));
+  const widths = columns.map((column, i) =>
+    Math.max(header ? width(column.header) : 0, ...cells.map((row) => width(row[i] ?? ''))),
+  );
+  const flex = columns.findIndex((column) => column.flex);
+  if (maxWidth && flex !== -1) {
+    const total = width(indent) + widths.reduce((sum, w) => sum + w, 0) + 2 * (columns.length - 1);
+    if (total > maxWidth) widths[flex] = Math.max((widths[flex] ?? 0) - (total - maxWidth), 10);
+  }
+  const fit = (text: string, i: number) => {
+    const cut = i === flex ? truncate(text, widths[i] ?? 0) : text;
+    return i === columns.length - 1 ? cut : cut + ' '.repeat(Math.max((widths[i] ?? 0) - width(cut), 0));
+  };
+  const lines: string[] = [];
+  if (header)
+    lines.push(
+      indent +
+        style.dim(
+          columns
+            .map((column, i) => fit(column.header, i))
+            .join('  ')
+            .trimEnd(),
+        ),
+    );
+  rows.forEach((row, r) => {
+    const line = columns
+      .map((column, i) => {
+        const cell = fit(cells[r]?.[i] ?? '', i);
+        return column.style ? column.style(row, cell) : cell;
+      })
+      .join('  ');
+    lines.push(indent + line.trimEnd());
+  });
+  return lines.length ? `${lines.join('\n')}\n` : '';
+}
+
+/**
+ * Compact time between two instants, for "in review 3h" or "no update 26h": minutes under an
+ * hour, hours under two days, days after that.
+ */
+export function elapsed(from: string, to: string): string {
+  const minutes = Math.max(Math.floor((Date.parse(to) - Date.parse(from)) / 60_000), 0);
+  if (minutes < 1) return '<1m';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 /** Label/value lines with aligned values. */

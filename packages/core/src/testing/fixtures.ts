@@ -202,3 +202,29 @@ export function scopeOf(row: { id: string; workspaceId: string }): ProjectScope 
 export function keyActor(world: World, scope: NonNullable<Actor['scope']>): Actor {
   return { ...world.agentActor, scope, apiKeyId: crypto.randomUUID() };
 }
+
+/**
+ * Inserts a task, taking its number from the project's counter like the task service does, so it
+ * mixes with createTask. Defaults: todo, priority none, unassigned. Writes no activity.
+ */
+export async function createTaskRow(
+  db: Db,
+  projectId: string,
+  values: Partial<Omit<typeof schema.task.$inferInsert, 'projectId' | 'number'>> & { createdById: string },
+): Promise<typeof schema.task.$inferSelect> {
+  const { project, task } = schema;
+  return db.transaction(async (tx) => {
+    const [counter] = await tx
+      .update(project)
+      .set({ nextTaskNumber: sql`${project.nextTaskNumber} + 1`, updatedAt: sql`${project.updatedAt}` })
+      .where(eq(project.id, projectId))
+      .returning({ number: sql<number>`${project.nextTaskNumber} - 1`.mapWith(Number) });
+    if (!counter) throw new Error(`project ${projectId} not found`);
+    const [row] = await tx
+      .insert(task)
+      .values({ title: `Task ${unique()}`, ...values, projectId, number: counter.number })
+      .returning();
+    if (!row) throw new Error('task insert failed');
+    return row;
+  });
+}

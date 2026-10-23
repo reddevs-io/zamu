@@ -183,7 +183,7 @@ Open `BETTER_AUTH_URL` in a browser. A new server sends you to the setup page:
    {name}" when [single sign-on](#single-sign-on-oidc) is configured.
 2. Name the workspace, usually your team or company.
 
-You land on the projects page, signed in. Setup runs once; afterwards `/setup` sends visitors to sign in.
+You land on the dashboard, signed in. Setup runs once; afterwards `/setup` sends visitors to sign in.
 
 Nobody can sign up on their own. To add people, go to Settings > Members > Invite person, pick a role and copy
 the invitation link. No email is sent: share the link yourself. It works once and expires after a week.
