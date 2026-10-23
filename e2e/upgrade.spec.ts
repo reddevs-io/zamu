@@ -119,7 +119,8 @@ test.afterAll(async () => {
 
 test('M1 0.1.1: set up the server and add a project with tasks', async () => {
   await page.goto('/');
-  await setUpServer(page);
+  // M1 has no dashboard: "/" opens the projects page.
+  await setUpServer(page, /\/projects$/);
 
   // The M1 API: GET /me has no theme yet.
   const me = await api<{ user: Record<string, unknown> }>(page.request, 'GET', '/me');

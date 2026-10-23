@@ -1,9 +1,10 @@
-// The M1 flow end to end, on a fresh database: a person sets up the server, creates a project and tasks, adds
-// an agent with a scoped key, the agent works on a task through the CLI, and the person sees it and revokes
-// the key. Each test builds on the previous one, so they share one page and run in order.
+// The M1 flow end to end: a person sets up the server (or signs in, when dashboard.spec.ts ran first and set
+// it up), creates a project and tasks, adds an agent with a scoped key, the agent works on a task through the
+// CLI, and the person sees it and revokes the key. Each test builds on the previous one, so they share one
+// page and run in order.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createCli, parseJson } from './cli';
-import { admin, workspaceName } from './session';
+import { admin, setUpServer, signInAsAdmin } from './session';
 import { baseURL } from './stack';
 
 const project = { name: 'Payments', key: 'PAY' };
@@ -79,21 +80,21 @@ test.afterAll(async () => {
 
 test('first run: set up the admin account and the workspace', async () => {
   await page.goto('/');
-  await expect(page).toHaveURL(/\/setup$/);
-  await settle();
-  await expect(page.getByRole('heading', { name: 'Set up this server' })).toBeVisible();
+  if (new URL(page.url()).pathname === '/setup') {
+    await setUpServer(page);
+  } else {
+    // dashboard.spec.ts sorts first in file order and has already set the server up through the same
+    // page (setUpServer): sign in as that admin instead.
+    await signInAsAdmin(page);
+    // Better Auth allows 3 sign-in attempts per address in a rolling 10-second window (counted from the last
+    // attempt). Setup and this sign-in may both fall inside it, and the next test makes two more attempts:
+    // let the window pass so the wrong-password banner, not "Too many requests", answers them.
+    await page.waitForTimeout(10_000);
+    await page.goto('/');
+  }
 
-  await page.getByLabel('Your name').fill(admin.name);
-  await page.getByLabel('Email').fill(admin.email);
-  await page.getByLabel('Password').fill(admin.password);
-  await page.getByRole('button', { name: 'Continue' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Name your workspace' })).toBeVisible();
-  await page.getByLabel('Workspace name').fill(workspaceName);
-  await page.getByRole('button', { name: 'Create workspace' }).click();
-
-  // No projects yet, so "/" lands on the projects page.
-  await expect(page).toHaveURL(/\/projects$/, { timeout: 15_000 });
+  // "/" lands on the dashboard.
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
   await settle();
   await expect(page.getByRole('button', { name: `${admin.name}: account menu` })).toBeVisible();
 
@@ -119,7 +120,7 @@ test('sign out, wrong password banner, sign in', async () => {
   await page.getByLabel('Password').fill(admin.password);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/projects$/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
   await settle();
 });
 

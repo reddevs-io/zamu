@@ -98,6 +98,7 @@ after upgrading pm; it replaces only its own block. `pm agents --print` shows th
 A typical loop for an agent:
 
 ```sh
+pm dashboard --json                     # reviews, mentions of the agent, stalled work, deadlines
 pm tasks list --mine --status todo --cycle current --json
 pm tasks update PAY-142 --status in_progress
 pm tasks show PAY-142 --json
@@ -181,6 +182,85 @@ tasks move to the next cycle; the server creates one with the same length when n
 `pm cycles end --move-to none` takes them out of cycles instead. `--milestone none` and `--cycle none`
 clear the field on `pm tasks update` and filter tasks without one on `pm tasks list`.
 
+## Dashboard
+
+`pm dashboard` shows what needs someone now, across every project the key can read. It prints the same data
+as the Dashboard page in the web app.
+
+```sh
+pm dashboard               # Mine: your tasks, your agents' tasks and mentions of you
+pm dashboard --everyone    # the whole workspace
+pm dashboard --json        # { schema: 'pm.v1.dashboard', data: Dashboard }
+```
+
+The output starts with the action queue, in four groups:
+
+| Group     | An item stays while                                                                                                                                              |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In review | The task is In review.                                                                                                                                           |
+| Mentions  | A comment mentions the member, the task is open, and the member has not commented on the task or changed it since. A reply by the member's agent does not count. |
+| Stalled   | The task is In progress with no update or comment for 24 hours when an agent holds it, or 5 days otherwise.                                                      |
+| Deadlines | A milestone is past its target date with open tasks, or the current cycle ends within 2 days with open tasks.                                                    |
+
+Items leave the queue on their own when the condition clears; nobody dismisses them. After the queue come one
+row per project (open, in progress and in review counts, current cycle, next milestone, last activity) and
+the agents (who they work for, their current task or Idle, and whether it is stalled).
+
+For a person, Mine covers the tasks assigned to them or to the agents they are responsible for, and mentions
+of them. For an agent's key, Mine means the agent's own tasks and mentions of the agent. `--everyone` covers
+every task and every mention in the projects the key can read. The key's project scope applies in both.
+
+### Ask your person for input
+
+When you need input from a person, mention your responsible person in a comment (@their-email); that puts
+it on their dashboard. It stays under Mentions until they comment on the task or change it.
+
+```sh
+pm comments add PAY-142 "Refunds over 500 EUR: one approval or two? @ana@example.com"
+pm tasks update PAY-142 --status in_review    # your task in review shows on their dashboard too
+```
+
+Your own dashboard works the same way: `pm dashboard` lists the comments that mention you and your tasks
+in review or stalled, so check it when you start a session.
+
+### pm.v1.dashboard
+
+`pm dashboard --json` prints the body of `GET /api/v1/dashboard?scope=mine|everyone`:
+
+```json
+{
+  "schema": "pm.v1.dashboard",
+  "data": {
+    "scope": "mine",
+    "generatedAt": "2026-10-23T17:12:30.413Z",
+    "groups": {
+      "review": { "total": 1, "items": [] },
+      "mentions": { "total": 1, "items": [] },
+      "stalled": { "total": 0, "items": [] },
+      "deadlines": { "total": 2, "items": [] }
+    },
+    "projects": [],
+    "agents": []
+  }
+}
+```
+
+Each group has `total`, which counts every item, and `items`, up to 50 of them. The items:
+
+| Group       | Item                                                                                                                                                |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review`    | `{ task, assignee, since }`: `since` is when the task last entered In review.                                                                       |
+| `mentions`  | `{ task, comment: { id, excerpt, createdAt }, author, onBehalfOf, mentioned }`: the newest unanswered mention per task and member.                  |
+| `stalled`   | `{ task, assignee, lastTouchedAt, thresholdHours }`                                                                                                 |
+| `deadlines` | `{ kind: "milestone", project, milestone, daysOverdue, openTasks, progress }` or `{ kind: "cycle", project, cycle, daysLeft, openTasks, progress }` |
+
+`task` is `{ key, title, status, priority, project: { key, name } }`. `excerpt` is plain text of at most
+200 characters: mentions read `@Name` and inline code keeps its backticks. A project row has `key`, `name`,
+`openCounts`, `openCount`, `usesMilestones`, `usesCycles`, `lastActivityAt`, `currentCycle` and
+`nextMilestone`. An agent row has `agent`, `currentTask` (null when idle), `inProgressCount`, `stalled` and
+`lastActivityAt`. `GET /api/v1/dashboard/counts` returns only the Mine totals:
+`{ review, mentions, stalled, deadlines, total }`.
+
 ## --json output
 
 Every command takes `--json` and prints one line with a versioned envelope:
@@ -199,6 +279,7 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 | `pm.v1.login`             | `{ url, me }`                                                                |
 | `pm.v1.logout`            | `{ url }` (null when nothing was stored)                                     |
 | `pm.v1.whoami`            | `{ user, workspace, role, auth: { method, scope }, project }`                |
+| `pm.v1.dashboard`         | `{ scope, generatedAt, groups, projects, agents }` (see Dashboard above)     |
 | `pm.v1.projects.list`     | `{ items: Project[] }` with open counts per status                           |
 | `pm.v1.tasks.list`        | `{ items: TaskListItem[], nextCursor, counts }`                              |
 | `pm.v1.tasks.show`        | `{ task: Task, activity: Activity[], timeline: TimelineEntry[] }`            |

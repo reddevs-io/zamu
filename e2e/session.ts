@@ -11,8 +11,11 @@ export async function settle(page: Page): Promise<void> {
   await page.waitForTimeout(500);
 }
 
-/** First run through the setup page: the admin account, then the workspace. Leaves the page signed in. */
-export async function setUpServer(page: Page): Promise<void> {
+/**
+ * First run through the setup page: the admin account, then the workspace. Leaves the page signed in on
+ * `landing`: setup sends the new admin to "/", which opens the dashboard (the projects page before 0.5.0).
+ */
+export async function setUpServer(page: Page, landing: RegExp = /\/dashboard$/): Promise<void> {
   await expect(page).toHaveURL(/\/setup$/);
   await settle(page);
   await expect(page.getByRole('heading', { name: 'Set up this server' })).toBeVisible();
@@ -24,7 +27,7 @@ export async function setUpServer(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Name your workspace' })).toBeVisible();
   await page.getByLabel('Workspace name').fill(workspaceName);
   await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page).toHaveURL(/\/projects$/, { timeout: 15_000 });
+  await expect(page).toHaveURL(landing, { timeout: 15_000 });
 }
 
 /**
