@@ -32,7 +32,39 @@ describe('readServerConfig', () => {
       publicUrl: 'https://projects.example.com',
       auth: { sso: null, passwordLogin: true, ipAddressHeaders: null },
       timeZone: 'UTC',
+      encryptionKey: undefined,
+      gitHosts: { allowPrivate: false, httpHosts: [] },
     });
+  });
+
+  it('reads APP_ENCRYPTION_KEY when set and refuses a key that is not 32 bytes, without echoing it', () => {
+    const key = Buffer.alloc(32, 9).toString('base64');
+    expect(readServerConfig({ ...BASE, APP_ENCRYPTION_KEY: key }).encryptionKey).toEqual(
+      new Uint8Array(32).fill(9),
+    );
+    expect(readServerConfig({ ...BASE, APP_ENCRYPTION_KEY: '  ' }).encryptionKey).toBeUndefined();
+    const short = Buffer.alloc(16, 9).toString('base64');
+    const found = problems({ ...BASE, APP_ENCRYPTION_KEY: short });
+    expect(found).toEqual([expect.stringMatching(/^APP_ENCRYPTION_KEY must decode to 32 bytes, not 16/)]);
+    expect(found.join('\n')).not.toContain(short);
+    expect(problems({ ...BASE, APP_ENCRYPTION_KEY: 'not base64!' })).toEqual([
+      expect.stringMatching(/^APP_ENCRYPTION_KEY is not base64/),
+    ]);
+  });
+
+  it('reads GIT_ALLOW_PRIVATE_HOSTS and GIT_HTTP_HOSTS', () => {
+    const config = readServerConfig({
+      ...BASE,
+      GIT_ALLOW_PRIVATE_HOSTS: 'true',
+      GIT_HTTP_HOSTS: 'localhost:3300, Forgejo.test',
+    });
+    expect(config.gitHosts).toEqual({ allowPrivate: true, httpHosts: ['localhost:3300', 'forgejo.test'] });
+    expect(problems({ ...BASE, GIT_ALLOW_PRIVATE_HOSTS: 'maybe' })).toEqual([
+      'GIT_ALLOW_PRIVATE_HOSTS must be true or false.',
+    ]);
+    expect(problems({ ...BASE, GIT_HTTP_HOSTS: 'gitlab example.com' })).toEqual([
+      expect.stringMatching(/^GIT_HTTP_HOSTS: /),
+    ]);
   });
 
   it('reads APP_TIME_ZONE and rejects an unknown zone', () => {

@@ -1,5 +1,5 @@
 // Development data: a workspace with projects PAY and WEB, a few tasks, the agent claude-dev acting
-// for the admin, and fresh API keys. Everything goes through @pm/auth and @pm/core, like real use.
+// for the admin, fresh API keys, and with `backlog` the mirrored Backlog.md project BACK. Everything goes through @pm/auth and @pm/core, like real use.
 // Re-running is safe: existing projects and the agent are kept, and new keys are issued each time.
 import { bootstrapAdmin, getActorFromRequest, isFirstRun } from '@pm/auth';
 import type { CreateTaskInput, Priority, TaskStatus } from '@pm/contracts';
@@ -21,10 +21,16 @@ import {
   updateTask,
 } from '@pm/core';
 import type { z } from 'zod';
+import { seedBacklogProject } from './seed-backlog';
 
 export interface SeedOptions {
   /** Also add M2 demo data to a newly created PAY: milestones, a current and a next cycle, comments. */
   planning?: boolean;
+  /**
+   * M3: also add the mirrored Backlog.md demo project BACK ("Payments API") with its git connection.
+   * Needs APP_ENCRYPTION_KEY in the context. Default false.
+   */
+  backlog?: boolean;
   adminName?: string;
   adminEmail?: string;
   adminPassword?: string;
@@ -53,6 +59,7 @@ export const SEED_DEFAULTS = {
   workspaceName: 'Reddevs',
   agentName: 'claude-dev',
   planning: false,
+  backlog: false,
 } satisfies Required<SeedOptions>;
 
 type Who = 'admin' | 'agent' | null;
@@ -262,6 +269,11 @@ export async function seedDevData(ctx: CoreContext, options: SeedOptions = {}): 
     }
     createdProjects.push({ key: spec.key, tasks: spec.tasks.length });
     if (opts.planning && spec.key === 'PAY') await seedPlanning(ctx, admin, agent);
+  }
+
+  if (opts.backlog) {
+    const backlog = await seedBacklogProject(ctx, admin);
+    if (backlog) createdProjects.push(backlog);
   }
 
   const adminKey = await createApiKey(ctx, admin, { name: `${user.name} dev seed`, scope: workspaceScope });
