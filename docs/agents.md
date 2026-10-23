@@ -68,7 +68,32 @@ Workspace  Reddevs
 Role       member
 Access     API key: all projects, write
 Server     https://pm.example.com
+Project    PAY (from git remote gitlab.com/reddevs/payments)
 ```
+
+## Link the repository to its project
+
+Link each project to the repository its code lives in, once. Then an agent working in any clone of it
+can leave out `--project`: pm finds the project from the clone's git remote.
+
+```sh
+cd payments                 # a clone of gitlab.com/reddevs/payments
+pm link --project PAY       # or set Repository in the project's Edit project dialog
+pm agents                   # write the pm instructions into AGENTS.md, naming PAY
+git add AGENTS.md && git commit -m "Add pm instructions for agents"
+```
+
+`pm link` needs a key that can edit the project. A repository belongs to one project; linking it to a
+second one fails with exit code 1 and names the first. HTTPS and SSH URLs of the same repository match.
+
+Other ways to set the project, in the order pm checks them: `--project`, the `PM_PROJECT` variable, the
+nearest committed `.pm.json` (`{ "project": "PAY" }`, written by `pm link --file`; useful when one
+repository holds several projects, one file per subfolder), then the linked remote. `pm whoami` shows
+which one applies in the current folder.
+
+`pm agents` puts a short block between `<!-- pm:start ... -->` and `<!-- pm:end -->` in `AGENTS.md`, or in
+`CLAUDE.md` when only that exists. It covers the loop below, `--json` and the exit codes. Run it again
+after upgrading pm; it replaces only its own block. `pm agents --print` shows the block without writing it.
 
 A typical loop for an agent:
 
@@ -173,7 +198,7 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 | ------------------------- | ---------------------------------------------------------------------------- |
 | `pm.v1.login`             | `{ url, me }`                                                                |
 | `pm.v1.logout`            | `{ url }` (null when nothing was stored)                                     |
-| `pm.v1.whoami`            | `{ user, workspace, role, auth: { method, scope } }`                         |
+| `pm.v1.whoami`            | `{ user, workspace, role, auth: { method, scope }, project }`                |
 | `pm.v1.projects.list`     | `{ items: Project[] }` with open counts per status                           |
 | `pm.v1.tasks.list`        | `{ items: TaskListItem[], nextCursor, counts }`                              |
 | `pm.v1.tasks.show`        | `{ task: Task, activity: Activity[], timeline: TimelineEntry[] }`            |
@@ -190,6 +215,8 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 | `pm.v1.cycles.create`     | `Cycle`                                                                      |
 | `pm.v1.cycles.current`    | `Cycle`, or `null` when no cycle is running                                  |
 | `pm.v1.cycles.end`        | `Cycle` with its summary, plus `rollovers`: the tasks that moved and where   |
+| `pm.v1.link`              | `{ project, target, action, repository, file }`                              |
+| `pm.v1.agents`            | `{ file, action, project, block }`                                           |
 | `pm.v1.error`             | RFC 9457 problem: `{ type, title, status, code, detail, requestId, issues }` |
 
 Statuses are `backlog`, `todo`, `in_progress`, `in_review`, `done`, `canceled`. Priorities are `none`, `low`,

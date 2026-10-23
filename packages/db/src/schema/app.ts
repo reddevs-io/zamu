@@ -73,11 +73,17 @@ export const project = pgTable(
     usesCycles: boolean('uses_cycles').default(true).notNull(),
     /** Next cycle number; taken like nextTaskNumber, under the project row lock. */
     nextCycleNumber: integer('next_cycle_number').default(1).notNull(),
+    /** Clone URL of the linked git repository, as entered. */
+    repository: text('repository'),
+    /** parseRepositoryUrl(repository).key: host/path in lowercase. Unique per workspace. */
+    repositoryKey: text('repository_key'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     uniqueIndex('project_workspaceId_key_unique').on(table.workspaceId, table.key),
+    uniqueIndex('project_workspaceId_repositoryKey_unique').on(table.workspaceId, table.repositoryKey),
+    check('project_repository_check', sql`(${table.repository} is null) = (${table.repositoryKey} is null)`),
     check('project_key_check', sql`${table.key} ~ '^[A-Z][A-Z0-9]{1,5}$'`),
     check('project_next_task_number_check', sql`${table.nextTaskNumber} >= 1`),
     check('project_next_cycle_number_check', sql`${table.nextCycleNumber} >= 1`),

@@ -18,6 +18,7 @@ import {
   Theme,
   UserId,
 } from './primitives';
+import { MAX_REPOSITORY_URL_LENGTH, parseRepositoryUrl, REPOSITORY_URL_HINT } from './repository';
 
 // Input schemas. Every entry point (API, server functions, CLI) parses with these.
 // Use z.input<> for what a caller may send and z.output<> (the exported types) for the parsed value.
@@ -40,6 +41,12 @@ function requireOneOf<K extends string>(fields: readonly K[]) {
 
 export const ProjectName = z.string().trim().min(1, 'Name is required').max(100);
 export const ProjectDescription = z.string().trim().max(2_000);
+/** A clone URL (HTTPS or SSH), or '' for none. */
+export const ProjectRepository = z
+  .string()
+  .trim()
+  .max(MAX_REPOSITORY_URL_LENGTH)
+  .refine((value) => value === '' || parseRepositoryUrl(value) !== null, REPOSITORY_URL_HINT);
 export const TaskTitle = z.string().trim().min(1, 'Title is required').max(300);
 /** Markdown. Not trimmed: leading indentation can be meaningful. */
 export const TaskDescription = z.string().max(100_000);
@@ -94,6 +101,8 @@ export const CreateProjectInput = z.object({
   name: ProjectName,
   key: ProjectKeyInput,
   description: ProjectDescription.optional(),
+  /** Links the project to a git repository; '' or omitted for none. */
+  repository: ProjectRepository.optional(),
 });
 export type CreateProjectInput = z.output<typeof CreateProjectInput>;
 
@@ -107,9 +116,11 @@ export const UpdateProjectInput = z
     description: ProjectDescription.nullable().optional(),
     usesMilestones: z.boolean().optional(),
     usesCycles: z.boolean().optional(),
+    /** null or '' unlinks the repository. */
+    repository: ProjectRepository.nullable().optional(),
   })
-  .refine(requireOneOf(['key', 'name', 'description', 'usesMilestones', 'usesCycles']), {
-    message: 'Change at least one of key, name, description, usesMilestones or usesCycles',
+  .refine(requireOneOf(['key', 'name', 'description', 'usesMilestones', 'usesCycles', 'repository']), {
+    message: 'Change at least one of key, name, description, usesMilestones, usesCycles or repository',
   });
 export type UpdateProjectInput = z.output<typeof UpdateProjectInput>;
 

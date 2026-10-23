@@ -1,3 +1,4 @@
+import { REPOSITORY_URL_HINT } from '@pm/contracts';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,6 +15,7 @@ function setup(onSubmit: NewProjectDialogProps['onSubmit'] = vi.fn().mockResolve
     name: () => screen.getByLabelText('Name'),
     key: () => screen.getByLabelText('Key') as HTMLInputElement,
     description: () => screen.getByLabelText(/Description/),
+    repository: () => screen.getByLabelText(/Repository/),
   };
 }
 
@@ -100,6 +102,63 @@ describe('NewProjectDialog', () => {
     await user.type(key(), 'PAY2{Enter}');
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't create the project.");
     expect(onSubmit).toHaveBeenLastCalledWith({ name: 'Payments', key: 'PAY2' });
+  });
+
+  it('shows an optional repository field that reads the URL back as it is typed', async () => {
+    const { user, repository } = setup();
+    expect(repository()).toHaveAttribute('placeholder', 'https://gitlab.com/team/repo.git');
+    expect(repository()).toHaveAccessibleDescription(
+      'The URL you clone from, HTTPS or SSH. Inside a clone of it, pm picks this project without --project.',
+    );
+    await user.type(repository(), 'git@gitlab.com:reddevs/billing.git');
+    expect(repository()).toHaveAccessibleDescription(
+      'Matches clones of gitlab.com/reddevs/billing, over HTTPS or SSH.',
+    );
+  });
+
+  it('sends the repository when one is given', async () => {
+    const { user, onSubmit, name, repository } = setup();
+    await user.type(name(), 'Billing reconciliation');
+    await user.type(repository(), ' git@gitlab.com:reddevs/billing.git {Enter}');
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        name: 'Billing reconciliation',
+        key: 'BIL',
+        repository: 'git@gitlab.com:reddevs/billing.git',
+      }),
+    );
+  });
+
+  it('flags a value that is not a clone URL when the field is left, and on submit', async () => {
+    const { user, onSubmit, name, repository } = setup();
+    await user.type(name(), 'Billing');
+    await user.type(repository(), 'reddevs/billing');
+    expect(screen.queryByText(REPOSITORY_URL_HINT)).not.toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByText(REPOSITORY_URL_HINT)).toBeInTheDocument();
+    expect(repository()).toHaveAttribute('aria-invalid', 'true');
+
+    // Typing clears the error until the next check.
+    await user.type(repository(), 'x');
+    expect(screen.queryByText(REPOSITORY_URL_HINT)).not.toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    expect(screen.getByText(REPOSITORY_URL_HINT)).toBeInTheDocument();
+    expect(repository()).toHaveFocus();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('puts a taken repository on the repository field', async () => {
+    const message =
+      'Payments (PAY) already uses gitlab.com/reddevs/payments. A repository can belong to one project.';
+    const onSubmit = vi.fn().mockResolvedValue({ field: 'repository', message });
+    const { user, name, key, repository } = setup(onSubmit);
+    await user.type(name(), 'Billing');
+    await user.type(repository(), 'https://gitlab.com/reddevs/payments.git{Enter}');
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(repository()).toHaveAttribute('aria-invalid', 'true');
+    expect(repository()).toHaveFocus();
+    expect(key()).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('closes with Cancel and Esc', async () => {

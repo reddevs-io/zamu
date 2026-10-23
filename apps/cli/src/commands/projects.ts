@@ -1,4 +1,5 @@
 // pm projects list.
+import { parseRepositoryUrl } from '@pm/contracts';
 import { type CommandContext, emit } from '../context';
 import { formatDate, table } from '../format';
 
@@ -19,6 +20,15 @@ export async function listProjects(context: CommandContext): Promise<void> {
         { header: 'IN REVIEW', value: (p) => String(p.openCounts.in_review) },
         { header: 'ACTIVE', value: (p) => formatDate(p.lastActivityAt) },
         { header: 'NAME', value: (p) => p.name },
+        ...(data.items.some((p) => p.repository)
+          ? [
+              {
+                header: 'REPOSITORY',
+                value: (p: (typeof data.items)[number]) =>
+                  p.repository ? (parseRepositoryUrl(p.repository)?.short ?? p.repository) : '',
+              },
+            ]
+          : []),
       ],
       style,
       context.io.columns,

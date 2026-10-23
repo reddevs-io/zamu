@@ -12,7 +12,7 @@ import { cn, composeTw } from './cn';
 export const inputBase = cn(
   'w-full min-w-0 border border-line bg-surface px-3 text-fg outline-none',
   'placeholder:text-faint disabled:opacity-50',
-  'invalid:border-danger focus:halo',
+  'invalid:border-danger focus:halo invalid:focus:border-danger',
 );
 
 export function Label({ className, ...props }: LabelProps) {

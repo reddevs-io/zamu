@@ -11,16 +11,18 @@ import {
   TextField,
   useHotkeys,
 } from '~/ui';
+import { newRepositoryHint, RepositoryField } from './RepositoryField';
 import {
   type NewProjectErrors,
   type NewProjectField,
   type NewProjectValues,
   normalizeKeyInput,
+  repositoryError,
   suggestKey,
   validateNewProject,
 } from './validation';
 
-/** What the server said: an error on one field (key taken) or a message for the banner. */
+/** What the server said: an error on one field (key or repository taken) or a message for the banner. */
 export interface NewProjectFailure {
   field?: NewProjectField;
   message: string;
@@ -33,7 +35,10 @@ export interface NewProjectDialogProps {
   onSubmit: (input: CreateProjectInput) => Promise<NewProjectFailure | null>;
 }
 
-/** New project dialog (frame 03-new-project): name, key suggested from the name, optional description. */
+/**
+ * New project dialog (frame 03-new-project, M2.1 frames 2a to 2d): name, key suggested from the name,
+ * optional description and repository.
+ */
 export function NewProjectDialog({ isOpen, onClose, onSubmit }: NewProjectDialogProps) {
   return (
     <Modal
@@ -51,9 +56,10 @@ export function NewProjectDialog({ isOpen, onClose, onSubmit }: NewProjectDialog
   );
 }
 
-const EMPTY: NewProjectValues = { name: '', key: '', description: '' };
+const EMPTY: NewProjectValues = { name: '', key: '', description: '', repository: '' };
 
-function useSubmitHint(): string {
+/** Shortcut hint on the submit button: ⌘↵ or Ctrl↵. */
+export function useSubmitHint(): string {
   // ⌘ on Apple platforms, Ctrl elsewhere. Read after mount: the server cannot know.
   const [hint, setHint] = useState('⌘↵');
   useEffect(() => {
@@ -89,6 +95,7 @@ export function NewProjectForm({ onCancel, onSubmit }: NewProjectFormProps) {
     name: useRef<HTMLInputElement>(null),
     key: useRef<HTMLInputElement>(null),
     description: useRef<HTMLInputElement>(null),
+    repository: useRef<HTMLInputElement>(null),
   };
 
   const clear = (field: NewProjectField) => {
@@ -115,12 +122,24 @@ export function NewProjectForm({ onCancel, onSubmit }: NewProjectFormProps) {
     clear('description');
   };
 
+  const onRepositoryChange = (repository: string) => {
+    setValues((current) => ({ ...current, repository }));
+    clear('repository');
+  };
+
+  const onRepositoryBlur = () => {
+    const error = repositoryError(values.repository);
+    if (error) setErrors((current) => ({ ...current, repository: error }));
+  };
+
   const submit = async () => {
     if (pending) return;
     const result = validateNewProject(values);
     if (!result.ok) {
       setErrors(result.errors);
-      const first = (['name', 'key', 'description'] as const).find((field) => result.errors[field]);
+      const first = (['name', 'key', 'description', 'repository'] as const).find(
+        (field) => result.errors[field],
+      );
       if (first) inputs[first].current?.focus();
       return;
     }
@@ -195,6 +214,14 @@ export function NewProjectForm({ onCancel, onSubmit }: NewProjectFormProps) {
           isInvalid={Boolean(errors.description)}
           errorMessage={errors.description}
           validationBehavior="aria"
+        />
+        <RepositoryField
+          inputRef={inputs.repository}
+          value={values.repository}
+          onChange={onRepositoryChange}
+          onBlur={onRepositoryBlur}
+          description={newRepositoryHint(values.repository)}
+          error={errors.repository}
         />
       </DialogBody>
       <DialogFooter>

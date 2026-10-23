@@ -41,22 +41,61 @@ To keep the key out of your shell history, pipe it in:
 pm login --key - --url https://pm.example.com < key.txt
 ```
 
-`pm logout` deletes the stored file. `pm whoami` shows the user, workspace, role and key scope.
+`pm logout` deletes the stored file. `pm whoami` shows the user, workspace, role, key scope and the
+project pm uses in the current folder.
 
 ### Environment variables
 
 Agents in CI usually skip `pm login` and set:
 
-| Variable   | Meaning                                                                              |
-| ---------- | ------------------------------------------------------------------------------------ |
-| `PM_URL`   | Server URL. Overrides the stored URL.                                                |
-| `PM_KEY`   | API key. Overrides the stored key. `PM_API_KEY` (printed by the dev seed) works too. |
-| `NO_COLOR` | Turns colour off. `FORCE_COLOR=1` turns it on when output is piped.                  |
+| Variable     | Meaning                                                                              |
+| ------------ | ------------------------------------------------------------------------------------ |
+| `PM_URL`     | Server URL. Overrides the stored URL.                                                |
+| `PM_KEY`     | API key. Overrides the stored key. `PM_API_KEY` (printed by the dev seed) works too. |
+| `PM_PROJECT` | Project key for commands that need one, when `--project` is not given.               |
+| `NO_COLOR`   | Turns colour off. `FORCE_COLOR=1` turns it on when output is piped.                  |
+
+## Project of the current folder
+
+Commands that work on one project (`tasks create`, `milestones`, `cycles`) take `--project`. Without
+it, pm uses the first of:
+1. `PM_PROJECT`.
+2. The nearest `.pm.json` from the current folder up to the repository root: `{ "project": "PAY" }`.
+   Commit it, or put one in each subfolder of a monorepo that holds several projects.
+3. The project linked to this clone's git remote (`origin`, or the only remote). A project links to
+   one repository; HTTPS and SSH URLs of the same repository match.
+
+Link once from a clone, or set Repository in the project's Edit project dialog on the web:
+
+```sh
+pm link --project PAY          # link PAY to this clone's remote
+pm link --project PAY --force  # replace another repository linked to PAY
+pm link --clear                # unlink this clone's project
+pm link --file --project PAY   # write .pm.json at the repository root instead
+pm link --file --here --project WEB   # .pm.json in this folder (monorepo subproject)
+pm whoami                      # Project  PAY (from git remote gitlab.com/reddevs/payments)
+```
+
+`pm tasks list` still spans every project unless you pass `--project`; only `--milestone <name>` uses
+the folder's project to look the name up. When nothing names a project, a command that needs one
+exits with code 1 and says how to fix it.
+
+### Instructions for coding agents
+
+`pm agents` writes how to use pm into the repository's `AGENTS.md` (or `CLAUDE.md` when only that
+exists), between `<!-- pm:start ... -->` and `<!-- pm:end -->`. It names the folder's project when pm
+can find it. Run it again after upgrading pm: it replaces only that block.
+
+```sh
+pm agents                      # AGENTS.md, else CLAUDE.md, at the repository root
+pm agents --file docs/AI.md    # another file
+pm agents --print              # print the block instead
+```
 
 ## Commands
 
 ```sh
-pm projects list
+pm projects list                                # with each project's linked repository
 
 pm tasks list                                   # every project you can read
 pm tasks list --mine                            # your tasks in every project
@@ -66,6 +105,7 @@ pm tasks list --project PAY --milestone "Webhooks v2" --cycle current
 pm tasks list --project PAY --milestone none --cycle none
 pm tasks show PAY-142
 pm tasks create --project PAY "Retry failed webhooks" --priority high --assignee claude-dev
+pm tasks create "Retry failed webhooks"          # in a clone linked to PAY
 pm tasks create --project PAY "Retry failed webhooks" --milestone "Webhooks v2" --cycle next
 git log -1 --format=%B | pm tasks create --project PAY "Follow up on the release" --description -
 pm tasks update PAY-142 --status in_review
@@ -108,9 +148,9 @@ pm cycles end 12 --project PAY --move-to none
 ### Milestones and cycles
 
 - `--milestone` takes a milestone id or its name, ignoring case. Names are looked up in the project:
-  `--project` for `pm tasks list` (exactly one), `pm tasks create` and `pm milestones update`, the task
-  key's project for `pm tasks update`. An unknown name fails with exit code 1 and lists the
-  project's milestones.
+  `--project` (or the folder's project) for `pm tasks list` (exactly one), `pm tasks create` and
+  `pm milestones update`, the task key's project for `pm tasks update`. An unknown name fails with
+  exit code 1 and lists the project's milestones.
 - `--cycle` takes a cycle number, `current` or `next`. `none` clears it on `pm tasks update` and
   filters tasks without a cycle on `pm tasks list`.
 - `--target none` clears a milestone's target date. Setting any status but `completed` on a completed
@@ -165,6 +205,8 @@ Every command takes `--json` and prints one versioned result:
 | `pm cycles create`     | `pm.v1.cycles.create`     |
 | `pm cycles current`    | `pm.v1.cycles.current`    |
 | `pm cycles end`        | `pm.v1.cycles.end`        |
+| `pm link`              | `pm.v1.link`              |
+| `pm agents`            | `pm.v1.agents`            |
 | any failure            | `pm.v1.error`             |
 
 The data schemas live in `@pm/contracts` (`cliDataSchemas`, `parseCliOutput`). Within `v1`, fields are

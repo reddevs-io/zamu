@@ -5,11 +5,12 @@ import {
   OPEN_TASK_STATUSES,
   Project,
   ProjectList,
+  parseRepositoryUrl,
   UpdateProjectInput,
   type UserRef,
 } from '@pm/contracts';
 import { type DbOrTx, schema } from '@pm/db';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, can } from './authz';
 import type { DbContext } from './context';
@@ -20,6 +21,7 @@ import { findProjectByKey, type ProjectRow, toDate, userRef } from './internal';
 const { project, task, user } = schema;
 
 const PROJECT_KEY_UNIQUE = 'project_workspaceId_key_unique';
+const PROJECT_REPOSITORY_UNIQUE = 'project_workspaceId_repositoryKey_unique';
 
 type ProjectContext = DbContext & ClockContext;
 
@@ -33,6 +35,7 @@ export function toProject(row: ProjectRow, currentCycle: CurrentCycle | null = n
     usesMilestones: row.usesMilestones,
     usesCycles: row.usesCycles,
     currentCycle: row.usesCycles ? currentCycle : null,
+    repository: row.repository,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -47,6 +50,56 @@ async function toProjectWithCycle(ctx: ProjectContext, db: DbOrTx, row: ProjectR
 
 function keyTaken(key: string): Conflict {
   return new Conflict(`Project key ${key} is already used in this workspace`);
+}
+
+/** The stored pair for a validated repository input; nulls for '' or null (no repository). */
+function repositoryColumns(value: string | null): {
+  repository: string | null;
+  repositoryKey: string | null;
+} {
+  const parsed = value ? parseRepositoryUrl(value) : null;
+  return parsed
+    ? { repository: value, repositoryKey: parsed.key }
+    : { repository: null, repositoryKey: null };
+}
+
+function repositoryTaken(short: string, owner?: { key: string; name: string }): Conflict {
+  const message = owner
+    ? `${owner.name} (${owner.key}) already uses ${short}. A repository can belong to one project.`
+    : `Another project in this workspace already uses ${short}. A repository can belong to one project.`;
+  return new Conflict(message, { issues: [{ path: 'repository', message }] });
+}
+
+/**
+ * Conflict when another project of the workspace links the same repository. Names that project
+ * only when the actor can read it.
+ */
+async function assertRepositoryFree(
+  db: DbOrTx,
+  actor: Actor,
+  repositoryKey: string,
+  exceptProjectId?: string,
+): Promise<void> {
+  const [owner] = await db
+    .select({ id: project.id, key: project.key, name: project.name, repository: project.repository })
+    .from(project)
+    .where(
+      and(
+        eq(project.workspaceId, actor.workspaceId),
+        eq(project.repositoryKey, repositoryKey),
+        exceptProjectId ? ne(project.id, exceptProjectId) : undefined,
+      ),
+    )
+    .limit(1);
+  if (!owner) return;
+  const short = parseRepositoryUrl(owner.repository ?? '')?.short ?? repositoryKey;
+  const visible = can(actor, 'project.read', { type: 'project', projectId: owner.id });
+  throw repositoryTaken(short, visible ? owner : undefined);
+}
+
+/** Conflict for a unique violation on the repository index (a concurrent link won the race). */
+function repositoryRace(short: string | null): Conflict {
+  return repositoryTaken(short ?? 'this repository');
 }
 
 const openCount = (status: string) =>
@@ -134,29 +187,36 @@ async function openAssignees({ db }: DbContext, projectIds: string[]): Promise<M
   return result;
 }
 
-/** Creates a project. Conflict when the key is already used in the workspace. */
+/**
+ * Creates a project. Conflict when the key is already used in the workspace, or when another
+ * project already links the repository.
+ */
 export async function createProject(
   { db }: DbContext,
   actor: Actor,
   input: z.input<typeof CreateProjectInput>,
 ): Promise<Project> {
-  const { name, key, description } = parseInput(CreateProjectInput, input);
+  const { name, key, description, repository } = parseInput(CreateProjectInput, input);
   authorize(actor, 'project.create');
+  const repo = repositoryColumns(repository ?? null);
+  if (repo.repositoryKey) await assertRepositoryFree(db, actor, repo.repositoryKey);
   try {
     const [row] = await db
       .insert(project)
-      .values({ workspaceId: actor.workspaceId, key, name, description: description || null })
+      .values({ workspaceId: actor.workspaceId, key, name, description: description || null, ...repo })
       .returning();
     if (!row) throw new Error('project insert returned no row');
     return toProject(row);
   } catch (error) {
     if (isUniqueViolation(error, PROJECT_KEY_UNIQUE)) throw keyTaken(key);
+    if (isUniqueViolation(error, PROJECT_REPOSITORY_UNIQUE))
+      throw repositoryRace(repository ? (parseRepositoryUrl(repository)?.short ?? null) : null);
     throw error;
   }
 }
 
 /**
- * Updates name, description, key or the milestone and cycle switches. The key can change only
+ * Updates name, description, key, repository or the milestone and cycle switches. The key can change only
  * while the project has no tasks, because task keys embed it. Conflict otherwise, or when the new
  * key is taken. Turning a switch off keeps the milestones or cycles; turning it on shows them again.
  */
@@ -195,6 +255,13 @@ export async function updateProject(
       if (parsed.usesCycles !== undefined && parsed.usesCycles !== current.usesCycles) {
         changes.usesCycles = parsed.usesCycles;
       }
+      if (parsed.repository !== undefined) {
+        const repo = repositoryColumns(parsed.repository);
+        if (repo.repository !== current.repository) {
+          if (repo.repositoryKey) await assertRepositoryFree(tx, actor, repo.repositoryKey, current.id);
+          Object.assign(changes, repo);
+        }
+      }
       if (Object.keys(changes).length === 0) return toProjectWithCycle(ctx, tx, current);
 
       const [row] = await tx.update(project).set(changes).where(eq(project.id, current.id)).returning();
@@ -203,6 +270,9 @@ export async function updateProject(
     });
   } catch (error) {
     if (parsed.key && isUniqueViolation(error, PROJECT_KEY_UNIQUE)) throw keyTaken(parsed.key);
+    if (isUniqueViolation(error, PROJECT_REPOSITORY_UNIQUE)) {
+      throw repositoryRace(parsed.repository ? (parseRepositoryUrl(parsed.repository)?.short ?? null) : null);
+    }
     throw error;
   }
 }

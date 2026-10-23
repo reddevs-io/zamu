@@ -117,6 +117,89 @@ describe('projects', () => {
     await expect(updateProject(ctx, readOnly, { project: 'PAY', name: 'x' })).rejects.toThrow(Forbidden);
   });
 
+  it('links one repository per project, matched on host and path', async () => {
+    const w = await createWorld(ctx.db);
+    const pay = await createProject(ctx, w.ownerActor, {
+      name: 'Payments',
+      key: 'PAY',
+      repository: 'git@gitlab.com:reddevs/payments.git',
+    });
+    expect(pay.repository).toBe('git@gitlab.com:reddevs/payments.git');
+    const plain = await createProject(ctx, w.ownerActor, { name: 'Web', key: 'WEB', repository: '' });
+    expect(plain.repository).toBeNull();
+
+    // The same repository in another form is taken, and the message names the owner.
+    const taken = createProject(ctx, w.ownerActor, {
+      name: 'Copy',
+      key: 'CPY',
+      repository: 'https://GitLab.com/reddevs/payments',
+    });
+    await expect(taken).rejects.toThrow(Conflict);
+    await expect(taken).rejects.toMatchObject({
+      message:
+        'Payments (PAY) already uses gitlab.com/reddevs/payments. A repository can belong to one project.',
+      issues: [{ path: 'repository' }],
+    });
+    await expect(
+      updateProject(ctx, w.ownerActor, {
+        project: 'WEB',
+        repository: 'ssh://git@gitlab.com:22/reddevs/payments',
+      }),
+    ).rejects.toThrow(/Payments \(PAY\) already uses/);
+
+    // Its own project can switch to another form of the same URL, or to another repository.
+    const ssh = await updateProject(ctx, w.ownerActor, {
+      project: 'PAY',
+      repository: 'https://gitlab.com/reddevs/payments.git',
+    });
+    expect(ssh.repository).toBe('https://gitlab.com/reddevs/payments.git');
+    const listed = (await listProjects(ctx, w.ownerActor)).items.find((p) => p.key === 'PAY');
+    expect(listed?.repository).toBe('https://gitlab.com/reddevs/payments.git');
+
+    // Clearing frees the repository for another project.
+    const cleared = await updateProject(ctx, w.ownerActor, { project: 'PAY', repository: null });
+    expect(cleared.repository).toBeNull();
+    const web = await updateProject(ctx, w.ownerActor, {
+      project: 'WEB',
+      repository: 'git@gitlab.com:reddevs/payments.git',
+    });
+    expect(web.repository).toBe('git@gitlab.com:reddevs/payments.git');
+
+    await expect(
+      updateProject(ctx, w.ownerActor, { project: 'PAY', repository: 'reddevs/payments' }),
+    ).rejects.toThrow(Invalid);
+
+    // Another workspace can link the same repository.
+    const other = await createWorld(ctx.db, 'Elsewhere');
+    await expect(
+      createProject(ctx, other.ownerActor, {
+        name: 'Web',
+        key: 'WEB',
+        repository: 'git@gitlab.com:reddevs/payments.git',
+      }),
+    ).resolves.toMatchObject({ key: 'WEB' });
+  });
+
+  it('does not name a project outside the key scope in a repository conflict', async () => {
+    const w = await createWorld(ctx.db);
+    await createProject(ctx, w.ownerActor, {
+      name: 'Secret',
+      key: 'SEC',
+      repository: 'https://github.com/t/secret',
+    });
+    const mine = await createProject(ctx, w.ownerActor, { name: 'Mine', key: 'MIN' });
+    const scoped = { ...w.agentActor, scope: { projects: [mine.id], access: 'write' as const } };
+    await expect(
+      updateProject(ctx, scoped, { project: 'MIN', repository: 'git@github.com:t/secret.git' }),
+    ).rejects.toThrow(
+      'Another project in this workspace already uses github.com/t/secret. A repository can belong to one project.',
+    );
+    // A project-scoped write key may link its own project.
+    await expect(
+      updateProject(ctx, scoped, { project: 'MIN', repository: 'git@github.com:t/mine.git' }),
+    ).resolves.toMatchObject({ repository: 'git@github.com:t/mine.git' });
+  });
+
   it('turns milestones and cycles on and off, both on by default', async () => {
     const created = await createProject(ctx, world.ownerActor, { name: 'Flags', key: randomProjectKey() });
     expect(created).toMatchObject({ usesMilestones: true, usesCycles: true, currentCycle: null });

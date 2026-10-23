@@ -7,6 +7,7 @@ import {
   FILTER_NONE,
   GetTaskInput,
   ListTasksInput,
+  MilestoneId,
   parseTaskKey,
   TASK_STATUSES,
   type Task,
@@ -29,6 +30,7 @@ import {
   table,
   timelineText,
 } from '../format';
+import { requireProject, resolveProject } from '../project';
 import {
   isNone,
   normalizeChoice,
@@ -100,8 +102,14 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
   if (options.mine && options.assignee !== undefined) {
     throw usageError('Use either --mine or --assignee, not both.');
   }
-  const projects = options.project?.length ? options.project : undefined;
   const milestoneNone = options.milestone !== undefined && isNone(options.milestone);
+  // Only a milestone name needs a project; then this clone's project fills in for --project.
+  const milestoneName =
+    options.milestone !== undefined &&
+    !milestoneNone &&
+    !MilestoneId.safeParse(options.milestone.trim()).success;
+  const fallback = !options.project?.length && milestoneName ? await resolveProject(context) : null;
+  const projects = options.project?.length ? options.project : fallback ? [fallback.key] : undefined;
   const draft = {
     ...(projects ? { project: projects } : {}),
     ...(options.status?.length ? { status: options.status } : {}),
@@ -238,7 +246,7 @@ export async function showTask(context: CommandContext, key: string): Promise<vo
 // ---------------------------------------------------------------------------
 
 export interface CreateOptions {
-  project: string;
+  project?: string;
   description?: string;
   priority?: string;
   assignee?: string;
@@ -254,7 +262,7 @@ export async function createTask(
 ): Promise<void> {
   const milestoneNone = options.milestone !== undefined && isNone(options.milestone);
   const draft = {
-    project: options.project,
+    project: await requireProject(context, options.project),
     title: titleWords.join(' '),
     ...(options.description !== undefined
       ? { description: await readText(context, options.description) }

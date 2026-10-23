@@ -1,4 +1,4 @@
-import type { ProjectWithCounts } from '@pm/contracts';
+import { type ProjectWithCounts, parseRepositoryUrl } from '@pm/contracts';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { projectHref } from '~/features/shell/paths';
@@ -26,6 +26,32 @@ function ProjectName({ project }: { project: ProjectWithCounts }) {
         {project.name}
       </Link>
       <Tooltip placement="top start">{project.name}</Tooltip>
+    </TooltipTrigger>
+  );
+}
+
+/**
+ * Linked repository as its short form, opening the repository page in a new tab. Long paths are cut
+ * from the left so the repository name stays visible (rtl box, ltr text). The row action does not run:
+ * the link handles its own presses.
+ */
+function RepositoryLink({ url }: { url: string }) {
+  const repository = parseRepositoryUrl(url);
+  if (!repository) return null;
+  return (
+    <TooltipTrigger>
+      <Link
+        href={repository.webUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="block w-fit max-w-full truncate text-left font-mono text-[10.5px] text-faint outline-none [direction:rtl] hover:text-accent hover:underline hover:underline-offset-2 focus-visible:focus-ring"
+      >
+        <span className="[direction:ltr] [unicode-bidi:isolate]">{repository.short}</span>
+      </Link>
+      <Tooltip placement="bottom start" className="max-w-none font-mono text-[10.5px] whitespace-nowrap">
+        {repository.webUrl}
+        <span aria-hidden> ↗</span>
+      </Tooltip>
     </TooltipTrigger>
   );
 }
@@ -62,11 +88,12 @@ const BASE_COLUMNS: readonly DataColumn<ProjectWithCounts>[] = [
     width: '1fr',
     isRowHeader: true,
     cell: (project) => (
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <ProjectName project={project} />
         {project.description ? (
           <div className="truncate text-[12px] text-muted">{project.description}</div>
         ) : null}
+        {project.repository ? <RepositoryLink url={project.repository} /> : null}
       </div>
     ),
   },
@@ -144,7 +171,10 @@ export interface ProjectsTableProps {
   onEdit?: (key: string) => void;
 }
 
-/** Projects table from frame 03: key, name and description, open-task bar, open count, members, age. */
+/**
+ * Projects table from frame 03 with the M2.1 repository line (option 1b): key, name, description and
+ * repository, open-task bar, open count, members, age.
+ */
 export function ProjectsTable({ projects, isLoading, emptyMessage, onOpen, onEdit }: ProjectsTableProps) {
   const editRef = useRef(onEdit);
   editRef.current = onEdit;
@@ -158,7 +188,8 @@ export function ProjectsTable({ projects, isLoading, emptyMessage, onOpen, onEdi
       items={projects}
       getKey={(project) => project.key}
       onRowAction={(key) => onOpen(key)}
-      rowHeight={53}
+      // 64px rows plus the divider; rows without a repository keep the same height.
+      rowHeight={65}
       isLoading={isLoading}
       skeletonRows={5}
       renderEmptyState={

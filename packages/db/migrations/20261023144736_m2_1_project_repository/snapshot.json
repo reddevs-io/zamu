@@ -1,0 +1,136 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "c85af1e1-a598-4686-81fa-5196e1722fbe",
+  "prevIds": ["d966838d-6272-4588-b1fa-0c530e89ab6c"],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "project", "repository"],
+      "writes": [
+        "s|col|public.project.repository",
+        "n|col|public.project.repository",
+        "e|col|public.project.repository"
+      ],
+      "reads": ["n|tbl|public.project", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "project", "repository_key"],
+      "writes": [
+        "s|col|public.project.repository_key",
+        "n|col|public.project.repository_key",
+        "e|col|public.project.repository_key"
+      ],
+      "reads": ["n|tbl|public.project", "n|sch|public"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "project", "project_workspaceId_repositoryKey_unique"],
+      "writes": [
+        "s|idx|public.project_workspaceId_repositoryKey_unique",
+        "n|idx|public.project_workspaceId_repositoryKey_unique",
+        "e|idx|public.project_workspaceId_repositoryKey_unique",
+        "n|rel|public.project_workspaceId_repositoryKey_unique"
+      ],
+      "reads": [
+        "n|tbl|public.project",
+        "n|sch|public",
+        "n|col|public.project.workspace_id",
+        "n|col|public.project.repository_key"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "project"],
+      "writes": [
+        "s|ck|public.project.project_repository_check",
+        "n|ck|public.project.project_repository_check",
+        "e|ck|public.project.project_repository_check",
+        "n|con|public.project.project_repository_check"
+      ],
+      "reads": [
+        "n|tbl|public.project",
+        "n|sch|public",
+        "n|col|public.project.repository",
+        "n|col|public.project.repository_key"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "repository",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "repository_key",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "project_workspaceId_repositoryKey_unique",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "workspace_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "repository_key",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "project_repository_check",
+        "value": "(\"repository\" is null) = (\"repository_key\" is null)",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

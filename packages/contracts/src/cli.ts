@@ -14,6 +14,7 @@ import {
   TaskListPage,
   TimelineItem,
 } from './entities';
+import { ProjectKey, ProjectKeyInput } from './primitives';
 import { Problem } from './problem';
 
 // Versioned `pm ... --json` output. Every result is { "schema": "pm.v1.<name>", "data": ... }.
@@ -21,14 +22,38 @@ import { Problem } from './problem';
 
 export const CLI_SCHEMA_VERSION = 'v1';
 
+export const CLI_PROJECT_SOURCES = ['flag', 'env', 'file', 'remote'] as const;
+/**
+ * Where pm took the project from when a command needs one: --project, PM_PROJECT, the nearest
+ * .pm.json, or the project whose repository matches the clone's git remote.
+ */
+export const CliProjectSource = z.enum(CLI_PROJECT_SOURCES);
+export type CliProjectSource = z.infer<typeof CliProjectSource>;
+
+export const CliResolvedProject = z.object({
+  key: ProjectKey,
+  source: CliProjectSource,
+  /** The .pm.json path (file) or the remote URL (remote); null otherwise. */
+  from: z.string().nullable(),
+});
+export type CliResolvedProject = z.output<typeof CliResolvedProject>;
+
+export const PROJECT_FILE_NAME = '.pm.json';
+
+/** Contents of .pm.json, committed at the repository root or in a monorepo subfolder. */
+export const ProjectFile = z.strictObject({ project: ProjectKeyInput });
+export type ProjectFile = z.output<typeof ProjectFile>;
+
+export const CLI_LINK_ACTIONS = ['linked', 'replaced', 'unchanged', 'cleared', 'created', 'updated'] as const;
+
 /** Data schema for each CLI result name. */
 export const cliDataSchemas = {
   /** pm login */
   login: z.object({ url: z.url(), me: Me }),
   /** pm logout */
   logout: z.object({ url: z.url().nullable() }),
-  /** pm whoami */
-  whoami: Me,
+  /** pm whoami. `project` (M2.1) is the project commands use here, or null. */
+  whoami: Me.extend({ project: CliResolvedProject.nullable().optional() }),
   /** pm projects list */
   'projects.list': ProjectList,
   /** pm tasks list [--mine] [--project ...] [--milestone ...] [--cycle ...] */
@@ -68,6 +93,25 @@ export const cliDataSchemas = {
   'cycles.current': Cycle.nullable(),
   /** pm cycles end: the completed cycle with its summary and rollovers. */
   'cycles.end': CycleDetail,
+  /**
+   * pm link: `target` server sets or clears the project's repository; file writes .pm.json.
+   * `repository` is the short form (host/path) of the linked repository, null once cleared.
+   */
+  link: z.object({
+    project: ProjectKey,
+    target: z.enum(['server', 'file']),
+    action: z.enum(CLI_LINK_ACTIONS),
+    repository: z.string().nullable(),
+    /** The .pm.json path for target file, else null. */
+    file: z.string().nullable(),
+  }),
+  /** pm agents: `file` is null with --print. `block` is the text between the pm markers. */
+  agents: z.object({
+    file: z.string().nullable(),
+    action: z.enum(['created', 'updated', 'unchanged', 'printed']),
+    project: ProjectKey.nullable(),
+    block: z.string(),
+  }),
   /** Any command that fails while --json is set (printed to stdout, exit code still non-zero). */
   error: Problem,
 } as const;

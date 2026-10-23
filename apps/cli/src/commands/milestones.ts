@@ -2,11 +2,13 @@
 import {
   CreateMilestoneInput,
   ListMilestonesInput,
+  MilestoneId,
   type MilestoneWithProgress,
   UpdateMilestoneInput,
 } from '@pm/contracts';
 import { type CommandContext, emit } from '../context';
 import { fields, milestoneStatusLabel, progressLabel, table } from '../format';
+import { requireProject, resolveProject } from '../project';
 import { isNone, normalizeChoice, parseInput, readText, resolveMilestone } from './shared';
 
 function days(count: number): string {
@@ -44,8 +46,8 @@ function milestoneSummary(context: CommandContext, verb: string, milestone: Mile
 // pm milestones list
 // ---------------------------------------------------------------------------
 
-export async function listMilestones(context: CommandContext, options: { project: string }): Promise<void> {
-  const input = parseInput(ListMilestonesInput, { project: options.project });
+export async function listMilestones(context: CommandContext, options: { project?: string }): Promise<void> {
+  const input = parseInput(ListMilestonesInput, { project: await requireProject(context, options.project) });
   const client = await context.client();
   const milestones = await client.milestones.list(input);
   emit(context, 'milestones.list', milestones, (data) => {
@@ -72,7 +74,7 @@ export async function listMilestones(context: CommandContext, options: { project
 // ---------------------------------------------------------------------------
 
 export interface CreateMilestoneOptions {
-  project: string;
+  project?: string;
   target?: string;
   description?: string;
 }
@@ -83,7 +85,7 @@ export async function createMilestone(
   options: CreateMilestoneOptions,
 ): Promise<void> {
   const input = parseInput(CreateMilestoneInput, {
-    project: options.project,
+    project: await requireProject(context, options.project),
     name: nameWords.join(' '),
     ...(options.target !== undefined ? { targetDate: isNone(options.target) ? null : options.target } : {}),
     ...(options.description !== undefined
@@ -125,7 +127,11 @@ export async function updateMilestone(
   const placeholder = '00000000-0000-7000-8000-000000000000';
   parseInput(UpdateMilestoneInput, { id: placeholder, ...changes });
   const client = await context.client();
-  const id = await resolveMilestone(client, options.project, idOrName, 'Milestone');
+  // A name needs a project to look it up in; an id does not.
+  const project = MilestoneId.safeParse(idOrName.trim()).success
+    ? options.project
+    : (await resolveProject(context, options.project))?.key;
+  const id = await resolveMilestone(client, project, idOrName, 'Milestone');
   const input = parseInput(UpdateMilestoneInput, { id, ...changes });
   const milestone = await client.milestones.update(input);
   emit(context, 'milestones.update', milestone, (data) => milestoneSummary(context, 'Updated', data));

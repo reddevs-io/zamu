@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CLI_RESULT_NAMES, cliOutput, cliSchemaId, parseCliOutput } from './cli';
+import {
+  CLI_RESULT_NAMES,
+  cliOutput,
+  cliOutputSchemas,
+  cliSchemaId,
+  ProjectFile,
+  parseCliOutput,
+} from './cli';
 import { problem } from './problem';
 import {
   activityFixture,
@@ -38,8 +45,41 @@ describe('CLI output', () => {
       'cycles.create',
       'cycles.current',
       'cycles.end',
+      'link',
+      'agents',
       'error',
     ]);
+  });
+
+  it('describes the M2.1 results: whoami project, link and agents', () => {
+    const me = cliOutputSchemas.whoami.shape.data;
+    expect(
+      me.safeParse({ ...meFixture, project: { key: 'PAY', source: 'remote', from: 'git@x.io:t/p.git' } })
+        .success,
+    ).toBe(true);
+    expect(me.safeParse({ ...meFixture, project: null }).success).toBe(true);
+    expect(me.safeParse(meFixture).success, 'older pm without the field').toBe(true);
+    expect(me.safeParse({ ...meFixture, project: { key: 'PAY', source: 'guess', from: null } }).success).toBe(
+      false,
+    );
+
+    const link = cliOutput('link', {
+      project: 'PAY',
+      target: 'server',
+      action: 'linked',
+      repository: 'gitlab.com/t/p',
+      file: null,
+    });
+    expect(link.schema).toBe('pm.v1.link');
+    const agents = cliOutput('agents', {
+      file: '/repo/AGENTS.md',
+      action: 'created',
+      project: null,
+      block: '...',
+    });
+    expect(agents.data.action).toBe('created');
+    expect(ProjectFile.safeParse({ project: 'pay' }).data).toEqual({ project: 'PAY' });
+    expect(ProjectFile.safeParse({ project: 'PAY', url: 'https://pm.example.com' }).success).toBe(false);
   });
 
   it('wraps data in the versioned envelope and serialises dates', () => {

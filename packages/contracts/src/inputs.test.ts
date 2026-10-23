@@ -45,6 +45,17 @@ describe('CreateProjectInput', () => {
     );
   });
 
+  it('keeps an optional repository and rejects what is not a clone URL', () => {
+    expect(
+      CreateProjectInput.parse({ name: 'Web', key: 'WEB', repository: 'https://github.com/team/web' })
+        .repository,
+    ).toBe('https://github.com/team/web');
+    expect(CreateProjectInput.parse({ name: 'Web', key: 'WEB', repository: '' }).repository).toBe('');
+    expect(
+      CreateProjectInput.safeParse({ name: 'Web', key: 'WEB', repository: '/srv/git/web' }).success,
+    ).toBe(false);
+  });
+
   it.each([
     [{ name: '', key: 'PAY' }],
     [{ name: '   ', key: 'PAY' }],
@@ -69,8 +80,24 @@ describe('UpdateProjectInput', () => {
     const result = UpdateProjectInput.safeParse({ project: 'PAY' });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.message).toBe(
-      'Change at least one of key, name, description, usesMilestones or usesCycles',
+      'Change at least one of key, name, description, usesMilestones, usesCycles or repository',
     );
+  });
+
+  it('sets, keeps or clears the repository', () => {
+    expect(UpdateProjectInput.parse({ project: 'PAY', repository: ' git@gitlab.com:team/pay.git ' })).toEqual(
+      {
+        project: 'PAY',
+        repository: 'git@gitlab.com:team/pay.git',
+      },
+    );
+    expect(UpdateProjectInput.parse({ project: 'PAY', repository: null }).repository).toBeNull();
+    expect(UpdateProjectInput.parse({ project: 'PAY', repository: '' }).repository).toBe('');
+    const bad = UpdateProjectInput.safeParse({ project: 'PAY', repository: 'team/pay' });
+    expect(bad.error?.issues[0]).toMatchObject({
+      path: ['repository'],
+      message: 'Not a clone URL. Use the form https://host/owner/repo or git@host:owner/repo.',
+    });
   });
 
   it('turns milestones and cycles on or off', () => {

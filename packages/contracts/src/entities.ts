@@ -95,6 +95,11 @@ export const Project = z.object({
   usesCycles: z.boolean().default(true),
   /** Null when the project has no current cycle or does not use cycles. */
   currentCycle: CurrentCycle.nullable().default(null),
+  /**
+   * Clone URL of the linked git repository, as entered (M2.1). parseRepositoryUrl gives its short
+   * form and web page. The CLI picks this project inside a clone whose remote matches.
+   */
+  repository: z.string().nullable().default(null),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });

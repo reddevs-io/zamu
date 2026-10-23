@@ -5,7 +5,8 @@
 // the contract's CLI output schemas, and every failure against its exit code.
 //
 // The server code is imported by relative path (apps/web/src/server uses relative imports for this).
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type CliResultName, parseCliOutput } from '@pm/contracts';
@@ -36,6 +37,8 @@ interface RunOptions {
   fetch?: FetchLike;
   tty?: boolean;
   columns?: number;
+  /** Working directory (default: the temporary home, which is not a git repository). */
+  cwd?: string;
 }
 
 interface RunResult {
@@ -53,6 +56,7 @@ async function pm(args: string[], options: RunOptions = {}): Promise<RunResult> 
     readStdin: async () => options.stdin ?? '',
     env: { XDG_CONFIG_HOME: configHome, ...options.env },
     homeDir: home,
+    cwd: options.cwd ?? home,
     isTTY: options.tty ?? false,
     ...(options.columns ? { columns: options.columns } : {}),
     fetch: options.fetch ?? handle,
@@ -1204,6 +1208,292 @@ describe('output conventions', () => {
     const unknown = await pm(['frobnicate']);
     expect(unknown.code).toBe(1);
     expect(unknown.stderr).toContain("unknown command 'frobnicate'");
+  });
+});
+
+/** A git repository in the temporary home with an origin remote (or none). */
+async function clone(name: string, remote?: string): Promise<string> {
+  const dir = join(home, name);
+  await mkdir(join(dir, 'src', 'deep'), { recursive: true });
+  execFileSync('git', ['init', '-q', dir]);
+  if (remote) execFileSync('git', ['-C', dir, 'remote', 'add', 'origin', remote]);
+  return dir;
+}
+
+describe('repository link (M2.1)', () => {
+  const SSH = 'git@gitlab.example.com:team/payments.git';
+
+  afterAll(async () => {
+    await as(keys.admin, ['link', '--clear', '--project', 'PAY']);
+  });
+
+  it('pm link links PAY to the remote, and commands in any clone of it use PAY', async () => {
+    const repo = await clone('payments', SSH);
+    const before = await as(keys.agent, ['milestones', 'list', '--json'], { cwd: repo });
+    expect(expectFailure(before, 1, 'BAD_REQUEST').detail).toBe(
+      'No project given, and no project you can read is linked to gitlab.example.com/team/payments.',
+    );
+    const beforeHuman = await as(keys.agent, ['milestones', 'list'], { cwd: repo });
+    expect(beforeHuman.stderr).toContain('pm link --project KEY');
+
+    const linked = await as(keys.agent, ['link', '--project', 'pay', '--json'], { cwd: repo });
+    expect(linked.code, linked.stdout).toBe(0);
+    expect(parsed(linked, 'link').data).toEqual({
+      project: 'PAY',
+      target: 'server',
+      action: 'linked',
+      repository: 'gitlab.example.com/team/payments',
+      file: null,
+    });
+    const human = await as(keys.agent, ['link', '--project', 'PAY'], { cwd: repo });
+    expect(human.stdout).toBe('PAY is already linked to gitlab.example.com/team/payments.\n');
+
+    const projects = parsed(await as(keys.agent, ['projects', 'list', '--json']), 'projects.list');
+    expect(projects.data.items.find((p) => p.key === 'PAY')?.repository).toBe(SSH);
+    const table = await as(keys.agent, ['projects', 'list']);
+    expect(table.stdout).toMatch(/REPOSITORY\n/);
+    expect(table.stdout).toContain('gitlab.example.com/team/payments');
+
+    // A subfolder, and another clone over HTTPS with other casing, find PAY too.
+    const sub = join(repo, 'src', 'deep');
+    const milestones = parsed(
+      await as(keys.agent, ['milestones', 'list', '--json'], { cwd: sub }),
+      'milestones.list',
+    );
+    expect(milestones.data.items.map((m) => m.name)).toContain('Webhooks v2');
+    const https = await clone('payments-https', 'https://gitlab.example.com/Team/Payments');
+    const cycle = parsed(
+      await as(keys.agent, ['cycles', 'current', '--json'], { cwd: https }),
+      'cycles.current',
+    );
+    expect(cycle.data?.project.key).toBe('PAY');
+
+    const created = parsed(
+      await as(keys.agent, ['tasks', 'create', 'Filed from a clone', '--json'], { cwd: sub }),
+      'tasks.create',
+    );
+    expect(created.data.key).toMatch(/^PAY-\d+$/);
+
+    // A milestone name is looked up in the clone's project, and the list narrows to it.
+    const byName = parsed(
+      await as(keys.agent, ['tasks', 'list', '--milestone', 'webhooks v2', '--json'], { cwd: repo }),
+      'tasks.list',
+    );
+    expect(byName.data.items.length).toBeGreaterThan(0);
+    expect(new Set(byName.data.items.map((t) => t.project.key))).toEqual(new Set(['PAY']));
+    // Without a milestone name, tasks list still covers every project.
+    const all = parsed(
+      await as(keys.agent, ['tasks', 'list', '--limit', '200', '--json'], { cwd: repo }),
+      'tasks.list',
+    );
+    expect(new Set(all.data.items.map((t) => t.project.key))).toEqual(new Set(['PAY', 'WEB']));
+
+    const me = parsed(await as(keys.agent, ['whoami', '--json'], { cwd: sub }), 'whoami');
+    expect(me.data.project).toEqual({ key: 'PAY', source: 'remote', from: SSH });
+    const meHuman = await as(keys.agent, ['whoami'], { cwd: sub });
+    expect(meHuman.stdout).toMatch(/Project\s+PAY \(from git remote gitlab\.example\.com\/team\/payments\)/);
+  });
+
+  it('refuses a repository another project has, and replaces a link only with --force', async () => {
+    const repo = await clone('payments-2', SSH);
+    const taken = await as(keys.agent, ['link', '--project', 'WEB', '--json'], { cwd: repo });
+    expect(expectFailure(taken, 1, 'CONFLICT').detail).toBe(
+      'Payments (PAY) already uses gitlab.example.com/team/payments. A repository can belong to one project.',
+    );
+    const takenHuman = await as(keys.agent, ['link', '--project', 'WEB'], { cwd: repo });
+    expect(takenHuman.stderr).toMatch(
+      /^pm: Payments \(PAY\) already uses gitlab\.example\.com\/team\/payments\. A repository can belong to one project\.\n {2}Request id: /,
+    );
+
+    const fork = await clone('payments-fork', 'https://github.com/someone/payments-fork.git');
+    const refused = await as(keys.agent, ['link', '--project', 'PAY', '--json'], { cwd: fork });
+    expect(expectFailure(refused, 1, 'BAD_REQUEST').detail).toBe(
+      'PAY is already linked to gitlab.example.com/team/payments.',
+    );
+    const forced = await as(keys.agent, ['link', '--project', 'PAY', '--force'], { cwd: fork });
+    expect(forced.stdout).toBe(
+      'Linked PAY to github.com/someone/payments-fork (was gitlab.example.com/team/payments).\n',
+    );
+
+    // --clear finds the project through the remote it is linked to.
+    const cleared = await as(keys.agent, ['link', '--clear', '--json'], { cwd: fork });
+    expect(parsed(cleared, 'link').data).toMatchObject({
+      project: 'PAY',
+      action: 'cleared',
+      repository: null,
+    });
+    const again = await as(keys.agent, ['link', '--clear', '--project', 'PAY']);
+    expect(again.stdout).toBe('PAY has no repository linked.\n');
+
+    await as(keys.agent, ['link', '--project', 'PAY'], { cwd: repo });
+  });
+
+  it('takes --project, then PM_PROJECT, then .pm.json, then the remote', async () => {
+    const repo = await clone('payments-3', SSH);
+    const sub = join(repo, 'src');
+    const remote = parsed(await as(keys.agent, ['whoami', '--json'], { cwd: sub }), 'whoami');
+    expect(remote.data.project?.source).toBe('remote');
+
+    await writeFile(join(sub, '.pm.json'), '{ "project": "web" }\n');
+    const file = parsed(await as(keys.agent, ['whoami', '--json'], { cwd: join(sub, 'deep') }), 'whoami');
+    expect(file.data.project).toEqual({ key: 'WEB', source: 'file', from: join(sub, '.pm.json') });
+    const milestones = parsed(
+      await as(keys.agent, ['milestones', 'list', '--json'], { cwd: sub }),
+      'milestones.list',
+    );
+    expect(milestones.data.items.every((m) => m.project.key === 'WEB')).toBe(true);
+    // Through a symlinked path the file is found at its real location.
+    await symlink(repo, join(home, 'payments-link'));
+    const viaLink = parsed(
+      await as(keys.agent, ['whoami', '--json'], { cwd: join(home, 'payments-link', 'src', 'deep') }),
+      'whoami',
+    );
+    expect(viaLink.data.project).toMatchObject({ key: 'WEB', source: 'file' });
+
+    const env = parsed(
+      await as(keys.agent, ['whoami', '--json'], { cwd: sub, env: { PM_PROJECT: 'pay' } }),
+      'whoami',
+    );
+    expect(env.data.project).toEqual({ key: 'PAY', source: 'env', from: null });
+    const flag = parsed(
+      await as(keys.agent, ['cycles', 'list', '--project', 'WEB', '--json'], {
+        cwd: sub,
+        env: { PM_PROJECT: 'PAY' },
+      }),
+      'cycles.list',
+    );
+    expect(flag.data.items.length).toBeGreaterThan(0);
+    expect(flag.data.items.every((c) => c.project.key === 'WEB')).toBe(true);
+
+    await writeFile(join(sub, '.pm.json'), '{ "project": "WEB", "url": "https://pm.example.com" }');
+    const extra = await as(keys.agent, ['whoami', '--json'], { cwd: sub });
+    expect(expectFailure(extra, 1, 'BAD_REQUEST').detail).toBe(
+      `${join(sub, '.pm.json')} is not a valid pm project file.`,
+    );
+    await writeFile(join(sub, '.pm.json'), '{ project: WEB }');
+    expect(
+      expectFailure(await as(keys.agent, ['whoami', '--json'], { cwd: sub }), 1, 'BAD_REQUEST').detail,
+    ).toBe(`${join(sub, '.pm.json')} is not valid JSON.`);
+    const badEnv = await as(keys.agent, ['whoami', '--json'], {
+      cwd: repo,
+      env: { PM_PROJECT: 'not a key' },
+    });
+    expect(expectFailure(badEnv, 1, 'BAD_REQUEST').detail).toBe('PM_PROJECT is not a project key: not a key');
+
+    // Outside any repository nothing names a project.
+    const outside = await as(keys.agent, ['cycles', 'list']);
+    expect(outside.code).toBe(1);
+    expect(outside.stderr).toContain('pm: No project given. Pass --project KEY.');
+    expect(parsed(await as(keys.agent, ['whoami', '--json']), 'whoami').data.project).toBeNull();
+    expect((await as(keys.agent, ['whoami'])).stdout).toMatch(/Project\s+none here/);
+  });
+
+  it('pm link --file writes .pm.json at the repository root, or here with --here', async () => {
+    const repo = await clone('monorepo');
+    const sub = join(repo, 'src');
+    const created = await as(keys.agent, ['link', '--file', '--project', 'web', '--json'], { cwd: sub });
+    expect(parsed(created, 'link').data).toEqual({
+      project: 'WEB',
+      target: 'file',
+      action: 'created',
+      repository: null,
+      file: join(repo, '.pm.json'),
+    });
+    expect(JSON.parse(await readFile(join(repo, '.pm.json'), 'utf8'))).toEqual({ project: 'WEB' });
+    const same = await as(keys.agent, ['link', '--file'], { cwd: sub });
+    expect(same.stdout).toBe('../.pm.json already names WEB.\n');
+
+    const here = await as(keys.agent, ['link', '--file', '--here', '--project', 'PAY'], { cwd: sub });
+    expect(here.stdout).toBe(
+      'Wrote .pm.json: pm uses PAY in this folder and below. Commit it so every clone gets it.\n',
+    );
+    expect(
+      parsed(await as(keys.agent, ['whoami', '--json'], { cwd: join(sub, 'deep') }), 'whoami').data.project
+        ?.key,
+    ).toBe('PAY');
+
+    expect(
+      expectFailure(
+        await as(keys.agent, ['link', '--file', '--project', 'ZZZ', '--json'], { cwd: repo }),
+        3,
+        'NOT_FOUND',
+      ).detail,
+    ).toBe('No project ZZZ that this key can read.');
+    expect((await as(keys.agent, ['link', '--file', '--clear'])).code).toBe(1);
+    expect((await as(keys.agent, ['link', '--here'])).code).toBe(1);
+    expect((await as(keys.agent, ['link', '--clear', '--force'])).code).toBe(1);
+
+    const noRemote = await as(keys.agent, ['link', '--project', 'PAY', '--json'], { cwd: repo });
+    expect(expectFailure(noRemote, 1, 'BAD_REQUEST').detail).toBe('This clone has no git remote to link.');
+    const notRepo = await as(keys.agent, ['link', '--project', 'PAY', '--json']);
+    expect(expectFailure(notRepo, 1, 'BAD_REQUEST').detail).toBe(
+      'This folder is not inside a git repository.',
+    );
+    const local = await clone('local-remote', '/srv/git/payments.git');
+    const unlinkable = await as(keys.agent, ['link', '--project', 'PAY', '--json'], { cwd: local });
+    expect(expectFailure(unlinkable, 1, 'BAD_REQUEST').detail).toBe(
+      'The remote origin (/srv/git/payments.git) is not a URL pm can link.',
+    );
+  });
+
+  it('pm agents writes a marked block into AGENTS.md and replaces only that block', async () => {
+    const repo = await clone('agents', SSH);
+    const created = await as(keys.agent, ['agents', '--json'], { cwd: join(repo, 'src') });
+    const out = parsed(created, 'agents').data;
+    expect(out).toMatchObject({ file: join(repo, 'AGENTS.md'), action: 'created', project: 'PAY' });
+    const first = await readFile(join(repo, 'AGENTS.md'), 'utf8');
+    expect(first).toBe(`${out.block}\n`);
+    expect(first).toMatch(
+      /^<!-- pm:start \(written by pm agents; run it again to update\) -->\n## Tasks: the pm CLI\n/,
+    );
+    expect(first).toContain('Tasks for this repository are in project PAY.');
+    expect(first).toContain('`pm tasks show PAY-12 --json`');
+    expect(first.trimEnd().endsWith('<!-- pm:end -->')).toBe(true);
+
+    const unchanged = await as(keys.agent, ['agents'], { cwd: repo });
+    expect(unchanged.stdout).toBe('AGENTS.md already has the current pm instructions.\n');
+
+    // Hand-written text around the block survives; the block is rewritten in place.
+    await writeFile(
+      join(repo, 'AGENTS.md'),
+      `# Repo rules\n\nUse pnpm.\n\n${first}\n## More\n\nKeep this.\n`,
+    );
+    const updated = await as(keys.agent, ['agents', '--project', 'web'], { cwd: repo });
+    expect(updated.stdout).toBe('Wrote pm instructions for WEB into AGENTS.md.\n');
+    const second = await readFile(join(repo, 'AGENTS.md'), 'utf8');
+    expect(second.startsWith('# Repo rules\n\nUse pnpm.\n\n<!-- pm:start')).toBe(true);
+    expect(second.endsWith('<!-- pm:end -->\n\n## More\n\nKeep this.\n')).toBe(true);
+    expect(second.match(/<!-- pm:start/g)).toHaveLength(1);
+    expect(second).toContain('project WEB');
+
+    // Only CLAUDE.md: the block goes there. --file picks any file.
+    const claude = await clone('claude-only');
+    await writeFile(join(claude, 'CLAUDE.md'), '# Notes\n');
+    const intoClaude = parsed(await as(keys.agent, ['agents', '--json'], { cwd: claude }), 'agents').data;
+    expect(intoClaude).toMatchObject({ file: join(claude, 'CLAUDE.md'), action: 'updated', project: null });
+    expect(await readFile(join(claude, 'CLAUDE.md'), 'utf8')).toMatch(/^# Notes\n\n<!-- pm:start/);
+    const custom = parsed(
+      await as(keys.agent, ['agents', '--file', 'docs/AI.md', '--json'], { cwd: repo }),
+      'agents',
+    );
+    expect(custom.data).toMatchObject({ file: join(repo, 'docs', 'AI.md'), action: 'created' });
+  });
+
+  it('pm agents --print works without credentials and without a project', async () => {
+    const repo = await clone('offline', SSH);
+    const printed = await pm(['agents', '--print'], { cwd: repo });
+    expect(printed.code, printed.stderr).toBe(0);
+    expect(printed.stdout).toContain('Pass --project KEY to commands that work on one project.');
+    expect(printed.stdout).toContain('`pm tasks create "Title" --project KEY --description -`');
+    expect(printed.stderr).toBe('');
+    const json = parsed(await pm(['agents', '--print', '--json'], { cwd: repo }), 'agents');
+    expect(json.data).toMatchObject({ file: null, action: 'printed', project: null });
+    await expect(stat(join(repo, 'AGENTS.md'))).rejects.toThrow();
+
+    // With a key the server refuses, the lookup is skipped with a note and the block still prints.
+    const refused = await as(keys.revoked, ['agents', '--print'], { cwd: repo });
+    expect(refused.code).toBe(0);
+    expect(refused.stderr).toContain('pm: could not look up the project of this clone');
   });
 });
 
