@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<style>
+.st-grid{display:grid;grid-template-columns:220px minmax(0,1fr);min-width:0;min-height:0}
+.st-nav{border-right:1px solid var(--line);padding:22px 12px;display:flex;flex-direction:column;gap:2px;background:var(--band)}
+.st-navh{padding:14px 12px 6px}
+.st-ni{height:30px;display:flex;align-items:center;padding:0 12px;color:var(--muted)}
+.st-nion{height:30px;display:flex;align-items:center;padding:0 12px;color:var(--fg);font-weight:600;background:var(--surface);box-shadow:inset 2px 0 0 var(--accent)}
+.st-title{padding:0 12px 4px;font-size:15px;font-weight:600}
+.st-main{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.cn-cols{grid-template-columns:minmax(0,1fr) 120px 150px 96px 190px 92px}
+.cn-row{min-height:56px;display:grid;grid-template-columns:minmax(0,1fr) 120px 150px 96px 190px 92px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.cn-rowm{min-height:56px;display:grid;grid-template-columns:minmax(0,1fr) 120px 150px 96px 190px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.cn-colsm{grid-template-columns:minmax(0,1fr) 120px 150px 96px 190px}
+.cn-name{display:flex;align-items:center;gap:10px;min-width:0}
+.cn-host{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--faint)}
+.cn-used{display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.cn-key{font-family:"Martian Mono",ui-monospace,monospace;font-size:10px;height:18px;display:inline-flex;align-items:center;padding:0 5px;border:1px solid var(--line);color:var(--fg)}
+.cn-acts{display:flex;gap:6px;justify-content:flex-end}
+.cn-provs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cn-test{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--line);background:var(--band);font-size:12.5px;line-height:1.5}
+.cn-teste{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--danger);background:var(--danger-bg);font-size:12.5px;line-height:1.5}
+.cn-test .m3-dot,.cn-teste .m3-dot{margin-top:5px}
+.cn-scope{font-size:11.5px;color:var(--muted);line-height:1.5}
+.cn-intro{padding:16px 24px 0;font-size:12.5px;color:var(--muted);max-width:760px;line-height:1.55}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rk" href="#"><span>PAY</span><span class="lg-rn">12</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnavon" href="#">Settings</a>
+      <span class="lg-rme">{{ meIni }}</span>
+    </nav>
+    <div class="st-grid">
+      <aside class="st-nav">
+        <div class="st-title">Settings</div>
+        <div class="lg-cap st-navh">Workspace</div>
+        <a class="st-ni" href="#">General</a>
+        <a class="st-ni" href="#">Members</a>
+        <a class="st-ni" href="#">API keys</a>
+        <a class="st-nion" href="#">Git connections</a>
+        <div class="lg-cap st-navh">You</div>
+        <a class="st-ni" href="#">Appearance</a>
+        <a class="st-ni" href="#">Your API keys</a>
+      </aside>
+      <section class="st-main">
+        <header class="lg-head">
+          <div><h1 class="lg-h1">Git connections</h1><div class="lg-sub">{{ sub }}</div></div>
+          <sc-if value="{{ canAdd }}" hint-placeholder-val="{{ true }}"><div class="lg-headr"><button class="lg-btn">Add connection</button></div></sc-if>
+        </header>
+        <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:20px 24px"><div class="lg-banner"><span class="lg-bannerx"></span><span>Couldn't load connections. The server didn't answer in time.</span><span class="lg-sp"></span><button class="lg-btn2" style="height:28px">Try again</button></div></div>
+        </sc-if>
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:56px 48px">
+            <div class="lg-empty" style="max-width:480px">
+              <div class="lg-h1" style="font-size:17px">No git connections yet</div>
+              <p class="lg-muted" style="margin:0;line-height:1.55">A connection lets projects read files from GitHub, GitLab or a Gitea/Forgejo server with an access token. Projects use it to mirror or import a Backlog.md folder. One connection can serve every project on the same account.</p>
+              <p class="lg-faint" style="margin:0;line-height:1.55;font-size:12px">The token only needs read access. You add webhooks yourself, so the app never asks for admin rights.</p>
+              <button class="lg-btn">Add connection</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasTable }}" hint-placeholder-val="{{ true }}">
+          <div class="{{ thCls }}" style="margin-top:8px"><span>Connection</span><span>Provider</span><span>Status</span><span>Checked</span><span>Used by</span><sc-if value="{{ canAdd }}" hint-placeholder-val="{{ true }}"><span></span></sc-if></div>
+          <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ skel }}" as="k" hint-placeholder-count="4"><div class="cn-row"><div class="cn-name"><span class="lg-skel" style="width:26px;height:26px"></span><span class="lg-skel" style="width:{{ k }}px"></span></div><span class="lg-skel" style="width:60px"></span><span class="lg-skel" style="width:80px"></span><span class="lg-skel" style="width:40px"></span><span class="lg-skel" style="width:110px"></span><span></span></div></sc-for>
+          </sc-if>
+          <sc-for list="{{ conns }}" as="c" hint-placeholder-count="4">
+            <div class="{{ rowCls }}">
+              <div class="cn-name"><span class="m3-prov">{{ c.badge }}</span><div style="min-width:0"><div class="lg-trunc" style="font-weight:600">{{ c.name }}</div><div class="cn-host lg-trunc">{{ c.host }}</div></div></div>
+              <span class="lg-muted">{{ c.prov }}</span>
+              <span><span class="{{ c.tagCls }}"><span class="{{ c.dotCls }}"></span>{{ c.status }}</span></span>
+              <span class="lg-upd" style="text-align:left">{{ c.checked }}</span>
+              <span class="cn-used"><sc-for list="{{ c.used }}" as="u" hint-placeholder-count="2"><span class="cn-key">{{ u }}</span></sc-for><sc-if value="{{ c.unused }}" hint-placeholder-val="{{ false }}"><span class="lg-faint">No projects</span></sc-if><sc-if value="{{ c.paused }}" hint-placeholder-val="{{ false }}"><span class="m2-warn" style="font-size:11.5px">mirror paused</span></sc-if></span>
+              <sc-if value="{{ canAdd }}" hint-placeholder-val="{{ true }}"><span class="cn-acts"><button class="lg-btn2" style="height:28px;font-size:12px">Edit</button><span class="lg-faint" style="width:20px;text-align:center;font-size:16px">⋯</span></span></sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{ isMember }}" hint-placeholder-val="{{ false }}"><div class="cn-intro">Only owners and admins can add, change or delete connections. Tokens are never shown, to anyone, after they are saved.</div></sc-if>
+        </sc-if>
+      </section>
+    </div>
+  </div>
+  <sc-if value="{{ isDialog }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:56px;width:600px" data-screen-label="Add git connection">
+      <div class="lg-dh"><span style="font-weight:600">Add git connection</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db">
+        <div class="lg-field"><span class="lg-label">Provider</span>
+          <div class="cn-provs">
+            <div class="lg-opt"><span class="lg-radio"></span><span>GitHub</span></div>
+            <div class="lg-opton"><span class="lg-radioon"></span><span>GitLab</span></div>
+            <div class="lg-opt"><span class="lg-radio"></span><span>Gitea / Forgejo</span></div>
+          </div>
+          <span class="lg-hint">Pick it yourself: a self-hosted address doesn't say which software runs there.</span>
+        </div>
+        <div class="lg-field"><span class="lg-label">Host</span><div class="lg-input"><span class="lg-mono" style="font-size:12px">gitlab.com</span></div><span class="lg-hint">gitlab.com, or your server's address, like git.example.com.</span></div>
+        <div class="lg-field"><span class="lg-label">Name</span><div class="lg-input"><span>GitLab · reddevs</span></div></div>
+        <div class="lg-field"><span class="lg-label">Access token</span><div class="{{ tokenCls }}"><span class="lg-mono" style="font-size:12px;letter-spacing:2px">••••••••••••••••••••••••</span><span class="lg-sp"></span><span class="lg-faint" style="font-size:11.5px">glpat-…3kd</span></div>
+          <span class="cn-scope">GitLab: a personal, group or project token with the <span class="lg-codei">read_api</span> scope and at least the Reporter role. Nothing more is needed.</span>
+        </div>
+        <sc-if value="{{ isTesting }}" hint-placeholder-val="{{ false }}"><div class="cn-test"><span class="m3-dot m3-run"></span><span>Testing the token against gitlab.com…</span></div></sc-if>
+        <sc-if value="{{ isOk }}" hint-placeholder-val="{{ false }}"><div class="cn-test"><span class="m3-dot m3-ok"></span><span><b>Working.</b> Signed in as <span class="lg-mono" style="font-size:11.5px">reddevs-bot</span> and can read 14 repositories. Expires Jan 21, 2027.</span></div></sc-if>
+        <sc-if value="{{ isRejected }}" hint-placeholder-val="{{ false }}"><div class="cn-teste"><span class="m3-dot m3-er"></span><span><b>Token rejected.</b> gitlab.com answered 401. The token may have expired or been revoked, or it lacks <span class="lg-codei">read_api</span>. Nothing was saved.</span></div></sc-if>
+      </div>
+      <div class="lg-df"><span class="lg-hint">The token is encrypted and never shown again.</span><span class="lg-sp"></span><button class="lg-btn2">{{ testLabel }}</button><button class="lg-btn" style="{{ saveStyle }}">Save connection</button></div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isDelete }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:170px;width:480px" data-screen-label="Delete git connection">
+      <div class="lg-dh"><span style="font-weight:600">Delete GitLab · reddevs?</span></div>
+      <div class="lg-db" style="gap:12px">
+        <span style="line-height:1.55">Three projects read Backlog.md through this connection. Their mirrors pause until you pick another connection for them. Their tasks stay as they are.</span>
+        <div class="cn-used"><span class="cn-key">PAY</span>Payments<span class="cn-key" style="margin-left:8px">WEB</span>Web app<span class="cn-key" style="margin-left:8px">CLI</span>pm CLI</div>
+        <span class="lg-hint">Revoke the token at gitlab.com too if nothing else uses it.</span>
+      </div>
+      <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn2">Keep</button><button class="lg-btnd" style="height:32px;background:var(--danger);color:var(--on-accent);border-color:var(--danger)">Delete connection</button></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["list", "testing", "ok", "rejected", "delete", "empty", "loading", "error", "member"], "default": "list" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'list';
+    const member = state === 'member';
+    const c = (badge, name, host, prov, st, checked, used, paused) => {
+      const tag = { ok: ['m3-tagok', 'm3-dot m3-ok', 'Working'], rej: ['m3-tager', 'm3-dot m3-er', 'Token rejected'], down: ['m3-tagwn', 'm3-dot m3-wn', 'Host unreachable'] }[st];
+      return { badge, name, host, prov, tagCls: tag[0], dotCls: tag[1], status: tag[2], checked, used, unused: used.length === 0, paused: !!paused };
+    };
+    const all = [
+      c('GL', 'GitLab · reddevs', 'gitlab.com', 'GitLab', 'ok', '4m ago', ['PAY', 'WEB', 'CLI']),
+      c('GH', 'GitHub · ana-ruiz', 'github.com', 'GitHub', 'ok', '1h ago', ['DOCS']),
+      c('FJ', 'Forgejo at home', 'git.home.example.com', 'Gitea / Forgejo', 'down', '12m ago', ['INF'], true),
+      c('GL', 'Client GitLab (expired)', 'gitlab.internal.client-infrastructure.example-corporation.io', 'GitLab', 'rej', 'Oct 21', [])
+    ];
+    const listStates = ['list', 'testing', 'ok', 'rejected', 'delete', 'member'];
+    const sub = member ? 'Connections to git providers. Projects use them to read Backlog.md.'
+      : state === 'empty' ? 'Read access to GitHub, GitLab or Gitea/Forgejo, for Backlog.md mirrors and imports.'
+      : (state === 'error' || state === 'loading') ? 'Projects use connections to read Backlog.md from a repository.'
+      : '4 connections. Projects use them to read Backlog.md from a repository.';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Settings · git connections · ' + state,
+      meIni: member ? 'TB' : 'AR',
+      sub,
+      canAdd: !member && state !== 'empty',
+      isMember: member,
+      isError: state === 'error',
+      isEmpty: state === 'empty',
+      hasTable: listStates.includes(state) || state === 'loading',
+      isLoading: state === 'loading',
+      skel: [150, 120, 170, 140],
+      conns: listStates.includes(state) ? all : [],
+      rowCls: member ? 'cn-rowm' : 'cn-row',
+      thCls: member ? 'lg-th cn-colsm' : 'lg-th cn-cols',
+      isDialog: ['testing', 'ok', 'rejected'].includes(state),
+      isTesting: state === 'testing',
+      isOk: state === 'ok',
+      isRejected: state === 'rejected',
+      tokenCls: state === 'rejected' ? 'lg-inpute' : 'lg-input',
+      testLabel: state === 'testing' ? 'Testing…' : 'Test',
+      saveStyle: state === 'ok' ? '' : 'opacity:0.45',
+      isDelete: state === 'delete'
+    };
+  }
+}
+</script>
+</body>
+</html>

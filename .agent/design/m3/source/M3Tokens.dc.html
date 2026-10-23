@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<style>
+.tk-page{height:100%;overflow:hidden;padding:24px 28px;box-sizing:border-box;display:grid;grid-template-columns:300px minmax(0,1fr) 300px;gap:28px}
+.tk-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.tk-h{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.tk-sw{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center}
+.tk-chip{width:44px;height:32px;border:1px solid var(--line);box-sizing:border-box}
+.tk-name{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--fg)}
+.tk-note{font-size:11.5px;color:var(--muted);line-height:1.4}
+.tk-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}
+.tk-lab{font-size:11px;color:var(--faint);width:88px;flex:none}
+.tk-cells{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line)}
+.tk-cell{padding:7px 10px 8px;display:flex;flex-direction:column;gap:3px;border-right:1px solid var(--line)}
+.tk-cell:last-child{border-right:0}
+.tk-keys{display:grid;grid-template-columns:62px minmax(0,1fr);gap:7px 10px;font-size:12px;align-items:baseline;line-height:1.4}
+.tk-k{display:flex;gap:3px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="tk-page">
+    <div class="tk-col">
+      <div class="tk-h">New tokens · ledger-m3.css</div>
+      <div class="tk-sw"><span class="tk-chip" style="background:var(--sys-bg);display:grid;place-items:center;color:var(--sys-fg);font-family:'Martian Mono',monospace;font-size:11px">B</span><div><div class="tk-name">--sys-bg / --sys-fg</div><div class="tk-note">The Backlog.md actor: a filled square. People are round, agents are outlined squares.</div></div></div>
+      <div class="tk-sw"><span class="tk-chip m3-lock"></span><div><div class="tk-name">--hatch</div><div class="tk-note">Diagonal hatch on anything Backlog.md owns. Always paired with the words “file” or “comes from Backlog.md”.</div></div></div>
+      <div class="tk-sw"><span class="tk-chip" style="background:var(--src-bg)"></span><div><div class="tk-name">--src-bg</div><div class="tk-note">Ground of the source strip and the Backlog.md section on a task.</div></div></div>
+      <div class="tk-note">Status colours reuse M1 and M2 tokens: --done for healthy, --warn for problems, --danger for failures, --faint outline for paused.</div>
+
+      <div class="tk-h" style="margin-top:6px">Keyboard · added in M3</div>
+      <div class="tk-keys">
+        <span class="tk-k"><span class="lg-kbd">⇧R</span></span><span>Refresh the mirror now. Project views and Backlog.md settings, owners and admins.</span>
+        <span class="tk-k"><span class="lg-kbd">⇧M</span></span><span>On a mirrored task, ⇧M and clicks on hatched fields open the “comes from Backlog.md” note instead of a picker. ⇧C still sets the cycle.</span>
+        <span class="tk-k"><span class="lg-kbd">⇧H</span><span class="lg-kbd">⇧L</span></span><span>On a mirrored card, a toast says why it can't change column. ⇧J/K still reorder.</span>
+        <span class="tk-k"><span class="lg-kbd">⌘↵</span></span><span>Setup and New from Backlog.md: continue to the next step, and start on the last one.</span>
+        <span class="tk-k"><span class="lg-kbd">Esc</span></span><span>Setup: cancel. Nothing is written before the last step.</span>
+      </div>
+    </div>
+
+    <div class="tk-col">
+      <div class="tk-h">Components and states</div>
+      <div class="tk-row"><span class="tk-lab">Actor</span><span class="m3-sys">B</span><span class="m3-sysl">B</span><span class="lg-av" style="--h:25">AR</span><span class="lg-ag">C</span><span class="lg-faint">Backlog.md · person · agent</span></div>
+      <div class="tk-row"><span class="tk-lab">Mirror state</span><span class="m3-dot m3-ok"></span>healthy<span class="m3-dot m3-run"></span>refreshing<span class="m3-dot m3-wn"></span>problems<span class="m3-dot m3-er"></span>failed<span class="m3-dot m3-pz"></span>paused / detached</div>
+      <div class="tk-row"><span class="tk-lab">Provider</span><span class="m3-prov">GH</span><span class="m3-prov">GL</span><span class="m3-prov">FJ</span><span class="lg-faint">letters, no logos</span></div>
+      <div class="tk-row"><span class="tk-lab">Connection</span><span class="m3-tagok"><span class="m3-dot m3-ok"></span>Working</span><span class="m3-tagwn"><span class="m3-dot m3-wn"></span>Host unreachable</span><span class="m3-tager"><span class="m3-dot m3-er"></span>Token rejected</span></div>
+      <div class="tk-row"><span class="tk-lab">Source button</span><span class="m3-srcbtn"><span class="m3-dot m3-ok"></span>Backlog.md<span class="lg-faint">3m ago</span><span class="lg-faint">▾</span></span><span class="m3-srcbtnon"><span class="m3-dot m3-wn"></span>Backlog.md<span class="lg-faint">31 problems</span><span class="lg-faint">▾</span></span></div>
+      <div class="tk-row" style="align-items:stretch"><span class="tk-lab">Property</span><div class="tk-cells" style="flex:1"><div class="tk-cell m3-lock"><span class="lg-cap">Status <span class="m3-own">· file</span></span><span style="display:flex;gap:6px;align-items:center;font-weight:500"><span class="lg-sq lg-s-prog"></span>In progress</span></div><div class="tk-cell"><span class="lg-cap">Cycle</span><span style="display:flex;gap:6px;align-items:center;font-weight:500"><span class="m2-cyon" style="--p:60%"></span>Cycle 4</span></div></div></div>
+      <div class="tk-row"><span class="tk-lab">Source strip</span><div class="m3-strip" style="flex:1"><span class="m3-sys">B</span><span style="flex:none">From</span><span class="m3-path">backlog/tasks/back-786 - Retry-failed-webhook-deliveries.md</span><span class="lg-sp"></span><a href="#" style="color:var(--accent)">Open file</a></div></div>
+      <div class="tk-row" style="align-items:stretch"><span class="tk-lab">Backlog.md section</span><div class="m3-bmd" style="flex:1"><div class="m3-kv"><span class="m3-k">Labels</span><span class="m3-vals"><span class="m3-lbl">webhooks</span><span class="m3-lbl">retries</span></span></div><div class="m3-kv"><span class="m3-k">Depends on</span><span class="m3-vals"><a class="m3-tlink" href="#"><span class="lg-sq lg-s-prog"></span><span class="lg-mono" style="font-size:10.5px;color:var(--muted)">PAY-805</span>Signature check</a><span class="m3-tmiss"><span class="lg-mono" style="font-size:10.5px">BACK-12</span>no task</span></span></div></div></div>
+      <div class="tk-row"><span class="tk-lab">Steps</span><div class="m3-steps" style="flex:1;flex-direction:row;gap:4px"><div class="m3-step"><span class="m3-stepndone">✓</span>Mode</div><div class="m3-stepon"><span class="m3-stepnon">2</span>Source</div><div class="m3-step"><span class="m3-stepn">3</span>Mappings</div></div></div>
+      <div class="tk-row" style="align-items:stretch"><span class="tk-lab">Mapping row</span><div class="m3-map" style="flex:1"><div class="m3-maprow"><span class="m3-from">In Progress</span><span class="m3-arrow">→</span><span class="m3-sel"><span class="lg-sq lg-s-prog"></span>In progress<span class="lg-sp"></span><span class="m3-how">by name</span></span><span class="m3-num">9</span></div><div class="m3-maprow"><span class="m3-from">Blocked</span><span class="m3-arrow">→</span><span class="m3-selwn"><span class="lg-sq lg-s-todo"></span>Todo<span class="lg-sp"></span><span class="m3-howwn">fallback</span></span><span class="m3-num">2</span></div><div class="m3-maprow"><span class="m3-from">Needs info</span><span class="m3-arrow">→</span><span class="m3-selon"><span class="lg-sq lg-s-todo"></span>Todo<span class="lg-sp"></span><span class="lg-faint">▾</span></span><span class="m3-num">4</span></div></div></div>
+      <div class="tk-row" style="align-items:stretch"><span class="tk-lab">Problem row</span><div class="m3-issues" style="flex:1"><div class="m3-issue" style="grid-template-columns:10px minmax(0,1fr)"><span class="m3-dot m3-er"></span><span><span class="lg-mono" style="font-size:10.5px">back-233 - Retry-SEPA.md</span> · frontmatter is not valid YAML</span></div></div></div>
+      <div class="tk-row"><span class="tk-lab">Copy field</span><div class="m3-copy" style="flex:1"><span class="m3-copyv">https://pm.example.com/api/webhooks/backlog/01JB7Q4X2M9K</span><button class="m3-copyb">Copy</button></div></div>
+    </div>
+
+    <div class="tk-col">
+      <div class="tk-h">Board while dragging a mirrored card</div>
+      <div style="display:flex;height:220px;border:1px solid var(--line)">
+        <div class="m2-col"><div class="m2-colh"><span class="lg-sq lg-s-prog"></span>Own column</div><div class="m2-colb"><div class="m2-card"><span class="lg-key">PAY-797</span><span class="m2-cardt">Stream invoice PDFs</span></div><div class="m2-dropline"></div><div class="m2-cardghost" style="height:40px"></div></div></div>
+        <div class="m3-colno"><div class="m2-colh"><span class="lg-sq lg-s-review"></span>Other</div><div class="m3-colnot">Status comes from Backlog.md. Change it in the task file.</div><div class="m2-colb"><div class="m2-card"><span class="lg-key">PAY-801</span><span class="m2-cardt">Failed deliveries</span></div></div></div>
+      </div>
+      <div class="tk-note">Reordering inside the column is allowed: the order is app-owned after the first read. Other columns hatch, dim their cards and say why.</div>
+      <div class="tk-h" style="margin-top:6px">Checklist from a Backlog.md section</div>
+      <div class="m3-doc"><div class="m3-ck"><span class="m3-ckon"></span><span>#1 Retries follow the schedule</span></div><div class="m3-ck"><span class="m3-ckbox"></span><span>#3 A 429 waits for Retry-After</span></div></div>
+      <div class="tk-note">Read-only. It ticks when the file changes, never from a click here.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    return { rootCls: 'lg-root lg-' + theme, label: 'M3 tokens and components · ' + theme };
+  }
+}
+</script>
+</body>
+</html>

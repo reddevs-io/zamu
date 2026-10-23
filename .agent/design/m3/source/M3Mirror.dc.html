@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<style>
+.mm-wrap{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.mm-rk{position:relative}
+.mm-mk{position:absolute;top:7px;right:13px;width:5px;height:5px;background:currentColor;opacity:0.75}
+.mm-row{height:36px;display:grid;grid-template-columns:84px minmax(0,1fr) 150px 22px 54px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.mm-rowh{height:36px;display:grid;grid-template-columns:84px minmax(0,1fr) 190px 22px 54px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);color:var(--muted)}
+.mm-sub{color:var(--faint);font-size:11px;margin-left:6px}
+.mm-new{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:32px;padding:0 12px;border:1px dashed var(--line);background:none;color:var(--faint);font-weight:600;box-sizing:border-box;white-space:nowrap}
+.mm-tip{position:absolute;right:24px;top:58px;width:340px;z-index:6;background:var(--fg);color:var(--bg);padding:10px 12px;font-size:12px;line-height:1.5;box-shadow:var(--shadow)}
+.mm-tip .lg-codei{background:oklch(0.5 0 0 / 0.35);color:inherit}
+.mm-pop{right:24px;top:56px;width:380px}
+.mm-facts{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 10px;padding:10px 12px;font-size:12px;align-items:baseline}
+.mm-toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:9px 12px 9px 14px;background:var(--fg);color:var(--bg);font-size:12.5px;box-shadow:var(--shadow);z-index:7;white-space:nowrap}
+.mm-toast .lg-kbd{color:var(--bg);border-color:oklch(0.6 0 0 / 0.5)}
+.mm-pj{height:56px;display:grid;grid-template-columns:minmax(0,1fr) 120px 150px 90px;gap:16px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.mm-pjn{display:flex;align-items:center;gap:10px;min-width:0}
+.mm-pjk{width:44px;height:28px;flex:none;border:1px solid var(--line);display:grid;place-items:center;font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px}
+.mm-bmd{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="{{ railProjects }}" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="{{ railPay }}" href="#" title="Payments · mirrored from Backlog.md"><span class="mm-mk"></span><span>PAY</span><span class="lg-rn">{{ openN }}</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk mm-rk" href="#" title="pm CLI · mirrored from Backlog.md"><span class="mm-mk"></span><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="mm-wrap">
+
+      <sc-if value="{{ isProjects }}" hint-placeholder-val="{{ false }}">
+        <header class="lg-head"><div><h1 class="lg-h1">Projects</h1><div class="lg-sub">4 projects in Reddevs</div></div><div class="lg-headr"><button class="lg-btn2">New from Backlog.md</button><button class="lg-btn">New project</button></div></header>
+        <div class="lg-th" style="grid-template-columns:minmax(0,1fr) 120px 150px 90px;margin-top:8px"><span>Project</span><span>Open</span><span>Tasks come from</span><span>Updated</span></div>
+        <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+          <div class="mm-pj">
+            <div class="mm-pjn"><span class="mm-pjk">{{ p.key }}</span><div style="min-width:0"><div style="font-weight:600" class="lg-trunc">{{ p.name }}</div><div class="lg-trunc" style="font-size:11.5px;color:var(--muted)">{{ p.desc }} <span class="lg-mono" style="font-size:10.5px;color:var(--faint)">{{ p.repo }}</span></div></div></div>
+            <span class="m2-num">{{ p.open }}</span>
+            <span class="mm-bmd"><sc-if value="{{ p.mirror }}" hint-placeholder-val="{{ false }}"><span class="{{ p.dot }}"></span>Backlog.md mirror</sc-if><sc-if value="{{ p.imported }}" hint-placeholder-val="{{ false }}"><span class="lg-faint">This app · imported</span></sc-if><sc-if value="{{ p.native }}" hint-placeholder-val="{{ true }}"><span class="lg-faint">This app</span></sc-if></span>
+            <span class="lg-upd" style="text-align:left">{{ p.upd }}</span>
+          </div>
+        </sc-for>
+        <div style="padding:14px 24px" class="lg-hint">The small square next to a project key in the sidebar marks a Backlog.md mirror.</div>
+      </sc-if>
+
+      <sc-if value="{{ isProject }}" hint-placeholder-val="{{ true }}">
+        <header class="lg-head">
+          <div style="min-width:0"><h1 class="lg-h1">Payments</h1><div class="lg-sub"><span class="lg-mono">PAY</span> · {{ openN }} open · {{ viewName }}</div></div>
+          <div class="lg-headr">
+            <sc-if value="{{ showSrc }}" hint-placeholder-val="{{ true }}"><span class="{{ srcBtnCls }}"><span class="{{ srcDot }}"></span>Backlog.md<span class="lg-faint">{{ srcWhen }}</span><span class="lg-faint">▾</span></span></sc-if>
+            <div class="lg-search" style="width:140px"><span>Search</span><span class="lg-kbd">/</span></div>
+            <sc-if value="{{ showSrc }}" hint-placeholder-val="{{ true }}"><span class="mm-new">New<span class="lg-kbd" style="opacity:0.6">C</span></span></sc-if>
+            <sc-if value="{{ isDetached }}" hint-placeholder-val="{{ false }}"><button class="lg-btn">New<span class="lg-btnk">C</span></button></sc-if>
+          </div>
+        </header>
+        <nav class="m2-tabs">
+          <a class="m2-tabon" href="#">Tasks<span class="m2-tabn">{{ openN }}</span></a>
+          <a class="m2-tab" href="#"><span class="m2-ms"></span>Milestones<span class="m2-tabn">6</span></a>
+          <a class="m2-tab" href="#"><span class="m2-cyon" style="--p:60%"></span>Cycles<span class="m2-tabn">C4 · 3d left</span></a>
+          <a class="m2-tab" href="#">Settings</a>
+        </nav>
+        <div class="lg-bar">
+          <span>Status <span class="lg-bv">{{ fStatus }}</span></span>
+          <span>Assignee <span class="lg-bv">Any</span></span>
+          <span>Milestone <span class="lg-bv">Any</span></span>
+          <span>Cycle <span class="lg-bv">Any</span></span>
+          <sc-if value="{{ showHiddenLink }}" hint-placeholder-val="{{ true }}"><span>Removed from Backlog.md <span class="lg-bv">{{ fHidden }}</span></span></sc-if>
+          <span class="lg-sp"></span>
+          <span class="m2-seg"><span class="{{ segList }}">List</span><span class="{{ segBoard }}">Board</span></span>
+          <span class="lg-kbd">V</span>
+        </div>
+
+        <sc-if value="{{ isFailed }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px 24px;border-bottom:1px solid var(--line)"><div class="lg-banner"><span class="lg-bannerx"></span><span style="flex:1;line-height:1.5">The last Backlog.md refresh failed 14m ago: <span class="lg-codei">backlog/config.yml</span> line 12 can't be read. Tasks show commit 9f8e7d6 from 2h ago.</span><button class="lg-btn2" style="height:28px">Details</button></div></div>
+        </sc-if>
+        <sc-if value="{{ isHidden }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:10px 24px;border-bottom:1px solid var(--line)"><div class="m3-strip"><span class="m3-dot m3-pz"></span><span>9 tasks whose files are gone from <span class="lg-mono" style="font-size:11px">main</span>. They're hidden from lists, the board, My tasks and the dashboard, and come back if their file returns. Comments are kept.</span></div></div>
+        </sc-if>
+
+        <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;overflow:hidden">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+              <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+              <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="4">
+                <div class="{{ rowCls }}"><span class="lg-key">{{ r.key }}</span><span class="lg-trunc">{{ r.title }}<sc-if value="{{ r.parent }}" hint-placeholder-val="{{ false }}"><span class="mm-sub">sub of {{ r.parent }}</span></sc-if></span><span class="lg-trunc" style="font-size:11.5px;color:var(--muted)">{{ r.meta }}</span><span class="{{ r.avCls }}" style="--h:{{ r.hue }}">{{ r.ini }}</span><span class="lg-upd">{{ r.upd }}</span></div>
+              </sc-for>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1"><sc-for list="{{ skel }}" as="k" hint-placeholder-count="8"><div class="mm-row"><span class="lg-skel" style="width:56px"></span><span class="lg-skel" style="width:{{ k }}%"></span><span class="lg-skel" style="width:80px"></span><span class="lg-skel" style="width:18px;height:18px;border-radius:50%"></span><span class="lg-skel" style="width:30px"></span></div></sc-for></div>
+        </sc-if>
+
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;padding:48px 24px"><div class="lg-empty" style="max-width:520px"><h2 class="lg-h2">No tasks in backlog/ yet</h2><p class="lg-muted" style="margin:0;line-height:1.55">The mirror is set up and reads <span class="lg-mono" style="font-size:11.5px">gitlab.com/reddevs/payments</span>, but the folder has no task files on main. Create one, push it, and it shows up here.</p><div class="lg-code" style="width:100%;box-sizing:border-box">backlog task create "Retry failed webhook deliveries" &amp;&amp; git push</div><span class="lg-hint">Last checked 3m ago · commit a1b2c3d</span></div></div>
+        </sc-if>
+
+        <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-board" style="position:relative">
+            <sc-for list="{{ cols }}" as="c" hint-placeholder-count="4">
+              <div class="{{ c.cls }}">
+                <div class="m2-colh"><span class="{{ c.sq }}"></span><span>{{ c.name }}</span><span class="lg-gc">{{ c.count }}</span></div>
+                <sc-if value="{{ c.no }}" hint-placeholder-val="{{ false }}"><div class="m3-colnot">Status comes from Backlog.md.<br />Change it in the task file.</div></sc-if>
+                <div class="m2-colb">
+                  <sc-for list="{{ c.cards }}" as="t" hint-placeholder-count="3">
+                    <sc-if value="{{ t.isLine }}" hint-placeholder-val="{{ false }}"><div class="m2-dropline"></div></sc-if>
+                    <sc-if value="{{ t.isGhost }}" hint-placeholder-val="{{ false }}"><div class="m2-cardghost"></div></sc-if>
+                    <sc-if value="{{ t.isCard }}" hint-placeholder-val="{{ true }}">
+                      <div class="{{ t.cls }}" style="{{ t.style }}">
+                        <div class="m2-cardl"><span class="lg-key">{{ t.key }}</span><span class="lg-sp"></span><span class="{{ t.priCls }}">{{ t.pri }}</span></div>
+                        <div class="m2-cardt">{{ t.title }}</div>
+                        <div class="m2-cardf"><sc-if value="{{ t.ms }}" hint-placeholder-val="{{ false }}"><span class="m2-chip"><span class="m2-ms"></span><span class="m2-chipt">{{ t.ms }}</span></span></sc-if><span class="lg-sp"></span><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span></div>
+                      </div>
+                    </sc-if>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isPop }}" hint-placeholder-val="{{ false }}">
+        <div class="m2-pop mm-pop" data-screen-label="Mirror status popover">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line-2)"><span class="m3-dot m3-wn"></span><b>Mirroring, with problems</b><span class="lg-sp"></span><span class="lg-kbd">⇧R</span></div>
+          <div class="mm-facts">
+            <span class="lg-muted">Source</span><span class="lg-mono" style="font-size:11px">gitlab.com/reddevs/payments · main</span>
+            <span class="lg-muted">Last refresh</span><span>3m ago by webhook, commit <span class="lg-mono" style="font-size:11px">a1b2c3d</span></span>
+            <span class="lg-muted">Next check</span><span>in 57m</span>
+            <span class="lg-muted">Problems</span><span class="m2-warn">30 files skipped, 1 status unmapped</span>
+          </div>
+          <div class="lg-df" style="padding:8px 12px"><a href="#" class="lg-muted" style="font-size:12px">Open Backlog.md settings</a><span class="lg-sp"></span><button class="lg-btn" style="height:28px">Refresh now</button></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isTip }}" hint-placeholder-val="{{ false }}">
+        <div class="mm-tip">Tasks in Payments come from Backlog.md. Add a file under <span class="lg-codei">backlog/tasks/</span>, or run <span class="lg-codei">backlog task create</span>, and push. It shows up here after the next refresh.</div>
+      </sc-if>
+      <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+        <div class="mm-toast"><span>{{ toast }}</span><sc-if value="{{ toastKey }}" hint-placeholder-val="{{ false }}"><span class="lg-kbd">{{ toastKey }}</span><span style="opacity:0.75">{{ toastKeyText }}</span></sc-if></div>
+      </sc-if>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["list", "popover", "create", "failed", "board", "boardkeys", "hidden", "projects", "detached", "loading", "empty"], "default": "list" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'list';
+    const P = { ana: ['AR', 25, 'lg-av'], tomas: ['TB', 220, 'lg-av'], claude: ['C', 0, 'lg-ag'], codex: ['X', 0, 'lg-ag'], none: ['', 0, 'm2-none'] };
+    const r = (key, title, meta, who, upd, parent) => ({ key, title, meta, ini: P[who][0], hue: P[who][1], avCls: P[who][2], upd, parent: parent || '' });
+    const hidden = state === 'hidden';
+    let groups;
+    if (hidden) {
+      groups = [{ name: 'Removed from Backlog.md', sq: 'm3-dot m3-pz', count: 9, rows: [
+        r('PAY-233', 'Retry SEPA mandates after a bank holiday', 'removed Oct 22 · 3 comments', 'claude', 'Oct 22'),
+        r('PAY-602', 'Spike: card network tokens', 'removed Oct 21', 'ana', 'Oct 21'),
+        r('PAY-611', 'Old dashboard: CSV export button', 'removed Oct 20 · 1 comment', 'tomas', 'Oct 20'),
+        r('PAY-786.3', 'Alert merchants after 24h of failures', 'removed Oct 19', 'claude', 'Oct 19', 'PAY-786'),
+        r('PAY-640', 'Refund reasons as a fixed list', 'removed Oct 12', 'none', 'Oct 12'),
+        r('PAY-641', 'Refund reasons: migrate free text', 'removed Oct 12', 'none', 'Oct 12'),
+        r('PAY-702', 'Draft: payout currency switch', 'removed Oct 3', 'codex', 'Oct 3'),
+        r('PAY-703', 'Draft: payout fees preview', 'removed Oct 3', 'codex', 'Oct 3'),
+        r('PAY-744', 'Duplicate of PAY-743', 'removed Sep 29', 'none', 'Sep 29')
+      ] }];
+    } else {
+      groups = [
+        { name: 'In progress', sq: 'lg-sq lg-s-prog', count: 9, rows: [
+          r('PAY-786', 'Retry failed webhook deliveries with exponential backoff', '◇ Webhooks v2', 'claude', '3m'),
+          r('PAY-786.1', 'Honour Retry-After on 429 responses', '◇ Webhooks v2', 'claude', '3m', 'PAY-786'),
+          r('PAY-797', 'Stream invoice PDFs instead of buffering them', '◇ Invoices', 'codex', '1h'),
+          r('PAY-805', 'Webhook signature check accepts expired timestamps', '◇ Webhooks v2', 'ana', '2h')
+        ] },
+        { name: 'In review', sq: 'lg-sq lg-s-review', count: 3, rows: [
+          r('PAY-801', 'Merchant dashboard: show failed deliveries per endpoint', '◇ Webhooks v2', 'claude', '20m'),
+          r('PAY-788', 'Paginate the transactions CSV export', '', 'tomas', '5h')
+        ] },
+        { name: 'Todo', sq: 'lg-sq lg-s-todo', count: 26, rows: [
+          r('PAY-786.2', 'Dead-letter queue after the sixth attempt', '◇ Webhooks v2', 'none', '3m', 'PAY-786'),
+          r('PAY-809', 'Add idempotency keys to the refund endpoint', '◇ Refunds rework', 'codex', '1d'),
+          r('PAY-810', 'Document the retry schedule for merchants', '', 'none', '1d'),
+          r('PAY-811', 'Blocked: wait for the bank’s new SEPA file format', '◇ SEPA Direct Debit', 'ana', '2h'),
+          r('PAY-812', 'Move webhook secrets to the secret store', '', 'none', '2h')
+        ] }
+      ];
+    }
+    const S = { todo: 'lg-sq lg-s-todo', prog: 'lg-sq lg-s-prog', rev: 'lg-sq lg-s-review', done: 'lg-sq lg-s-done', backlog: 'lg-sq lg-s-backlog' };
+    const card = (key, title, pri, ms, who, extra) => Object.assign({ isCard: true, isLine: false, isGhost: false, key, title, pri: '■■■'.slice(0, pri) || '–', priCls: pri === 3 ? 'lg-pri' : 'lg-prilow', ms, ini: P[who][0], hue: P[who][1], avCls: P[who][2], cls: 'm2-card', style: '' }, extra || {});
+    const line = { isCard: false, isLine: true, isGhost: false };
+    const ghost = { isCard: false, isLine: false, isGhost: true };
+    const dragging = state === 'board';
+    const keys = state === 'boardkeys';
+    const cols = [
+      { name: 'Todo', sq: S.todo, count: 26, cards: [card('PAY-786.2', 'Dead-letter queue after the sixth attempt', 2, 'Webhooks v2', 'none'), card('PAY-809', 'Add idempotency keys to the refund endpoint', 2, 'Refunds rework', 'codex'), card('PAY-810', 'Document the retry schedule for merchants', 1, '', 'none'), card('PAY-811', 'Blocked: wait for the bank’s new SEPA file format', 3, 'SEPA Direct Debit', 'ana')] },
+      { name: 'In progress', sq: S.prog, count: 9, cards: dragging ? [card('PAY-797', 'Stream invoice PDFs instead of buffering them', 2, 'Invoices', 'codex'), line, ghost, card('PAY-805', 'Webhook signature check accepts expired timestamps', 3, 'Webhooks v2', 'ana'), card('PAY-786.1', 'Honour Retry-After on 429 responses', 2, 'Webhooks v2', 'claude')] : [card('PAY-786', 'Retry failed webhook deliveries with exponential backoff', 3, 'Webhooks v2', 'claude', keys ? { cls: 'm2-cardfoc' } : {}), card('PAY-786.1', 'Honour Retry-After on 429 responses', 2, 'Webhooks v2', 'claude'), card('PAY-797', 'Stream invoice PDFs instead of buffering them', 2, 'Invoices', 'codex'), card('PAY-805', 'Webhook signature check accepts expired timestamps', 3, 'Webhooks v2', 'ana')] },
+      { name: 'In review', sq: S.rev, count: 3, cards: [card('PAY-801', 'Merchant dashboard: show failed deliveries per endpoint', 2, 'Webhooks v2', 'claude'), card('PAY-788', 'Paginate the transactions CSV export', 1, '', 'tomas')] },
+      { name: 'Done', sq: S.done, count: 367, cards: [card('PAY-804', 'Log webhook response bodies up to 4 KB', 1, 'Webhooks v2', 'claude'), card('PAY-799', 'Drop the v1 webhook payload format', 2, 'Webhooks v2', 'ana')] }
+    ].map((c, i) => Object.assign(c, { cls: dragging && i !== 1 ? 'm3-colno' : 'm2-col', no: dragging && i !== 1 }));
+    if (dragging) cols[1].cards.splice(2, 0, card('PAY-786', 'Retry failed webhook deliveries with exponential backoff', 3, 'Webhooks v2', 'claude', { cls: 'm2-carddrag', style: 'position:relative;transform:rotate(-1.5deg) translateX(6px)' }));
+    const projects = [
+      { key: 'PAY', name: 'Payments', desc: 'Card payments, refunds and merchant webhooks ·', repo: 'gitlab.com/reddevs/payments', open: 38, mirror: true, imported: false, native: false, dot: 'm3-dot m3-ok', upd: '3m' },
+      { key: 'WEB', name: 'Web app', desc: 'Customer-facing app ·', repo: 'gitlab.com/reddevs/web', open: 27, mirror: false, imported: true, native: false, dot: '', upd: '20m' },
+      { key: 'CLI', name: 'pm CLI', desc: '', repo: 'github.com/ana-ruiz/pm-cli', open: 9, mirror: true, imported: false, native: false, dot: 'm3-dot m3-er', upd: '2h' },
+      { key: 'INF', name: 'Infrastructure', desc: 'Clusters, CI runners and DNS', repo: '', open: 5, mirror: false, imported: false, native: true, dot: '', upd: '1d' }
+    ];
+    const listy = ['list', 'popover', 'create', 'failed', 'hidden', 'detached'].includes(state);
+    const srcDot = state === 'failed' ? 'm3-dot m3-er' : (state === 'popover' ? 'm3-dot m3-wn' : 'm3-dot m3-ok');
+    const toast = { board: 'Status comes from Backlog.md, so cards move only within their column.', boardkeys: 'PAY-786 stays in In progress: its status comes from Backlog.md.', detached: 'Payments is detached from Backlog.md. Everything is editable here now.' }[state] || '';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Mirrored project · ' + state,
+      railProjects: state === 'projects' ? 'lg-rnavon' : 'lg-rnav',
+      railPay: state === 'projects' ? 'lg-rk mm-rk' : 'lg-rkon mm-rk',
+      isProjects: state === 'projects',
+      isProject: state !== 'projects',
+      projects,
+      openN: 38,
+      viewName: state === 'detached' ? 'detached from Backlog.md on Oct 23' : (state.indexOf('board') === 0 ? 'board' : 'list'),
+      showSrc: state !== 'detached',
+      isDetached: state === 'detached',
+      srcBtnCls: state === 'popover' ? 'm3-srcbtnon' : 'm3-srcbtn',
+      srcDot,
+      srcWhen: state === 'failed' ? 'failed 14m ago' : (state === 'popover' ? '31 problems' : '3m ago'),
+      fStatus: hidden ? 'Any' : 'Open',
+      fHidden: hidden ? '9 shown' : 'Hidden · 9',
+      showHiddenLink: state !== 'detached' && state.indexOf('board') !== 0,
+      segList: state.indexOf('board') === 0 ? 'm2-segi' : 'm2-segon',
+      segBoard: state.indexOf('board') === 0 ? 'm2-segon' : 'm2-segi',
+      isFailed: state === 'failed',
+      isHidden: hidden,
+      isList: listy,
+      rowCls: hidden ? 'mm-rowh' : 'mm-row',
+      groups,
+      isLoading: state === 'loading',
+      skel: [62, 48, 70, 55, 40, 66, 52, 60],
+      isEmpty: state === 'empty',
+      isBoard: dragging || keys,
+      cols,
+      isPop: state === 'popover',
+      isTip: state === 'create',
+      toast,
+      toastKey: keys ? '⇧J/K' : '',
+      toastKeyText: keys ? 'reorders' : ''
+    };
+  }
+}
+</script>
+</body>
+</html>
