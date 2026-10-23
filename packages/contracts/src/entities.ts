@@ -2,12 +2,19 @@ import { z } from 'zod';
 import {
   ApiKeyAccess,
   AuthId,
+  CalendarDate,
+  CommentId,
+  CycleId,
+  CycleState,
+  MilestoneId,
+  MilestoneStatus,
   Priority,
   ProjectId,
   ProjectKey,
   RowId,
   TaskKey,
   TaskStatus,
+  Theme,
   Timestamp,
   UserId,
   UserKind,
@@ -44,15 +51,50 @@ export const ProjectRef = z.object({
 });
 export type ProjectRef = z.output<typeof ProjectRef>;
 
+/** A task's milestone, as shown on cards, rows and in the task panel. */
+export const MilestoneRef = z.object({
+  id: MilestoneId,
+  name: z.string(),
+  status: MilestoneStatus,
+  targetDate: CalendarDate.nullable(),
+});
+export type MilestoneRef = z.output<typeof MilestoneRef>;
+
+/** A task's cycle. `state` is derived from the dates and completedAt at read time. */
+export const CycleRef = z.object({
+  id: CycleId,
+  number: z.number().int().positive(),
+  name: z.string().nullable(),
+  startsOn: CalendarDate,
+  endsOn: CalendarDate,
+  state: CycleState,
+});
+export type CycleRef = z.output<typeof CycleRef>;
+
+/** The project's current cycle, for the header tab note ("C12 · 3d left"). */
+export const CurrentCycle = CycleRef.omit({ state: true }).extend({
+  /** Days left including today, in APP_TIME_ZONE: 1 on the last day. */
+  daysLeft: z.number().int().positive(),
+});
+export type CurrentCycle = z.output<typeof CurrentCycle>;
+
 // ---------------------------------------------------------------------------
 // Projects
 // ---------------------------------------------------------------------------
 
+// The defaults on fields added in M2 keep servers that do not send them yet valid; clients always
+// receive the fields.
 export const Project = z.object({
   id: ProjectId,
   key: ProjectKey,
   name: z.string(),
   description: z.string().nullable(),
+  /** Off hides the milestones tab, filter and fields. The data stays. */
+  usesMilestones: z.boolean().default(true),
+  /** Off hides the cycles tab, filter and fields. The data stays. */
+  usesCycles: z.boolean().default(true),
+  /** Null when the project has no current cycle or does not use cycles. */
+  currentCycle: CurrentCycle.nullable().default(null),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });
@@ -105,20 +147,31 @@ export const Task = z.object({
   createdBy: UserRef,
   /** The responsible human when an agent created the task; null for people. */
   createdOnBehalfOf: UserRef.nullable(),
+  milestone: MilestoneRef.nullable().default(null),
+  cycle: CycleRef.nullable().default(null),
+  /** When the task last entered its cycle; after the cycle's start means "added after start". */
+  cycleAddedAt: Timestamp.nullable().default(null),
+  /** Position inside its status column on the board, ascending. Only the order matters. */
+  rank: z.number(),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });
 export type Task = z.output<typeof Task>;
 
-/** A row in the task list: no description, no project (the list is per project). */
+/** A row in the task list, on the board and on My tasks: everything but the description and creator. */
 export const TaskListItem = Task.pick({
   id: true,
   key: true,
   number: true,
+  project: true,
   title: true,
   status: true,
   priority: true,
   assignee: true,
+  milestone: true,
+  cycle: true,
+  cycleAddedAt: true,
+  rank: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -133,17 +186,154 @@ export const TaskListPage = z.object({
 });
 export type TaskListPage = z.output<typeof TaskListPage>;
 
+/**
+ * Problem code of a task write rejected because `ifUpdatedAt` is older than the stored task
+ * (409). The problem data carries the current task, so the client can roll back and show it.
+ */
+export const TASK_CHANGED = 'TASK_CHANGED';
+
+/** Data of the TASK_CHANGED problem. */
+export const TaskChangedData = z.object({
+  task: Task,
+});
+export type TaskChangedData = z.output<typeof TaskChangedData>;
+
+// ---------------------------------------------------------------------------
+// Milestones
+// ---------------------------------------------------------------------------
+
+export const Milestone = z.object({
+  id: MilestoneId,
+  project: ProjectRef,
+  name: z.string(),
+  /** Markdown. */
+  description: z.string().nullable(),
+  targetDate: CalendarDate.nullable(),
+  status: MilestoneStatus,
+  /** When it was last marked Completed; null otherwise. */
+  completedAt: Timestamp.nullable(),
+  createdBy: UserRef,
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
+});
+export type Milestone = z.output<typeof Milestone>;
+
+/** Task counts of a milestone. Progress is done / (total - canceled). */
+export const MilestoneProgress = z.object({
+  total: z.number().int().nonnegative(),
+  done: z.number().int().nonnegative(),
+  /** In progress and In review. */
+  inProgress: z.number().int().nonnegative(),
+  /** Backlog and Todo. */
+  open: z.number().int().nonnegative(),
+  canceled: z.number().int().nonnegative(),
+});
+export type MilestoneProgress = z.output<typeof MilestoneProgress>;
+
+/** Done share of the non-canceled tasks, 0 to 1; 0 for an empty milestone. */
+export function milestoneProgressRatio(progress: MilestoneProgress): number {
+  const counted = progress.total - progress.canceled;
+  return counted > 0 ? progress.done / counted : 0;
+}
+
+export const MilestoneWithProgress = Milestone.extend({
+  progress: MilestoneProgress,
+  /** Days from today to the target date in APP_TIME_ZONE (0 on the day, negative after); null without a target. */
+  daysLeft: z.number().int().nullable(),
+  /** Target date before today and not Completed. */
+  overdue: z.boolean(),
+});
+export type MilestoneWithProgress = z.output<typeof MilestoneWithProgress>;
+
+// ---------------------------------------------------------------------------
+// Cycles
+// ---------------------------------------------------------------------------
+
+/** Live counts of the tasks currently in a cycle. */
+export const CycleCounts = StatusCounts.extend({
+  total: z.number().int().nonnegative(),
+  /** Tasks whose cycleAddedAt is after the start of startsOn. */
+  addedAfterStart: z.number().int().nonnegative(),
+  unassigned: z.number().int().nonnegative(),
+  /** Tasks assigned to agents. */
+  agents: z.number().int().nonnegative(),
+});
+export type CycleCounts = z.output<typeof CycleCounts>;
+
+/** Written once when the cycle ends; the completed cycle page reads it. */
+export const CycleSummary = z.object({
+  /** Tasks in the cycle when it ended. */
+  scope: z.number().int().nonnegative(),
+  completed: z.number().int().nonnegative(),
+  rolledOver: z.number().int().nonnegative(),
+  canceled: z.number().int().nonnegative(),
+  addedAfterStart: z.number().int().nonnegative(),
+});
+export type CycleSummary = z.output<typeof CycleSummary>;
+
+export const Cycle = z.object({
+  id: CycleId,
+  project: ProjectRef,
+  number: z.number().int().positive(),
+  name: z.string().nullable(),
+  /** First day, included. */
+  startsOn: CalendarDate,
+  /** Last day, included; the cycle ends at the following midnight in APP_TIME_ZONE. */
+  endsOn: CalendarDate,
+  state: CycleState,
+  /** Current cycles only: days left including today (1 on the last day). Null otherwise. */
+  daysLeft: z.number().int().positive().nullable(),
+  counts: CycleCounts,
+  /** Set once the cycle ended. */
+  completedAt: Timestamp.nullable(),
+  /** Who ended it; null while not ended or when the hourly job ended it. */
+  endedBy: UserRef.nullable(),
+  /** Null until the cycle ends. */
+  summary: CycleSummary.nullable(),
+});
+export type Cycle = z.output<typeof Cycle>;
+
+/** An unfinished task moved when a cycle ended. */
+export const CycleRollover = z.object({
+  task: z.object({
+    id: RowId,
+    key: TaskKey,
+    title: z.string(),
+    /** Status now. */
+    status: TaskStatus,
+  }),
+  statusAtEnd: TaskStatus,
+  /** Null when the person ending the cycle chose "No cycle". */
+  movedTo: CycleRef.pick({ id: true, number: true, name: true }).nullable(),
+  createdAt: Timestamp,
+});
+export type CycleRollover = z.output<typeof CycleRollover>;
+
+/** One cycle with the record of what rolled over (empty unless completed). */
+export const CycleDetail = Cycle.extend({
+  rollovers: z.array(CycleRollover),
+});
+export type CycleDetail = z.output<typeof CycleDetail>;
+
 // ---------------------------------------------------------------------------
 // Activity
 // ---------------------------------------------------------------------------
 
-export const ACTIVITY_TYPES = ['task.created', 'task.updated'] as const;
+export const ACTIVITY_TYPES = ['task.created', 'task.updated', 'cycle.ended'] as const;
 export const ActivityType = z.enum(ACTIVITY_TYPES);
 export type ActivityType = z.infer<typeof ActivityType>;
 
+/** A milestone inside an activity change. A deleted milestone reads as "Deleted milestone". */
+export const ActivityMilestoneRef = MilestoneRef.pick({ id: true, name: true });
+export type ActivityMilestoneRef = z.output<typeof ActivityMilestoneRef>;
+
+/** A cycle inside an activity change. */
+export const ActivityCycleRef = CycleRef.pick({ id: true, number: true, name: true });
+export type ActivityCycleRef = z.output<typeof ActivityCycleRef>;
+
 /**
- * One field change. The API resolves the assignee to a user reference; the database row stores
- * user ids, and core resolves them when reading.
+ * One field change. The API resolves the assignee, milestone and cycle to references; the
+ * database row stores ids, and core resolves them when reading.
  */
 export const ActivityChange = z.discriminatedUnion('field', [
   z.object({ field: z.literal('title'), from: z.string().nullable(), to: z.string().nullable() }),
@@ -151,6 +341,12 @@ export const ActivityChange = z.discriminatedUnion('field', [
   z.object({ field: z.literal('status'), from: TaskStatus.nullable(), to: TaskStatus.nullable() }),
   z.object({ field: z.literal('priority'), from: Priority.nullable(), to: Priority.nullable() }),
   z.object({ field: z.literal('assignee'), from: UserRef.nullable(), to: UserRef.nullable() }),
+  z.object({
+    field: z.literal('milestone'),
+    from: ActivityMilestoneRef.nullable(),
+    to: ActivityMilestoneRef.nullable(),
+  }),
+  z.object({ field: z.literal('cycle'), from: ActivityCycleRef.nullable(), to: ActivityCycleRef.nullable() }),
 ]);
 export type ActivityChange = z.output<typeof ActivityChange>;
 
@@ -158,7 +354,11 @@ export const Activity = z.object({
   id: RowId,
   type: ActivityType,
   taskKey: TaskKey,
-  actor: UserRef,
+  /**
+   * Who made the change. Null means the system: the hourly job that ends cycles. A cycle.ended
+   * entry carries one cycle change from the ended cycle to the one the task moved to.
+   */
+  actor: UserRef.nullable(),
   /** The agent's responsible human at the time of the change; null for people. */
   onBehalfOf: UserRef.nullable(),
   /** For task.created: the initial values that differ from the defaults. */
@@ -166,6 +366,40 @@ export const Activity = z.object({
   createdAt: Timestamp,
 });
 export type Activity = z.output<typeof Activity>;
+
+// ---------------------------------------------------------------------------
+// Comments and the timeline
+// ---------------------------------------------------------------------------
+
+/** Longest comment body in characters, after trimming. */
+export const MAX_COMMENT_LENGTH = 20_000;
+
+export const Comment = z.object({
+  id: CommentId,
+  taskKey: TaskKey,
+  /** Only the author edits or deletes, agents included. */
+  author: UserRef,
+  /** The agent's responsible human when an agent wrote it; null for people. */
+  onBehalfOf: UserRef.nullable(),
+  /**
+   * Markdown with mentions as [@Name](mention:<userId>). Null once deleted: the timeline shows
+   * "Comment deleted by <author>".
+   */
+  body: z.string().nullable(),
+  /** Members the body mentions, in order of first mention. Empty once deleted. */
+  mentions: z.array(UserRef),
+  createdAt: Timestamp,
+  editedAt: Timestamp.nullable(),
+  deletedAt: Timestamp.nullable(),
+});
+export type Comment = z.output<typeof Comment>;
+
+/** One entry of a task's history: activity and comments in one list, oldest first. */
+export const TimelineItem = z.discriminatedUnion('kind', [
+  Activity.extend({ kind: z.literal('activity') }),
+  Comment.extend({ kind: z.literal('comment') }),
+]);
+export type TimelineItem = z.output<typeof TimelineItem>;
 
 // ---------------------------------------------------------------------------
 // Members
@@ -278,6 +512,8 @@ export const Me = z.object({
     email: z.string().nullable(),
     kind: UserKind,
     responsible: UserRef.nullable(),
+    /** People choose it; agents keep "system". */
+    theme: Theme.default('system'),
   }),
   workspace: z.object({
     id: WorkspaceId,
@@ -305,3 +541,15 @@ export type ActivityList = z.output<typeof ActivityList>;
 
 export const MemberList = z.object({ items: z.array(Member) });
 export type MemberList = z.output<typeof MemberList>;
+
+export const MilestoneList = z.object({ items: z.array(MilestoneWithProgress) });
+export type MilestoneList = z.output<typeof MilestoneList>;
+
+export const CycleList = z.object({ items: z.array(Cycle) });
+export type CycleList = z.output<typeof CycleList>;
+
+export const CommentList = z.object({ items: z.array(Comment) });
+export type CommentList = z.output<typeof CommentList>;
+
+export const Timeline = z.object({ items: z.array(TimelineItem) });
+export type Timeline = z.output<typeof Timeline>;

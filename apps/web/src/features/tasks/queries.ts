@@ -1,8 +1,10 @@
 import {
   type AssigneeRef,
   type CreateTaskInput,
+  type CycleRef,
   type ListTasksInput,
   MAX_TASK_LIST_LIMIT,
+  type MilestoneRef,
   type Priority,
   type StatusCounts,
   type Task,
@@ -73,6 +75,21 @@ export function activityQuery(key: string) {
   return orpc.tasks.activity.queryOptions({ input: { key }, retry: retryOnce });
 }
 
+/** Activity and comments of a task, oldest first. */
+export function timelineQuery(key: string) {
+  return orpc.tasks.timeline.queryOptions({ input: { key }, retry: retryOnce });
+}
+
+/** Milestones of a project, with progress, for the milestone pickers. */
+export function milestonesQuery(project: string) {
+  return orpc.milestones.list.queryOptions({ input: { project }, retry: retryOnce });
+}
+
+/** Cycles of a project, oldest first, for the cycle pickers. */
+export function cyclesQuery(project: string) {
+  return orpc.cycles.list.queryOptions({ input: { project }, retry: retryOnce });
+}
+
 export const projectsQuery = () => orpc.projects.list.queryOptions({ retry: retryOnce });
 export const membersQuery = () => orpc.members.list.queryOptions({ retry: retryOnce, staleTime: 60_000 });
 export const meQuery = () => orpc.me.get.queryOptions({ retry: retryOnce, staleTime: 5 * 60_000 });
@@ -88,6 +105,10 @@ export interface TaskPatch {
   status?: TaskStatus;
   priority?: Priority;
   assignee?: AssigneeRef | null;
+  /** The new milestone (sent as its id), or null to clear it. */
+  milestone?: MilestoneRef | null;
+  /** The new cycle (sent as its number), or null to clear it. */
+  cycle?: CycleRef | null;
 }
 
 export interface UpdateTaskVariables {
@@ -139,6 +160,8 @@ function toUpdateInput({ key, patch }: UpdateTaskVariables) {
     ...(patch.status !== undefined ? { status: patch.status } : {}),
     ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
     ...(patch.assignee !== undefined ? { assignee: patch.assignee?.id ?? null } : {}),
+    ...(patch.milestone !== undefined ? { milestone: patch.milestone?.id ?? null } : {}),
+    ...(patch.cycle !== undefined ? { cycle: patch.cycle?.number ?? null } : {}),
   };
 }
 
@@ -147,13 +170,19 @@ interface Snapshot {
   lists: [readonly unknown[], unknown][];
 }
 
-/** Invalidates everything a task change can affect: the task, its activity, lists and project counts. */
+/**
+ * Invalidates everything a task change can affect: the task, its activity and timeline, lists, project
+ * counts, and milestone and cycle progress.
+ */
 export function invalidateTask(queryClient: QueryClient, key: string) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: orpc.tasks.get.key({ input: { key } }) }),
     queryClient.invalidateQueries({ queryKey: orpc.tasks.activity.key({ input: { key } }) }),
+    queryClient.invalidateQueries({ queryKey: orpc.tasks.timeline.key({ input: { key } }) }),
     queryClient.invalidateQueries({ queryKey: orpc.tasks.list.key() }),
     queryClient.invalidateQueries({ queryKey: orpc.projects.key() }),
+    queryClient.invalidateQueries({ queryKey: orpc.milestones.key() }),
+    queryClient.invalidateQueries({ queryKey: orpc.cycles.key() }),
   ]);
 }
 
@@ -196,7 +225,10 @@ export function useUpdateTask() {
     onSuccess: (task) => {
       queryClient.setQueryData(orpc.tasks.get.queryKey({ input: { key: task.key } }), task);
     },
-    onSettled: (_task, _error, { key }) => invalidateTask(queryClient, key),
+    // Not awaited: the rollback and the error show at once instead of after the refetch.
+    onSettled: (_task, _error, { key }) => {
+      void invalidateTask(queryClient, key);
+    },
   });
 }
 
@@ -211,6 +243,8 @@ export function useCreateTask() {
       // Not awaited: the dialog can take the next task while the list refreshes.
       void queryClient.invalidateQueries({ queryKey: orpc.tasks.list.key() });
       void queryClient.invalidateQueries({ queryKey: orpc.projects.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.milestones.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.cycles.key() });
     },
   });
 }

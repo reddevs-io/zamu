@@ -1,10 +1,11 @@
-// The caller: user, workspace, role and how far their credentials reach.
-import { Me } from '@pm/contracts';
+// The caller: user, workspace, role and how far their credentials reach; their preferences.
+import { Me, UpdateMeInput } from '@pm/contracts';
 import { schema } from '@pm/db';
 import { eq, inArray } from 'drizzle-orm';
-import { type Actor, authorize } from './authz';
+import type { z } from 'zod';
+import { type Actor, authorize, isSession } from './authz';
 import type { DbContext } from './context';
-import { NotFound } from './errors';
+import { NotFound, parseInput } from './errors';
 import { loadUsers, userRef } from './internal';
 
 export async function getMe({ db }: DbContext, actor: Actor): Promise<Me> {
@@ -42,9 +43,30 @@ export async function getMe({ db }: DbContext, actor: Actor): Promise<Me> {
       email: me.kind === 'agent' ? null : me.email,
       kind: me.kind,
       responsible: responsible ? userRef(responsible) : null,
+      theme: me.theme,
     },
     workspace: { id: workspace.id, name: workspace.name, slug: workspace.slug },
     role: actor.role,
-    auth: { method: actor.apiKeyId || actor.scope ? 'api_key' : 'session', scope },
+    auth: { method: isSession(actor) ? 'session' : 'api_key', scope },
   });
+}
+
+/**
+ * Changes the caller's own preferences (the theme). People signed in with a session only:
+ * API keys and agents get Forbidden. Returns the updated Me.
+ */
+export async function updateMe(
+  ctx: DbContext,
+  actor: Actor,
+  input: z.input<typeof UpdateMeInput>,
+): Promise<Me> {
+  authorize(actor, 'profile.update');
+  const { theme } = parseInput(UpdateMeInput, input);
+  const [row] = await ctx.db
+    .update(schema.user)
+    .set({ theme })
+    .where(eq(schema.user.id, actor.userId))
+    .returning({ id: schema.user.id });
+  if (!row) throw new NotFound('User not found');
+  return getMe(ctx, actor);
 }

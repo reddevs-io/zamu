@@ -33,6 +33,8 @@ x-app: &app
     PASSWORD_LOGIN: ${PASSWORD_LOGIN:-}
     # Client IP headers set by your reverse proxy, in order. See docs/self-hosting.md.
     TRUSTED_IP_HEADERS: ${TRUSTED_IP_HEADERS:-}
+    # IANA time zone that decides when cycles end (midnight on their end date). Empty means UTC.
+    APP_TIME_ZONE: ${APP_TIME_ZONE:-}
 
 services:
   db:

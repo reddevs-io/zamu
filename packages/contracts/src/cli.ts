@@ -1,5 +1,19 @@
 import { z } from 'zod';
-import { Activity, Me, ProjectList, Task, TaskListPage } from './entities';
+import {
+  Activity,
+  Comment,
+  CommentList,
+  Cycle,
+  CycleDetail,
+  CycleList,
+  Me,
+  MilestoneList,
+  MilestoneWithProgress,
+  ProjectList,
+  Task,
+  TaskListPage,
+  TimelineItem,
+} from './entities';
 import { Problem } from './problem';
 
 // Versioned `pm ... --json` output. Every result is { "schema": "pm.v1.<name>", "data": ... }.
@@ -17,14 +31,43 @@ export const cliDataSchemas = {
   whoami: Me,
   /** pm projects list */
   'projects.list': ProjectList,
-  /** pm tasks list */
+  /** pm tasks list [--mine] [--project ...] [--milestone ...] [--cycle ...] */
   'tasks.list': TaskListPage,
-  /** pm tasks show */
-  'tasks.show': z.object({ task: Task, activity: z.array(Activity) }),
+  /**
+   * pm tasks show. `activity` is the M1 field and stays for v1 readers; `timeline` (M2) holds
+   * activity and comments in one list, oldest first.
+   */
+  'tasks.show': z.object({
+    task: Task,
+    activity: z.array(Activity),
+    timeline: z.array(TimelineItem).optional(),
+  }),
   /** pm tasks create */
   'tasks.create': Task,
   /** pm tasks update */
   'tasks.update': Task,
+  /** pm comments list */
+  'comments.list': CommentList,
+  /** pm comments add */
+  'comments.add': Comment,
+  /** pm comments edit */
+  'comments.edit': Comment,
+  /** pm comments delete: the comment as it is after the soft delete (body null). */
+  'comments.delete': Comment,
+  /** pm milestones list */
+  'milestones.list': MilestoneList,
+  /** pm milestones create */
+  'milestones.create': MilestoneWithProgress,
+  /** pm milestones update */
+  'milestones.update': MilestoneWithProgress,
+  /** pm cycles list */
+  'cycles.list': CycleList,
+  /** pm cycles create */
+  'cycles.create': Cycle,
+  /** pm cycles current: null when the project has no current cycle. */
+  'cycles.current': Cycle.nullable(),
+  /** pm cycles end: the completed cycle with its summary and rollovers. */
+  'cycles.end': CycleDetail,
   /** Any command that fails while --json is set (printed to stdout, exit code still non-zero). */
   error: Problem,
 } as const;

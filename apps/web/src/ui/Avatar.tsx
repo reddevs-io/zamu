@@ -77,3 +77,32 @@ export function MemberLabel({ className, onBehalfOf, ...avatar }: MemberLabelPro
     </span>
   );
 }
+
+export interface UnassignedAvatarProps {
+  /** `sm` is 18px, `md` is 28px. */
+  size?: 'sm' | 'md';
+  /** Accessible name; set `decorative` when a visible label says it. */
+  label?: string;
+  decorative?: boolean;
+  className?: string;
+}
+
+/** Dashed empty circle in the avatar slot of an unassigned task. */
+export function UnassignedAvatar({
+  size = 'sm',
+  label = 'Unassigned',
+  decorative = false,
+  className,
+}: UnassignedAvatarProps) {
+  return (
+    <span
+      {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': label })}
+      data-kind="none"
+      className={cn(
+        'block shrink-0 rounded-full border-[1.5px] border-dashed border-faint',
+        size === 'sm' ? 'size-[18px]' : 'size-7',
+        className,
+      )}
+    />
+  );
+}

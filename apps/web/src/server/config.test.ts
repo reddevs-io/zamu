@@ -31,7 +31,13 @@ describe('readServerConfig', () => {
       baseUrl: 'https://projects.example.com',
       publicUrl: 'https://projects.example.com',
       auth: { sso: null, passwordLogin: true, ipAddressHeaders: null },
+      timeZone: 'UTC',
     });
+  });
+
+  it('reads APP_TIME_ZONE and rejects an unknown zone', () => {
+    expect(readServerConfig({ ...BASE, APP_TIME_ZONE: 'Europe/Paris' }).timeZone).toBe('Europe/Paris');
+    expect(() => readServerConfig({ ...BASE, APP_TIME_ZONE: 'Mars/Olympus' })).toThrow(/APP_TIME_ZONE/);
   });
 
   it('reads the production SSO configuration', () => {

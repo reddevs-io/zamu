@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { colorSchemeFor, themeClass, useUserTheme } from '../features/theme/theme';
 import { requireSetUp } from '../lib/session';
 import type { RouterContext } from '../router';
 import appCss from '../styles/app.css?url';
@@ -13,8 +14,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      // The UI follows the system theme (prefers-color-scheme).
-      { name: 'color-scheme', content: 'light dark' },
+      // color-scheme is rendered by RootDocument: it follows the signed-in person's theme.
       { title: 'project-management' },
     ],
     links: [
@@ -35,11 +35,18 @@ function RootComponent() {
   );
 }
 
+/**
+ * The document. A signed-in person's Light or Dark choice puts that class on <html> (tokens.css honours
+ * it over prefers-color-scheme); System and signed-out pages carry no class and follow the system. The
+ * server renders the class from the prefetched me query, so a reload never flashes the other theme.
+ */
 function RootDocument({ children }: { children: ReactNode }) {
+  const theme = useUserTheme();
   return (
-    <html lang="en">
+    <html lang="en" className={themeClass(theme)}>
       <head>
         <HeadContent />
+        <meta name="color-scheme" content={colorSchemeFor(theme)} />
       </head>
       <body>
         {children}

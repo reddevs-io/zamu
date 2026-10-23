@@ -1,14 +1,30 @@
 // /api/v1 procedures. Each one hands the parsed input and the actor to a core service and returns
 // its result; the rules live in @pm/core.
 import {
+  createComment,
+  createCycle,
+  createMilestone,
   createProject,
   createTask,
+  deleteComment,
+  deleteMilestone,
+  endCycle,
+  getCycle,
   getMe,
+  getMilestone,
   getTask,
+  listComments,
+  listCycles,
   listMembers,
+  listMilestones,
   listProjects,
   listTaskActivity,
   listTasks,
+  listTaskTimeline,
+  updateComment,
+  updateCycle,
+  updateMe,
+  updateMilestone,
   updateProject,
   updateTask,
 } from '@pm/core';
@@ -17,6 +33,7 @@ import { api } from './base';
 export const router = api.router({
   me: {
     get: api.me.get.handler(({ context }) => getMe(context.core, context.actor)),
+    update: api.me.update.handler(({ context, input }) => updateMe(context.core, context.actor, input)),
   },
   projects: {
     list: api.projects.list.handler(({ context }) => listProjects(context.core, context.actor)),
@@ -35,6 +52,47 @@ export const router = api.router({
     activity: api.tasks.activity.handler(({ context, input }) =>
       listTaskActivity(context.core, context.actor, input),
     ),
+    timeline: api.tasks.timeline.handler(({ context, input }) =>
+      listTaskTimeline(context.core, context.actor, input),
+    ),
+  },
+  comments: {
+    list: api.comments.list.handler(({ context, input }) => listComments(context.core, context.actor, input)),
+    create: api.comments.create.handler(({ context, input }) =>
+      createComment(context.core, context.actor, input),
+    ),
+    update: api.comments.update.handler(({ context, input }) =>
+      updateComment(context.core, context.actor, input),
+    ),
+    delete: api.comments.delete.handler(({ context, input }) =>
+      deleteComment(context.core, context.actor, input),
+    ),
+  },
+  milestones: {
+    list: api.milestones.list.handler(({ context, input }) =>
+      listMilestones(context.core, context.actor, input),
+    ),
+    create: api.milestones.create.handler(({ context, input }) =>
+      createMilestone(context.core, context.actor, input),
+    ),
+    get: api.milestones.get.handler(({ context, input }) => getMilestone(context.core, context.actor, input)),
+    update: api.milestones.update.handler(({ context, input }) =>
+      updateMilestone(context.core, context.actor, input),
+    ),
+    delete: api.milestones.delete.handler(({ context, input }) =>
+      deleteMilestone(context.core, context.actor, input),
+    ),
+  },
+  cycles: {
+    list: api.cycles.list.handler(({ context, input }) => listCycles(context.core, context.actor, input)),
+    create: api.cycles.create.handler(({ context, input }) =>
+      createCycle(context.core, context.actor, input),
+    ),
+    get: api.cycles.get.handler(({ context, input }) => getCycle(context.core, context.actor, input)),
+    update: api.cycles.update.handler(({ context, input }) =>
+      updateCycle(context.core, context.actor, input),
+    ),
+    end: api.cycles.end.handler(({ context, input }) => endCycle(context.core, context.actor, input)),
   },
   members: {
     list: api.members.list.handler(({ context }) => listMembers(context.core, context.actor)),

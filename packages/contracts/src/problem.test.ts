@@ -10,6 +10,7 @@ import {
   toProblemIssues,
 } from './problem';
 import { decodeProblem, encodeProblem } from './problem-codec';
+import { taskFixture } from './testing/fixtures';
 
 describe('problem()', () => {
   it('fills title and status from the code', () => {
@@ -119,6 +120,31 @@ describe('encodeProblem / decodeProblem', () => {
     const decoded = decodeProblem(JSON.parse(JSON.stringify(encodeProblem(original))));
     expect(decoded?.code).toBe('NOT_FOUND');
     expect(decoded?.message).toBe('No task PAY-9');
+  });
+
+  it('carries the current task through a TASK_CHANGED conflict', () => {
+    const error = new ORPCError('TASK_CHANGED', {
+      status: 409,
+      message: 'PAY-142 changed since you loaded it',
+      data: { requestId: 'req_5', task: taskFixture },
+    });
+    const body = encodeProblem(error);
+    expect(body).toMatchObject({
+      title: 'Task changed',
+      status: 409,
+      code: 'TASK_CHANGED',
+      requestId: 'req_5',
+      task: { key: 'PAY-142', updatedAt: '2026-10-22T18:00:00.000Z' },
+    });
+    const decoded = decodeProblem(JSON.parse(JSON.stringify(body)));
+    expect(decoded?.code).toBe('TASK_CHANGED');
+    expect(decoded?.status).toBe(409);
+    expect(decoded?.data.task?.key).toBe('PAY-142');
+    expect(decoded?.data.task?.rank).toBe(taskFixture.rank);
+  });
+
+  it('rejects a Problem whose task is not a task', () => {
+    expect(Problem.safeParse({ ...problem('TASK_CHANGED'), task: { key: 'PAY-1' } }).success).toBe(false);
   });
 
   it('returns null for bodies that are not Problems', () => {

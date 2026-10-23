@@ -3,10 +3,16 @@ import { CLI_RESULT_NAMES, cliOutput, cliSchemaId, parseCliOutput } from './cli'
 import { problem } from './problem';
 import {
   activityFixture,
+  commentFixture,
+  completedCycleFixture,
+  cycleFixture,
+  deletedCommentFixture,
   meFixture,
+  milestoneWithProgressFixture,
   projectWithCountsFixture,
   taskFixture,
   taskListPageFixture,
+  timelineFixture,
 } from './testing/fixtures';
 
 describe('CLI output', () => {
@@ -21,6 +27,17 @@ describe('CLI output', () => {
       'tasks.show',
       'tasks.create',
       'tasks.update',
+      'comments.list',
+      'comments.add',
+      'comments.edit',
+      'comments.delete',
+      'milestones.list',
+      'milestones.create',
+      'milestones.update',
+      'cycles.list',
+      'cycles.create',
+      'cycles.current',
+      'cycles.end',
       'error',
     ]);
   });
@@ -43,8 +60,21 @@ describe('CLI output', () => {
     ['projects.list', { items: [projectWithCountsFixture] }],
     ['tasks.list', taskListPageFixture],
     ['tasks.show', { task: taskFixture, activity: [activityFixture] }],
+    ['tasks.show', { task: taskFixture, activity: [activityFixture], timeline: timelineFixture }],
     ['tasks.create', taskFixture],
     ['tasks.update', taskFixture],
+    ['comments.list', { items: [commentFixture, deletedCommentFixture] }],
+    ['comments.add', commentFixture],
+    ['comments.edit', commentFixture],
+    ['comments.delete', deletedCommentFixture],
+    ['milestones.list', { items: [milestoneWithProgressFixture] }],
+    ['milestones.create', milestoneWithProgressFixture],
+    ['milestones.update', milestoneWithProgressFixture],
+    ['cycles.list', { items: [cycleFixture, completedCycleFixture] }],
+    ['cycles.create', cycleFixture],
+    ['cycles.current', cycleFixture],
+    ['cycles.current', null],
+    ['cycles.end', completedCycleFixture],
     ['error', problem('FORBIDDEN', 'This key is read-only')],
   ] as const)('%s round-trips through JSON', (name, data) => {
     const printed = JSON.stringify(cliOutput(name, data as never));

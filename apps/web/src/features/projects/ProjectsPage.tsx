@@ -14,6 +14,7 @@ import {
   SearchField,
   StatusSquare,
 } from '~/ui';
+import { EditProjectDialogHost } from './EditProjectDialog';
 import { byLastActivity, filterProjects } from './order';
 import { ProjectsTable } from './ProjectsTable';
 import { meQuery, projectsQuery } from './queries';
@@ -51,6 +52,8 @@ export function ProjectsPage() {
   const isEmpty = count === 0;
 
   const openProject = (key: string) => void router.navigate({ href: projectHref(key) });
+  const [editing, setEditing] = useState<string | null>(null);
+  const editedProject = projects.data?.items.find((project) => project.key === editing);
   const newProjectButton = (
     <Button kbd="P" aria-keyshortcuts="P" onPress={newProject.open}>
       New project
@@ -106,9 +109,16 @@ export function ProjectsPage() {
             isLoading={projects.isPending}
             emptyMessage={query.trim() ? `No projects match “${query.trim()}”.` : undefined}
             onOpen={openProject}
+            onEdit={setEditing}
           />
         </>
       )}
+      <EditProjectDialogHost
+        key={editing ?? 'none'}
+        project={editedProject}
+        isOpen={editing != null && editedProject != null}
+        onClose={() => setEditing(null)}
+      />
     </section>
   );
 }

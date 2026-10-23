@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
-import { SearchField, TextField } from '~/ui';
-import { useShellHotkeys } from './hotkeys';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SearchField, TextField, useHotkeys } from '~/ui';
+import { GO_TO_WINDOW_MS, useGoToHotkeys, useShellHotkeys } from './hotkeys';
 import { NewProjectProvider, useNewProject } from './new-project';
 import { PageSearchProvider, usePageSearchRef } from './page-search';
 import { QuickCreateProvider, useQuickCreate } from './quick-create';
@@ -86,5 +86,53 @@ describe('useShellHotkeys', () => {
     render(<Unregistered />, { wrapper: Providers });
     await user.keyboard('/');
     expect(screen.getByRole('searchbox', { name: 'Search tasks' })).toHaveFocus();
+  });
+});
+
+function GoTo({ onMyTasks, onM }: { onMyTasks: () => void; onM: () => void }) {
+  useGoToHotkeys({ m: onMyTasks });
+  // A page shortcut on the same letter (M focuses the comment composer on task screens).
+  useHotkeys({ m: onM });
+  return (
+    <main>
+      <TextField label="Notes" />
+    </main>
+  );
+}
+
+describe('useGoToHotkeys', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('G then M goes to My tasks, and the page does not also get M', async () => {
+    const user = userEvent.setup();
+    const onMyTasks = vi.fn();
+    const onM = vi.fn();
+    render(<GoTo onMyTasks={onMyTasks} onM={onM} />);
+    await user.keyboard('gm');
+    expect(onMyTasks).toHaveBeenCalledTimes(1);
+    expect(onM).not.toHaveBeenCalled();
+    // M alone is the page's.
+    await user.keyboard('m');
+    expect(onMyTasks).toHaveBeenCalledTimes(1);
+    expect(onM).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the sequence while typing and after the window passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const user = userEvent.setup();
+    const onMyTasks = vi.fn();
+    render(<GoTo onMyTasks={onMyTasks} onM={() => {}} />);
+    await user.click(screen.getByLabelText('Notes'));
+    await user.keyboard('gm');
+    expect(onMyTasks).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Notes')).toHaveValue('gm');
+    await user.click(document.body);
+    await user.keyboard('g');
+    vi.setSystemTime(Date.now() + GO_TO_WINDOW_MS + 1);
+    await user.keyboard('m');
+    expect(onMyTasks).not.toHaveBeenCalled();
+    // Another key between G and M cancels it.
+    await user.keyboard('gxm');
+    expect(onMyTasks).not.toHaveBeenCalled();
   });
 });

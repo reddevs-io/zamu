@@ -92,4 +92,28 @@ describe('can', () => {
     expect(() => authorize(bot, 'apiKey.create', owner(itself))).toThrow(Forbidden);
     expect(() => authorize(bot, 'member.manage')).toThrow('Agents cannot manage members, agents or API keys');
   });
+
+  it('lets only people signed in with a session change their preferences', () => {
+    expect(can(person('member'), 'profile.update')).toBe(true);
+    expect(can(person('owner', { projects: 'all', access: 'write' }), 'profile.update')).toBe(false);
+    expect(can(agent({ projects: 'all', access: 'write' }), 'profile.update')).toBe(false);
+    expect(
+      can(
+        { ...agent({ projects: 'all', access: 'write' }), scope: undefined, apiKeyId: undefined },
+        'profile.update',
+      ),
+    ).toBe(false);
+    // A read-only key hears why: keys, not read access.
+    expect(() => authorize(person('member', { projects: 'all', access: 'read' }), 'profile.update')).toThrow(
+      /not with an API key/,
+    );
+  });
+
+  it('covers M2 planning and comment writes with task.write and feature switches with project.update', () => {
+    const scoped = agent({ projects: [p1], access: 'write' });
+    expect(can(scoped, 'task.write', project(p1))).toBe(true);
+    expect(can(scoped, 'project.update', project(p1))).toBe(true);
+    expect(can(scoped, 'project.update', project(p2))).toBe(false);
+    expect(can(agent({ projects: [p1], access: 'read' }), 'project.update', project(p1))).toBe(false);
+  });
 });

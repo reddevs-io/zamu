@@ -11,7 +11,7 @@ import { act, configure, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageSearchProvider, useFocusPageSearch } from '~/features/shell/page-search';
-import { QuickCreateProvider } from '~/features/shell/quick-create';
+import { QuickCreateProvider, useQuickCreate } from '~/features/shell/quick-create';
 import { UIProvider, useHotkeys } from '~/ui';
 import { createFakeApi, type FakeApi } from './fake-api';
 import { QuickCreateDialog } from './QuickCreateDialog';
@@ -51,6 +51,16 @@ function SlashFocusesSearch() {
   return null;
 }
 
+/** Opens quick create the way the board column's "+" does. */
+function OpenInReview() {
+  const quickCreate = useQuickCreate();
+  return (
+    <button type="button" onClick={() => quickCreate.open('PAY', { status: 'in_review' })}>
+      Open in review
+    </button>
+  );
+}
+
 /** `guardMs` delays every navigation, like the signed-in layout's server-side session check. */
 function renderApp(url: string, { guardMs = 0 }: { guardMs?: number } = {}) {
   const queryClient = new QueryClient({
@@ -62,6 +72,7 @@ function renderApp(url: string, { guardMs = 0 }: { guardMs?: number } = {}) {
         <PageSearchProvider>
           <QuickCreateProvider>
             <SlashFocusesSearch />
+            <OpenInReview />
             <Outlet />
             <QuickCreateDialog />
           </QuickCreateProvider>
@@ -246,17 +257,29 @@ describe('optimistic edits', () => {
     await user.clear(input);
     await user.type(input, 'Renamed task{Enter}');
 
-    // Optimistic: the pane and the list row change before the server answers.
-    expect(await within(pane()).findByRole('heading', { name: 'Renamed task' })).toBeInTheDocument();
-    expect(within(row('PAY-2')).getByText('Renamed task')).toBeInTheDocument();
-    expect(fake.calls.update).toEqual([{ key: 'PAY-2', title: 'Renamed task' }]);
+    // Optimistic: the pane and the list row change before the server answers. Under a loaded full-suite
+    // run the render can lag, so wait on the whole optimistic state with a generous timeout.
+    await waitFor(
+      () => {
+        expect(within(pane()).getByRole('heading', { name: 'Renamed task' })).toBeInTheDocument();
+        expect(within(row('PAY-2')).getByText('Renamed task')).toBeInTheDocument();
+        expect(fake.calls.update).toEqual([{ key: 'PAY-2', title: 'Renamed task' }]);
+      },
+      { timeout: 10_000 },
+    );
 
     await act(async () => release());
-    // Rolled back, with the reason.
-    expect(await within(pane()).findByRole('heading', { name: 'Task number 2' })).toBeInTheDocument();
-    expect(within(row('PAY-2')).getByText('Task number 2')).toBeInTheDocument();
-    expect(within(pane()).getByRole('alert')).toHaveTextContent(
-      "Couldn't save your change, so it was undone. Title is too long",
+    // Rolled back, with the reason. The banner and the rollback come from the same failed mutation;
+    // wait for both instead of reading the banner right after the heading.
+    await waitFor(
+      () => {
+        expect(within(pane()).getByRole('heading', { name: 'Task number 2' })).toBeInTheDocument();
+        expect(within(row('PAY-2')).getByText('Task number 2')).toBeInTheDocument();
+        expect(within(pane()).getByRole('alert')).toHaveTextContent(
+          "Couldn't save your change, so it was undone. Title is too long",
+        );
+      },
+      { timeout: 10_000 },
     );
   });
 
@@ -330,6 +353,35 @@ describe('quick create', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('preselects the status passed to open() for that opening only', async () => {
+    const user = userEvent.setup();
+    renderApp('/p/PAY');
+    const fake = api.current as FakeApi;
+    await screen.findByRole('row', { name: /PAY-1\b/ });
+
+    await user.click(screen.getByRole('button', { name: 'Open in review' }));
+    let dialog = await screen.findByRole('dialog', { name: 'New task' });
+    expect(within(dialog).getByRole('button', { name: /In review/ })).toBeInTheDocument();
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Title' }),
+      'Review me{Control>}{Enter}{/Control}',
+    );
+    await waitFor(() => expect(fake.calls.create).toHaveLength(1));
+    expect(fake.calls.create[0]).toMatchObject({ title: 'Review me', status: 'in_review' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // The next plain open starts from the default status again.
+    await user.click(screen.getByRole('button', { name: /^New/ }));
+    dialog = await screen.findByRole('dialog', { name: 'New task' });
+    expect(within(dialog).getByRole('button', { name: /Todo/ })).toBeInTheDocument();
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Title' }),
+      'Plain{Control>}{Enter}{/Control}',
+    );
+    await waitFor(() => expect(fake.calls.create).toHaveLength(2));
+    expect(fake.calls.create[1]).toMatchObject({ title: 'Plain', status: 'todo' });
   });
 
   it('closes after creating when Create more is off', async () => {

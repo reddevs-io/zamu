@@ -3,6 +3,7 @@
 import { type Auth, createAuth } from '@pm/auth';
 import { createDb, type Db, type DbHandle, schema } from '@pm/db';
 import { sharedTestDatabaseUrl } from '@pm/db/test';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Actor } from '../authz';
 import type { CoreContext } from '../context';
 
@@ -95,4 +96,109 @@ export function randomProjectKey(): string {
   let key = letters[Math.floor(Math.random() * letters.length)] as string;
   for (let i = 0; i < 5; i++) key += chars[Math.floor(Math.random() * chars.length)];
   return key;
+}
+
+// ---------------------------------------------------------------------------
+// M2 rows: milestones, cycles, comments. Raw inserts that skip the services' rules, so tests of one
+// service can set up the others' data. Use the services themselves when the rules matter.
+// ---------------------------------------------------------------------------
+
+/** Where a fixture row lives: the workspace and project ids. */
+export interface ProjectScope {
+  workspaceId: string;
+  projectId: string;
+}
+
+/** A calendar date (YYYY-MM-DD, UTC) `days` after `from` (default now). Negative goes back. */
+export function isoDate(days = 0, from: Date = new Date()): string {
+  const date = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + days));
+  return date.toISOString().slice(0, 10);
+}
+
+/** Inserts a milestone. Name defaults to a unique one; status to planned. */
+export async function createMilestoneRow(
+  db: Db,
+  scope: ProjectScope,
+  values: Partial<Omit<typeof schema.milestone.$inferInsert, 'workspaceId' | 'projectId'>> & {
+    createdById: string;
+  },
+): Promise<typeof schema.milestone.$inferSelect> {
+  const [row] = await db
+    .insert(schema.milestone)
+    .values({ name: `Milestone ${unique()}`, ...values, ...scope })
+    .returning();
+  if (!row) throw new Error('milestone insert failed');
+  return row;
+}
+
+/**
+ * Inserts a cycle. The number defaults to the project's next_cycle_number, which is advanced past
+ * the number used either way. Dates default to a current 14-day cycle (started 3 days ago).
+ */
+export async function createCycleRow(
+  db: Db,
+  scope: ProjectScope,
+  values: Partial<Omit<typeof schema.cycle.$inferInsert, 'workspaceId' | 'projectId'>> = {},
+): Promise<typeof schema.cycle.$inferSelect> {
+  return db.transaction(async (tx) => {
+    const [counter] = await tx
+      .select({ next: schema.project.nextCycleNumber })
+      .from(schema.project)
+      .where(eq(schema.project.id, scope.projectId))
+      .for('update');
+    if (!counter) throw new Error(`project ${scope.projectId} not found`);
+    const number = values.number ?? counter.next;
+    await tx
+      .update(schema.project)
+      .set({
+        nextCycleNumber: Math.max(counter.next, number + 1),
+        updatedAt: sql`${schema.project.updatedAt}`,
+      })
+      .where(eq(schema.project.id, scope.projectId));
+    const [row] = await tx
+      .insert(schema.cycle)
+      .values({ startsOn: isoDate(-3), endsOn: isoDate(10), ...values, number, ...scope })
+      .returning();
+    if (!row) throw new Error('cycle insert failed');
+    return row;
+  });
+}
+
+/** Inserts a comment. A deleted comment (deletedAt set) gets a null body, as the check requires. */
+export async function createCommentRow(
+  db: Db,
+  scope: ProjectScope,
+  values: Partial<Omit<typeof schema.comment.$inferInsert, 'workspaceId' | 'projectId'>> & {
+    taskId: string;
+    authorId: string;
+  },
+): Promise<typeof schema.comment.$inferSelect> {
+  const body = values.deletedAt ? null : (values.body ?? `Comment ${unique()}`);
+  const [row] = await db
+    .insert(schema.comment)
+    .values({ ...values, body, ...scope })
+    .returning();
+  if (!row) throw new Error('comment insert failed');
+  return row;
+}
+
+/** The project row for `key` in a workspace, e.g. after createProject, for ProjectScope and ids. */
+export async function projectRow(db: Db, workspaceId: string, key: string) {
+  const [row] = await db
+    .select()
+    .from(schema.project)
+    .where(and(eq(schema.project.workspaceId, workspaceId), eq(schema.project.key, key)))
+    .limit(1);
+  if (!row) throw new Error(`project ${key} not found`);
+  return row;
+}
+
+/** ProjectScope of a project row. */
+export function scopeOf(row: { id: string; workspaceId: string }): ProjectScope {
+  return { workspaceId: row.workspaceId, projectId: row.id };
+}
+
+/** An agent actor of `world` acting through a key with this scope (projects are ids). */
+export function keyActor(world: World, scope: NonNullable<Actor['scope']>): Actor {
+  return { ...world.agentActor, scope, apiKeyId: crypto.randomUUID() };
 }

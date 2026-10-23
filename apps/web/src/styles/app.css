@@ -37,6 +37,14 @@
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
   --color-scrim: var(--scrim);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-drop: var(--drop);
+  --color-drop-line: var(--drop-line);
+  --color-mention: var(--mention);
+  --color-mention-bg: var(--mention-bg);
+  --color-comment-bg: var(--comment-bg);
+  --color-track: var(--track);
   --shadow-dialog: var(--shadow);
 }
 

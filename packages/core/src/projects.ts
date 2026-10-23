@@ -1,17 +1,19 @@
-// Projects: list with open counts, create, update.
+// Projects: list with open counts, create, update, and the milestone and cycle switches.
 import {
   CreateProjectInput,
+  type CurrentCycle,
   OPEN_TASK_STATUSES,
   Project,
   ProjectList,
   UpdateProjectInput,
   type UserRef,
 } from '@pm/contracts';
-import { schema } from '@pm/db';
+import { type DbOrTx, schema } from '@pm/db';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, can } from './authz';
 import type { DbContext } from './context';
+import { type ClockContext, currentCycles } from './cycles';
 import { Conflict, isUniqueViolation, parseInput } from './errors';
 import { findProjectByKey, type ProjectRow, toDate, userRef } from './internal';
 
@@ -19,15 +21,28 @@ const { project, task, user } = schema;
 
 const PROJECT_KEY_UNIQUE = 'project_workspaceId_key_unique';
 
-export function toProject(row: ProjectRow): Project {
+type ProjectContext = DbContext & ClockContext;
+
+/** The contract shape. `currentCycle` is dropped when the project does not use cycles. */
+export function toProject(row: ProjectRow, currentCycle: CurrentCycle | null = null): Project {
   return Project.parse({
     id: row.id,
     key: row.key,
     name: row.name,
     description: row.description,
+    usesMilestones: row.usesMilestones,
+    usesCycles: row.usesCycles,
+    currentCycle: row.usesCycles ? currentCycle : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
+}
+
+/** toProject with the current cycle looked up. */
+async function toProjectWithCycle(ctx: ProjectContext, db: DbOrTx, row: ProjectRow): Promise<Project> {
+  if (!row.usesCycles) return toProject(row);
+  const cycles = await currentCycles(db, [row.id], ctx);
+  return toProject(row, cycles.get(row.id) ?? null);
 }
 
 function keyTaken(key: string): Conflict {
@@ -39,9 +54,10 @@ const openCount = (status: string) =>
 
 /**
  * Projects the actor can read, with open task counts per status, the distinct assignees of open
- * tasks (people first) and the last activity time. Most recently active first.
+ * tasks (people first), the last activity time and the current cycle. Most recently active first.
  */
-export async function listProjects({ db }: DbContext, actor: Actor): Promise<ProjectList> {
+export async function listProjects(ctx: ProjectContext, actor: Actor): Promise<ProjectList> {
+  const { db } = ctx;
   authorize(actor, 'workspace.read');
   const scope = actor.scope?.projects;
   if (Array.isArray(scope) && scope.length === 0) return { items: [] };
@@ -69,10 +85,17 @@ export async function listProjects({ db }: DbContext, actor: Actor): Promise<Pro
   const visible = rows.filter((row) =>
     can(actor, 'project.read', { type: 'project', projectId: row.project.id }),
   );
-  const assignees = await openAssignees(
-    { db },
-    visible.map((row) => row.project.id),
-  );
+  const [assignees, cycles] = await Promise.all([
+    openAssignees(
+      { db },
+      visible.map((row) => row.project.id),
+    ),
+    currentCycles(
+      db,
+      visible.filter((row) => row.project.usesCycles).map((row) => row.project.id),
+      ctx,
+    ),
+  ]);
 
   return ProjectList.parse({
     items: visible.map((row) => {
@@ -83,7 +106,7 @@ export async function listProjects({ db }: DbContext, actor: Actor): Promise<Pro
         in_review: row.in_review,
       };
       return {
-        ...toProject(row.project),
+        ...toProject(row.project, cycles.get(row.project.id) ?? null),
         openCounts,
         openCount: Object.values(openCounts).reduce((sum, n) => sum + n, 0),
         lastActivityAt: toDate(row.lastActivityAt),
@@ -133,17 +156,18 @@ export async function createProject(
 }
 
 /**
- * Updates name, description or key. The key can change only while the project has no tasks,
- * because task keys embed it. Conflict otherwise, or when the new key is taken.
+ * Updates name, description, key or the milestone and cycle switches. The key can change only
+ * while the project has no tasks, because task keys embed it. Conflict otherwise, or when the new
+ * key is taken. Turning a switch off keeps the milestones or cycles; turning it on shows them again.
  */
 export async function updateProject(
-  { db }: DbContext,
+  ctx: ProjectContext,
   actor: Actor,
   input: z.input<typeof UpdateProjectInput>,
 ): Promise<Project> {
   const parsed = parseInput(UpdateProjectInput, input);
   try {
-    return await db.transaction(async (tx) => {
+    return await ctx.db.transaction(async (tx) => {
       // Locking the row also serialises against task creation, which updates next_task_number.
       const current = await findProjectByKey(tx, actor, parsed.project, { forUpdate: true });
       authorize(actor, 'project.update', { type: 'project', projectId: current.id });
@@ -165,11 +189,17 @@ export async function updateProject(
         }
         changes.key = parsed.key;
       }
-      if (Object.keys(changes).length === 0) return toProject(current);
+      if (parsed.usesMilestones !== undefined && parsed.usesMilestones !== current.usesMilestones) {
+        changes.usesMilestones = parsed.usesMilestones;
+      }
+      if (parsed.usesCycles !== undefined && parsed.usesCycles !== current.usesCycles) {
+        changes.usesCycles = parsed.usesCycles;
+      }
+      if (Object.keys(changes).length === 0) return toProjectWithCycle(ctx, tx, current);
 
       const [row] = await tx.update(project).set(changes).where(eq(project.id, current.id)).returning();
       if (!row) throw new Error('project update returned no row');
-      return toProject(row);
+      return toProjectWithCycle(ctx, tx, row);
     });
   } catch (error) {
     if (parsed.key && isUniqueViolation(error, PROJECT_KEY_UNIQUE)) throw keyTaken(parsed.key);

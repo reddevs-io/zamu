@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createCycle, endCycle } from './cycles';
 import { Conflict, Forbidden, Invalid, NotFound } from './errors';
 import { createProject, listProjects, updateProject } from './projects';
 import { createTask, updateTask } from './tasks';
-import { createWorld, type TestContext, testContext, type World } from './testing/fixtures';
+import { createWorld, randomProjectKey, type TestContext, testContext, type World } from './testing/fixtures';
 
 describe('projects', () => {
   let ctx: TestContext;
@@ -114,5 +115,74 @@ describe('projects', () => {
     const readOnly = { ...w.agentActor, scope: { projects: 'all' as const, access: 'read' as const } };
     expect((await listProjects(ctx, readOnly)).items).toHaveLength(2);
     await expect(updateProject(ctx, readOnly, { project: 'PAY', name: 'x' })).rejects.toThrow(Forbidden);
+  });
+
+  it('turns milestones and cycles on and off, both on by default', async () => {
+    const created = await createProject(ctx, world.ownerActor, { name: 'Flags', key: randomProjectKey() });
+    expect(created).toMatchObject({ usesMilestones: true, usesCycles: true, currentCycle: null });
+
+    const off = await updateProject(ctx, world.memberActor, {
+      project: created.key,
+      usesMilestones: false,
+      usesCycles: false,
+    });
+    expect(off).toMatchObject({ usesMilestones: false, usesCycles: false });
+    // Unchanged values are a no-op, not an error.
+    expect(
+      await updateProject(ctx, world.memberActor, { project: created.key, usesCycles: false }),
+    ).toMatchObject({
+      usesCycles: false,
+      updatedAt: off.updatedAt,
+    });
+    const on = await updateProject(ctx, world.memberActor, { project: created.key, usesCycles: true });
+    expect(on).toMatchObject({ usesMilestones: false, usesCycles: true });
+
+    const readOnly = { ...world.agentActor, scope: { projects: 'all' as const, access: 'read' as const } };
+    await expect(
+      updateProject(ctx, readOnly, { project: created.key, usesMilestones: true }),
+    ).rejects.toThrow(Forbidden);
+  });
+
+  it('shows the current cycle in the project list and after updates', async () => {
+    const w = await createWorld(ctx.db);
+    const now = new Date('2040-05-09T08:00:00Z');
+    const clock = { ...ctx, timeZone: 'UTC', now: () => now };
+    const pay = await createProject(clock, w.ownerActor, { name: 'Payments', key: 'PAY' });
+    await createProject(clock, w.ownerActor, { name: 'Web', key: 'WEB' });
+    const cycle = await createCycle(clock, w.ownerActor, {
+      project: 'PAY',
+      name: 'Checkout',
+      startsOn: '2040-05-01',
+      endsOn: '2040-05-11',
+    });
+    await createCycle(clock, w.ownerActor, { project: 'WEB', startsOn: '2040-05-20', endsOn: '2040-05-30' });
+
+    const byKey = async () =>
+      Object.fromEntries((await listProjects(clock, w.ownerActor)).items.map((p) => [p.key, p.currentCycle]));
+    expect(await byKey()).toEqual({
+      PAY: {
+        id: cycle.id,
+        number: 1,
+        name: 'Checkout',
+        startsOn: '2040-05-01',
+        endsOn: '2040-05-11',
+        daysLeft: 3,
+      },
+      WEB: null,
+    });
+    expect(
+      (await updateProject(clock, w.ownerActor, { project: 'PAY', name: 'Pay' })).currentCycle,
+    ).toMatchObject({
+      number: 1,
+    });
+
+    // Turning cycles off hides the current cycle; ending it removes it.
+    expect(
+      (await updateProject(clock, w.ownerActor, { project: 'PAY', usesCycles: false })).currentCycle,
+    ).toBeNull();
+    expect((await byKey()).PAY).toBeNull();
+    await updateProject(clock, w.ownerActor, { project: 'PAY', usesCycles: true });
+    await endCycle(clock, w.ownerActor, { project: pay.key, number: 'current' });
+    expect((await byKey()).PAY).toBeNull();
   });
 });

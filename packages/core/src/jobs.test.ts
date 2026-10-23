@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  CYCLES_END_DUE,
   createJobQueue,
   enqueue,
   ensureQueues,
@@ -37,11 +38,17 @@ describe('jobs', () => {
     return result.rows[0]?.n ?? 0;
   }
 
-  it('exports names, payload schemas and the daily schedule', () => {
-    expect(JOB_NAMES).toEqual(['invitations.expire']);
+  it('exports names, payload schemas and the schedules', () => {
+    expect(JOB_NAMES).toEqual(['invitations.expire', 'cycles.end-due']);
     expect(isJobName('invitations.expire')).toBe(true);
+    expect(isJobName('cycles.end-due')).toBe(true);
     expect(isJobName('nope')).toBe(false);
     expect(JOB_SCHEDULES[INVITATIONS_EXPIRE]).toEqual({ cron: '0 3 * * *', tz: 'UTC', data: {} });
+    expect(JOB_SCHEDULES[CYCLES_END_DUE]).toEqual({ cron: '0 * * * *', tz: 'UTC', data: {} });
+    expect(parseJobPayload(CYCLES_END_DUE, { now: '2040-01-01T00:00:00Z' })).toEqual({
+      now: '2040-01-01T00:00:00Z',
+    });
+    expect(() => parseJobPayload(CYCLES_END_DUE, { now: 'soon' })).toThrow();
     expect(parseJobPayload(INVITATIONS_EXPIRE, null)).toEqual({});
     expect(() => parseJobPayload(INVITATIONS_EXPIRE, { now: 'soon' })).toThrow();
   });

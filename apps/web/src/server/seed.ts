@@ -5,19 +5,26 @@ import { bootstrapAdmin, getActorFromRequest, isFirstRun } from '@pm/auth';
 import type { CreateTaskInput, Priority, TaskStatus } from '@pm/contracts';
 import {
   type Actor,
+  addCalendarDays,
   Conflict,
   type CoreContext,
   createAgent,
   createApiKey,
+  createComment,
+  createCycle,
+  createMilestone,
   createProject,
   createTask,
   listMembers,
+  todayIn,
   toWorkspaceRole,
   updateTask,
 } from '@pm/core';
 import type { z } from 'zod';
 
 export interface SeedOptions {
+  /** Also add M2 demo data to a newly created PAY: milestones, a current and a next cycle, comments. */
+  planning?: boolean;
   adminName?: string;
   adminEmail?: string;
   adminPassword?: string;
@@ -45,6 +52,7 @@ export const SEED_DEFAULTS = {
   adminPassword: 'dev-password-1234',
   workspaceName: 'Reddevs',
   agentName: 'claude-dev',
+  planning: false,
 } satisfies Required<SeedOptions>;
 
 type Who = 'admin' | 'agent' | null;
@@ -253,6 +261,7 @@ export async function seedDevData(ctx: CoreContext, options: SeedOptions = {}): 
       }
     }
     createdProjects.push({ key: spec.key, tasks: spec.tasks.length });
+    if (opts.planning && spec.key === 'PAY') await seedPlanning(ctx, admin, agent);
   }
 
   const adminKey = await createApiKey(ctx, admin, { name: `${user.name} dev seed`, scope: workspaceScope });
@@ -271,4 +280,47 @@ export async function seedDevData(ctx: CoreContext, options: SeedOptions = {}): 
     agentKey,
     adminKey: adminKey.key,
   };
+}
+
+/**
+ * M2 demo data for PAY: two milestones (one overdue), a current cycle that ends in three days and the
+ * next one, tasks spread over them, and a short comment thread with a mention.
+ */
+async function seedPlanning(ctx: CoreContext, admin: Actor, agent: Actor): Promise<void> {
+  const today = todayIn(ctx);
+  const webhooks = await createMilestone(ctx, admin, {
+    project: 'PAY',
+    name: 'Webhooks v2',
+    description: 'Reliable delivery: retries, signed payloads, a delivery log merchants can read.',
+    targetDate: addCalendarDays(today, 22),
+  });
+  const audit = await createMilestone(ctx, admin, {
+    project: 'PAY',
+    name: 'PCI audit',
+    targetDate: addCalendarDays(today, -3),
+  });
+  await createCycle(ctx, admin, {
+    project: 'PAY',
+    name: 'Checkout rewrite',
+    startsOn: addCalendarDays(today, -11),
+    endsOn: addCalendarDays(today, 2),
+  });
+  await createCycle(ctx, admin, { project: 'PAY' });
+  for (let n = 1; n <= 8; n++) {
+    const milestone = n <= 5 ? webhooks.id : n <= 7 ? audit.id : null;
+    await updateTask(ctx, admin, {
+      key: `PAY-${n}`,
+      cycle: n <= 6 ? 'current' : 'next',
+      ...(milestone ? { milestone } : {}),
+    });
+  }
+  await createComment(ctx, admin, {
+    key: 'PAY-1',
+    body: 'Should 429 count toward the 6 attempts? Some providers send it for minutes during deploys.',
+  });
+  await createComment(ctx, agent, {
+    key: 'PAY-1',
+    body: 'Done. 429 now waits for Retry-After and does not use an attempt.\n\n- 4xx stops retrying, except 408 and 429\n- Tests: 14 new cases',
+  });
+  await createComment(ctx, admin, { key: 'PAY-1', body: 'Thanks @claude-dev, looks good.' });
 }

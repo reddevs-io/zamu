@@ -14,20 +14,26 @@ export interface JobRecord {
 export interface RunJobContext {
   db: Db;
   logger: Logger;
+  /** APP_TIME_ZONE, passed to core so cycles end at midnight in that zone. */
+  timeZone?: string;
 }
 
 /**
  * Runs `job` and returns the handler's result, which pg-boss stores as the job's output.
  * Rethrows handler and payload errors so pg-boss fails the job and retries it up to the queue's limit.
  */
-export async function runJob(name: JobName, job: JobRecord, { db, logger }: RunJobContext): Promise<unknown> {
+export async function runJob(
+  name: JobName,
+  job: JobRecord,
+  { db, logger, timeZone }: RunJobContext,
+): Promise<unknown> {
   const jobLogger = logger.child({ job: name, jobId: job.id });
   const started = performance.now();
   const durationMs = () => Math.round(performance.now() - started);
   jobLogger.info('job started', { retryCount: job.retryCount });
 
   try {
-    const output = await runCoreJob({ db }, name, job.data);
+    const output = await runCoreJob(timeZone ? { db, timeZone } : { db }, name, job.data);
     jobLogger.info('job completed', { durationMs: durationMs(), output });
     return output;
   } catch (error) {

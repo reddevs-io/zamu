@@ -1,8 +1,8 @@
 import type { ProjectWithCounts } from '@pm/contracts';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { projectHref } from '~/features/shell/paths';
-import { Avatar, type DataColumn, DataTable, StatusBar, Tooltip, TooltipTrigger } from '~/ui';
+import { Avatar, Button, type DataColumn, DataTable, StatusBar, Tooltip, TooltipTrigger } from '~/ui';
 import { shortAge } from './time';
 
 const MAX_AVATARS = 4;
@@ -49,7 +49,7 @@ function Members({ project }: { project: ProjectWithCounts }) {
   );
 }
 
-const COLUMNS: readonly DataColumn<ProjectWithCounts>[] = [
+const BASE_COLUMNS: readonly DataColumn<ProjectWithCounts>[] = [
   {
     id: 'key',
     header: 'Key',
@@ -108,20 +108,53 @@ const COLUMNS: readonly DataColumn<ProjectWithCounts>[] = [
   },
 ];
 
+/** Base columns plus a trailing Edit button when the page can edit projects. */
+function columnsFor(onEdit: ((key: string) => void) | undefined): readonly DataColumn<ProjectWithCounts>[] {
+  if (!onEdit) return BASE_COLUMNS;
+  return [
+    ...BASE_COLUMNS,
+    {
+      id: 'edit',
+      header: '',
+      width: 40,
+      align: 'end',
+      skeleton: 0,
+      cell: (project) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="px-0"
+          aria-label={`Edit ${project.name}`}
+          onPress={() => onEdit(project.key)}
+        >
+          Edit
+        </Button>
+      ),
+    },
+  ];
+}
+
 export interface ProjectsTableProps {
   projects: readonly ProjectWithCounts[];
   isLoading?: boolean;
   /** Shown in the body when `projects` is empty (search without matches). */
   emptyMessage?: string;
   onOpen: (key: string) => void;
+  /** Opens the Edit project dialog (name, description, milestones and cycles switches). */
+  onEdit?: (key: string) => void;
 }
 
 /** Projects table from frame 03: key, name and description, open-task bar, open count, members, age. */
-export function ProjectsTable({ projects, isLoading, emptyMessage, onOpen }: ProjectsTableProps) {
+export function ProjectsTable({ projects, isLoading, emptyMessage, onOpen, onEdit }: ProjectsTableProps) {
+  const editRef = useRef(onEdit);
+  editRef.current = onEdit;
+  const hasEdit = onEdit != null;
+  // Stable columns: DataTable re-renders every row when they change.
+  const columns = useMemo(() => columnsFor(hasEdit ? (key) => editRef.current?.(key) : undefined), [hasEdit]);
   return (
     <DataTable
       aria-label="Projects"
-      columns={COLUMNS}
+      columns={columns}
       items={projects}
       getKey={(project) => project.key}
       onRowAction={(key) => onOpen(key)}

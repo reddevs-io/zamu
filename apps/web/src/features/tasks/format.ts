@@ -52,6 +52,22 @@ export function formatPageTime(value: string | Date, now: Date = new Date()): st
   return formatDayTime(value, now);
 }
 
+/** Splits a CalendarDate ("2026-11-14") into a local Date at midnight, so the day never shifts by zone. */
+function calendarDate(value: string): Date {
+  const [year = 1970, month = 1, day = 1] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/** A CalendarDate as "Nov 14", with the year when it is not the current one. */
+export function formatCalendarDay(value: string, now: Date = new Date()): string {
+  return formatDay(calendarDate(value), now);
+}
+
+/** "Oct 26 – Nov 8". */
+export function formatDateRange(start: string, end: string, now: Date = new Date()): string {
+  return `${formatCalendarDay(start, now)} – ${formatCalendarDay(end, now)}`;
+}
+
 /**
  * Binds a formatter to the clock from useNow(). Before the clock is set (SSR, hydration) it returns '',
  * so server and browser render the same markup.
@@ -161,6 +177,11 @@ function describeChange(change: ActivityChange): string {
       if (!change.from) return 'added a description';
       return 'edited the description';
     }
+    case 'milestone':
+      return change.to ? `set milestone ${change.to.name}` : 'cleared the milestone';
+    case 'cycle':
+      if (change.to) return `moved it to Cycle ${change.to.number}`;
+      return change.from ? `removed it from Cycle ${change.from.number}` : 'removed it from the cycle';
   }
 }
 
@@ -169,8 +190,29 @@ function joinPhrases(phrases: string[]): string {
   return `${phrases.slice(0, -1).join(', ')} and ${phrases.at(-1)}`;
 }
 
+const cycleName = (cycle: { number: number }) => `Cycle ${cycle.number}`;
+
 /** The verb phrase after the actor: "moved it from Todo to In progress", "created the task". */
 export function describeActivity(activity: Pick<Activity, 'type' | 'changes'>): string {
   if (activity.type === 'task.created') return 'created the task';
+  if (activity.type === 'cycle.ended') {
+    const change = activity.changes.find((item) => item.field === 'cycle');
+    if (change?.field === 'cycle' && change.from) {
+      return change.to
+        ? `ended ${cycleName(change.from)} and moved it to ${cycleName(change.to)}`
+        : `ended ${cycleName(change.from)} and took it out of the cycle`;
+    }
+  }
   return joinPhrases(activity.changes.map(describeChange)) || 'updated the task';
+}
+
+/**
+ * The system line for a cycle.ended entry: "Cycle 12 ended. Moved to Cycle 13." The person who ended
+ * a cycle early, if any, is named by the caller.
+ */
+export function describeCycleEnded(activity: Pick<Activity, 'changes'>): string {
+  const change = activity.changes.find((item) => item.field === 'cycle');
+  if (change?.field !== 'cycle' || !change.from) return 'The cycle ended.';
+  const ended = `${cycleName(change.from)} ended.`;
+  return change.to ? `${ended} Moved to ${cycleName(change.to)}.` : `${ended} Taken out of the cycle.`;
 }

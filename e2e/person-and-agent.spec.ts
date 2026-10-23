@@ -3,10 +3,9 @@
 // the key. Each test builds on the previous one, so they share one page and run in order.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createCli, parseJson } from './cli';
+import { admin, workspaceName } from './session';
 import { baseURL } from './stack';
 
-const admin = { name: 'Ana Ruiz', email: 'ana@example.com', password: 'e2e-password-1234' };
-const workspaceName = 'Reddevs';
 const project = { name: 'Payments', key: 'PAY' };
 const taskTitles = [
   'Match Stripe payouts to invoices',

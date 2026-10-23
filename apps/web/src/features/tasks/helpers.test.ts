@@ -91,6 +91,19 @@ describe('activity sentences', () => {
       ]),
     ).toBe('moved it from Todo to Done, set priority to Low and renamed it to “b”');
   });
+
+  it('phrases milestone and cycle changes', () => {
+    const milestone = { id: '00000000-0000-4000-8000-0000000000b1', name: 'Webhooks v2' };
+    const cycle = (number: number) => ({
+      id: `00000000-0000-4000-8000-0000000000c${number}`,
+      number,
+      name: null,
+    });
+    expect(updated([{ field: 'milestone', from: null, to: milestone }])).toBe('set milestone Webhooks v2');
+    expect(updated([{ field: 'milestone', from: milestone, to: null }])).toBe('cleared the milestone');
+    expect(updated([{ field: 'cycle', from: cycle(2), to: cycle(3) }])).toBe('moved it to Cycle 3');
+    expect(updated([{ field: 'cycle', from: cycle(2), to: null }])).toBe('removed it from Cycle 2');
+  });
 });
 
 describe('URL search', () => {
@@ -113,7 +126,8 @@ describe('URL search', () => {
     expect(eagerStatuses({ status: ['done', 'todo'] })).toEqual(['todo', 'done']);
     expect(visibleStatuses({})).toHaveLength(6);
     expect(listInput('PAY', { q: '  ', priority: ['high'] }, ['todo'])).toEqual({
-      project: 'PAY',
+      project: ['PAY'],
+      order: 'list',
       status: ['todo'],
       priority: ['high'],
     });
@@ -135,10 +149,15 @@ const item = (
   id: `00000000-0000-4000-8000-${key.replace(/\D/g, '').padStart(12, '0')}`,
   key,
   number: Number(key.split('-')[1]),
+  project: { id: '00000000-0000-4000-8000-0000000000aa', key: 'PAY', name: 'Payments' },
   title: key,
   status,
   priority,
   assignee: null,
+  milestone: null,
+  cycle: null,
+  cycleAddedAt: null,
+  rank: Number(key.split('-')[1]),
   createdAt: ago(minutes * MIN).toISOString(),
   updatedAt: ago(minutes * MIN).toISOString(),
 });

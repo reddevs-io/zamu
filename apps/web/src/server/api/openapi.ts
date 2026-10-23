@@ -1,12 +1,16 @@
 // The OpenAPI 3.1 document of /api/v1, generated from the contract and served at /api/v1/openapi.json.
 import { OpenAPIGenerator } from '@orpc/openapi';
 import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4';
-import { contract, problemJsonSchema } from '@pm/contracts';
+import { contract, Problem, Task } from '@pm/contracts';
 
 export const OPENAPI_PATH = '/api/v1/openapi.json';
 
 type OpenAPIDocument = Awaited<ReturnType<OpenAPIGenerator['generate']>>;
 type GenerateOptions = NonNullable<Parameters<OpenAPIGenerator['generate']>[1]>;
+
+const PROBLEM_REF = {
+  $ref: '#/components/schemas/Problem',
+} as GenerateOptions['customErrorResponseBodySchema'];
 
 const generator = new OpenAPIGenerator({ schemaConverters: [new ZodToJsonSchemaConverter()] });
 
@@ -32,8 +36,14 @@ export function generateOpenApiDocument(): Promise<OpenAPIDocument> {
       },
     },
     security: [{ apiKey: [] }, { session: [] }],
+    // Shared components. Problem carries a Task (TASK_CHANGED), so inlining it in every error
+    // response of every operation would repeat the Task schema about 150 times.
+    commonSchemas: {
+      Problem: { schema: Problem, strategy: 'output' },
+      Task: { schema: Task, strategy: 'output' },
+    },
     // Every error status shares the Problem body instead of oRPC's default error shape.
-    customErrorResponseBodySchema: problemJsonSchema as GenerateOptions['customErrorResponseBodySchema'],
+    customErrorResponseBodySchema: PROBLEM_REF,
   });
 }
 

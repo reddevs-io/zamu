@@ -17,6 +17,7 @@ async function main() {
       adminEmail: process.env.SEED_ADMIN_EMAIL || SEED_DEFAULTS.adminEmail,
       adminPassword: process.env.SEED_ADMIN_PASSWORD || SEED_DEFAULTS.adminPassword,
       workspaceName: process.env.SEED_WORKSPACE || SEED_DEFAULTS.workspaceName,
+      planning: process.env.SEED_PLANNING !== '0',
     });
     const log = (line = '') => process.stderr.write(`${line}\n`);
     log(result.bootstrapped ? 'Set up the instance (first run).' : 'Instance already set up; added to it.');

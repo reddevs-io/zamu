@@ -7,7 +7,7 @@ project-management runs as one Docker image with three roles, started by `docker
 | `db`      | Postgres 18. The only service that keeps state, in the `pgdata` volume.     |
 | `migrate` | Applies database migrations, then exits. Runs on every `docker compose up`. |
 | `web`     | The web app, the REST API (`/api/v1`) and sign-in. Listens on port 3000.    |
-| `worker`  | Background jobs (pg-boss), such as expiring old invitations once a day.     |
+| `worker`  | Background jobs (pg-boss): ends due cycles hourly, expires invitations.     |
 
 `web` and `worker` start only after `migrate` has finished without errors.
 
@@ -38,11 +38,23 @@ Edit `.env`:
 | `POSTGRES_PASSWORD`  | no       | `postgres`                 | Database password. Set it before the first start: Postgres only reads it when it creates the volume.   |
 | `POSTGRES_DB`        | no       | `project_management`       | Database name.                                                                                         |
 | `PM_IMAGE`           | no       | `project-management:local` | Tag of the image compose builds and runs.                                                              |
+| `APP_TIME_ZONE`      | no       | `UTC`                      | IANA time zone, such as `Europe/Brussels`. Decides when "today" starts for cycles. See below.          |
 
 `DATABASE_URL` and `TEST_DATABASE_URL` in `.env` are for local development. Compose ignores them: the
 containers reach Postgres as `db` on their own network.
 
 If you change `PORT`, change the port in `BETTER_AUTH_URL` and `PUBLIC_URL` too.
+
+### Time zone and cycle ends
+
+A cycle runs until the end of its end date and then ends by itself: the worker checks every hour, on the
+hour, and ends each cycle whose end date is before today. Unfinished tasks move to the next planned cycle,
+or to a new one of the same length when none is planned. Both `web` and `worker` count "today" in
+`APP_TIME_ZONE`, so with `APP_TIME_ZONE=Europe/Brussels` a cycle ending on Sunday closes within the hour
+after midnight Brussels time. The web app uses the same zone for days left and overdue milestones.
+
+The zone is one setting for the whole server. A team spread over several zones sees cycles end at that
+zone's midnight. An invalid name stops both services at start: `docker compose logs web worker` names it.
 
 ## Start
 
@@ -229,6 +241,11 @@ docker compose up -d --build
 
 Compose rebuilds the image, runs `migrate` against the existing database, then restarts `web` and `worker`.
 If a migration fails, `web` and `worker` do not start: `docker compose logs migrate` shows why.
+
+Upgrading from 0.1.x (M1) adds milestones, cycles, comments and the board. The migration gives every
+existing task a board position that keeps its list order (priority, then most recently updated) inside its
+status, and turns milestones and cycles on for every project. Nothing else needs doing. The end-to-end
+suite checks this path: it starts 0.1.1, adds data, then switches to the new image.
 
 ## The CLI in the image
 

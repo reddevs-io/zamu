@@ -1,8 +1,11 @@
 /*
  * Ledger (2a) design tokens, ported from .agent/design/m1/final/source/ledger.css.
  *
+ * M2 tokens (--warn … --track) come from .agent/design/m2/source/ledger-m2.css.
+ *
  * The page follows prefers-color-scheme. A `.light` or `.dark` class on any element forces that theme
- * for its subtree (used by the /__ui gallery and by tests). Tailwind utilities read these variables
+ * for its subtree: on <html> it is the saved theme choice (no class = System); the /__ui gallery and
+ * tests use it on inner elements. Tailwind utilities read these variables
  * through `@theme inline` in app.css, so `bg-surface` resolves per element.
  */
 
@@ -30,6 +33,15 @@
   --danger-bg: oklch(0.96 0.03 28);
   --scrim: oklch(0.2 0.02 255 / 0.35);
   --shadow: 0 24px 64px -16px oklch(0.2 0.03 255 / 0.35);
+  /* M2 (ledger-m2.css) */
+  --warn: oklch(0.52 0.12 65);
+  --warn-bg: oklch(0.96 0.035 80);
+  --drop: oklch(0.955 0.025 262);
+  --drop-line: oklch(0.52 0.2 262);
+  --mention: oklch(0.45 0.17 262);
+  --mention-bg: oklch(0.94 0.03 262);
+  --comment-bg: oklch(0.998 0.002 240);
+  --track: oklch(0.92 0.006 245);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,6 +68,15 @@
     --danger-bg: oklch(0.27 0.05 30);
     --scrim: oklch(0.05 0.01 255 / 0.6);
     --shadow: 0 24px 64px -12px oklch(0 0 0 / 0.7);
+    /* M2 (ledger-m2.css) */
+    --warn: oklch(0.8 0.12 75);
+    --warn-bg: oklch(0.28 0.045 70);
+    --drop: oklch(0.25 0.035 262);
+    --drop-line: oklch(0.72 0.15 258);
+    --mention: oklch(0.8 0.11 258);
+    --mention-bg: oklch(0.29 0.05 262);
+    --comment-bg: oklch(0.215 0.013 255);
+    --track: oklch(0.3 0.013 255);
   }
 }
 
@@ -82,4 +103,13 @@
   --danger-bg: oklch(0.27 0.05 30);
   --scrim: oklch(0.05 0.01 255 / 0.6);
   --shadow: 0 24px 64px -12px oklch(0 0 0 / 0.7);
+  /* M2 (ledger-m2.css) */
+  --warn: oklch(0.8 0.12 75);
+  --warn-bg: oklch(0.28 0.045 70);
+  --drop: oklch(0.25 0.035 262);
+  --drop-line: oklch(0.72 0.15 258);
+  --mention: oklch(0.8 0.11 258);
+  --mention-bg: oklch(0.29 0.05 262);
+  --comment-bg: oklch(0.215 0.013 255);
+  --track: oklch(0.3 0.013 255);
 }

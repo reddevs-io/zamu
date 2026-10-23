@@ -32,6 +32,8 @@ import { Tag } from '../Tag';
 import { SearchField, TextArea, TextField } from '../TextField';
 import { Tooltip, TooltipTrigger } from '../Tooltip';
 import { useHotkeys } from '../useHotkeys';
+import { M2Gallery } from './M2Gallery';
+import { M2TokensSheet } from './M2TokensSheet';
 import {
   ASSIGNEE_OPTIONS,
   COLLAPSED_BY_DEFAULT,
@@ -42,12 +44,19 @@ import {
 } from './sample';
 import { TokensSheet } from './TokensSheet';
 
-/** /__ui: the tokens frame first (1280×800, compared with the design), then every component and state. */
+/**
+ * /__ui: the M1 tokens frame (1280×800) and the M2 tokens frame (1280 wide), both compared with their
+ * design frames, then every component and state.
+ */
 export function UIGallery() {
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <TokensSheet />
+      <div className="border-t border-line">
+        <M2TokensSheet />
+      </div>
       <div className="flex w-[1280px] flex-col gap-12 border-t border-line px-10 py-10">
+        <M2Gallery />
         <ButtonsSection />
         <FieldsSection />
         <ChoiceSection />

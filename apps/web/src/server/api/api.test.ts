@@ -34,6 +34,8 @@ const keys = {} as {
   revoked: string;
 };
 let otherWorkspaceTask: string;
+let agentId: string;
+let adminEmail: string;
 
 type Auth = { cookie: string } | { key: string } | null;
 
@@ -79,6 +81,8 @@ beforeAll(async () => {
   const seeded = await seedDevData(core);
   keys.agent = seeded.agentKey;
   keys.admin = seeded.adminKey;
+  agentId = seeded.agent.id;
+  adminEmail = seeded.admin.email;
 
   const signIn = await auth.api.signInEmail({
     body: { email: seeded.admin.email, password: seeded.admin.password as string },
@@ -129,23 +133,54 @@ afterAll(async () => {
 describe('OpenAPI document', () => {
   it('is served without auth and lists every contract path', async () => {
     const result = await call('GET', '/api/v1/openapi.json');
+    const problemRef = { $ref: '#/components/schemas/Problem' };
     expect(result.status).toBe(200);
     expect(result.body.openapi).toMatch(/^3\.1/);
     expect(Object.keys(result.body.paths).sort()).toEqual([
+      '/api/v1/comments/{id}',
+      '/api/v1/cycles/{project}/{number}',
+      '/api/v1/cycles/{project}/{number}/end',
       '/api/v1/me',
       '/api/v1/members',
+      '/api/v1/milestones/{id}',
       '/api/v1/projects',
       '/api/v1/projects/{project}',
+      '/api/v1/projects/{project}/cycles',
+      '/api/v1/projects/{project}/milestones',
       '/api/v1/tasks',
       '/api/v1/tasks/{key}',
       '/api/v1/tasks/{key}/activity',
+      '/api/v1/tasks/{key}/comments',
+      '/api/v1/tasks/{key}/timeline',
     ]);
+    // Every operation has an id, a summary and a tag; ids are unique.
+    const operations = Object.values(result.body.paths).flatMap((item) => Object.values(item as object));
+    expect(operations).toHaveLength(26);
+    const ids = operations.map((op: { operationId: string }) => op.operationId);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const op of operations) {
+      expect(op.summary, op.operationId).toEqual(expect.any(String));
+      expect(op.tags, op.operationId).toHaveLength(1);
+    }
+    expect(result.body.paths['/api/v1/me'].patch).toBeDefined();
+    expect(Object.keys(result.body.paths['/api/v1/milestones/{id}'].delete.responses)).toContain('204');
+    expect(Object.keys(result.body.paths['/api/v1/tasks/{key}/comments'].post.responses)).toContain('201');
+    // TASK_CHANGED shares the 409 response (and its Problem body) with CONFLICT.
+    expect(
+      result.body.paths['/api/v1/tasks/{key}'].patch.responses['409'].content['application/json'].schema,
+    ).toEqual(problemRef);
+    // Shared components keep the document small: Task is not inlined in every error response.
+    expect(JSON.stringify(result.body).length).toBeLessThan(250_000);
     expect(result.body.components.securitySchemes.apiKey).toMatchObject({ type: 'http', scheme: 'bearer' });
-    // Error responses use the Problem body.
+    // Error responses use the shared Problem body.
     const getTask = result.body.paths['/api/v1/tasks/{key}'].get;
-    const notFound = JSON.stringify(getTask.responses['404']);
-    expect(notFound).toContain('requestId');
-    expect(notFound).toContain('issues');
+    expect(getTask.responses['404'].content['application/json'].schema).toEqual(problemRef);
+    const problem = result.body.components.schemas.Problem;
+    expect(Object.keys(problem.properties)).toEqual(
+      expect.arrayContaining(['code', 'requestId', 'issues', 'task']),
+    );
+    expect(problem.properties.code.enum).toContain('TASK_CHANGED');
+    expect(problem.properties.task).toEqual({ $ref: '#/components/schemas/Task' });
   });
 });
 
@@ -519,5 +554,607 @@ describe('clients', () => {
       () => core,
     );
     await expect(anonymous.projects.list()).rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M2: theme, project switches, cross-project tasks, board moves, milestones, cycles, comments
+// ---------------------------------------------------------------------------
+
+/** Today and later days as calendar dates in UTC, the default APP_TIME_ZONE. */
+function day(offset = 0): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
+describe('M2: me and project switches', () => {
+  it('PATCH /me sets the theme for a session and returns 403 to API keys', async () => {
+    const updated = await call('PATCH', '/api/v1/me', { auth: session(), body: { theme: 'dark' } });
+    expect(updated.status, JSON.stringify(updated.body)).toBe(200);
+    expect(updated.body).toMatchObject({ user: { name: 'Ana Ruiz', theme: 'dark' } });
+    expect((await call('GET', '/api/v1/me', { auth: session() })).body.user.theme).toBe('dark');
+
+    expectProblem(
+      await call('PATCH', '/api/v1/me', { auth: key('admin'), body: { theme: 'light' } }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('PATCH', '/api/v1/me', { auth: key('agent'), body: { theme: 'light' } }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('PATCH', '/api/v1/me', { auth: session(), body: { theme: 'sepia' } }),
+      400,
+      'BAD_REQUEST',
+    );
+    await call('PATCH', '/api/v1/me', { auth: session(), body: { theme: 'system' } });
+  });
+
+  it('PATCH /projects/{project} turns milestones and cycles off and on', async () => {
+    await call('POST', '/api/v1/projects', { auth: session(), body: { name: 'Switches', key: 'SW' } });
+    const off = await call('PATCH', '/api/v1/projects/SW', {
+      auth: session(),
+      body: { usesMilestones: false, usesCycles: false },
+    });
+    expect(off.status, JSON.stringify(off.body)).toBe(200);
+    expect(off.body).toMatchObject({
+      key: 'SW',
+      usesMilestones: false,
+      usesCycles: false,
+      currentCycle: null,
+    });
+
+    expectProblem(
+      await call('POST', '/api/v1/projects/SW/milestones', { auth: session(), body: { name: 'v1' } }),
+      409,
+      'CONFLICT',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/projects/SW/cycles', { auth: session(), body: {} }),
+      409,
+      'CONFLICT',
+    );
+    const on = await call('PATCH', '/api/v1/projects/SW', {
+      auth: session(),
+      body: { usesMilestones: true },
+    });
+    expect(on.body).toMatchObject({ usesMilestones: true, usesCycles: false });
+    expectProblem(
+      await call('PATCH', '/api/v1/projects/SW', { auth: key('adminRead'), body: { usesCycles: true } }),
+      403,
+      'FORBIDDEN',
+    );
+  });
+});
+
+describe('M2: tasks across projects and on the board', () => {
+  it('GET /tasks without a project spans every readable project', async () => {
+    const all = await call('GET', '/api/v1/tasks?limit=200', { auth: session() });
+    expect(all.status, JSON.stringify(all.body)).toBe(200);
+    const projects = new Set(all.body.items.map((t: { project: { key: string } }) => t.project.key));
+    expect([...projects]).toEqual(expect.arrayContaining(['PAY', 'WEB']));
+    expect(all.body.items[0]).toMatchObject({
+      project: { key: expect.any(String), name: expect.any(String) },
+      milestone: null,
+      cycle: null,
+      rank: expect.any(Number),
+    });
+
+    // The plan's "My tasks" call, as the agent.
+    const mine = await call('GET', '/api/v1/tasks?assignee=me', { auth: key('agent') });
+    expect(mine.status).toBe(200);
+    expect(mine.body.items.length).toBeGreaterThan(0);
+    expect(
+      mine.body.items.every((t: { assignee: { name: string } }) => t.assignee.name === 'claude-dev'),
+    ).toBe(true);
+
+    // Two projects by key.
+    const two = await call('GET', '/api/v1/tasks?project=PAY&project=web&limit=200', { auth: session() });
+    expect(two.status, JSON.stringify(two.body)).toBe(200);
+    expect(new Set(two.body.items.map((t: { project: { key: string } }) => t.project.key))).toEqual(
+      new Set(['PAY', 'WEB']),
+    );
+
+    // A key scoped to PAY sees only PAY without a project, and 403 when it names WEB.
+    const scoped = await call('GET', '/api/v1/tasks?limit=200', { auth: key('agentPayOnly') });
+    expect(scoped.status).toBe(200);
+    expect(new Set(scoped.body.items.map((t: { project: { key: string } }) => t.project.key))).toEqual(
+      new Set(['PAY']),
+    );
+    expectProblem(
+      await call('GET', '/api/v1/tasks?project=PAY&project=WEB', { auth: key('agentPayOnly') }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(await call('GET', '/api/v1/tasks?cycle=later', { auth: session() }), 400, 'BAD_REQUEST');
+    expectProblem(await call('GET', '/api/v1/tasks?order=random', { auth: session() }), 400, 'BAD_REQUEST');
+  });
+
+  it('PATCH /tasks/{key} moves a card with position and maps a stale ifUpdatedAt to 409 TASK_CHANGED', async () => {
+    await call('POST', '/api/v1/projects', { auth: session(), body: { name: 'Board', key: 'BRD' } });
+    const a = (await call('POST', '/api/v1/tasks', { auth: session(), body: { project: 'BRD', title: 'A' } }))
+      .body;
+    const b = (await call('POST', '/api/v1/tasks', { auth: session(), body: { project: 'BRD', title: 'B' } }))
+      .body;
+    const column = async () =>
+      (
+        await call('GET', '/api/v1/tasks?project=BRD&status=todo&order=board', { auth: session() })
+      ).body.items.map((t: { key: string }) => t.key);
+    // New tasks go to the top of their column.
+    expect(await column()).toEqual([b.key, a.key]);
+
+    const moved = await call('PATCH', `/api/v1/tasks/${a.key}`, {
+      auth: session(),
+      body: { position: { before: b.key }, ifUpdatedAt: a.updatedAt },
+    });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    expect(await column()).toEqual([a.key, b.key]);
+
+    // The anchor must sit in the target column.
+    const wrongColumn = await call('PATCH', `/api/v1/tasks/${b.key}`, {
+      auth: key('agent'),
+      body: { status: 'in_progress', position: { after: a.key } },
+    });
+    expectProblem(wrongColumn, 422, 'UNPROCESSABLE_CONTENT');
+    expect(wrongColumn.body.issues).toEqual([{ path: 'position.after', message: expect.any(String) }]);
+
+    // Status and position in one write: A moves to In progress, after C.
+    const c = (
+      await call('POST', '/api/v1/tasks', {
+        auth: session(),
+        body: { project: 'BRD', title: 'C', status: 'in_progress' },
+      })
+    ).body;
+    const across = await call('PATCH', `/api/v1/tasks/${a.key}`, {
+      auth: key('agent'),
+      body: { status: 'in_progress', position: { after: c.key } },
+    });
+    expect(across.status, JSON.stringify(across.body)).toBe(200);
+    const progress = await call('GET', '/api/v1/tasks?project=BRD&status=in_progress&order=board', {
+      auth: session(),
+    });
+    expect(progress.body.items.map((t: { key: string }) => t.key)).toEqual([c.key, a.key]);
+
+    const stale = await call('PATCH', `/api/v1/tasks/${a.key}`, {
+      auth: key('agent'),
+      body: { title: 'A, again', ifUpdatedAt: '2000-01-01T00:00:00Z' },
+    });
+    expectProblem(stale, 409, 'TASK_CHANGED');
+    expect(stale.body.task).toMatchObject({ key: a.key, title: 'A', status: 'in_progress' });
+    expect(stale.body.task.updatedAt).toBe(across.body.updatedAt);
+
+    expectProblem(
+      await call('PATCH', `/api/v1/tasks/${a.key}`, {
+        auth: session(),
+        body: { position: { before: b.key, after: b.key } },
+      }),
+      400,
+      'BAD_REQUEST',
+    );
+  });
+});
+
+describe('M2: milestones and cycles', () => {
+  let milestoneId: string;
+
+  it('milestones: create, list, get, update, filter tasks, delete', async () => {
+    await call('POST', '/api/v1/projects', { auth: session(), body: { name: 'Planning', key: 'PLN' } });
+    const created = await call('POST', '/api/v1/projects/pln/milestones', {
+      auth: session(),
+      body: { name: 'Webhooks v2', targetDate: day(30) },
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect(created.body).toMatchObject({
+      name: 'Webhooks v2',
+      status: 'planned',
+      project: { key: 'PLN' },
+      progress: { total: 0, done: 0 },
+      overdue: false,
+    });
+    milestoneId = created.body.id;
+
+    expectProblem(
+      await call('POST', '/api/v1/projects/PLN/milestones', {
+        auth: session(),
+        body: { name: 'webhooks V2' },
+      }),
+      409,
+      'CONFLICT',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/projects/PLN/milestones', { auth: session(), body: { name: '' } }),
+      400,
+      'BAD_REQUEST',
+    );
+
+    const task = await call('POST', '/api/v1/tasks', {
+      auth: key('agent'),
+      body: { project: 'PLN', title: 'Retry webhooks', milestone: milestoneId },
+    });
+    expect(task.status, JSON.stringify(task.body)).toBe(201);
+    expect(task.body.milestone).toMatchObject({ id: milestoneId, name: 'Webhooks v2' });
+
+    // Starting a task turns the milestone Active.
+    await call('PATCH', `/api/v1/tasks/${task.body.key}`, {
+      auth: key('agent'),
+      body: { status: 'in_progress' },
+    });
+    const fetched = await call('GET', `/api/v1/milestones/${milestoneId}`, { auth: key('adminRead') });
+    expect(fetched.status).toBe(200);
+    expect(fetched.body).toMatchObject({ status: 'active', progress: { total: 1, inProgress: 1 } });
+
+    const list = await call('GET', '/api/v1/projects/PLN/milestones?status=active', {
+      auth: key('adminRead'),
+    });
+    expect(list.status, JSON.stringify(list.body)).toBe(200);
+    expect(list.body.items.map((m: { id: string }) => m.id)).toEqual([milestoneId]);
+
+    const inMilestone = await call('GET', `/api/v1/tasks?project=PLN&milestone=${milestoneId}`, {
+      auth: session(),
+    });
+    expect(inMilestone.body.items.map((t: { key: string }) => t.key)).toEqual([task.body.key]);
+    const without = await call('GET', '/api/v1/tasks?project=PLN&milestone=none', { auth: session() });
+    expect(without.body.items).toHaveLength(0);
+
+    const updated = await call('PATCH', `/api/v1/milestones/${milestoneId}`, {
+      auth: session(),
+      body: { status: 'completed', targetDate: null },
+    });
+    expect(updated.status, JSON.stringify(updated.body)).toBe(200);
+    expect(updated.body).toMatchObject({
+      status: 'completed',
+      targetDate: null,
+      completedAt: expect.any(String),
+    });
+
+    const extra = await call('POST', '/api/v1/projects/PLN/milestones', {
+      auth: session(),
+      body: { name: 'Tmp' },
+    });
+    const deleted = await call('DELETE', `/api/v1/milestones/${extra.body.id}`, { auth: key('agent') });
+    expect(deleted.status).toBe(204);
+    expect(deleted.body).toBeNull();
+    expectProblem(
+      await call('GET', `/api/v1/milestones/${extra.body.id}`, { auth: session() }),
+      404,
+      'NOT_FOUND',
+    );
+    expectProblem(await call('GET', '/api/v1/milestones/not-an-id', { auth: session() }), 400, 'BAD_REQUEST');
+  });
+
+  it('milestones: a read-only key reads only, a PAY-only key gets 403 elsewhere', async () => {
+    expectProblem(
+      await call('POST', '/api/v1/projects/PLN/milestones', { auth: key('adminRead'), body: { name: 'No' } }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('PATCH', `/api/v1/milestones/${milestoneId}`, {
+        auth: key('adminRead'),
+        body: { name: 'No' },
+      }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('DELETE', `/api/v1/milestones/${milestoneId}`, { auth: key('adminRead') }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('GET', '/api/v1/projects/PLN/milestones', { auth: key('agentPayOnly') }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('GET', `/api/v1/milestones/${milestoneId}`, { auth: key('agentPayOnly') }),
+      403,
+      'FORBIDDEN',
+    );
+    expect((await call('GET', '/api/v1/projects/PAY/milestones', { auth: key('agentPayOnly') })).status).toBe(
+      200,
+    );
+  });
+
+  it('cycles: create, get by number, current and next, update, filter tasks, end with rollover', async () => {
+    const created = await call('POST', '/api/v1/projects/PLN/cycles', {
+      auth: session(),
+      body: { startsOn: day(0), endsOn: day(6), name: 'Kickoff' },
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect(created.body).toMatchObject({ number: 1, state: 'current', daysLeft: 7, rollovers: [] });
+
+    expectProblem(
+      await call('POST', '/api/v1/projects/PLN/cycles', {
+        auth: session(),
+        body: { startsOn: day(3), endsOn: day(10) },
+      }),
+      409,
+      'CONFLICT',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/projects/PLN/cycles', {
+        auth: session(),
+        body: { startsOn: day(10), endsOn: day(5) },
+      }),
+      400,
+      'BAD_REQUEST',
+    );
+
+    const current = await call('GET', '/api/v1/cycles/pln/current', { auth: key('adminRead') });
+    expect(current.status, JSON.stringify(current.body)).toBe(200);
+    expect(current.body).toMatchObject({ number: 1, name: 'Kickoff' });
+    expect((await call('GET', '/api/v1/cycles/PLN/1', { auth: session() })).body.id).toBe(created.body.id);
+    expectProblem(await call('GET', '/api/v1/cycles/PLN/next', { auth: session() }), 404, 'NOT_FOUND');
+    expectProblem(await call('GET', '/api/v1/cycles/PLN/7', { auth: session() }), 404, 'NOT_FOUND');
+    expectProblem(await call('GET', '/api/v1/cycles/PLN/last', { auth: session() }), 400, 'BAD_REQUEST');
+
+    const listed = await call('GET', '/api/v1/projects/PLN/cycles?state=current', { auth: key('adminRead') });
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+    expect(listed.body.items.map((c: { number: number }) => c.number)).toEqual([1]);
+    const project = (await call('GET', '/api/v1/projects', { auth: session() })).body.items.find(
+      (p: { key: string }) => p.key === 'PLN',
+    );
+    expect(project.currentCycle).toMatchObject({ number: 1, name: 'Kickoff' });
+
+    const renamed = await call('PATCH', '/api/v1/cycles/PLN/current', {
+      auth: session(),
+      body: { name: 'Start' },
+    });
+    expect(renamed.status, JSON.stringify(renamed.body)).toBe(200);
+    expect(renamed.body.name).toBe('Start');
+    expectProblem(
+      await call('PATCH', '/api/v1/cycles/PLN/1', { auth: session(), body: { startsOn: day(1) } }),
+      409,
+      'CONFLICT',
+    );
+
+    const open = await call('POST', '/api/v1/tasks', {
+      auth: key('agent'),
+      body: { project: 'PLN', title: 'Ship it', cycle: 'current' },
+    });
+    expect(open.status, JSON.stringify(open.body)).toBe(201);
+    expect(open.body.cycle).toMatchObject({ number: 1 });
+    const done = await call('POST', '/api/v1/tasks', {
+      auth: key('agent'),
+      body: { project: 'PLN', title: 'Done already', cycle: 1, status: 'done' },
+    });
+    expect(done.status).toBe(201);
+    const inCycle = await call('GET', '/api/v1/tasks?project=PLN&cycle=current', { auth: session() });
+    expect(inCycle.body.items.map((t: { key: string }) => t.key).sort()).toEqual(
+      [open.body.key, done.body.key].sort(),
+    );
+    expectProblem(
+      await call('POST', '/api/v1/tasks', {
+        auth: session(),
+        body: { project: 'PLN', title: 'x', cycle: 'next' },
+      }),
+      422,
+      'UNPROCESSABLE_CONTENT',
+    );
+
+    expectProblem(
+      await call('POST', '/api/v1/cycles/PLN/1/end', { auth: key('adminRead'), body: {} }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/cycles/PLN/1/end', { auth: session(), body: { moveTo: 'later' } }),
+      400,
+      'BAD_REQUEST',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/cycles/PLN/1/end', { auth: session(), body: { moveTo: 9 } }),
+      422,
+      'UNPROCESSABLE_CONTENT',
+    );
+
+    const ended = await call('POST', '/api/v1/cycles/PLN/current/end', { auth: key('agent'), body: {} });
+    expect(ended.status, JSON.stringify(ended.body)).toBe(200);
+    expect(ended.body).toMatchObject({
+      number: 1,
+      state: 'completed',
+      endedBy: { name: 'claude-dev' },
+      summary: { scope: 2, completed: 1, rolledOver: 1 },
+    });
+    expect(ended.body.rollovers).toEqual([
+      expect.objectContaining({
+        task: expect.objectContaining({ key: open.body.key }),
+        movedTo: expect.objectContaining({ number: 2 }),
+      }),
+    ]);
+
+    // The next cycle was created with the same length; ending again changes nothing.
+    const next = await call('GET', '/api/v1/cycles/PLN/next', { auth: session() });
+    expect(next.body).toMatchObject({ number: 2, startsOn: day(7), endsOn: day(13), state: 'upcoming' });
+    const again = await call('POST', '/api/v1/cycles/PLN/1/end', { auth: session() });
+    expect(again.status, JSON.stringify(again.body)).toBe(200);
+    expect(again.body.completedAt).toBe(ended.body.completedAt);
+
+    const timeline = await call('GET', `/api/v1/tasks/${open.body.key}/timeline`, { auth: key('adminRead') });
+    expect(timeline.status).toBe(200);
+    expect(timeline.body.items.map((i: { kind: string; type?: string }) => i.type)).toEqual([
+      'task.created',
+      'cycle.ended',
+    ]);
+  });
+
+  it('cycles: scope checks', async () => {
+    expectProblem(
+      await call('POST', '/api/v1/projects/PLN/cycles', { auth: key('adminRead'), body: {} }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('PATCH', '/api/v1/cycles/PLN/2', { auth: key('adminRead'), body: { name: 'No' } }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(await call('GET', '/api/v1/cycles/PLN/1', { auth: key('agentPayOnly') }), 403, 'FORBIDDEN');
+    expectProblem(
+      await call('GET', '/api/v1/projects/PLN/cycles', { auth: key('agentPayOnly') }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(await call('GET', '/api/v1/cycles/ELSE/current', { auth: session() }), 404, 'NOT_FOUND');
+  });
+});
+
+describe('M2: comments and the timeline', () => {
+  let commentId: string;
+
+  it('an agent comments with mentions (the Gate G2 call)', async () => {
+    const created = await call('POST', '/api/v1/tasks/PAY-1/comments', {
+      auth: key('agent'),
+      body: { body: `Done. @claude-dev, see @${adminEmail} and @nobody` },
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect(created.body).toMatchObject({
+      taskKey: 'PAY-1',
+      author: { name: 'claude-dev', kind: 'agent' },
+      onBehalfOf: { name: 'Ana Ruiz' },
+      editedAt: null,
+      deletedAt: null,
+    });
+    expect(created.body.body).toContain(`(mention:${agentId})`);
+    expect(created.body.body).toContain('@nobody');
+    expect(created.body.mentions.map((m: { name: string }) => m.name)).toEqual(['claude-dev', 'Ana Ruiz']);
+    commentId = created.body.id;
+
+    const list = await call('GET', '/api/v1/tasks/pay-1/comments', { auth: key('adminRead') });
+    expect(list.status).toBe(200);
+    expect(list.body.items.map((c: { id: string }) => c.id)).toContain(commentId);
+
+    const timeline = await call('GET', '/api/v1/tasks/PAY-1/timeline', { auth: session() });
+    expect(timeline.status).toBe(200);
+    const kinds = timeline.body.items.map((i: { kind: string }) => i.kind);
+    expect(kinds[0]).toBe('activity');
+    expect(kinds.at(-1)).toBe('comment');
+    expect(timeline.body.items.at(-1)).toMatchObject({ id: commentId, kind: 'comment' });
+  });
+
+  it('only the author edits or deletes; deleted comments stay with a null body', async () => {
+    // The responsible human cannot edit or delete the agent's comment.
+    expectProblem(
+      await call('PATCH', `/api/v1/comments/${commentId}`, { auth: session(), body: { body: 'Mine now' } }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('DELETE', `/api/v1/comments/${commentId}`, { auth: session() }),
+      403,
+      'FORBIDDEN',
+    );
+
+    const edited = await call('PATCH', `/api/v1/comments/${commentId}`, {
+      auth: key('agent'),
+      body: { body: 'Done, tests pass.' },
+    });
+    expect(edited.status, JSON.stringify(edited.body)).toBe(200);
+    expect(edited.body).toMatchObject({
+      body: 'Done, tests pass.',
+      editedAt: expect.any(String),
+      mentions: [],
+    });
+    expectProblem(
+      await call('PATCH', `/api/v1/comments/${commentId}`, { auth: key('agent'), body: { body: '   ' } }),
+      400,
+      'BAD_REQUEST',
+    );
+
+    const deleted = await call('DELETE', `/api/v1/comments/${commentId}`, { auth: key('agent') });
+    expect(deleted.status, JSON.stringify(deleted.body)).toBe(200);
+    expect(deleted.body).toMatchObject({ id: commentId, body: null, deletedAt: expect.any(String) });
+    expectProblem(
+      await call('DELETE', `/api/v1/comments/${commentId}`, { auth: key('agent') }),
+      409,
+      'CONFLICT',
+    );
+    expectProblem(
+      await call('PATCH', `/api/v1/comments/${commentId}`, { auth: key('agent'), body: { body: 'Back' } }),
+      409,
+      'CONFLICT',
+    );
+
+    const timeline = await call('GET', '/api/v1/tasks/PAY-1/timeline', { auth: session() });
+    expect(timeline.body.items.find((i: { id: string }) => i.id === commentId)).toMatchObject({
+      kind: 'comment',
+      body: null,
+    });
+    expectProblem(
+      await call('DELETE', `/api/v1/comments/${crypto.randomUUID()}`, { auth: key('agent') }),
+      404,
+      'NOT_FOUND',
+    );
+    expectProblem(await call('DELETE', '/api/v1/comments/nope', { auth: key('agent') }), 400, 'BAD_REQUEST');
+  });
+
+  it('comment scope checks', async () => {
+    expectProblem(
+      await call('POST', '/api/v1/tasks/PAY-1/comments', { auth: key('adminRead'), body: { body: 'No' } }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/tasks/WEB-1/comments', { auth: key('agentPayOnly'), body: { body: 'No' } }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('GET', '/api/v1/tasks/WEB-1/comments', { auth: key('agentPayOnly') }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('GET', '/api/v1/tasks/WEB-1/timeline', { auth: key('agentPayOnly') }),
+      403,
+      'FORBIDDEN',
+    );
+    expect(
+      (
+        await call('POST', '/api/v1/tasks/PAY-1/comments', {
+          auth: key('agentPayOnly'),
+          body: { body: 'In scope' },
+        })
+      ).status,
+    ).toBe(201);
+    expectProblem(
+      await call('GET', `/api/v1/tasks/${otherWorkspaceTask}/comments`, { auth: session() }),
+      404,
+      'NOT_FOUND',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/tasks/PAY-1/comments', {
+        auth: key('agent'),
+        body: { body: 'x'.repeat(20_001) },
+      }),
+      400,
+      'BAD_REQUEST',
+    );
+  });
+});
+
+describe('M2: clients', () => {
+  it('the RPC client receives TASK_CHANGED with the current task', async () => {
+    const browser: ApiClient = createORPCClient(
+      new RPCLink({
+        url: `${ORIGIN}${RPC_PREFIX}`,
+        headers: { cookie },
+        fetch: (request) => handle(request),
+      }),
+    );
+    const task = await browser.tasks.create({ project: 'BRD', title: 'Conflict me' });
+    await browser.tasks.update({ key: task.key, title: 'Changed elsewhere' });
+    await expect(
+      browser.tasks.update({ key: task.key, status: 'in_review', ifUpdatedAt: task.updatedAt }),
+    ).rejects.toMatchObject({
+      code: 'TASK_CHANGED',
+      status: 409,
+      defined: true,
+      data: { task: { key: task.key, title: 'Changed elsewhere' } },
+    });
   });
 });

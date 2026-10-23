@@ -1,85 +1,64 @@
 // pm tasks list | show | create | update.
+import { ORPCError } from '@orpc/client';
 import {
-  ASSIGNEE_AGENTS,
+  ActivityList,
   ASSIGNEE_ME,
   CreateTaskInput,
+  FILTER_NONE,
   GetTaskInput,
   ListTasksInput,
-  MemberList,
+  parseTaskKey,
   TASK_STATUSES,
   type Task,
+  Timeline,
+  type TimelineItem,
   UpdateTaskInput,
-  UserId,
 } from '@pm/contracts';
-import type { z } from 'zod';
 import type { ApiClient } from '../client';
 import { type CommandContext, emit } from '../context';
-import { inputError, notFoundError, usageError } from '../errors';
+import { usageError } from '../errors';
 import {
-  activitySentence,
   assigneeLabel,
+  cycleLabel,
+  cycleStateLabel,
   fields,
   formatTime,
-  personLabel,
+  milestoneStatusLabel,
   priorityLabel,
   statusLabel,
   table,
+  timelineText,
 } from '../format';
+import {
+  isNone,
+  normalizeChoice,
+  normalizeCycle,
+  parseInput,
+  readText,
+  resolveAssignee,
+  resolveMilestone,
+} from './shared';
 
-/** `In progress`, `in-progress` and `IN_PROGRESS` all mean in_progress. */
-export function normalizeChoice(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]+/g, '_');
+// Kept here for callers that imported them from this module in M1.
+export { collectList, normalizeChoice, resolveAssignee } from './shared';
+
+/** "Webhooks v2 (Active, target 2026-11-14)". */
+function milestoneField(milestone: NonNullable<Task['milestone']>): string {
+  const target = milestone.targetDate ? `, target ${milestone.targetDate}` : '';
+  return `${milestone.name} (${milestoneStatusLabel(milestone.status)}${target})`;
 }
 
-/** Commander collector for repeatable, comma-separated options (`--status todo,in_progress`). */
-export function collectList(value: string, previous: string[] = []): string[] {
-  return [...previous, ...value.split(',').map(normalizeChoice).filter(Boolean)];
+/** "Cycle 12 · Checkout rewrite (Current, 2026-10-12 to 2026-10-25)". */
+function cycleField(cycle: NonNullable<Task['cycle']>): string {
+  return `${cycleLabel(cycle)} (${cycleStateLabel(cycle.state)}, ${cycle.startsOn} to ${cycle.endsOn})`;
 }
 
-function parseInput<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) throw inputError(parsed.error);
-  return parsed.data;
-}
-
-async function readText(context: CommandContext, value: string): Promise<string> {
-  return value === '-' ? context.io.readStdin() : value;
-}
-
-/**
- * Resolves an --assignee value to what the API takes: `me`, `agents` (list filter only), a user id,
- * or a member name or email looked up through GET /members.
- */
-export async function resolveAssignee(
-  client: ApiClient,
-  value: string,
-  { allowAgents }: { allowAgents: boolean },
-): Promise<string> {
-  const trimmed = value.trim();
-  const lower = trimmed.toLowerCase();
-  if (lower === ASSIGNEE_ME) return ASSIGNEE_ME;
-  if (lower === ASSIGNEE_AGENTS) {
-    if (allowAgents) return ASSIGNEE_AGENTS;
-    throw usageError('--assignee agents only filters pm tasks list. Name one agent instead.');
-  }
-  if (UserId.safeParse(trimmed).success) return trimmed;
-
-  const members = MemberList.parse(await client.members.list()).items;
-  const matches = members.filter(
-    (member) => member.name.toLowerCase() === lower || member.email?.toLowerCase() === lower,
-  );
-  if (matches.length === 1) return (matches[0] as (typeof matches)[number]).id;
-  if (matches.length === 0) {
-    throw notFoundError(`No workspace member named "${trimmed}".`, [
-      `Members: ${members.map((member) => member.name).join(', ') || 'none'}`,
-    ]);
-  }
-  throw usageError(`More than one member is named "${trimmed}". Pass the user id instead.`, undefined, [
-    ...matches.map((member) => `${member.id}  ${personLabel(member)}`),
-  ]);
+/** Milestone and cycle lines, only for what the task has. */
+function planningFields(task: Pick<Task, 'milestone' | 'cycle'>): [string, string][] {
+  const entries: [string, string][] = [];
+  if (task.milestone) entries.push(['Milestone', milestoneField(task.milestone)]);
+  if (task.cycle) entries.push(['Cycle', cycleField(task.cycle)]);
+  return entries;
 }
 
 function taskSummary(context: CommandContext, verb: string, task: Task): string {
@@ -90,9 +69,16 @@ function taskSummary(context: CommandContext, verb: string, task: Task): string 
       ['Status', style.status(task.status, statusLabel(task.status))],
       ['Priority', style.priority(task.priority, priorityLabel(task.priority))],
       ['Assignee', assigneeLabel(task.assignee)],
+      ...planningFields(task),
     ],
     style,
   )}`;
+}
+
+/** The value of --cycle as the API takes it: a number, current, next, or null for none. */
+function cycleValue(value: string): string | null {
+  const cycle = normalizeCycle(value);
+  return cycle === FILTER_NONE ? null : cycle;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,33 +86,61 @@ function taskSummary(context: CommandContext, verb: string, task: Task): string 
 // ---------------------------------------------------------------------------
 
 export interface ListOptions {
-  project: string;
+  project?: string[];
+  mine?: boolean;
   status?: string[];
   assignee?: string;
+  milestone?: string;
+  cycle?: string;
   limit?: string;
   cursor?: string;
 }
 
 export async function listTasks(context: CommandContext, options: ListOptions): Promise<void> {
+  if (options.mine && options.assignee !== undefined) {
+    throw usageError('Use either --mine or --assignee, not both.');
+  }
+  const projects = options.project?.length ? options.project : undefined;
+  const milestoneNone = options.milestone !== undefined && isNone(options.milestone);
   const draft = {
-    project: options.project,
+    ...(projects ? { project: projects } : {}),
     ...(options.status?.length ? { status: options.status } : {}),
+    ...(options.mine ? { assignee: ASSIGNEE_ME } : {}),
+    ...(milestoneNone ? { milestone: FILTER_NONE } : {}),
+    ...(options.cycle !== undefined ? { cycle: normalizeCycle(options.cycle) } : {}),
     ...(options.limit !== undefined ? { limit: options.limit } : {}),
     ...(options.cursor !== undefined ? { cursor: options.cursor } : {}),
   };
   // Validate what we can before touching the network (and before resolving names).
-  parseInput(ListTasksInput, draft);
+  const checked = parseInput(ListTasksInput, draft);
   const client = await context.client();
   const assignee =
     options.assignee === undefined
       ? undefined
       : await resolveAssignee(client, options.assignee, { allowAgents: true });
-  const input = parseInput(ListTasksInput, { ...draft, ...(assignee ? { assignee } : {}) });
+  const milestone =
+    options.milestone === undefined || milestoneNone
+      ? undefined
+      : await resolveMilestone(
+          client,
+          checked.project?.length === 1 ? checked.project[0] : undefined,
+          options.milestone,
+        );
+  const input = parseInput(ListTasksInput, {
+    ...draft,
+    ...(assignee ? { assignee } : {}),
+    ...(milestone ? { milestone } : {}),
+  });
   const page = await client.tasks.list(input);
 
   emit(context, 'tasks.list', page, (data) => {
     const { style } = context;
-    if (data.items.length === 0) return `No tasks in ${input.project} match.\n`;
+    if (data.items.length === 0) {
+      return input.project ? `No tasks in ${input.project.join(', ')} match.\n` : 'No tasks match.\n';
+    }
+    // Milestone and cycle columns appear only when some task has one.
+    const withMilestone = data.items.some((t) => t.milestone);
+    const withCycle = data.items.some((t) => t.cycle);
     const rows = table(
       data.items,
       [
@@ -142,6 +156,17 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
           style: (t, cell) => style.priority(t.priority, cell),
         },
         { header: 'ASSIGNEE', value: (t) => assigneeLabel(t.assignee) },
+        ...(withMilestone
+          ? [{ header: 'MILESTONE', value: (t: (typeof data.items)[number]) => t.milestone?.name ?? '' }]
+          : []),
+        ...(withCycle
+          ? [
+              {
+                header: 'CYCLE',
+                value: (t: (typeof data.items)[number]) => (t.cycle ? `C${t.cycle.number}` : ''),
+              },
+            ]
+          : []),
         { header: 'TITLE', value: (t) => t.title },
       ],
       style,
@@ -160,12 +185,27 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
 // pm tasks show
 // ---------------------------------------------------------------------------
 
+/**
+ * The task's timeline. A server older than M2 has no /timeline route: fall back to the activity
+ * list so pm tasks show still works there.
+ */
+async function loadTimeline(client: ApiClient, input: GetTaskInput): Promise<TimelineItem[]> {
+  try {
+    return Timeline.parse(await client.tasks.timeline(input)).items;
+  } catch (error) {
+    if (!(error instanceof ORPCError) || error.status !== 404) throw error;
+    const activity = ActivityList.parse(await client.tasks.activity(input)).items;
+    return activity.map((entry) => ({ ...entry, kind: 'activity' as const }));
+  }
+}
+
 export async function showTask(context: CommandContext, key: string): Promise<void> {
   const input = parseInput(GetTaskInput, { key });
   const client = await context.client();
-  const [task, activity] = await Promise.all([client.tasks.get(input), client.tasks.activity(input)]);
+  const [task, timeline] = await Promise.all([client.tasks.get(input), loadTimeline(client, input)]);
+  const activity = timeline.filter((item) => item.kind === 'activity');
 
-  emit(context, 'tasks.show', { task, activity: activity.items }, (data) => {
+  emit(context, 'tasks.show', { task, activity, timeline }, (data) => {
     const { style } = context;
     const t = data.task;
     const createdBy = t.createdOnBehalfOf
@@ -178,6 +218,7 @@ export async function showTask(context: CommandContext, key: string): Promise<vo
           ['Status', style.status(t.status, statusLabel(t.status))],
           ['Priority', style.priority(t.priority, priorityLabel(t.priority))],
           ['Assignee', assigneeLabel(t.assignee)],
+          ...planningFields(t),
           ['Project', `${t.project.key}  ${t.project.name}`],
           ['Created', `${formatTime(t.createdAt)} by ${createdBy}`],
           ['Updated', formatTime(t.updatedAt)],
@@ -186,15 +227,8 @@ export async function showTask(context: CommandContext, key: string): Promise<vo
       ),
     ];
     if (t.description?.trim()) parts.push(`\n${t.description.replace(/\s+$/, '')}\n`);
-    if (data.activity.length) {
-      parts.push(`\n${style.dim('Activity')}\n`);
-      parts.push(
-        data.activity
-          .map((entry) => `${style.dim(formatTime(entry.createdAt))}  ${activitySentence(entry)}`)
-          .join('\n'),
-        '\n',
-      );
-    }
+    const history = timelineText(data.timeline ?? [], style);
+    if (history) parts.push(`\n${style.dim('History')}\n`, history);
     return parts.join('');
   });
 }
@@ -209,6 +243,8 @@ export interface CreateOptions {
   priority?: string;
   assignee?: string;
   status?: string;
+  milestone?: string;
+  cycle?: string;
 }
 
 export async function createTask(
@@ -216,6 +252,7 @@ export async function createTask(
   titleWords: string[],
   options: CreateOptions,
 ): Promise<void> {
+  const milestoneNone = options.milestone !== undefined && isNone(options.milestone);
   const draft = {
     project: options.project,
     title: titleWords.join(' '),
@@ -224,14 +261,23 @@ export async function createTask(
       : {}),
     ...(options.priority !== undefined ? { priority: normalizeChoice(options.priority) } : {}),
     ...(options.status !== undefined ? { status: normalizeChoice(options.status) } : {}),
+    ...(options.cycle !== undefined ? { cycle: cycleValue(options.cycle) } : {}),
   };
-  parseInput(CreateTaskInput, draft);
+  const checked = parseInput(CreateTaskInput, draft);
   const client = await context.client();
   const assignee =
     options.assignee === undefined
       ? undefined
       : await resolveAssignee(client, options.assignee, { allowAgents: false });
-  const input = parseInput(CreateTaskInput, { ...draft, ...(assignee ? { assignee } : {}) });
+  const milestone =
+    options.milestone === undefined || milestoneNone
+      ? undefined
+      : await resolveMilestone(client, checked.project, options.milestone);
+  const input = parseInput(CreateTaskInput, {
+    ...draft,
+    ...(assignee ? { assignee } : {}),
+    ...(milestone ? { milestone } : {}),
+  });
   const task = await client.tasks.create(input);
   emit(context, 'tasks.create', task, (data) => taskSummary(context, 'Created', data));
 }
@@ -247,6 +293,8 @@ export interface UpdateOptions {
   unassign?: boolean;
   title?: string;
   description?: string;
+  milestone?: string;
+  cycle?: string;
 }
 
 export async function updateTask(
@@ -257,6 +305,7 @@ export async function updateTask(
   if (options.assignee !== undefined && options.unassign) {
     throw usageError('Use either --assignee or --unassign, not both.');
   }
+  const milestoneNone = options.milestone !== undefined && isNone(options.milestone);
   const draft = {
     key,
     ...(options.title !== undefined ? { title: options.title } : {}),
@@ -266,15 +315,30 @@ export async function updateTask(
     ...(options.status !== undefined ? { status: normalizeChoice(options.status) } : {}),
     ...(options.priority !== undefined ? { priority: normalizeChoice(options.priority) } : {}),
     ...(options.unassign ? { assignee: null } : {}),
+    ...(milestoneNone ? { milestone: null } : {}),
+    ...(options.cycle !== undefined ? { cycle: cycleValue(options.cycle) } : {}),
   };
-  // `me` stands in for a name still to be resolved, so "change at least one field" passes.
-  parseInput(UpdateTaskInput, options.assignee !== undefined ? { ...draft, assignee: ASSIGNEE_ME } : draft);
+  // `me` and null stand in for names still to be resolved, so "change at least one field" passes.
+  const checked = parseInput(UpdateTaskInput, {
+    ...draft,
+    ...(options.assignee !== undefined ? { assignee: ASSIGNEE_ME } : {}),
+    ...(options.milestone !== undefined ? { milestone: null } : {}),
+  });
   const client = await context.client();
   const assignee =
     options.assignee === undefined
       ? undefined
       : await resolveAssignee(client, options.assignee, { allowAgents: false });
-  const input = parseInput(UpdateTaskInput, { ...draft, ...(assignee ? { assignee } : {}) });
+  // Milestone names are looked up in the task's own project (PAY-142 → PAY).
+  const milestone =
+    options.milestone === undefined || milestoneNone
+      ? undefined
+      : await resolveMilestone(client, parseTaskKey(checked.key).projectKey, options.milestone);
+  const input = parseInput(UpdateTaskInput, {
+    ...draft,
+    ...(assignee ? { assignee } : {}),
+    ...(milestone ? { milestone } : {}),
+  });
   const task = await client.tasks.update(input);
   emit(context, 'tasks.update', task, (data) => taskSummary(context, 'Updated', data));
 }

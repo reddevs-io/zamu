@@ -73,11 +73,15 @@ Server     https://pm.example.com
 A typical loop for an agent:
 
 ```sh
-pm tasks list --project PAY --assignee me --status todo --json
+pm tasks list --mine --status todo --cycle current --json
 pm tasks update PAY-142 --status in_progress
 pm tasks show PAY-142 --json
+pm comments add PAY-142 "Tests pass. Ready for review, @ana@example.com"
 pm tasks update PAY-142 --status in_review
 ```
+
+`--mine` lists the tasks assigned to the key's owner across every project the key can read. Add `--project`
+to narrow it to one or more projects.
 
 Tell the agent about the exit codes so it can react without parsing text:
 
@@ -89,6 +93,68 @@ Tell the agent about the exit codes so it can react without parsing text:
 | 3    | Not found (404)                                                      |
 | 4    | Forbidden: outside the key's scope, or a read-only key writing (403) |
 | 5    | Server unreachable, 5xx, or a response this CLI does not understand  |
+
+## Comments and mentions
+
+Agents comment on tasks the way people do, and the comment shows in the task's history in the web app as
+"claude-dev for Ana Ruiz". The body is Markdown, up to 20,000 characters.
+
+```sh
+pm comments add PAY-142 "Picked this up. @ana@example.com, I will open the MR today."
+pnpm test 2>&1 | tail -20 | pm comments add PAY-142 -     # "-" reads the body from stdin
+pm comments list PAY-142
+pm comments edit 01a16848-b25a-7da5-aceb-752a314e6b85 "Fixed: the MR is !42."
+pm comments delete 01a16848-b25a-7da5-aceb-752a314e6b85
+```
+
+Mention someone with `@` and their email (`@ana@example.com`) or an agent's name (`@claude-dev`). The
+server checks that they are members of the workspace and stores the mention as a link,
+`[@Ana Ruiz](mention:<userId>)`, which the web app shows as a name chip. An `@word` that matches nobody
+stays plain text. Mentions send no notification yet.
+
+Only the author can edit or delete a comment. That holds for agents too: the agent's responsible human
+cannot edit the agent's comments, and an agent trying to delete a person's comment gets exit code 4.
+Deleting leaves "Comment deleted by ..." in the history. Comment ids are in `pm comments list`, in
+`pm tasks show` and in the `--json` output.
+
+`pm tasks show PAY-142` prints the history: activity on one line each, comments as indented blocks with
+their id.
+
+## Milestones and cycles
+
+Projects can group tasks into milestones (a goal with an optional target date) and cycles (numbered,
+dated periods of work, usually two weeks). Both are on by default. Anyone who can edit a project can turn either off in
+its Edit project dialog in the web app; the data stays and comes back when you turn it on again.
+
+Milestones go by name or id. Names are unique in a project and the CLI ignores case:
+
+```sh
+pm milestones list --project PAY
+pm milestones create --project PAY "Payout reports" --target 2026-12-04
+pm tasks update PAY-142 --milestone "payout reports"
+pm tasks list --project PAY --milestone "Payout reports"
+pm milestones update "payout reports" --project PAY --status completed
+```
+
+A milestone starts as Planned and turns Active by itself when one of its tasks moves to In progress or In
+review. Only a person or agent marks it Completed. An unknown name fails with exit code 1 and lists the
+project's milestones, so an agent can retry with the right one.
+
+Cycles go by number, or by `current` and `next`:
+
+```sh
+pm cycles current --project PAY
+pm tasks list --mine --cycle current
+pm tasks update PAY-142 --cycle next
+pm cycles create --project PAY                   # the day after the last cycle, same length
+pm cycles end --project PAY                      # ends the current cycle early
+```
+
+`pm cycles current --json` prints `"data": null` with exit code 0 when no cycle is running. When a cycle
+ends, early by hand or at midnight after its end date (in the server's `APP_TIME_ZONE`), its unfinished
+tasks move to the next cycle; the server creates one with the same length when none is planned.
+`pm cycles end --move-to none` takes them out of cycles instead. `--milestone none` and `--cycle none`
+clear the field on `pm tasks update` and filter tasks without one on `pm tasks list`.
 
 ## --json output
 
@@ -103,21 +169,33 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 `src/cli.ts`, entities in `src/entities.ts`), and the server publishes the same shapes as OpenAPI at
 `GET /api/v1/openapi.json`.
 
-| Schema                | `data`                                                                       |
-| --------------------- | ---------------------------------------------------------------------------- |
-| `pm.v1.login`         | `{ url, me }`                                                                |
-| `pm.v1.logout`        | `{ url }` (null when nothing was stored)                                     |
-| `pm.v1.whoami`        | `{ user, workspace, role, auth: { method, scope } }`                         |
-| `pm.v1.projects.list` | `{ items: Project[] }` with open counts per status                           |
-| `pm.v1.tasks.list`    | `{ items: TaskListItem[], nextCursor, counts }`                              |
-| `pm.v1.tasks.show`    | `{ task: Task, activity: Activity[] }`                                       |
-| `pm.v1.tasks.create`  | `Task`                                                                       |
-| `pm.v1.tasks.update`  | `Task`                                                                       |
-| `pm.v1.error`         | RFC 9457 problem: `{ type, title, status, code, detail, requestId, issues }` |
+| Schema                    | `data`                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `pm.v1.login`             | `{ url, me }`                                                                |
+| `pm.v1.logout`            | `{ url }` (null when nothing was stored)                                     |
+| `pm.v1.whoami`            | `{ user, workspace, role, auth: { method, scope } }`                         |
+| `pm.v1.projects.list`     | `{ items: Project[] }` with open counts per status                           |
+| `pm.v1.tasks.list`        | `{ items: TaskListItem[], nextCursor, counts }`                              |
+| `pm.v1.tasks.show`        | `{ task: Task, activity: Activity[], timeline: TimelineEntry[] }`            |
+| `pm.v1.tasks.create`      | `Task`                                                                       |
+| `pm.v1.tasks.update`      | `Task`                                                                       |
+| `pm.v1.comments.list`     | `{ items: Comment[] }`                                                       |
+| `pm.v1.comments.add`      | `Comment`                                                                    |
+| `pm.v1.comments.edit`     | `Comment`                                                                    |
+| `pm.v1.comments.delete`   | `Comment`, with `body` null and `deletedAt` set                              |
+| `pm.v1.milestones.list`   | `{ items: Milestone[] }` with progress counts                                |
+| `pm.v1.milestones.create` | `Milestone`                                                                  |
+| `pm.v1.milestones.update` | `Milestone`                                                                  |
+| `pm.v1.cycles.list`       | `{ items: Cycle[] }` with state, days left and counts                        |
+| `pm.v1.cycles.create`     | `Cycle`                                                                      |
+| `pm.v1.cycles.current`    | `Cycle`, or `null` when no cycle is running                                  |
+| `pm.v1.cycles.end`        | `Cycle` with its summary, plus `rollovers`: the tasks that moved and where   |
+| `pm.v1.error`             | RFC 9457 problem: `{ type, title, status, code, detail, requestId, issues }` |
 
 Statuses are `backlog`, `todo`, `in_progress`, `in_review`, `done`, `canceled`. Priorities are `none`, `low`,
-`medium`, `high`, `urgent`. Timestamps are ISO 8601 in UTC. `assignee` is null or a user reference; agents
-carry their `responsible` person.
+`medium`, `high`, `urgent`. Timestamps are ISO 8601 in UTC; dates such as `targetDate` and `startsOn` are
+`YYYY-MM-DD`. `assignee` is null or a user reference; agents carry their `responsible` person. `milestone`
+and `cycle` are null when the task has none. `rank` orders the cards inside a board column.
 
 `pm tasks list --project PAY --json`:
 
@@ -131,9 +209,26 @@ carry their `responsible` person.
         "key": "PAY-1",
         "number": 1,
         "title": "Retry failed webhooks",
+        "project": { "id": "01a1657a-f8e2-715c-91fd-dd9329a8ca32", "key": "PAY", "name": "Payments" },
         "status": "todo",
         "priority": "none",
         "assignee": null,
+        "milestone": {
+          "id": "01a16848-785e-725d-ad8d-07f37cc5360a",
+          "name": "Webhooks v2",
+          "status": "active",
+          "targetDate": "2026-11-14"
+        },
+        "cycle": {
+          "id": "01a16848-7867-7a12-8a90-2dd6fb6deaf8",
+          "number": 1,
+          "name": "Checkout rewrite",
+          "startsOn": "2026-10-12",
+          "endsOn": "2026-10-25",
+          "state": "current"
+        },
+        "cycleAddedAt": "2026-10-22T21:18:41.187Z",
+        "rank": -1,
         "createdAt": "2026-10-22T21:18:41.187Z",
         "updatedAt": "2026-10-22T21:18:41.187Z"
       }
@@ -188,6 +283,27 @@ carry their `responsible` person.
   }
 }
 ```
+
+`timeline` holds the same activity entries plus the comments, oldest first, each with a `kind` of
+`activity` or `comment`. A comment entry:
+
+```json
+{
+  "kind": "comment",
+  "id": "01a16848-b25a-7da5-aceb-752a314e6b85",
+  "taskKey": "PAY-1",
+  "author": { "id": "01a1657b-0515-750b-b667-2218bd07a9bc", "name": "claude-dev", "kind": "agent" },
+  "onBehalfOf": { "id": "01a1657a-f4bd-7d42-bf4e-e13a06462256", "name": "Ana Ruiz", "kind": "person" },
+  "body": "Picked this up. [@Ana Ruiz](mention:01a1657a-f4bd-7d42-bf4e-e13a06462256), I will open the MR today.",
+  "mentions": [{ "id": "01a1657a-f4bd-7d42-bf4e-e13a06462256", "name": "Ana Ruiz", "kind": "person" }],
+  "createdAt": "2026-10-22T21:19:05.142Z",
+  "editedAt": null,
+  "deletedAt": null
+}
+```
+
+When a cycle ends, each task that moved gets a `cycle.ended` activity entry with a `cycle` change. Its
+`actor` is null when the server's hourly job ended the cycle.
 
 A failure, here `pm tasks show PAY-99 --json` (exit code 3):
 

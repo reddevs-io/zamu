@@ -1,27 +1,19 @@
-import type { TaskListItem, TaskStatus } from '@pm/contracts';
+import type { TaskListItem } from '@pm/contracts';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ProjectHeader, TaskFilterBar, useProjectSummary, ViewSwitch } from '~/features/project-header';
+import { useSearchText } from '~/features/project-header/useSearchText';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';
-import {
-  Banner,
-  Button,
-  DataTable,
-  EmptyState,
-  FilterBar,
-  type OptionItem,
-  PageHeader,
-  SearchField,
-  Select,
-  useHotkeys,
-} from '~/ui';
+import { Banner, Button, DataTable, EmptyState, SearchField, useHotkeys } from '~/ui';
 import { useNow } from './clock';
 import { describeError } from './errors';
 import { buildGroups, visibleKeys } from './groups';
-import { rememberListSearch } from './list-memory';
-import { membersQuery, projectsQuery, type TaskListData, taskListQuery, taskQuery } from './queries';
+import { rememberListSearch, rememberView } from './list-memory';
+import { type TaskListData, taskListQuery, taskQuery } from './queries';
 import {
+  applyProjectFeatures,
   eagerStatuses,
   filtersOf,
   hasFilters,
@@ -29,30 +21,33 @@ import {
   listInput,
   type TaskListFilters,
   type TaskListSearch,
+  type TaskView,
   visibleStatuses,
 } from './search';
 import { useUrlSelection } from './selection';
 import { PaneSkeleton, RequestHint, TaskDetailPane } from './TaskDetailPane';
-import { PRIORITY_OPTIONS, STATUS_OPTIONS } from './TaskFields';
 import { taskColumns } from './TaskTable';
 
 // /p/$projectKey: the task table grouped by status, with the selected task in a permanent pane.
 // Selection and filters live in the URL (?task=PAY-142&q=…), so reloads and shared links restore them.
+// V switches to the board (?view=board), which the project then remembers.
 
 export interface TaskListScreenProps {
   projectKey: string;
   search: TaskListSearch;
 }
 
-const ANY = 'any';
-const SEARCH_DEBOUNCE_MS = 200;
-
 const pickItems = (results: { data?: TaskListData }[]) => results.map((result) => result.data?.items);
 
 export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   const navigate = useNavigate();
   const quickCreate = useOptionalQuickCreate();
-  const filters = useMemo(() => filtersOf(search), [search]);
+  const project = useProjectSummary(projectKey);
+  const usesMilestones = project?.usesMilestones ?? false;
+  const usesCycles = project?.usesCycles ?? false;
+  const searchKey = JSON.stringify(filtersOf(search));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: searchKey stands for the filter values
+  const filters = useMemo(() => applyProjectFeatures(filtersOf(search), project), [searchKey, project]);
 
   useEffect(() => rememberListSearch(projectKey, search), [projectKey, search]);
 
@@ -73,12 +68,6 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
     navigate({ to: '/p/$projectKey/$taskKey', params: { projectKey, taskKey: key } });
 
   // ---- Data ---------------------------------------------------------------------------------------
-  const project = useQuery({
-    ...projectsQuery(),
-    select: (data) => data.items.find((item) => item.key === projectKey),
-  }).data;
-  const members = useQuery(membersQuery()).data?.items;
-
   const [collapsed, setCollapsed] = useCollapsedGroups(filters);
   const eager = useQuery(taskListQuery(listInput(projectKey, filters, eagerStatuses(filters))));
   const lazyStatuses = filters.status ? [] : LAZY_STATUSES.filter((status) => !collapsed.has(status));
@@ -161,6 +150,7 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   };
 
   useHotkeys({
+    v: () => actions.current.setView('board'),
     Escape: { handler: () => select(null), enabled: selected != null },
     j: () => move(1),
     k: () => move(-1),
@@ -178,28 +168,17 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   });
 
   // ---- Search box: local text, debounced into the URL ---------------------------------------------
-  const [query, setQuery] = useState(search.q ?? '');
-  const lastPushed = useRef(search.q ?? '');
-  useEffect(() => {
-    // Back/forward or a link changed q: show it.
-    if ((search.q ?? '') !== lastPushed.current) {
-      lastPushed.current = search.q ?? '';
-      setQuery(search.q ?? '');
-    }
-  }, [search.q]);
-  useEffect(() => {
-    if (query === lastPushed.current) return;
-    const timer = setTimeout(() => {
-      lastPushed.current = query;
-      setSearchRef.current((previous) => ({ ...previous, q: query.trim() ? query : undefined }));
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [query]);
+  const [query, setQuery, resetQuery] = useSearchText(search.q, (q) =>
+    setSearchRef.current((previous) => ({ ...previous, q })),
+  );
 
   const clearFilters = () => {
-    setQuery('');
-    lastPushed.current = '';
-    setSearch(() => ({}));
+    resetQuery();
+    setSearch((previous) => ({ lanes: previous.lanes }));
+  };
+  const setView = (view: TaskView) => {
+    rememberView(projectKey, view);
+    setSearch((previous) => ({ ...previous, view: view === 'board' ? 'board' : undefined }));
   };
 
   // ---- Rendering ----------------------------------------------------------------------------------
@@ -211,20 +190,6 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   const listError = eager.isError && !eager.data ? describeError(eager.error) : null;
 
   const newTask = () => quickCreate?.open(projectKey);
-
-  const assigneeItems = useMemo<OptionItem[]>(
-    () => [
-      { id: ANY, label: 'Any' },
-      { id: 'me', label: 'Me' },
-      { id: 'agents', label: 'Agents' },
-      ...(members ?? []).map((member) => ({
-        id: member.id,
-        label: member.name,
-        avatar: { name: member.name, kind: member.kind },
-      })),
-    ],
-    [members],
-  );
 
   const renderEmpty = () => {
     if (listError) {
@@ -279,7 +244,13 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   };
 
   // The header and filters do not depend on the selection, so J/K does not re-render them.
-  const actions = useRef({ enterTable: () => {}, newTask: () => {}, clearFilters: () => {}, setSearch });
+  const actions = useRef({
+    enterTable: () => {},
+    newTask: () => {},
+    clearFilters: () => {},
+    setSearch,
+    setView: (_view: TaskView) => {},
+  });
   actions.current = {
     enterTable: () => {
       const current = selectedRef.current;
@@ -291,114 +262,63 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
     newTask,
     clearFilters,
     setSearch,
+    setView,
   };
-  const projectName = project?.name;
   const openCount = project?.openCount;
   const subtitleText = isEmptyProject
     ? 'no tasks yet'
     : openCount != null
       ? `${openCount} open · grouped by status`
       : 'grouped by status';
+  // `search` changes with the selection; searchKey holds the filter values the header shows.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: searchKey stands for the filters in `search`
   const header = useMemo(
     () => (
-      <>
-        <PageHeader
-          title={projectName ?? projectKey}
-          subtitle={
-            <>
-              <span className="font-mono">{projectKey}</span> · {subtitleText}
-            </>
-          }
-          actions={
-            <>
-              <SearchField
-                width={140}
-                value={query}
-                onChange={setQuery}
-                inputRef={searchRef}
-                aria-label="Search tasks"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    actions.current.enterTable();
-                  } else {
-                    event.continuePropagation();
-                  }
-                }}
-              />
-              <Button kbd="C" onPress={() => actions.current.newTask()} aria-keyshortcuts="c">
-                New
-              </Button>
-            </>
-          }
-        />
-        <FilterBar
-          end={
-            filtered ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="px-0 font-normal"
-                onPress={() => actions.current.clearFilters()}
-              >
-                Clear
-              </Button>
-            ) : undefined
-          }
-        >
-          <Select
-            label="Status"
-            variant="filter"
-            selectionMode="multiple"
-            items={STATUS_OPTIONS}
-            value={search.status ?? []}
-            onChange={(keys) =>
-              actions.current.setSearch((previous) => ({
-                ...previous,
-                status: keys.length ? (keys.map(String) as TaskStatus[]) : undefined,
-              }))
-            }
+      <ProjectHeader
+        projectKey={projectKey}
+        current="tasks"
+        subtitle={subtitleText}
+        actions={
+          <>
+            <SearchField
+              width={140}
+              value={query}
+              onChange={setQuery}
+              inputRef={searchRef}
+              aria-label="Search tasks"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  actions.current.enterTable();
+                } else {
+                  event.continuePropagation();
+                }
+              }}
+            />
+            <Button kbd="C" onPress={() => actions.current.newTask()} aria-keyshortcuts="c">
+              New
+            </Button>
+          </>
+        }
+        filters={
+          <TaskFilterBar
+            projectKey={projectKey}
+            search={search}
+            onChange={(update) => actions.current.setSearch(update)}
+            usesMilestones={usesMilestones}
+            usesCycles={usesCycles}
           />
-          <Select
-            label="Priority"
-            variant="filter"
-            selectionMode="multiple"
-            items={PRIORITY_OPTIONS}
-            value={search.priority ?? []}
-            onChange={(keys) =>
-              actions.current.setSearch((previous) => ({
-                ...previous,
-                priority: keys.length ? (keys.map(String) as TaskListFilters['priority']) : undefined,
-              }))
-            }
+        }
+        filtersEnd={
+          <ViewSwitch
+            view="list"
+            onChange={(view) => actions.current.setView(view)}
+            onClear={filtered ? () => actions.current.clearFilters() : undefined}
           />
-          <Select
-            label="Assignee"
-            variant="filter"
-            items={assigneeItems}
-            value={search.assignee ?? ANY}
-            onChange={(key) =>
-              actions.current.setSearch((previous) => ({
-                ...previous,
-                assignee: key == null || key === ANY ? undefined : String(key),
-              }))
-            }
-          />
-        </FilterBar>
-      </>
+        }
+      />
     ),
-    [
-      projectKey,
-      projectName,
-      subtitleText,
-      query,
-      searchRef,
-      filtered,
-      search.status,
-      search.priority,
-      search.assignee,
-      assigneeItems,
-    ],
+    [projectKey, subtitleText, query, searchRef, filtered, searchKey, usesMilestones, usesCycles],
   );
 
   return (

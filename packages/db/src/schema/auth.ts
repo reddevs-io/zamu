@@ -7,6 +7,7 @@
 // - timestamps are timestamptz with defaultNow() everywhere.
 // - user.kind is NOT NULL with a check constraint; session.active_organization_id and apikey.reference_id are uuid
 //   foreign keys; member has a unique (organization_id, user_id).
+// - user.theme (M2): the person's theme choice, with a check constraint. Better Auth does not read it.
 // - API-key rate limiting defaults to off (the plugin is configured with rateLimit.enabled = false).
 // - the generated v1 `relations()` blocks are replaced by defineRelations in ../relations.ts (Drizzle 1.0).
 import { sql } from 'drizzle-orm';
@@ -49,9 +50,14 @@ export const user = pgTable(
     responsibleUserId: uuid('responsible_user_id').references((): AnyPgColumn => user.id, {
       onDelete: 'set null',
     }),
+    /** Theme choice for people. Agents keep the default. */
+    theme: text('theme', { enum: ['system', 'light', 'dark'] })
+      .default('system')
+      .notNull(),
   },
   (table) => [
     check('user_kind_check', sql`${table.kind} in ('person', 'agent')`),
+    check('user_theme_check', sql`${table.theme} in ('system', 'light', 'dark')`),
     index('user_responsibleUserId_idx').on(table.responsibleUserId),
   ],
 );

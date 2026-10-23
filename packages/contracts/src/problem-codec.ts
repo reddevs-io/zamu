@@ -19,7 +19,8 @@ function isProblemCode(code: string): code is ProblemCode {
 
 /**
  * Turns an ORPCError into a Problem body. Unknown codes fall back by status class. Validation
- * failures (an ORPCError caused by a ValidationError) list their issues.
+ * failures (an ORPCError caused by a ValidationError) list their issues. A `task` in the error
+ * data (TASK_CHANGED) is copied into the body.
  */
 export function encodeProblem(error: ORPCError<string, unknown>, requestId?: string): Problem {
   const code: ProblemCode = isProblemCode(error.code)
@@ -35,6 +36,7 @@ export function encodeProblem(error: ORPCError<string, unknown>, requestId?: str
         ? toProblemIssues(error.cause.issues)
         : undefined;
   const id = requestId ?? (data.success ? data.data.requestId : undefined);
+  const task = data.success ? data.data.task : undefined;
   return {
     type: 'about:blank',
     title: PROBLEM_TITLES[code],
@@ -43,6 +45,7 @@ export function encodeProblem(error: ORPCError<string, unknown>, requestId?: str
     ...(error.message ? { detail: error.message } : {}),
     ...(id ? { requestId: id } : {}),
     ...(issues?.length ? { issues } : {}),
+    ...(task ? { task } : {}),
   };
 }
 
@@ -53,7 +56,7 @@ export function encodeProblem(error: ORPCError<string, unknown>, requestId?: str
 export function decodeProblem(body: unknown): ORPCError<ProblemCode, ProblemData> | null {
   const parsed = Problem.safeParse(body);
   if (!parsed.success) return null;
-  const { code, status, title, detail, requestId, issues } = parsed.data;
+  const { code, status, title, detail, requestId, issues, task } = parsed.data;
   return new ORPCError(code, {
     defined: true,
     status,
@@ -61,6 +64,7 @@ export function decodeProblem(body: unknown): ORPCError<ProblemCode, ProblemData
     data: {
       ...(requestId ? { requestId } : {}),
       ...(issues ? { issues } : {}),
+      ...(task ? { task } : {}),
     },
   });
 }
