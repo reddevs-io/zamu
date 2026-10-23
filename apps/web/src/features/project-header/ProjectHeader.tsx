@@ -5,14 +5,18 @@ import { retryOnce } from '~/features/tasks/errors';
 import { projectsQuery } from '~/features/tasks/queries';
 import { orpc } from '~/lib/orpc';
 import { FilterBar, PageHeader, ViewTabs } from '~/ui';
+import { MirrorSourceButton } from './MirrorSource';
+import { isMirrored } from './mirror';
 import { type ProjectView, projectTabs } from './tabs';
 
 // Shared header of a project's pages (tasks list and board, milestones, cycles):
 //
-//   Payments                                        [Search /] [New C]
+//   Payments                                  [■ Backlog.md 3m ago ▾] [Search /] [New C]
 //   PAY · 12 open · board
-//   Tasks 12   ◇ Milestones 3   ◑ Cycles C12 · 3d left          (only when milestones or cycles are on)
+//   Tasks 12   ◇ Milestones 3   ◑ Cycles C12 · 3d left   Settings
 //   Status Any  Priority Any  …                       [List|Board] V   (only when `filters` is given)
+//
+// A project that mirrors Backlog.md gets the source button (and ⇧R) before the page's actions.
 
 export interface ProjectHeaderProps {
   /** Upper-case project key from the route ("PAY"). */
@@ -27,6 +31,11 @@ export interface ProjectHeaderProps {
   filters?: ReactNode;
   /** Right end of the filter bar (the List / Board switch). */
   filtersEnd?: ReactNode;
+  /**
+   * ⇧R refreshes a mirrored project from any page with this header (default true). Turn it off on a
+   * page that binds ⇧R itself.
+   */
+  refreshHotkey?: boolean;
   className?: string;
 }
 
@@ -55,9 +64,11 @@ export function ProjectHeader({
   actions,
   filters,
   filtersEnd,
+  refreshHotkey = true,
   className,
 }: ProjectHeaderProps) {
   const project = useProjectSummary(projectKey);
+  const mirrored = isMirrored(project);
   const milestoneCount = useOpenMilestoneCount(projectKey, project?.usesMilestones ?? false);
   const tabs = project ? projectTabs(project, milestoneCount) : [];
 
@@ -71,7 +82,16 @@ export function ProjectHeader({
             {subtitle != null ? <> · {subtitle}</> : null}
           </>
         }
-        actions={actions}
+        actions={
+          mirrored && project ? (
+            <>
+              <MirrorSourceButton project={project} refreshHotkey={refreshHotkey} />
+              {actions}
+            </>
+          ) : (
+            actions
+          )
+        }
       />
       {tabs.length ? (
         <ViewTabs items={tabs} currentId={current} aria-label={`${project?.name ?? projectKey} views`} />

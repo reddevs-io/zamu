@@ -1,0 +1,42 @@
+{
+  "description": "GET /repos/{owner}/{repo} and GET /repos/{owner}/{repo}/branches/{branch} on Codeberg (Forgejo).",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/repos/forgejo/docs"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "id": 130587,
+          "name": "docs",
+          "full_name": "forgejo/docs",
+          "private": false,
+          "html_url": "https://codeberg.org/forgejo/docs",
+          "default_branch": "next"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://codeberg.org/api/v1/repos/forgejo/docs/branches/next"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "name": "next",
+          "commit": {
+            "id": "65faeb1c07bbc43cbc3ac32aef19a7671500dd78",
+            "message": "docs: update\n"
+          },
+          "protected": true
+        }
+      }
+    }
+  ]
+}

@@ -8,7 +8,6 @@ import {
   GetTaskInput,
   ListTasksInput,
   MilestoneId,
-  parseTaskKey,
   TASK_STATUSES,
   type Task,
   Timeline,
@@ -39,6 +38,9 @@ import {
   readText,
   resolveAssignee,
   resolveMilestone,
+  type TaskRef,
+  taskRef,
+  withTaskRef,
 } from './shared';
 
 // Kept here for callers that imported them from this module in M1.
@@ -75,6 +77,25 @@ function taskSummary(context: CommandContext, verb: string, task: Task): string 
     ],
     style,
   )}`;
+}
+
+/**
+ * M3: where a mirrored or imported task comes from, the fields Backlog.md owns, and whether its
+ * file is gone. Nothing for native tasks.
+ */
+function backlogFields(task: Task): [string, string][] {
+  const entries: [string, string][] = [];
+  if (task.backlog) {
+    entries.push([
+      'Backlog.md',
+      task.backlog.file ? `${task.backlog.id}  ${task.backlog.file}` : task.backlog.id,
+    ]);
+  }
+  if (task.locked?.length) {
+    entries.push(['Locked', `${task.locked.join(', ')} (change them in Backlog.md)`]);
+  }
+  if (task.hidden) entries.push(['Hidden', 'its file is gone from the default branch']);
+  return entries;
 }
 
 /** The value of --cycle as the API takes it: a number, current, next, or null for none. */
@@ -207,10 +228,18 @@ async function loadTimeline(client: ApiClient, input: GetTaskInput): Promise<Tim
   }
 }
 
-export async function showTask(context: CommandContext, key: string): Promise<void> {
-  const input = parseInput(GetTaskInput, { key });
+export async function showTask(
+  context: CommandContext,
+  key: string,
+  options: { project?: string } = {},
+): Promise<void> {
+  const ref = await taskRef(context, key, options.project);
+  parseInput(GetTaskInput, ref);
   const client = await context.client();
-  const [task, timeline] = await Promise.all([client.tasks.get(input), loadTimeline(client, input)]);
+  const [task, timeline] = await withTaskRef(context, ref, (r) => {
+    const input = parseInput(GetTaskInput, r);
+    return Promise.all([client.tasks.get(input), loadTimeline(client, input)]);
+  });
   const activity = timeline.filter((item) => item.kind === 'activity');
 
   emit(context, 'tasks.show', { task, activity, timeline }, (data) => {
@@ -228,6 +257,7 @@ export async function showTask(context: CommandContext, key: string): Promise<vo
           ['Assignee', assigneeLabel(t.assignee)],
           ...planningFields(t),
           ['Project', `${t.project.key}  ${t.project.name}`],
+          ...backlogFields(t),
           ['Created', `${formatTime(t.createdAt)} by ${createdBy}`],
           ['Updated', formatTime(t.updatedAt)],
         ],
@@ -261,8 +291,10 @@ export async function createTask(
   options: CreateOptions,
 ): Promise<void> {
   const milestoneNone = options.milestone !== undefined && isNone(options.milestone);
+  const project = await requireProject(context, options.project);
+  context.target = { ...context.target, project };
   const draft = {
-    project: await requireProject(context, options.project),
+    project,
     title: titleWords.join(' '),
     ...(options.description !== undefined
       ? { description: await readText(context, options.description) }
@@ -295,6 +327,7 @@ export async function createTask(
 // ---------------------------------------------------------------------------
 
 export interface UpdateOptions {
+  project?: string;
   status?: string;
   priority?: string;
   assignee?: string;
@@ -314,8 +347,9 @@ export async function updateTask(
     throw usageError('Use either --assignee or --unassign, not both.');
   }
   const milestoneNone = options.milestone !== undefined && isNone(options.milestone);
+  const ref = await taskRef(context, key, options.project);
   const draft = {
-    key,
+    ...ref,
     ...(options.title !== undefined ? { title: options.title } : {}),
     ...(options.description !== undefined
       ? { description: await readText(context, options.description) }
@@ -327,7 +361,7 @@ export async function updateTask(
     ...(options.cycle !== undefined ? { cycle: cycleValue(options.cycle) } : {}),
   };
   // `me` and null stand in for names still to be resolved, so "change at least one field" passes.
-  const checked = parseInput(UpdateTaskInput, {
+  parseInput(UpdateTaskInput, {
     ...draft,
     ...(options.assignee !== undefined ? { assignee: ASSIGNEE_ME } : {}),
     ...(options.milestone !== undefined ? { milestone: null } : {}),
@@ -337,16 +371,30 @@ export async function updateTask(
     options.assignee === undefined
       ? undefined
       : await resolveAssignee(client, options.assignee, { allowAgents: false });
-  // Milestone names are looked up in the task's own project (PAY-142 → PAY).
-  const milestone =
-    options.milestone === undefined || milestoneNone
-      ? undefined
-      : await resolveMilestone(client, parseTaskKey(checked.key).projectKey, options.milestone);
-  const input = parseInput(UpdateTaskInput, {
-    ...draft,
-    ...(assignee ? { assignee } : {}),
-    ...(milestone ? { milestone } : {}),
-  });
-  const task = await client.tasks.update(input);
+  // Milestone names are looked up in the task's own project, so a name needs the task first (a
+  // Backlog.md id does not name its project). Its app key then addresses the update.
+  let target: TaskRef = ref;
+  let milestone: string | undefined;
+  if (options.milestone !== undefined && !milestoneNone) {
+    const value = options.milestone;
+    if (MilestoneId.safeParse(value.trim()).success) milestone = value.trim();
+    else {
+      const current = await withTaskRef(context, ref, (r) => client.tasks.get(parseInput(GetTaskInput, r)));
+      target = { key: current.key };
+      context.target = { ...context.target, task: target };
+      milestone = await resolveMilestone(client, current.project.key, value);
+    }
+  }
+  const task = await withTaskRef(context, target, (r) =>
+    client.tasks.update(
+      parseInput(UpdateTaskInput, {
+        ...draft,
+        key: r.key,
+        project: r.project,
+        ...(assignee ? { assignee } : {}),
+        ...(milestone ? { milestone } : {}),
+      }),
+    ),
+  );
   emit(context, 'tasks.update', task, (data) => taskSummary(context, 'Updated', data));
 }

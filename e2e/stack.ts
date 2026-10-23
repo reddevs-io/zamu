@@ -3,7 +3,11 @@
 // started from the same checkout. Every run starts on a fresh Postgres volume.
 //
 // The upgrade test (upgrade.spec.ts) starts a second stack from the same compose file under another project
-// name and port, first on the M1 image and then on this checkout's image.
+// name and port, first on older images and then on this checkout's image.
+//
+// The Backlog.md specs start a Forgejo container (e2e/forgejo.ts) and attach it to the stack's network, so the
+// app reaches it by a network alias over plain HTTP and Forgejo delivers webhooks to the web container. The
+// stack therefore runs with APP_ENCRYPTION_KEY, GIT_ALLOW_PRIVATE_HOSTS=true and those aliases in GIT_HTTP_HOSTS.
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -24,6 +28,19 @@ export const baseURL = (process.env.E2E_BASE_URL ?? `http://localhost:${port}`).
 /** Image built and run by the stack. Shares the tag with nothing else, so a run never replaces another image. */
 export const image = process.env.PM_IMAGE ?? 'project-management:e2e';
 
+/** Network alias of each Backlog.md spec's Forgejo on the stack network (see forgejo.ts). */
+export const forgejoAliases = { mirror: 'forgejo-mirror', import: 'forgejo-import' } as const;
+
+/**
+ * Compose files: the production docker-compose.yml, which passes the M3 variables (APP_ENCRYPTION_KEY,
+ * GIT_ALLOW_PRIVATE_HOSTS, GIT_HTTP_HOSTS) from the environment the stack sets.
+ */
+export const composeFiles = ['docker-compose.yml'];
+
+/** 32 bytes, base64. Fixed so a kept stack (E2E_KEEP_STACK=1) can still read its own tokens. */
+const encryptionKey =
+  process.env.E2E_APP_ENCRYPTION_KEY ?? Buffer.from('e2e-only-key-never-in-production').toString('base64');
+
 /** Path of the CLI that globalSetup builds; the suite runs it like an agent would. */
 export const cliPath = fileURLToPath(new URL('../apps/cli/dist/index.js', import.meta.url));
 
@@ -39,6 +56,8 @@ export interface StackOptions {
 }
 
 export interface Stack extends StackOptions {
+  /** The stack's default network, which the Backlog.md specs attach Forgejo to. */
+  network: string;
   /** Runs `docker compose -p <project> -f docker-compose.yml <args>` from the repository root. */
   compose(args: string[], options?: { quiet?: boolean }): string;
   /** Polls GET /api/healthz until it answers 200. */
@@ -51,10 +70,11 @@ export interface Stack extends StackOptions {
 export function createStack(options: StackOptions): Stack {
   const stack: Stack = {
     ...options,
+    network: `${options.project}_default`,
     compose(args, { quiet = false } = {}) {
       const output = execFileSync(
         'docker',
-        ['compose', '-p', stack.project, '-f', 'docker-compose.yml', ...args],
+        ['compose', '-p', stack.project, ...composeFiles.flatMap((file) => ['-f', file]), ...args],
         {
           cwd: repoRoot,
           // Shell values win over the repository's .env, which compose also reads.
@@ -69,6 +89,9 @@ export function createStack(options: StackOptions): Stack {
             POSTGRES_USER: 'postgres',
             POSTGRES_PASSWORD: 'postgres',
             POSTGRES_DB: 'project_management',
+            APP_ENCRYPTION_KEY: encryptionKey,
+            GIT_ALLOW_PRIVATE_HOSTS: 'true',
+            GIT_HTTP_HOSTS: Object.values(forgejoAliases).join(','),
           },
           encoding: 'utf8',
           stdio: quiet ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 'inherit'],
@@ -107,6 +130,11 @@ export function createStack(options: StackOptions): Stack {
     },
   };
   return stack;
+}
+
+/** The command that removes a kept stack, for log messages. */
+export function downCommand(stack: Pick<Stack, 'project'>): string {
+  return `docker compose -p ${stack.project} ${composeFiles.map((file) => `-f ${file}`).join(' ')} down -v`;
 }
 
 /** The stack every spec but the upgrade test uses. */

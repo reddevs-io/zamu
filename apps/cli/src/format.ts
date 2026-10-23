@@ -241,9 +241,14 @@ export function changeSentence(change: ActivityChange): string {
 
 /** "claude-dev for Ana Ruiz moved it from Todo to In progress". */
 export function activitySentence(activity: Activity): string {
-  // A null actor is the system: the hourly job that ends cycles.
-  const actor = activity.actor?.name ?? 'System';
+  // A null actor is a Backlog.md refresh (origin backlog) or the system: the hourly job that ends cycles.
+  const actor = activity.actor?.name ?? (activity.origin === 'backlog' ? 'Backlog.md' : 'System');
   const who = activity.onBehalfOf ? `${actor} for ${activity.onBehalfOf.name}` : actor;
+  // "(a1b2c3d)": the commit a Backlog.md refresh read.
+  const commit =
+    activity.origin === 'backlog' && activity.originRef ? ` (${activity.originRef.slice(0, 7)})` : '';
+  if (activity.type === 'task.hidden') return `${who} hid the task: its file is gone${commit}`;
+  if (activity.type === 'task.restored') return `${who} restored the task: its file is back${commit}`;
   if (activity.type === 'cycle.ended') {
     // "Cycle 12 ended. Moved to Cycle 13." The hourly job has no actor; a person who ended it early does.
     const change = activity.changes.find((c) => c.field === 'cycle');
@@ -258,10 +263,11 @@ export function activitySentence(activity: Activity): string {
     const extras = activity.changes
       .filter((change) => change.field !== 'title' && change.field !== 'description')
       .map(changeSentence);
-    return [`${who} created the task`, ...extras].join(', ');
+    return `${[`${who} created the task`, ...extras].join(', ')}${commit}`;
   }
   const changes = activity.changes.map(changeSentence);
-  return `${who} ${changes.length ? changes.join(', ') : 'updated the task'}`;
+  if (activity.backlogFields?.length) changes.push(`changed ${activity.backlogFields.join(', ')}`);
+  return `${who} ${changes.length ? changes.join(', ') : 'updated the task'}${commit}`;
 }
 
 /** "all projects, write" or "PAY, WEB, read". */

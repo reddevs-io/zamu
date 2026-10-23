@@ -1,0 +1,111 @@
+{
+  "description": "Error statuses. 401 and 404 bodies recorded; rate-limit answers from the rate limit docs.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed and extended by hand.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/user"
+      },
+      "response": {
+        "status": 401,
+        "headers": {},
+        "json": {
+          "message": "Bad credentials",
+          "documentation_url": "https://docs.github.com/rest",
+          "status": "401"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/missing"
+      },
+      "response": {
+        "status": 404,
+        "headers": {},
+        "json": {
+          "message": "Not Found",
+          "documentation_url": "https://docs.github.com/rest/repos/repos#get-a-repository",
+          "status": "404"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/limited"
+      },
+      "response": {
+        "status": 403,
+        "headers": {
+          "x-ratelimit-limit": "5000",
+          "x-ratelimit-remaining": "0",
+          "x-ratelimit-reset": "1792780000"
+        },
+        "json": {
+          "message": "API rate limit exceeded for user ID 1.",
+          "documentation_url": "https://docs.github.com/rest/overview/rate-limits-for-the-rest-api"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/secondary"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "retry-after": "30"
+        },
+        "json": {
+          "message": "You have exceeded a secondary rate limit. Please wait a few minutes before you try again."
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/forbidden"
+      },
+      "response": {
+        "status": 403,
+        "headers": {
+          "x-ratelimit-remaining": "4999"
+        },
+        "json": {
+          "message": "Resource not accessible by personal access token",
+          "status": "403"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/down"
+      },
+      "response": {
+        "status": 502,
+        "headers": {
+          "content-type": "text/html"
+        },
+        "text": "<html>Bad gateway</html>"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/teapot"
+      },
+      "response": {
+        "status": 418,
+        "headers": {},
+        "json": {
+          "message": "I am a teapot"
+        }
+      }
+    }
+  ]
+}

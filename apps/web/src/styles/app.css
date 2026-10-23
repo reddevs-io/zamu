@@ -45,6 +45,10 @@
   --color-mention-bg: var(--mention-bg);
   --color-comment-bg: var(--comment-bg);
   --color-track: var(--track);
+  --color-sys-bg: var(--sys-bg);
+  --color-sys-fg: var(--sys-fg);
+  --color-hatch: var(--hatch);
+  --color-src-bg: var(--src-bg);
   --shadow-dialog: var(--shadow);
 }
 
@@ -98,4 +102,10 @@
 @utility halo {
   border-color: var(--focus);
   box-shadow: 0 0 0 3px oklch(0.6 0.15 262 / 0.2);
+}
+
+/* Diagonal hatch on anything Backlog.md owns (ledger-m3.css .m3-lock). Always pair it with words that say why:
+   OwnedFieldCaption ("· file") or a note such as "comes from Backlog.md". */
+@utility locked-hatch {
+  background-image: repeating-linear-gradient(135deg, var(--hatch) 0 5px, transparent 5px 10px);
 }

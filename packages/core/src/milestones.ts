@@ -1,24 +1,39 @@
 // Milestones: per-project goals with an optional target date. Planned until a task in them starts
 // (activateMilestoneForTask), Active then, Completed only by hand. Progress comes from task counts.
+// M3: milestones of a project mirrored from Backlog.md come from its files. Creating, changing and
+// deleting them in the app fails with MILESTONE_MIRRORED; hidden ones (file gone) leave the list.
 import {
   CreateMilestoneInput,
   DeleteMilestoneInput,
   GetMilestoneInput,
   ListMilestonesInput,
+  MILESTONE_OWNED_FIELDS,
   MilestoneList,
+  type MilestoneOwnedField,
   type MilestoneProgress,
   MilestoneWithProgress,
   UpdateMilestoneInput,
 } from '@pm/contracts';
 import { type DbOrTx, schema, type Tx } from '@pm/db';
-import { and, asc, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type ActivityEntry, recordActivities } from './activity';
 import { type Actor, authorize } from './authz';
 import type { DbContext } from './context';
 import { type ClockContext, calendarDaysBetween, clockNow, todayIn } from './cycles';
-import { Conflict, isUniqueViolation, NotFound, parseInput } from './errors';
-import { findProjectByKey, loadUsers, type ProjectRow, userRef } from './internal';
+import { Conflict, isUniqueViolation, MilestoneMirrored, NotFound, parseInput } from './errors';
+import {
+  type BacklogSourceRow,
+  backlogFilePath,
+  findProjectByKey,
+  isMirrored,
+  loadBacklogSource,
+  loadUsers,
+  type ProjectRow,
+  shellWord,
+  sourceMirrors,
+  userRef,
+} from './internal';
 
 const { milestone, project, task } = schema;
 
@@ -67,7 +82,8 @@ async function milestoneProgress(db: DbOrTx, ids: string[]): Promise<Map<string,
       canceled: countWhere(sql`${task.status} = 'canceled'`),
     })
     .from(task)
-    .where(inArray(task.milestoneId, ids))
+    // Hidden tasks (file gone from Backlog.md) do not count.
+    .where(and(inArray(task.milestoneId, ids), isNull(task.hiddenAt)))
     .groupBy(task.milestoneId);
   for (const { milestoneId, ...progress } of rows) if (milestoneId) result.set(milestoneId, progress);
   return result;
@@ -80,6 +96,9 @@ async function toMilestones(
   clock: ClockContext,
 ): Promise<MilestoneWithProgress[]> {
   const today = todayIn(clock);
+  const locked: MilestoneOwnedField[] = (await isMirrored(db, projectRow.id))
+    ? [...MILESTONE_OWNED_FIELDS]
+    : [];
   const [progress, users] = await Promise.all([
     milestoneProgress(
       db,
@@ -102,6 +121,9 @@ async function toMilestones(
       status: row.status,
       completedAt: row.completedAt,
       createdBy: userRef(creator),
+      backlogId: row.backlogId,
+      locked,
+      hidden: row.hiddenAt !== null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       progress: progress.get(row.id) ?? EMPTY_PROGRESS,
@@ -125,6 +147,54 @@ function requireMilestones(projectRow: ProjectRow): void {
   if (!projectRow.usesMilestones) {
     throw new Conflict(`${projectRow.key} does not use milestones. Turn them on in the project settings.`);
   }
+}
+
+/** How a MilestoneMirrored message names each owned field. */
+const OWNED_FIELD_LABELS: Record<MilestoneOwnedField, string> = {
+  name: 'name',
+  description: 'description',
+  targetDate: 'target date',
+  status: 'status',
+};
+
+/** MilestoneMirrored for a new milestone in a mirrored project: milestones are added in Backlog.md. */
+function milestoneCreateRefused(projectRow: ProjectRow, name: string, targetDate: string | null | undefined) {
+  const due = targetDate ? ` --due-date ${targetDate}` : '';
+  return new MilestoneMirrored(
+    `Milestones in ${projectRow.name} come from Backlog.md. Run backlog milestone add and push. It shows up here after the next refresh.`,
+    { hint: `backlog milestone add ${shellWord(name)}${due}` },
+  );
+}
+
+/**
+ * MilestoneMirrored for a change (`field`) or the deletion (field undefined) of a milestone of a
+ * mirrored project, with its file, Backlog.md id and a hint. Hints use Backlog.md's milestone
+ * commands (rename, archive, remove) where one exists.
+ */
+async function milestoneMirrored(
+  db: DbOrTx,
+  source: BacklogSourceRow,
+  row: MilestoneRow,
+  change: { field: MilestoneOwnedField; to: string | null } | null,
+): Promise<MilestoneMirrored> {
+  const file = await backlogFilePath(db, source, { milestoneId: row.id });
+  const id = shellWord(row.backlogId ?? row.name);
+  let hint: string;
+  if (!change) hint = `backlog milestone remove ${id}`;
+  else if (change.field === 'name') hint = `backlog milestone rename ${id} ${shellWord(change.to ?? '')}`;
+  else if (change.field === 'status' && change.to === 'completed') hint = `backlog milestone archive ${id}`;
+  else if (change.field === 'status') hint = 'Move the milestone file out of the archive and push';
+  else if (change.field === 'targetDate') hint = 'Change due_date in the milestone file and push';
+  else hint = 'Change the Description section of the milestone file and push';
+  const message = change
+    ? `${row.name} is mirrored from Backlog.md, so its ${OWNED_FIELD_LABELS[change.field]} can't change here`
+    : `${row.name} is mirrored from Backlog.md, so it can't be deleted here`;
+  return new MilestoneMirrored(message, {
+    ...(change ? { field: change.field } : {}),
+    ...(file ? { file } : {}),
+    ...(row.backlogId ? { backlogId: row.backlogId } : {}),
+    hint,
+  });
 }
 
 function nameTaken(name: string): Conflict {
@@ -157,7 +227,10 @@ async function findMilestone(
 // Read
 // ---------------------------------------------------------------------------
 
-/** A project's milestones with progress, by target date (none last), then name. */
+/**
+ * A project's milestones with progress, by target date (none last), then name. Milestones whose
+ * Backlog.md file is gone (hidden) are left out; getMilestone still finds them.
+ */
 export async function listMilestones(
   ctx: MilestoneContext,
   actor: Actor,
@@ -171,6 +244,7 @@ export async function listMilestones(
     .where(
       and(
         eq(milestone.projectId, projectRow.id),
+        isNull(milestone.hiddenAt),
         parsed.status ? inArray(milestone.status, parsed.status) : undefined,
       ),
     )
@@ -192,7 +266,10 @@ export async function getMilestone(
 // Write
 // ---------------------------------------------------------------------------
 
-/** Creates a Planned milestone. Conflict when the name is taken in the project (ignoring case). */
+/**
+ * Creates a Planned milestone. Conflict when the name is taken in the project (ignoring case);
+ * MilestoneMirrored when the project mirrors Backlog.md.
+ */
 export async function createMilestone(
   ctx: MilestoneContext,
   actor: Actor,
@@ -202,6 +279,9 @@ export async function createMilestone(
   const projectRow = await findProjectByKey(ctx.db, actor, parsed.project);
   authorize(actor, 'task.write', { type: 'project', projectId: projectRow.id });
   requireMilestones(projectRow);
+  if (await isMirrored(ctx.db, projectRow.id)) {
+    throw milestoneCreateRefused(projectRow, parsed.name, parsed.targetDate);
+  }
   try {
     const [row] = await ctx.db
       .insert(milestone)
@@ -224,7 +304,8 @@ export async function createMilestone(
 
 /**
  * Changes name, description, target date or status. Completed is set by hand only; any other
- * status on a Completed milestone reopens it as Active.
+ * status on a Completed milestone reopens it as Active. MilestoneMirrored for a real change in a
+ * project that mirrors Backlog.md (sending the stored values changes nothing and passes).
  */
 export async function updateMilestone(
   ctx: MilestoneContext,
@@ -261,6 +342,17 @@ export async function updateMilestone(
         }
       }
       if (Object.keys(set).length === 0) return toMilestone(tx, projectRow, current, ctx);
+      const source = await loadBacklogSource(tx, projectRow.id);
+      if (sourceMirrors(source)) {
+        const field = MILESTONE_OWNED_FIELDS.find(
+          (name) => name in set || (name === 'status' && 'completedAt' in set),
+        );
+        const to = field ? ((set as Record<string, unknown>)[field] as string | null | undefined) : undefined;
+        throw await milestoneMirrored(tx, source as BacklogSourceRow, current, {
+          field: field ?? 'status',
+          to: to ?? null,
+        });
+      }
 
       const [row] = await tx.update(milestone).set(set).where(eq(milestone.id, current.id)).returning();
       if (!row) throw new Error('milestone update returned no row');
@@ -274,7 +366,7 @@ export async function updateMilestone(
 
 /**
  * Deletes a milestone. Its tasks lose it, each with a task.updated activity entry, in the same
- * transaction.
+ * transaction. MilestoneMirrored when the project mirrors Backlog.md.
  */
 export async function deleteMilestone(
   ctx: MilestoneContext,
@@ -288,6 +380,8 @@ export async function deleteMilestone(
     });
     authorize(actor, 'task.write', { type: 'project', projectId: projectRow.id });
     requireMilestones(projectRow);
+    const source = await loadBacklogSource(tx, projectRow.id);
+    if (sourceMirrors(source)) throw await milestoneMirrored(tx, source as BacklogSourceRow, current, null);
 
     const cleared = await tx
       .update(task)

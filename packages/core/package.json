@@ -14,8 +14,10 @@
   "dependencies": {
     "@opentelemetry/api": "1.10.0",
     "@pm/auth": "workspace:*",
+    "@pm/backlog-md": "workspace:*",
     "@pm/contracts": "workspace:*",
     "@pm/db": "workspace:*",
+    "@pm/git-providers": "workspace:*",
     "better-auth": "1.7.12",
     "drizzle-orm": "1.0.0-rc.5",
     "pg-boss": "12.38.0",

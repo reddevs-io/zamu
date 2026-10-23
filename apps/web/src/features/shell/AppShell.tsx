@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
+import { type ReactNode, useCallback } from 'react';
+import { createRefusalText, isMirrored } from '~/features/project-header/mirror';
 import { NewProjectDialogHost } from '~/features/projects/NewProjectDialogHost';
 import { meQuery, projectsQuery } from '~/features/projects/queries';
 import { QuickCreateDialog } from '~/features/tasks/QuickCreateDialog';
@@ -32,11 +33,22 @@ export interface AppShellProps {
 /**
  * Signed-in shell: the rail with the account menu, the global shortcuts (C quick create, P new project,
  * / page search, G then D for the dashboard, G then M for My tasks) and the dialogs they open. Pages render
- * inside the content area.
+ * inside the content area. Quick create refuses projects whose tasks come from Backlog.md, with the New
+ * button's tooltip text.
  */
 export function AppShell({ user, children }: AppShellProps) {
+  const queryClient = useQueryClient();
+  const refuse = useCallback(
+    (projectKey: string) => {
+      const project = queryClient
+        .getQueryData(projectsQuery().queryKey)
+        ?.items.find((item) => item.key === projectKey);
+      return project && isMirrored(project) ? createRefusalText(project.name) : null;
+    },
+    [queryClient],
+  );
   return (
-    <QuickCreateProvider>
+    <QuickCreateProvider refuse={refuse}>
       <NewProjectProvider>
         <PageSearchProvider>
           <ShellFrame user={user}>{children}</ShellFrame>
@@ -102,6 +114,7 @@ function ShellFrame({ user, children }: AppShellProps) {
             openCount: project.openCount,
             href: projectHref(project.key),
             isCurrent: project.key === currentKey,
+            mirrored: isMirrored(project),
           }))}
           settings={{ href: SETTINGS_HREF, isCurrent: pathname.startsWith('/settings') }}
           user={{ name: me.data?.user.name ?? user.name }}

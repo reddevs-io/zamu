@@ -1,0 +1,28 @@
+{
+  "description": "GET /user for a token with read:user (private user schema).",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/user"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "x-ratelimit-limit": "5000",
+          "x-ratelimit-resource": "core"
+        },
+        "json": {
+          "login": "octocat",
+          "id": 1,
+          "type": "User",
+          "name": "The Octocat",
+          "public_repos": 8,
+          "total_private_repos": 3,
+          "owned_private_repos": 2
+        }
+      }
+    }
+  ]
+}

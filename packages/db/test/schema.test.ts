@@ -3,10 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Db, type Tx } from '../src/client';
 import {
   activity,
+  backlogFile,
+  backlogSource,
   comment,
   commentMention,
   cycle,
   cycleRollover,
+  gitConnection,
   milestone,
   organization,
   project,
@@ -65,10 +68,13 @@ describe('schema on a throwaway database', () => {
       'account',
       'activity',
       'apikey',
+      'backlog_file',
+      'backlog_source',
       'comment',
       'comment_mention',
       'cycle',
       'cycle_rollover',
+      'git_connection',
       'invitation',
       'member',
       'milestone',
@@ -368,6 +374,238 @@ describe('M2 schema', () => {
     const loaded = await db.query.activity.findFirst({ where: { id: entry?.id }, with: { actor: true } });
     expect(loaded?.actor).toBeNull();
     expect(loaded?.type).toBe('cycle.ended');
+  });
+});
+
+describe('M3 schema', () => {
+  let database: TestDatabase;
+  let db: Db;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    db = database.db;
+  });
+
+  afterAll(async () => {
+    await database?.drop();
+  });
+
+  async function newConnection(world: Awaited<ReturnType<typeof seed>>, name: string, host = 'gitlab.com') {
+    const [row] = await db
+      .insert(gitConnection)
+      .values({
+        workspaceId: world.workspace.id,
+        name,
+        provider: 'gitlab',
+        host,
+        apiBaseUrl: `https://${host}/api/v4`,
+        tokenCiphertext: 'v1:AAAA',
+        tokenHint: 'xyz',
+        createdById: world.owner.id,
+      })
+      .returning();
+    if (!row) throw new Error('connection insert failed');
+    return row;
+  }
+
+  async function newSource(world: Awaited<ReturnType<typeof seed>>, connectionId: string | null) {
+    const [row] = await db
+      .insert(backlogSource)
+      .values({
+        projectId: world.pay.id,
+        connectionId,
+        mode: 'mirror',
+        webhookId: `wh_${crypto.randomUUID()}`,
+        createdById: world.owner.id,
+      })
+      .returning();
+    if (!row) throw new Error('source insert failed');
+    return row;
+  }
+
+  it('stores connections with unique names per workspace and checked enumerations', async () => {
+    const world = await seed(db);
+    const connection = await newConnection(world, 'GitLab · reddevs');
+    expect(connection).toMatchObject({ status: 'unchecked', checkedAt: null, checkedLogin: null });
+    expect(await pgErrorCode(newConnection(world, 'gitlab · REDDEVS'))).toBe('23505');
+    expect(await pgErrorCode(newConnection(world, 'Upper host', 'GitLab.com'))).toBe('23514');
+    expect(
+      await pgErrorCode(
+        db.execute(sql`update git_connection set provider = 'bitbucket' where id = ${connection.id}`),
+      ),
+    ).toBe('23514');
+    expect(
+      await pgErrorCode(
+        db.execute(sql`update git_connection set status = 'broken' where id = ${connection.id}`),
+      ),
+    ).toBe('23514');
+    const other = await seed(db);
+    await expect(newConnection(other, 'GitLab · reddevs')).resolves.toBeTruthy();
+  });
+
+  it('keeps one source per project, defaults its state and pauses it when the connection goes', async () => {
+    const world = await seed(db);
+    const connection = await newConnection(world, 'Forgejo');
+    const source = await newSource(world, connection.id);
+    expect(source).toMatchObject({
+      state: 'setup',
+      mappings: { status: [], priority: [], assignee: [] },
+      warnings: [],
+      lastTrigger: null,
+      detachedAt: null,
+    });
+    expect(await pgErrorCode(newSource(world, connection.id))).toBe('23505');
+    expect(
+      await pgErrorCode(db.execute(sql`update backlog_source set mode = 'sync' where id = ${source.id}`)),
+    ).toBe('23514');
+    expect(
+      await pgErrorCode(
+        db.execute(sql`update backlog_source set last_trigger = 'cron' where id = ${source.id}`),
+      ),
+    ).toBe('23514');
+    // detached and detached_at go together.
+    expect(
+      await pgErrorCode(
+        db.execute(sql`update backlog_source set state = 'detached' where id = ${source.id}`),
+      ),
+    ).toBe('23514');
+    await db.execute(
+      sql`update backlog_source set state = 'detached', detached_at = now() where id = ${source.id}`,
+    );
+
+    await db.delete(gitConnection).where(eq(gitConnection.id, connection.id));
+    const loaded = await db.query.project.findFirst({
+      where: { id: world.pay.id },
+      with: { backlogSource: { with: { connection: true } } },
+    });
+    expect(loaded?.backlogSource?.connectionId).toBeNull();
+    expect(loaded?.backlogSource?.connection).toBeNull();
+  });
+
+  it('tracks files per source and lets tasks carry Backlog.md keys, data and hiding', async () => {
+    const world = await seed(db);
+    const source = await newSource(world, null);
+    const [parent] = await db
+      .insert(task)
+      .values({
+        projectId: world.pay.id,
+        number: 786,
+        title: 'Retry webhooks',
+        createdById: world.owner.id,
+        backlogId: 'BACK-786',
+        backlogData: { labels: ['webhooks'] },
+      })
+      .returning();
+    const [sub] = await db
+      .insert(task)
+      .values({
+        projectId: world.pay.id,
+        number: 786,
+        keySuffix: '1',
+        title: 'Honour Retry-After',
+        createdById: world.owner.id,
+        backlogId: 'BACK-786.1',
+        hiddenAt: new Date(),
+      })
+      .returning();
+    if (!parent || !sub) throw new Error('task insert failed');
+    expect(parent.keySuffix).toBeNull();
+    expect(parent.backlogData).toEqual({ labels: ['webhooks'] });
+    expect(
+      await pgErrorCode(
+        db
+          .insert(task)
+          .values({ projectId: world.pay.id, number: 786, title: 'Dup', createdById: world.owner.id }),
+      ),
+    ).toBe('23505');
+
+    await db.insert(backlogFile).values([
+      { sourceId: source.id, path: 'backlog/config.yml', blobSha: 'a1', kind: 'config' },
+      {
+        sourceId: source.id,
+        path: 'backlog/tasks/back-786.1 - Honour.md',
+        blobSha: 'b2',
+        kind: 'task',
+        backlogId: 'BACK-786.1',
+        taskId: sub.id,
+      },
+    ]);
+    expect(
+      await pgErrorCode(
+        db
+          .insert(backlogFile)
+          .values({ sourceId: source.id, path: 'backlog/config.yml', blobSha: 'c3', kind: 'config' }),
+      ),
+    ).toBe('23505');
+    expect(
+      await pgErrorCode(
+        db
+          .insert(backlogFile)
+          .values({ sourceId: source.id, path: 'backlog/docs/a.md', blobSha: 'd4', kind: 'doc' as 'task' }),
+      ),
+    ).toBe('23514');
+
+    const files = await db.query.backlogSource.findFirst({
+      where: { id: source.id },
+      with: { files: { with: { task: true } } },
+    });
+    expect(files?.files.find((file) => file.kind === 'task')?.task?.backlogId).toBe('BACK-786.1');
+
+    // Deleting the task keeps the file row (it may be re-linked by the next refresh).
+    await db.delete(task).where(eq(task.id, sub.id));
+    const after = await db.query.backlogFile.findMany({ where: { sourceId: source.id } });
+    expect(after).toHaveLength(2);
+    expect(after.every((file) => file.taskId === null)).toBe(true);
+
+    // Removing the project removes its source and files.
+    await db.delete(project).where(eq(project.id, world.pay.id));
+    expect(await db.query.backlogFile.findMany({ where: { sourceId: source.id } })).toEqual([]);
+  });
+
+  it('records activity origin and project-level rows without a task', async () => {
+    const world = await seed(db);
+    const [row] = await db
+      .insert(activity)
+      .values({
+        workspaceId: world.workspace.id,
+        projectId: world.pay.id,
+        taskId: null,
+        actorId: null,
+        type: 'project.backlog_imported',
+        origin: 'backlog',
+        originRef: 'a1b2c3d4',
+        changes: [{ field: 'tasks', from: null, to: 412 }],
+      })
+      .returning();
+    expect(row).toMatchObject({ origin: 'backlog', originRef: 'a1b2c3d4', taskId: null });
+    const [plain] = await db
+      .insert(activity)
+      .values({
+        workspaceId: world.workspace.id,
+        projectId: world.pay.id,
+        actorId: world.owner.id,
+        type: 'task.updated',
+      })
+      .returning();
+    expect(plain).toMatchObject({ origin: 'app', originRef: null });
+    expect(
+      await pgErrorCode(db.execute(sql`update activity set origin = 'github' where id = ${plain?.id}`)),
+    ).toBe('23514');
+  });
+
+  it('lets milestones carry a Backlog.md id and hiding', async () => {
+    const world = await seed(db);
+    const [row] = await db
+      .insert(milestone)
+      .values({
+        workspaceId: world.workspace.id,
+        projectId: world.pay.id,
+        name: 'Webhooks v2',
+        createdById: world.owner.id,
+        backlogId: 'm-3',
+      })
+      .returning();
+    expect(row).toMatchObject({ backlogId: 'm-3', hiddenAt: null });
   });
 });
 

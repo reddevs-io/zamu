@@ -7,7 +7,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { configure, render, screen, waitFor, within } from '@testing-library/react';
+import { act, configure, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageSearchProvider } from '~/features/shell/page-search';
@@ -308,5 +308,50 @@ describe('board', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/filtered: Cycle 12, assigned to agents/)).toBeInTheDocument();
+  });
+});
+
+describe('board of a project mirrored from Backlog.md', () => {
+  beforeEach(() => {
+    api.current = createFakeBoardApi({ mirrored: true });
+  });
+
+  it('explains instead of changing status with Shift+L, and still reorders with Shift+J', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await screen.findByText('Card 4');
+    await user.keyboard('jl');
+    await waitFor(() => expect(focusedKey()).toBe('PAY-2'));
+
+    await user.keyboard('{Shift>}L{/Shift}');
+    const toast = await screen.findByRole('status');
+    expect(toast).toHaveTextContent('PAY-2 stays in Todo: its status comes from Backlog.md.');
+    expect(toast).toHaveTextContent('reorders');
+    expect(keysIn(/^Todo/)).toEqual(['PAY-2', 'PAY-3']);
+    expect(api.current?.calls.update).toHaveLength(0);
+
+    await user.keyboard('{Shift>}J{/Shift}');
+    await waitFor(() => expect(api.current?.calls.update).toHaveLength(1));
+    expect(api.current?.calls.update[0]).toMatchObject({ key: 'PAY-2', position: { after: 'PAY-3' } });
+    expect(api.current?.calls.update[0]).not.toHaveProperty('status');
+    await waitFor(() => expect(keysIn(/^Todo/)).toEqual(['PAY-3', 'PAY-2']));
+  });
+
+  it('shows the source button and a New that does not create, and no + on the columns', async () => {
+    const user = userEvent.setup();
+    renderBoard('/p/PAY?view=board', { quickCreate: true });
+    await screen.findByText('Card 4');
+    expect(screen.getByRole('button', { name: /^Backlog\.md: Mirroring/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New task in In progress' })).not.toBeInTheDocument();
+    const create = screen.getByRole('button', { name: /^New/ });
+    expect(create).toHaveAttribute('aria-disabled', 'true');
+    // The provider in this test has no refusal rule, so the press reaches quick create: the shell's
+    // provider turns it into the refusal toast (see hotkeys.test.tsx).
+    // Keyboard focus opens the tooltip (React Aria shows it for keyboard focus at once).
+    await user.tab();
+    act(() => create.focus());
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Tasks in Payments come from Backlog.md. Add a file under backlog/tasks/, or run backlog task create, and push. It shows up here after the next refresh.',
+    );
   });
 });

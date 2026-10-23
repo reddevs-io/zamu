@@ -1,7 +1,16 @@
 import { schema } from '@pm/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DELETED_MILESTONE_NAME, listTaskActivity, recordActivities, recordActivity } from './activity';
+import {
+  DELETED_MILESTONE_NAME,
+  listTaskActivity,
+  loadProjectActivityRows,
+  loadTaskActivityRows,
+  recordActivities,
+  recordActivity,
+  toActivities,
+  toProjectActivities,
+} from './activity';
 import { createWorld, randomProjectKey, type TestContext, testContext, type World } from './testing/fixtures';
 
 // Rows are written directly so this suite covers activity.ts on its own, whatever tasks.ts does.
@@ -137,5 +146,130 @@ describe('activity', () => {
         },
       ],
     });
+  });
+
+  it('marks app rows with origin app and no commit', async () => {
+    const task = await newTask(3);
+    await ctx.db.transaction(async (tx) => {
+      await recordActivity(tx, world.memberActor, {
+        projectId,
+        taskId: task.id,
+        type: 'task.updated',
+        changes: [{ field: 'priority', from: 'none', to: 'high' }],
+      });
+    });
+    const { items } = await listTaskActivity(ctx, world.memberActor, { key: `${projectKey}-3` });
+    expect(items[0]).toMatchObject({ origin: 'app', originRef: null, backlogFields: [] });
+  });
+
+  it('writes Backlog.md rows without an actor, with the commit and the Backlog.md-only fields', async () => {
+    const task = await newTask(4);
+    await ctx.db.transaction(async (tx) => {
+      await recordActivities(tx, null, [
+        {
+          workspaceId: world.workspaceId,
+          projectId,
+          taskId: task.id,
+          type: 'task.updated',
+          origin: 'backlog',
+          originRef: 'a1b2c3d4e5f6',
+          changes: [
+            { field: 'status', from: 'todo', to: 'in_progress' },
+            { field: 'backlog', from: null, to: ['labels', 'dependencies'] },
+          ],
+        },
+        {
+          workspaceId: world.workspaceId,
+          projectId,
+          taskId: task.id,
+          type: 'task.hidden',
+          origin: 'backlog',
+          originRef: 'b2c3d4e5f6a1',
+          changes: [],
+        },
+        {
+          workspaceId: world.workspaceId,
+          projectId,
+          taskId: task.id,
+          type: 'task.restored',
+          origin: 'backlog',
+          originRef: 'c3d4e5f6a1b2',
+          changes: [],
+        },
+      ]);
+    });
+
+    const { items } = await listTaskActivity(ctx, world.memberActor, { key: `${projectKey}-4` });
+    expect(items.map((item) => [item.type, item.origin, item.originRef])).toEqual([
+      ['task.updated', 'backlog', 'a1b2c3d4e5f6'],
+      ['task.hidden', 'backlog', 'b2c3d4e5f6a1'],
+      ['task.restored', 'backlog', 'c3d4e5f6a1b2'],
+    ]);
+    expect(items[0]).toMatchObject({
+      actor: null,
+      onBehalfOf: null,
+      changes: [{ field: 'status', from: 'todo', to: 'in_progress' }],
+      backlogFields: ['labels', 'dependencies'],
+    });
+
+    // A subtask key passes through as given.
+    const rows = await loadTaskActivityRows(ctx.db, task.id);
+    const mapped = await toActivities(ctx.db, `${projectKey}-4.1`, rows);
+    expect(mapped.every((item) => item.taskKey === `${projectKey}-4.1`)).toBe(true);
+  });
+
+  it('refuses a Backlog.md row with an actor', async () => {
+    const task = await newTask(5);
+    await expect(
+      ctx.db.transaction(async (tx) => {
+        await recordActivity(tx, world.memberActor, {
+          projectId,
+          taskId: task.id,
+          type: 'task.updated',
+          origin: 'backlog',
+          changes: [],
+        });
+      }),
+    ).rejects.toThrow(/without an actor/);
+    expect(await loadTaskActivityRows(ctx.db, task.id)).toEqual([]);
+  });
+
+  it('writes and reads project-level rows, which stay out of task activity', async () => {
+    const task = await newTask(6);
+    await ctx.db.transaction(async (tx) => {
+      await recordActivity(tx, null, {
+        workspaceId: world.workspaceId,
+        projectId,
+        type: 'project.backlog_imported',
+        origin: 'backlog',
+        originRef: 'a1b2c3d4e5f6',
+        details: { mode: 'mirror', repository: 'gitlab.com/reddevs/payments', tasks: 412, milestones: 6 },
+      });
+      await recordActivity(tx, world.ownerActor, {
+        projectId,
+        type: 'project.backlog_detached',
+        details: {},
+      });
+    });
+
+    const rows = await loadProjectActivityRows(ctx.db, projectId);
+    expect(rows.every((row) => row.taskId === null)).toBe(true);
+    const entries = await toProjectActivities(ctx.db, rows);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({
+      type: 'project.backlog_imported',
+      actor: null,
+      origin: 'backlog',
+      originRef: 'a1b2c3d4e5f6',
+      details: { mode: 'mirror', repository: 'gitlab.com/reddevs/payments', tasks: 412, milestones: 6 },
+    });
+    expect(entries[1]).toMatchObject({
+      type: 'project.backlog_detached',
+      actor: { id: world.owner.id },
+      origin: 'app',
+      originRef: null,
+      details: { mode: null, repository: null, tasks: null, milestones: null },
+    });
+    expect(await loadTaskActivityRows(ctx.db, task.id)).toEqual([]);
   });
 });

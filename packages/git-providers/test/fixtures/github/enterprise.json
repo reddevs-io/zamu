@@ -1,0 +1,22 @@
+{
+  "description": "GitHub Enterprise Server under /api/v3; a token without read:user gets the public user schema.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://ghe.example.com/api/v3/user"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "login": "hubot",
+          "id": 7,
+          "type": "User",
+          "public_repos": 4
+        }
+      }
+    }
+  ]
+}

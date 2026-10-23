@@ -2,6 +2,8 @@ import { type InferContractRouterInputs, type InferContractRouterOutputs, oc } f
 import { z } from 'zod';
 import {
   ActivityList,
+  BacklogRefreshResult,
+  BacklogSourceStatus,
   Comment,
   CommentList,
   CycleDetail,
@@ -27,6 +29,7 @@ import {
   DeleteCommentInput,
   DeleteMilestoneInput,
   EndCycleInput,
+  GetBacklogStatusInput,
   GetCycleInput,
   GetDashboardInput,
   GetMilestoneInput,
@@ -37,6 +40,7 @@ import {
   ListTaskActivityInput,
   ListTasksInput,
   ListTaskTimelineInput,
+  RefreshBacklogInput,
   UpdateCommentInput,
   UpdateCycleInput,
   UpdateMeInput,
@@ -67,6 +71,19 @@ export const apiErrors = {
   /** A task write with a stale ifUpdatedAt (409). */
   TASK_CHANGED: { status: PROBLEM_STATUS.TASK_CHANGED, data: TaskChangedProblemData },
   UNPROCESSABLE_CONTENT: { status: PROBLEM_STATUS.UNPROCESSABLE_CONTENT, data: ProblemData },
+  // M3, all 409. The *_MIRRORED bodies carry field, file, backlogId and hint.
+  /** A write to a field Backlog.md owns on a mirrored task. */
+  TASK_MIRRORED: { status: PROBLEM_STATUS.TASK_MIRRORED, data: ProblemData },
+  /** Creating, changing or deleting a milestone of a mirrored project. */
+  MILESTONE_MIRRORED: { status: PROBLEM_STATUS.MILESTONE_MIRRORED, data: ProblemData },
+  /** Creating a task in a mirrored project, or a project change the mirror forbids. */
+  PROJECT_MIRRORED: { status: PROBLEM_STATUS.PROJECT_MIRRORED, data: ProblemData },
+  /** Setting up Backlog.md on a project that has tasks. */
+  PROJECT_NOT_EMPTY: { status: PROBLEM_STATUS.PROJECT_NOT_EMPTY, data: ProblemData },
+  /** Refreshing a mirror whose connection is missing, rejected or unreachable. */
+  BACKLOG_PAUSED: { status: PROBLEM_STATUS.BACKLOG_PAUSED, data: ProblemData },
+  /** Refreshing a source that was detached. */
+  BACKLOG_DETACHED: { status: PROBLEM_STATUS.BACKLOG_DETACHED, data: ProblemData },
 };
 
 const base = oc.errors(apiErrors);
@@ -345,6 +362,34 @@ export const contract = base.prefix(API_PREFIX).router({
       })
       .input(EndCycleInput)
       .output(CycleDetail),
+  },
+  backlog: {
+    status: base
+      .route({
+        method: 'GET',
+        path: '/projects/{project}/backlog',
+        tags: ['backlog'],
+        summary: 'Get the Backlog.md source of a project',
+        description:
+          'Mode, state, repository, branch, folder, connection, last read, next poll, last webhook ' +
+          'notification, counts, mappings and problems (paged with problemsCursor). 404 when the ' +
+          'project has no Backlog.md source.',
+      })
+      .input(GetBacklogStatusInput)
+      .output(BacklogSourceStatus),
+    refresh: base
+      .route({
+        method: 'POST',
+        path: '/projects/{project}/backlog/refresh',
+        successStatus: 202,
+        tags: ['backlog'],
+        summary: 'Refresh a Backlog.md mirror',
+        description:
+          'Queues a read of the default branch (trigger cli) and returns the source state. queued is ' +
+          'false when a run was already waiting. 409 BACKLOG_PAUSED or BACKLOG_DETACHED with the reason.',
+      })
+      .input(RefreshBacklogInput)
+      .output(BacklogRefreshResult),
   },
   dashboard: {
     get: base

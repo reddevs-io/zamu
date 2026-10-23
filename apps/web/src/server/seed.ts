@@ -1,6 +1,6 @@
 // Development data: a workspace with projects PAY and WEB, a few tasks, the agent claude-dev acting
-// for the admin, and fresh API keys. Everything goes through @pm/auth and @pm/core, like real use,
-// except backdating one task for the dashboard's Stalled group.
+// for the admin, fresh API keys, and with `backlog` the mirrored Backlog.md project BACK. Everything goes
+// through @pm/auth and @pm/core, like real use, except backdating one task for the dashboard's Stalled group.
 // Re-running is safe: existing projects and the agent are kept, and new keys are issued each time.
 import {
   AcceptInvitationError,
@@ -30,10 +30,16 @@ import {
   updateTask,
 } from '@pm/core';
 import type { z } from 'zod';
+import { seedBacklogProject } from './seed-backlog';
 
 export interface SeedOptions {
   /** Also add M2 demo data to a newly created PAY: milestones, a current and a next cycle, comments. */
   planning?: boolean;
+  /**
+   * M3: also add the mirrored Backlog.md demo project BACK ("Payments API") with its git connection.
+   * Needs APP_ENCRYPTION_KEY in the context. Default false.
+   */
+  backlog?: boolean;
   /**
    * With planning, when PAY and WEB are both new: fill every dashboard queue group for the admin.
    * Adds the member Tomás Berg, a WEB cycle that ends tomorrow, two unanswered mentions of the
@@ -76,6 +82,7 @@ export const SEED_DEFAULTS = {
   memberEmail: 'tomas@example.com',
   memberPassword: 'dev-password-1234',
   planning: false,
+  backlog: false,
   dashboard: false,
 } satisfies Required<SeedOptions>;
 
@@ -295,6 +302,11 @@ export async function seedDevData(ctx: CoreContext, options: SeedOptions = {}): 
     opts.planning && opts.dashboard && created.has('PAY') && created.has('WEB')
       ? await seedDashboard(ctx, admin, agent, { name: user.name, opts })
       : null;
+
+  if (opts.backlog) {
+    const backlog = await seedBacklogProject(ctx, admin);
+    if (backlog) createdProjects.push(backlog);
+  }
 
   const adminKey = await createApiKey(ctx, admin, { name: `${user.name} dev seed`, scope: workspaceScope });
 

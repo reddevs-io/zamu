@@ -1,0 +1,19 @@
+{
+  "description": "GET /projects/:id/repository/blobs/:sha/raw returns the bytes as text/plain.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/blobs/0eb453a67ec1f140ada18146d48c089cd72d17ec/raw"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/plain; charset=utf-8"
+        },
+        "text": "#!/usr/bin/env bash\n#\n# Outputs Go packages that need testing based on changes vs origin/main.\n# Includes both directly changed packages and their reverse dependencies\n# (packages that import a changed package).\n#\n# Usage:\n#   ./scripts/changed-test-pkgs.sh          # outputs space-separated package list\n#   make test-changed                        # runs tests via this script\n#\nset -euo pipefail\n\ncd \"$(git rev-parse --show-toplevel)\"\n\nMODULE=$(go list -m)\n\n# Get changed .go files: committed branch changes (three-dot merge-base)\n# plus any uncommitted changes in the working tree.\nCOMMITTED=$(git diff --name-only origin/main...HEAD -- '*.go' 2>/dev/null || true)\nUNCOMMITTED=$(git diff --name-only HEAD -- '*.go' 2>/dev/null || true)\nCHANGED_FILES=$(printf '%s\\n%s' \"$COMMITTED\" \"$UNCOMMITTED\" | sort -u | grep -v '^$' || true)\n\nif [ -z \"$CHANGED_FILES\" ]; then\n  exit 0\nfi\n\n# Convert file paths to package import paths, skipping repo-root files\n# (root .go files like main.go belong to the root module package, but\n# testing \"./\" would run everything — handle explicitly). Drop directories\n# that no longer exist on disk (deleted packages) since `go list` cannot\n# resolve them and would fail the run.\nCHANGED_PKGS=$(echo \"$CHANGED_FILES\" \\\n  | xargs -I{} dirname {} \\\n  | sort -u \\\n  | grep -v '^\\.$' \\\n  | while IFS= read -r dir; do [ -d \"$dir\" ] && echo \"$dir\"; done \\\n  | sed \"s|^|${MODULE}/|\")\n\n# If there are root-level .go changes, add the module root package\nif echo \"$CHANGED_FILES\" | xargs -I{} dirname {} | grep -q '^\\.$'; then\n  CHANGED_PKGS=$(printf '%s\\n%s' \"$MODULE\" \"$CHANGED_PKGS\")\nfi\n\nif [ -z \"$CHANGED_PKGS\" ]; then\n  exit 0\nfi\n\n# Find reverse dependencies: packages in this module that import any changed package\nREVERSE_DEPS=$(go list -f '{{.ImportPath}} {{join .Deps \" \"}}' ./... 2>/dev/null \\\n  | while IFS= read -r line; do\n      pkg=\"${line%% *}\"\n      deps=\" ${line#* } \"\n      for cp in $CHANGED_PKGS; do\n        if echo \"$deps\" | grep -q \" $cp \"; then\n          echo \"$pkg\"\n          break\n        fi\n      done\n    done)\n\n# Combine changed packages + reverse deps, deduplicate\nprintf '%s\\n%s' \"$CHANGED_PKGS\" \"$REVERSE_DEPS\" \\\n  | sort -u \\\n  | grep -v '^$' \\\n  | tr '\\n' ' '\n"
+      }
+    }
+  ]
+}

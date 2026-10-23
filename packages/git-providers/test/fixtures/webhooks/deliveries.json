@@ -1,0 +1,142 @@
+{
+  "description": "Webhook deliveries with signatures computed for the secret below (HMAC-SHA256 hex of the exact body; GitLab sends the secret). Payloads follow the providers' webhook docs, trimmed.",
+  "source": "Hand-written from the provider API docs.",
+  "secret": "whsec-fixture-0123456789",
+  "githubDocsVector": {
+    "secret": "It's a Secret to Everybody",
+    "body": "Hello, World!",
+    "signature": "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17"
+  },
+  "deliveries": {
+    "github-push": {
+      "provider": "github",
+      "headers": {
+        "X-GitHub-Event": "push",
+        "X-GitHub-Delivery": "72d3162e-cc78-11e3-81ab-4c9367dc0958",
+        "X-Hub-Signature-256": "sha256=76a92eed5123ce4bb5753fb9371243807fd190022e12b3e2b520ca41ce5255fc",
+        "Content-Type": "application/json",
+        "User-Agent": "GitHub-Hookshot/044aadd"
+      },
+      "body": "{\"ref\":\"refs/heads/main\",\"before\":\"28e1879d029cb852e4844d9c718537df08844e03\",\"after\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"created\":false,\"deleted\":false,\"forced\":false,\"repository\":{\"full_name\":\"acme/app\"},\"head_commit\":{\"id\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"message\":\"Update task\"}}",
+      "expected": {
+        "ok": true,
+        "event": "push",
+        "eventName": "push",
+        "branch": "main",
+        "headCommit": "bffeb74224043ba2feb48d137756c8a9331c449a",
+        "deleted": false
+      }
+    },
+    "github-push-form": {
+      "provider": "github",
+      "headers": {
+        "X-GitHub-Event": "push",
+        "X-Hub-Signature-256": "sha256=079ac448156fc5431114c37763f65f3ed97b813f7e8bd444e77e89ec73976ebb",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "body": "payload=%7B%22ref%22%3A%22refs%2Fheads%2Fmain%22%2C%22before%22%3A%2228e1879d029cb852e4844d9c718537df08844e03%22%2C%22after%22%3A%22bffeb74224043ba2feb48d137756c8a9331c449a%22%2C%22created%22%3Afalse%2C%22deleted%22%3Afalse%2C%22forced%22%3Afalse%2C%22repository%22%3A%7B%22full_name%22%3A%22acme%2Fapp%22%7D%2C%22head_commit%22%3A%7B%22id%22%3A%22bffeb74224043ba2feb48d137756c8a9331c449a%22%2C%22message%22%3A%22Update%20task%22%7D%7D",
+      "expected": {
+        "ok": true,
+        "event": "push",
+        "eventName": "push",
+        "branch": "main",
+        "headCommit": "bffeb74224043ba2feb48d137756c8a9331c449a",
+        "deleted": false
+      }
+    },
+    "github-delete": {
+      "provider": "github",
+      "headers": {
+        "X-GitHub-Event": "push",
+        "X-Hub-Signature-256": "sha256=a194ebe49257f852a8a8437b3b40877c6d9900c67068f97c6542a1f227a04670"
+      },
+      "body": "{\"ref\":\"refs/heads/feature\",\"before\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"after\":\"0000000000000000000000000000000000000000\",\"created\":false,\"deleted\":true,\"head_commit\":null}",
+      "expected": {
+        "ok": true,
+        "event": "push",
+        "eventName": "push",
+        "branch": "feature",
+        "deleted": true
+      }
+    },
+    "github-ping": {
+      "provider": "github",
+      "headers": {
+        "X-GitHub-Event": "ping",
+        "X-Hub-Signature-256": "sha256=aa365384843eb797977bcea44c5f6eca1898d4b49fae0ba2c6d35670df99d9e3"
+      },
+      "body": "{\"zen\":\"Keep it logically awesome.\",\"hook_id\":123,\"hook\":{\"type\":\"Repository\",\"events\":[\"push\"]}}",
+      "expected": {
+        "ok": true,
+        "event": "ping",
+        "eventName": "ping"
+      }
+    },
+    "gitlab-push": {
+      "provider": "gitlab",
+      "headers": {
+        "X-Gitlab-Event": "Push Hook",
+        "X-Gitlab-Token": "whsec-fixture-0123456789",
+        "X-Gitlab-Instance": "https://gitlab.com",
+        "User-Agent": "GitLab/19.1.0"
+      },
+      "body": "{\"object_kind\":\"push\",\"event_name\":\"push\",\"before\":\"28e1879d029cb852e4844d9c718537df08844e03\",\"after\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"ref\":\"refs/heads/main\",\"checkout_sha\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"project\":{\"path_with_namespace\":\"acme/app\"}}",
+      "expected": {
+        "ok": true,
+        "event": "push",
+        "eventName": "Push Hook",
+        "branch": "main",
+        "headCommit": "bffeb74224043ba2feb48d137756c8a9331c449a",
+        "deleted": false
+      }
+    },
+    "gitlab-tag-push": {
+      "provider": "gitlab",
+      "headers": {
+        "X-Gitlab-Event": "Tag Push Hook",
+        "X-Gitlab-Token": "whsec-fixture-0123456789"
+      },
+      "body": "{\"object_kind\":\"tag_push\",\"event_name\":\"tag_push\",\"before\":\"0000000000000000000000000000000000000000\",\"after\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"ref\":\"refs/tags/v1.0.0\",\"checkout_sha\":\"bffeb74224043ba2feb48d137756c8a9331c449a\"}",
+      "expected": {
+        "ok": true,
+        "event": "other",
+        "eventName": "Tag Push Hook"
+      }
+    },
+    "forgejo-push": {
+      "provider": "gitea",
+      "headers": {
+        "X-Forgejo-Event": "push",
+        "X-Forgejo-Signature": "bfb9a3f073cd7cd6b196c05a1fd8e79e00b21baccbb29c5c310330bee814e814",
+        "X-Gitea-Event": "push",
+        "X-Gitea-Signature": "bfb9a3f073cd7cd6b196c05a1fd8e79e00b21baccbb29c5c310330bee814e814",
+        "X-Hub-Signature-256": "sha256=bfb9a3f073cd7cd6b196c05a1fd8e79e00b21baccbb29c5c310330bee814e814"
+      },
+      "body": "{\"ref\":\"refs/heads/develop\",\"before\":\"28e1879d029cb852e4844d9c718537df08844e03\",\"after\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"compare_url\":\"\",\"commits\":[],\"repository\":{\"full_name\":\"acme/app\"}}",
+      "expected": {
+        "ok": true,
+        "event": "push",
+        "eventName": "push",
+        "branch": "develop",
+        "headCommit": "bffeb74224043ba2feb48d137756c8a9331c449a",
+        "deleted": false
+      }
+    },
+    "gitea-push": {
+      "provider": "gitea",
+      "headers": {
+        "X-Gitea-Event": "push",
+        "X-Gitea-Signature": "bfb9a3f073cd7cd6b196c05a1fd8e79e00b21baccbb29c5c310330bee814e814"
+      },
+      "body": "{\"ref\":\"refs/heads/develop\",\"before\":\"28e1879d029cb852e4844d9c718537df08844e03\",\"after\":\"bffeb74224043ba2feb48d137756c8a9331c449a\",\"compare_url\":\"\",\"commits\":[],\"repository\":{\"full_name\":\"acme/app\"}}",
+      "expected": {
+        "ok": true,
+        "event": "push",
+        "eventName": "push",
+        "branch": "develop",
+        "headCommit": "bffeb74224043ba2feb48d137756c8a9331c449a",
+        "deleted": false
+      }
+    }
+  }
+}

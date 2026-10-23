@@ -25,6 +25,7 @@ export const relations = defineRelations(schema, (r) => ({
     members: r.many.member(),
     invitations: r.many.invitation(),
     projects: r.many.project(),
+    gitConnections: r.many.gitConnection(),
   },
   member: {
     organization: r.one.organization({
@@ -50,6 +51,8 @@ export const relations = defineRelations(schema, (r) => ({
     tasks: r.many.task(),
     milestones: r.many.milestone(),
     cycles: r.many.cycle(),
+    /** M3: at most one row (backlog_source.project_id is unique). */
+    backlogSource: r.one.backlogSource({ from: r.project.id, to: r.backlogSource.projectId }),
   },
   milestone: {
     project: r.one.project({ from: r.milestone.projectId, to: r.project.id, optional: false }),
@@ -60,6 +63,7 @@ export const relations = defineRelations(schema, (r) => ({
       optional: false,
     }),
     tasks: r.many.task(),
+    backlogFiles: r.many.backlogFile(),
   },
   cycle: {
     project: r.one.project({ from: r.cycle.projectId, to: r.project.id, optional: false }),
@@ -111,6 +115,7 @@ export const relations = defineRelations(schema, (r) => ({
     activity: r.many.activity(),
     comments: r.many.comment(),
     rollovers: r.many.cycleRollover(),
+    backlogFiles: r.many.backlogFile(),
   },
   activity: {
     project: r.one.project({ from: r.activity.projectId, to: r.project.id, optional: false }),
@@ -118,5 +123,41 @@ export const relations = defineRelations(schema, (r) => ({
     /** Null for system entries (the hourly job ending a cycle). */
     actor: r.one.user({ from: r.activity.actorId, to: r.user.id, alias: 'activity_actor' }),
     onBehalfOf: r.one.user({ from: r.activity.onBehalfOfId, to: r.user.id, alias: 'activity_on_behalf_of' }),
+  },
+  gitConnection: {
+    workspace: r.one.organization({
+      from: r.gitConnection.workspaceId,
+      to: r.organization.id,
+      optional: false,
+    }),
+    createdBy: r.one.user({
+      from: r.gitConnection.createdById,
+      to: r.user.id,
+      alias: 'git_connection_created_by',
+      optional: false,
+    }),
+    sources: r.many.backlogSource(),
+  },
+  backlogSource: {
+    project: r.one.project({ from: r.backlogSource.projectId, to: r.project.id, optional: false }),
+    /** Null once the connection was deleted (the source is paused). */
+    connection: r.one.gitConnection({ from: r.backlogSource.connectionId, to: r.gitConnection.id }),
+    createdBy: r.one.user({
+      from: r.backlogSource.createdById,
+      to: r.user.id,
+      alias: 'backlog_source_created_by',
+      optional: false,
+    }),
+    detachedBy: r.one.user({
+      from: r.backlogSource.detachedById,
+      to: r.user.id,
+      alias: 'backlog_source_detached_by',
+    }),
+    files: r.many.backlogFile(),
+  },
+  backlogFile: {
+    source: r.one.backlogSource({ from: r.backlogFile.sourceId, to: r.backlogSource.id, optional: false }),
+    task: r.one.task({ from: r.backlogFile.taskId, to: r.task.id }),
+    milestone: r.one.milestone({ from: r.backlogFile.milestoneId, to: r.milestone.id }),
   },
 }));

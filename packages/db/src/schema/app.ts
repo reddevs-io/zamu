@@ -1,5 +1,6 @@
 // Application tables: projects, tasks, milestones, cycles, comments and activity.
-// See section 5 "Domain model" of the M1 plan and section 5 "Domain model changes" of the M2 plan.
+// See section 5 "Domain model" of the M1 plan, section 5 "Domain model changes" of the M2 plan and
+// section 5 "Domain model and behaviour" of the M3 plan (Backlog.md tables live in ./backlog).
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -16,6 +17,7 @@ import {
   smallint,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -28,8 +30,27 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const PRIORITY_MIN = 0;
 export const PRIORITY_MAX = 4;
 
-export const ACTIVITY_TYPES = ['task.created', 'task.updated', 'cycle.ended'] as const;
+export const ACTIVITY_TYPES = [
+  'task.created',
+  'task.updated',
+  'cycle.ended',
+  // M3. The project.* types have no task (task_id null).
+  'task.hidden',
+  'task.restored',
+  'project.backlog_imported',
+  'project.backlog_detached',
+] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
+
+/** Who wrote an activity row: the app (a person, an agent or the system) or a Backlog.md refresh. */
+export const ACTIVITY_ORIGINS = ['app', 'backlog'] as const;
+export type ActivityOrigin = (typeof ACTIVITY_ORIGINS)[number];
+
+/**
+ * task.key_suffix: the part after the number for Backlog.md subtasks, without the leading dot
+ * (`1` for PAY-786.1, `1.2` for PAY-786.1.2). Each part 1 to 99999, no leading zeros.
+ */
+export const KEY_SUFFIX_SQL_PATTERN = '^[1-9][0-9]{0,4}(\\.[1-9][0-9]{0,4})*$';
 
 /** One entry of activity.changes. */
 export interface ActivityChange {
@@ -111,11 +132,16 @@ export const milestone = pgTable(
     createdById: uuid('created_by_id')
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
+    /** M3: the Backlog.md milestone id (m-3), or the name for legacy config milestones. */
+    backlogId: text('backlog_id'),
+    /** M3: set while the milestone's file is gone from the default branch. */
+    hiddenAt: timestamp('hidden_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     uniqueIndex('milestone_projectId_name_unique').on(table.projectId, sql`lower(${table.name})`),
+    index('milestone_projectId_backlogId_idx').on(table.projectId, table.backlogId),
     check('milestone_name_check', sql`char_length(${table.name}) between 1 and 100`),
   ],
 );
@@ -167,8 +193,19 @@ export const task = pgTable(
     projectId: uuid('project_id')
       .notNull()
       .references(() => project.id, { onDelete: 'cascade' }),
-    /** Per-project counter; the task key is `${project.key}-${number}`. */
+    /**
+     * Per-project counter; the task key is `${project.key}-${number}`, plus `.${keySuffix}` when
+     * set. Mirrored tasks take the Backlog.md number.
+     */
     number: integer('number').notNull(),
+    /** M3: Backlog.md subtask suffix without the leading dot (`1`, `1.2`); null for every other task. */
+    keySuffix: text('key_suffix'),
+    /** M3: the Backlog.md id in uppercase without zero padding (BACK-786.1); kept after detach. */
+    backlogId: text('backlog_id'),
+    /** M3: the read-only Backlog.md block (fields the app has no column for). */
+    backlogData: jsonb('backlog_data').$type<Record<string, unknown>>(),
+    /** M3: set while the task's file is gone from the default branch. Hidden tasks stay out of lists. */
+    hiddenAt: timestamp('hidden_at', { withTimezone: true }),
     title: text('title').notNull(),
     /** Markdown. */
     description: text('description'),
@@ -196,14 +233,20 @@ export const task = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex('task_projectId_number_unique').on(table.projectId, table.number),
+    // NULLS NOT DISTINCT: tasks without a suffix keep the M1 rule of one task per number.
+    unique('task_projectId_number_keySuffix_unique')
+      .on(table.projectId, table.number, table.keySuffix)
+      .nullsNotDistinct(),
     index('task_projectId_status_idx').on(table.projectId, table.status),
+    index('task_projectId_backlogId_idx').on(table.projectId, table.backlogId),
+    index('task_projectId_hidden_idx').on(table.projectId).where(sql`${table.hiddenAt} is not null`),
     index('task_projectId_status_rank_idx').on(table.projectId, table.status, table.rank),
     index('task_assigneeId_idx').on(table.assigneeId),
     index('task_milestoneId_idx').on(table.milestoneId),
     index('task_cycleId_idx').on(table.cycleId),
     check('task_priority_check', sql`${table.priority} between 0 and 4`),
     check('task_number_check', sql`${table.number} >= 1`),
+    check('task_key_suffix_check', sql`${table.keySuffix} ~ ${sql.raw(`'${KEY_SUFFIX_SQL_PATTERN}'`)}`),
   ],
 );
 
@@ -217,19 +260,27 @@ export const activity = pgTable(
     projectId: uuid('project_id')
       .notNull()
       .references(() => project.id, { onDelete: 'cascade' }),
-    /** Null is reserved for project-level events; every M1 type refers to a task. */
+    /** Null for project-level events (project.backlog_imported, project.backlog_detached). */
     taskId: uuid('task_id').references(() => task.id, { onDelete: 'cascade' }),
-    /** Null means the system: the hourly job that ends cycles. */
+    /**
+     * Null means the system: the hourly job that ends cycles, or a Backlog.md refresh (origin
+     * backlog), which the UI shows as the Backlog.md actor.
+     */
     actorId: uuid('actor_id').references(() => user.id, { onDelete: 'restrict' }),
     /** The agent's responsible human; null when a person acted. */
     onBehalfOfId: uuid('on_behalf_of_id').references(() => user.id, { onDelete: 'restrict' }),
     type: text('type', { enum: ACTIVITY_TYPES }).notNull(),
     changes: jsonb('changes').$type<ActivityChange[]>().default([]).notNull(),
+    /** M3: app for everything written in the app, backlog for rows a Backlog.md refresh wrote. */
+    origin: text('origin', { enum: ACTIVITY_ORIGINS }).default('app').notNull(),
+    /** M3: the commit hash a Backlog.md refresh read; null for app rows. */
+    originRef: text('origin_ref'),
     createdAt: createdAt(),
   },
   (table) => [
     index('activity_taskId_createdAt_idx').on(table.taskId, table.createdAt),
     index('activity_projectId_createdAt_idx').on(table.projectId, table.createdAt),
+    check('activity_origin_check', sql`${table.origin} in ('app', 'backlog')`),
   ],
 );
 

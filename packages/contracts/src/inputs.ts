@@ -1,19 +1,23 @@
 import { z } from 'zod';
-import { ApiKeyScope, DashboardScope, MAX_COMMENT_LENGTH } from './entities';
+import { ApiKeyScope, BacklogMappings, DashboardScope, MAX_COMMENT_LENGTH } from './entities';
 import {
   AuthId,
+  BacklogMode,
   CalendarDate,
   CommentId,
   CycleNumber,
   CycleSelector,
   CycleState,
   cycleLengthDays,
+  GitConnectionId,
+  GitProvider,
   MAX_CYCLE_DAYS,
   MilestoneId,
   MilestoneStatus,
   Priority,
   ProjectKeyInput,
   TaskKeyInput,
+  TaskRefInput,
   TaskStatus,
   Theme,
   UserId,
@@ -83,6 +87,14 @@ export const TaskPosition = z.union(
 );
 export type TaskPosition = z.output<typeof TaskPosition>;
 
+/**
+ * M3: tasks whose Backlog.md file is gone are hidden. Lists leave them out unless asked: `only`
+ * lists just them, `include` lists them with the rest.
+ */
+export const HIDDEN_FILTERS = ['only', 'include'] as const;
+export const HiddenFilter = z.enum(HIDDEN_FILTERS);
+export type HiddenFilter = z.infer<typeof HiddenFilter>;
+
 export const TASK_LIST_ORDERS = ['list', 'board'] as const;
 /** list: status, priority desc, updated desc (M1). board: status, then rank. */
 export const TaskListOrder = z.enum(TASK_LIST_ORDERS);
@@ -137,8 +149,10 @@ export const ListTasksInput = z.object({
   milestone: MilestoneFilter.optional(),
   /** current and next resolve per project. */
   cycle: CycleFilter.optional(),
-  /** Matches the title or the task key. */
+  /** Matches the title, the task key or the Backlog.md id. */
   q: z.string().trim().max(200).optional(),
+  /** Omitted: hidden tasks are left out. */
+  hidden: HiddenFilter.optional(),
   order: TaskListOrder.default('list'),
   /** Only valid with the same order and filters it came from. */
   cursor: z.string().min(1).max(512).optional(),
@@ -147,8 +161,16 @@ export const ListTasksInput = z.object({
 });
 export type ListTasksInput = z.output<typeof ListTasksInput>;
 
+/**
+ * Narrows a Backlog.md id lookup to one project. Ids like TASK-12 repeat across repositories, so
+ * the CLI passes the project it resolved; app keys name their project already.
+ */
+const TaskRefProject = ProjectKeyInput.optional();
+
+/** `key` is an app key (PAY-786.1) or a Backlog.md id (BACK-786.1); see TaskRefInput. */
 export const GetTaskInput = z.object({
-  key: TaskKeyInput,
+  key: TaskRefInput,
+  project: TaskRefProject,
 });
 export type GetTaskInput = z.output<typeof GetTaskInput>;
 
@@ -175,7 +197,8 @@ export type CreateTaskInput = z.output<typeof CreateTaskInput>;
 
 export const UpdateTaskInput = z
   .object({
-    key: TaskKeyInput,
+    key: TaskRefInput,
+    project: TaskRefProject,
     title: TaskTitle.optional(),
     /** null clears the description. */
     description: TaskDescription.nullable().optional(),
@@ -261,7 +284,8 @@ export const ListCommentsInput = GetTaskInput;
 export type ListCommentsInput = GetTaskInput;
 
 export const CreateCommentInput = z.object({
-  key: TaskKeyInput,
+  key: TaskRefInput,
+  project: TaskRefProject,
   body: CommentBody,
 });
 export type CreateCommentInput = z.output<typeof CreateCommentInput>;
@@ -447,3 +471,215 @@ export const CreateInvitationInput = z.object({
   role: InvitationRole.default('member'),
 });
 export type CreateInvitationInput = z.output<typeof CreateInvitationInput>;
+
+// ---------------------------------------------------------------------------
+// Git connections (M3, server functions)
+// ---------------------------------------------------------------------------
+
+/** Unique per workspace ignoring case. */
+export const GitConnectionName = z.string().trim().min(1, 'Name is required').max(100);
+
+const HOST_PATTERN =
+  /^(?=.{1,253}(?::|$))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?::[1-9][0-9]{0,4})?$/;
+const HOST_MESSAGE = 'Use a host like gitlab.com or git.example.com:3000, without a path';
+
+/**
+ * A git host: lowercase name with an optional port, no scheme or path. A pasted
+ * `https://GitLab.example.com/` becomes `gitlab.example.com`.
+ */
+export const GitHost = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((value) => value.replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/\/+$/, ''))
+  .pipe(z.string().max(260).regex(HOST_PATTERN, HOST_MESSAGE));
+
+/** An access token as pasted. Read-only scopes are enough. Never echoed back. */
+export const GitToken = z
+  .string()
+  .trim()
+  .min(1, 'Paste the access token')
+  .max(4_096)
+  .regex(/^\S+$/, 'The token has spaces in it; paste it again');
+
+export const CreateGitConnectionInput = z.object({
+  provider: GitProvider,
+  host: GitHost,
+  name: GitConnectionName,
+  token: GitToken,
+});
+export type CreateGitConnectionInput = z.output<typeof CreateGitConnectionInput>;
+
+/** A new token replaces the stored one; provider and host stay (delete and re-add to change them). */
+export const UpdateGitConnectionInput = z
+  .object({
+    id: GitConnectionId,
+    name: GitConnectionName.optional(),
+    token: GitToken.optional(),
+  })
+  .refine(requireOneOf(['name', 'token']), { message: 'Change at least one of name or token' });
+export type UpdateGitConnectionInput = z.output<typeof UpdateGitConnectionInput>;
+
+export const DeleteGitConnectionInput = z.object({
+  id: GitConnectionId,
+});
+export type DeleteGitConnectionInput = z.output<typeof DeleteGitConnectionInput>;
+
+/**
+ * Tests a token without saving it (the add dialog), a saved connection, or a saved connection with
+ * a replacement token (the edit dialog). Testing a saved connection stores the result.
+ */
+export const TestGitConnectionInput = z.union(
+  [
+    z.strictObject({ provider: GitProvider, host: GitHost, token: GitToken }),
+    z.strictObject({ id: GitConnectionId, token: GitToken.optional() }),
+  ],
+  { error: 'Give a saved connection id, or a provider, host and token' },
+);
+export type TestGitConnectionInput = z.output<typeof TestGitConnectionInput>;
+
+// ---------------------------------------------------------------------------
+// Backlog.md (M3): /api/v1 routes
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_BACKLOG_PROBLEM_LIMIT = 50;
+export const MAX_BACKLOG_PROBLEM_LIMIT = 200;
+
+/** GET /projects/{project}/backlog. The problem list is paged. */
+export const GetBacklogStatusInput = z.object({
+  project: ProjectKeyInput,
+  /** From a previous page's problems.nextCursor. */
+  problemsCursor: z.string().min(1).max(512).optional(),
+  problemsLimit: z.coerce
+    .number<number>()
+    .int()
+    .min(1)
+    .max(MAX_BACKLOG_PROBLEM_LIMIT)
+    .default(DEFAULT_BACKLOG_PROBLEM_LIMIT),
+});
+export type GetBacklogStatusInput = z.output<typeof GetBacklogStatusInput>;
+
+/** POST /projects/{project}/backlog/refresh: trigger cli. */
+export const RefreshBacklogInput = z.object({
+  project: ProjectKeyInput,
+});
+export type RefreshBacklogInput = z.output<typeof RefreshBacklogInput>;
+
+// ---------------------------------------------------------------------------
+// Backlog.md (M3): setup and settings server functions
+// ---------------------------------------------------------------------------
+
+/**
+ * A Backlog.md folder relative to the repository root: backlog, .backlog, docs/backlog. Leading
+ * `./` and trailing slashes are dropped.
+ */
+export const BacklogFolder = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/^(?:\.\/)+/, '').replace(/\/+$/, ''))
+  .pipe(
+    z
+      .string()
+      .min(1, 'Name a folder, e.g. backlog')
+      .max(200)
+      .refine((value) => !value.startsWith('/'), 'Use a path inside the repository, without a leading /')
+      .refine((value) => !value.includes('\\'), 'Use / between folders')
+      .refine(
+        (value) => value.split('/').every((part) => part !== '' && part !== '.' && part !== '..'),
+        'Use a plain folder path without . or .. parts',
+      ),
+  );
+
+const BacklogProjectKey = ProjectKeyInput;
+
+/** Setup step 2: what the connection sees in the project's repository. */
+export const DetectBacklogInput = z.object({
+  projectKey: BacklogProjectKey,
+  connectionId: GitConnectionId,
+  /** Omitted: backlog_directory from backlog.config.yml, else backlog/, else .backlog/. */
+  folderOverride: BacklogFolder.optional(),
+});
+export type DetectBacklogInput = z.output<typeof DetectBacklogInput>;
+
+/**
+ * New project from Backlog.md: what the connection sees in a repository before the project exists,
+ * so the dialog can prefill the name and key from config.yml.
+ */
+export const DetectBacklogRepositoryInput = z.object({
+  /** A clone URL as typed (HTTPS or SSH); read with parseRepositoryUrl. */
+  repository: ProjectRepository.refine((value) => value !== '', 'Paste the repository URL'),
+  connectionId: GitConnectionId,
+  folderOverride: BacklogFolder.optional(),
+});
+export type DetectBacklogRepositoryInput = z.output<typeof DetectBacklogRepositoryInput>;
+
+/** Setup step 4: a dry run with the mappings from step 3. */
+export const PreviewBacklogInput = DetectBacklogInput.extend({
+  mappings: BacklogMappings,
+});
+export type PreviewBacklogInput = z.output<typeof PreviewBacklogInput>;
+
+/** Setup step 5: creates the source and enqueues the first read. Import detaches after it. */
+export const StartBacklogInput = PreviewBacklogInput.extend({
+  mode: BacklogMode,
+});
+export type StartBacklogInput = z.output<typeof StartBacklogInput>;
+
+/**
+ * New project from Backlog.md: creates the project (key defaults to the prefix when it is a valid
+ * project key) and opens setup at the mappings step.
+ */
+export const CreateProjectFromBacklogInput = z.object({
+  repository: ProjectRepository.refine((value) => value !== '', 'Paste the repository URL'),
+  connectionId: GitConnectionId,
+  name: ProjectName,
+  key: ProjectKeyInput,
+  mode: BacklogMode,
+  folderOverride: BacklogFolder.optional(),
+});
+export type CreateProjectFromBacklogInput = z.output<typeof CreateProjectFromBacklogInput>;
+
+/** Settings: new mappings, applied to every task on the next refresh. */
+export const UpdateBacklogMappingsInput = z.object({
+  projectKey: BacklogProjectKey,
+  mappings: BacklogMappings,
+});
+export type UpdateBacklogMappingsInput = z.output<typeof UpdateBacklogMappingsInput>;
+
+/** Settings: null goes back to detecting the folder. */
+export const SetBacklogFolderInput = z.object({
+  projectKey: BacklogProjectKey,
+  folderOverride: BacklogFolder.nullable(),
+});
+export type SetBacklogFolderInput = z.output<typeof SetBacklogFolderInput>;
+
+/** Settings: read through another connection (a paused mirror whose connection was deleted). */
+export const SetBacklogConnectionInput = z.object({
+  projectKey: BacklogProjectKey,
+  connectionId: GitConnectionId,
+});
+export type SetBacklogConnectionInput = z.output<typeof SetBacklogConnectionInput>;
+
+/** Settings: Refresh now (trigger manual), webhook info and status for the settings page. */
+export const BacklogProjectInput = z.object({
+  projectKey: BacklogProjectKey,
+});
+export type BacklogProjectInput = z.output<typeof BacklogProjectInput>;
+
+export const RefreshBacklogNowInput = BacklogProjectInput;
+export type RefreshBacklogNowInput = BacklogProjectInput;
+
+export const BacklogWebhookInfoInput = BacklogProjectInput;
+export type BacklogWebhookInfoInput = BacklogProjectInput;
+
+/** Detach for good. confirmKey is the project key typed by the person (any case). */
+export const DetachBacklogInput = z
+  .object({
+    projectKey: BacklogProjectKey,
+    confirmKey: z.string().trim().toUpperCase(),
+  })
+  .refine((value) => value.confirmKey === value.projectKey, {
+    path: ['confirmKey'],
+    message: 'Type the project key to confirm',
+  });
+export type DetachBacklogInput = z.output<typeof DetachBacklogInput>;

@@ -1,5 +1,5 @@
 // Worker entry point: `node --import tsx src/index.ts`. Runs until SIGTERM or SIGINT, then exits 0.
-import { isValidTimeZone } from '@pm/core';
+import { readWorkerConfig, WorkerConfigError } from './config';
 import { createLogger, isLogLevel } from './logger';
 import { startWorker, type Worker } from './worker';
 
@@ -18,20 +18,27 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  logger.fatal('DATABASE_URL is not set');
+let config: ReturnType<typeof readWorkerConfig>;
+try {
+  config = readWorkerConfig(process.env);
+} catch (error) {
+  if (!(error instanceof WorkerConfigError)) throw error;
+  for (const problem of error.problems) logger.fatal(problem);
   process.exit(1);
 }
-
-const timeZone = process.env.APP_TIME_ZONE?.trim() || 'UTC';
-if (!isValidTimeZone(timeZone)) {
-  logger.fatal('APP_TIME_ZONE is not a valid IANA time zone', { timeZone });
-  process.exit(1);
+const { databaseUrl, timeZone, encryptionKey, gitHosts } = config;
+if (!encryptionKey) {
+  logger.warn('APP_ENCRYPTION_KEY is not set: Backlog.md refreshes end paused until it is');
 }
 
 // In Docker the worker may start while Postgres is still coming up: retry for about a minute.
-const starting: Promise<Worker> = startWorker({ databaseUrl, logger, startAttempts: 6, timeZone });
+const starting: Promise<Worker> = startWorker({
+  databaseUrl,
+  logger,
+  startAttempts: 6,
+  timeZone,
+  git: { ...(encryptionKey ? { encryptionKey } : {}), gitHosts },
+});
 
 let shuttingDown = false;
 const shutdown = (signal: NodeJS.Signals) => {

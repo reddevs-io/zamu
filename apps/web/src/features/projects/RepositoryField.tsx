@@ -2,8 +2,9 @@ import { parseRepositoryUrl } from '@pm/contracts';
 import type { ReactNode, Ref } from 'react';
 import { InlineCode, TextField } from '~/ui';
 
-// The optional Repository field of the New and Edit project dialogs (M2.1 frames 2a to 3c). The hint
-// reads the URL back as the short form it matches; format errors show when the field loses focus.
+// The optional Repository field of the New project dialog and the project settings' General form
+// (M2.1 frames 2a to 3c). The hint reads the URL back as the short form it matches; format errors show
+// when the field loses focus.
 
 const codeClass = 'text-[10.5px] whitespace-nowrap text-fg';
 
@@ -37,7 +38,7 @@ export function newRepositoryHint(value: string): ReactNode {
   return matchHint(value) ?? emptyRepositoryHint();
 }
 
-/** Edit project: also mentions `pm link`, and says what saving an emptied field does. */
+/** Project settings: also mentions `pm link`, and says what saving an emptied field does. */
 export function editRepositoryHint(
   value: string,
   project: { key: string; repository: string | null },

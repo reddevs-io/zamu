@@ -1,0 +1,9 @@
+project_name: "Backlog Demo"
+backlog_directory: "planning"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: ["cli"]
+date_format: yyyy-mm-dd hh:mm
+task_prefix: "back"
+zero_padded_ids: 0
+definition_of_done: ["Tests pass"]

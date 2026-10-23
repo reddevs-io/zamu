@@ -1,0 +1,8 @@
+project_name: "Acme Shop"
+default_assignee: "@sam"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: []
+milestones: ["Beta launch", "v1.0"]
+date_format: yyyy-mm-dd
+zero_padded_ids: 3

@@ -2,19 +2,31 @@ import { MILESTONE_STATUS_LABELS, milestoneProgressRatio } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { useProjectSummary, ViewSwitch } from '~/features/project-header';
+import {
+  isMirrored,
+  MirrorCreateButton,
+  milestonesFolder,
+  useProjectSummary,
+  ViewSwitch,
+} from '~/features/project-header';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';
 import { useNow } from '~/features/tasks/clock';
 import { Markdown } from '~/features/tasks/Markdown';
 import { taskListQuery } from '~/features/tasks/queries';
 import {
   Button,
+  cn,
+  DisabledCreateButton,
   EmptyState,
   FilterBar,
+  InlineCode,
   isMilestoneFilled,
+  lockedHatch,
   MilestoneGlyph,
+  NoticeStrip,
   ProgressBar,
   Skeleton,
+  SystemActorAvatar,
   Tag,
   useHotkeys,
 } from '~/ui';
@@ -29,6 +41,8 @@ import type { PlanningTasksSearch } from './search';
 // /p/PAY/milestones/<id> (frames 17 and 18): the milestone with its progress and target, then its tasks
 // grouped by status. Edit opens the milestone dialog; New task opens quick create; Board shows the
 // project board filtered to this milestone.
+// Mirrored projects (M3): the milestone comes from a Backlog.md file, so its name, status and target
+// carry the hatch, a strip names the file's folder, and Edit and New task explain instead of acting.
 
 export interface MilestonePageProps {
   projectKey: string;
@@ -50,6 +64,9 @@ export function MilestonePage({ projectKey, milestoneId, search }: MilestonePage
 
   const projectName = project?.name ?? projectKey;
   const data = milestone.data;
+  const mirrored = isMirrored(project);
+  const locked = new Set(data?.locked ?? []);
+  const isLocked = locked.size > 0;
   const visibleTasks = useMemo(() => filterUnassigned(tasks.data?.items ?? [], search), [tasks.data, search]);
 
   const openTask = (key: string) =>
@@ -117,19 +134,58 @@ export function MilestonePage({ projectKey, milestoneId, search }: MilestonePage
         crumbs={crumbs}
         actions={
           <>
-            <Button variant="secondary" isDisabled={!data || !today} onPress={() => setEditing(true)}>
-              Edit
-            </Button>
-            <Button kbd="C" aria-keyshortcuts="c" onPress={newTask}>
-              New task
-            </Button>
+            {isLocked ? (
+              <DisabledCreateButton
+                kbd=""
+                tooltip={
+                  <>
+                    This milestone comes from Backlog.md. Change it in its file under{' '}
+                    <InlineCode>{milestonesFolder()}</InlineCode> and push.
+                  </>
+                }
+              >
+                Edit
+              </DisabledCreateButton>
+            ) : (
+              <Button variant="secondary" isDisabled={!data || !today} onPress={() => setEditing(true)}>
+                Edit
+              </Button>
+            )}
+            {mirrored ? (
+              <MirrorCreateButton projectName={projectName} onPress={newTask} aria-keyshortcuts="c">
+                New task
+              </MirrorCreateButton>
+            ) : (
+              <Button kbd="C" aria-keyshortcuts="c" onPress={newTask}>
+                New task
+              </Button>
+            )}
           </>
         }
       />
       <div className="flex shrink-0 flex-col gap-3.5 border-b border-line px-6 pt-5 pb-[18px]">
         {data ? (
           <>
-            <div className="flex min-w-0 items-center gap-3">
+            {isLocked ? (
+              <NoticeStrip marker={<SystemActorAvatar decorative />}>
+                <span className="leading-normal">
+                  Hatched fields come from Backlog.md
+                  {data.backlogId ? (
+                    <>
+                      {' '}
+                      milestone <span className="font-mono text-[11px] text-fg">{data.backlogId}</span>
+                    </>
+                  ) : null}
+                  . Change them in its file under <InlineCode>{milestonesFolder()}</InlineCode> and push.
+                </span>
+              </NoticeStrip>
+            ) : null}
+            <div
+              className={cn(
+                'flex min-w-0 items-center gap-3',
+                (locked.has('name') || locked.has('status')) && cn(lockedHatch, 'w-fit max-w-full py-1 pr-2'),
+              )}
+            >
               <MilestoneGlyph filled={isMilestoneFilled(data.status)} size={10} />
               <h1 className="m-0 truncate text-[24px] leading-tight font-semibold tracking-[-0.015em]">
                 {data.name}
@@ -157,7 +213,9 @@ export function MilestonePage({ projectKey, milestoneId, search }: MilestonePage
                 {progress?.done ?? 0} of {counted} done · {progress?.inProgress ?? 0} in progress
               </span>
               <span className="flex-1" />
-              <span className="text-muted">
+              <span
+                className={cn('text-muted', locked.has('targetDate') && cn(lockedHatch, 'px-1.5 py-0.5'))}
+              >
                 {target ? (
                   <>
                     Target <b className="font-semibold text-fg">{target}</b>

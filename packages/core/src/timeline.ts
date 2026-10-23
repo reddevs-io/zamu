@@ -19,15 +19,18 @@ function compareItems(a: TimelineItem, b: TimelineItem): number {
 /**
  * A task's history: activity entries and comments, oldest first, ties broken by id. Deleted
  * comments stay with a null body; their author is who deleted them (only authors delete).
+ * M3: the task may be addressed by its Backlog.md id. Entries a Backlog.md refresh wrote carry
+ * origin backlog, the commit in originRef and a null actor (the Backlog.md actor); a null actor
+ * with origin app is the system (the hourly cycle job). Hidden tasks keep their timeline.
  */
 export async function listTaskTimeline(
   { db }: DbContext,
   actor: Actor,
   input: z.input<typeof ListTaskTimelineInput>,
 ): Promise<Timeline> {
-  const { key } = parseInput(ListTaskTimelineInput, input);
-  const { project, task } = await findTask(db, actor, key);
-  const taskKey = formatTaskKey(project.key, task.number);
+  const { key, project: projectKey } = parseInput(ListTaskTimelineInput, input);
+  const { project, task } = await findTask(db, actor, key, { project: projectKey });
+  const taskKey = formatTaskKey(project.key, task.number, task.keySuffix);
   const [activityRows, commentRows] = await Promise.all([
     loadTaskActivityRows(db, task.id),
     loadTaskCommentRows(db, task.id),

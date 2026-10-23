@@ -133,8 +133,10 @@ e2e:
     DOCKER_TLS_CERTDIR: ""
     # Ports published by the stack live on the dind service, reachable as "docker".
     E2E_BASE_URL: http://docker:3100
-    # The upgrade test starts from the published M1 image (pulled with the job token).
+    # The upgrade test starts from the published M1 image (pulled with the job token). It builds M2.1 from
+    # commit 7eb6b7e with git archive, which needs the full history; set E2E_M2_1_IMAGE once 0.3.0 is published.
     E2E_M1_IMAGE: $CI_REGISTRY_IMAGE:0.1.1
+    GIT_DEPTH: "0"
   before_script:
     - apt-get update -qq
     - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends docker.io docker-compose-v2 docker-buildx >/dev/null

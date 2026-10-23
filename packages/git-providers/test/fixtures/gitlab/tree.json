@@ -1,0 +1,163 @@
+{
+  "description": "Folder check in the root listing, then the recursive listing over three keyset pages.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed and extended by hand.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/tree?ref=a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef&per_page=100&pagination=keyset"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": [
+          {
+            "id": "ea1bdda26579689a37598db0b74e0cf2e2149f7e",
+            "name": ".gitlab",
+            "type": "tree",
+            "path": ".gitlab",
+            "mode": "040000"
+          },
+          {
+            "id": "3140954ab12f8ec4d8684fd823e64753625e02c3",
+            "name": "cmd",
+            "type": "tree",
+            "path": "cmd",
+            "mode": "040000"
+          },
+          {
+            "id": "657e39c209596f59d89ad43ed330f110de54bdc3",
+            "name": "docs",
+            "type": "tree",
+            "path": "docs",
+            "mode": "040000"
+          },
+          {
+            "id": "f49a1b477dc7b4b5c6b1aaf0e92ab70a35d8a21b",
+            "name": "scripts",
+            "type": "tree",
+            "path": "scripts",
+            "mode": "040000"
+          },
+          {
+            "id": "1fb09b8887475a88cd811036c3f066f8de8c947f",
+            "name": "README.md",
+            "type": "blob",
+            "path": "README.md",
+            "mode": "100644"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/tree?ref=a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef&path=scripts&recursive=true&per_page=100&pagination=keyset"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "link": "<https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/tree?id=gitlab-org%2Fcli&page=1&page_token=eyJmaWxlX25hbWUiOiJzY3JpcHRzL2NvbW1pdC1saW50IiwidHJlZV9vaWQiOiJmNDlhMWI0NzdkYzdiNGI1YzZiMWFhZjBlOTJhYjcwYTM1ZDhhMjFiIn0%3D&pagination=keyset&path=scripts&per_page=3&recursive=true&ref=a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef&with_last_commit=false>; rel=\"next\""
+        },
+        "json": [
+          {
+            "id": "ef89b03d1ab233731a39c150d867dd04491d2ded",
+            "name": "comment-overlap",
+            "type": "tree",
+            "path": "scripts/comment-overlap",
+            "mode": "040000"
+          },
+          {
+            "id": "696be8fd02ce9fe47287a54fb2691edf02903f4d",
+            "name": "comment-ratio",
+            "type": "tree",
+            "path": "scripts/comment-ratio",
+            "mode": "040000"
+          },
+          {
+            "id": "8fb58379d3f79f76b9fda5b183c6b3706eb37e1c",
+            "name": "commit-lint",
+            "type": "tree",
+            "path": "scripts/commit-lint",
+            "mode": "040000"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/tree?id=gitlab-org%2Fcli&page=1&page_token=eyJmaWxlX25hbWUiOiJzY3JpcHRzL2NvbW1pdC1saW50IiwidHJlZV9vaWQiOiJmNDlhMWI0NzdkYzdiNGI1YzZiMWFhZjBlOTJhYjcwYTM1ZDhhMjFiIn0%3D&pagination=keyset&path=scripts&per_page=3&recursive=true&ref=a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef&with_last_commit=false"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "link": "<https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/tree?id=gitlab-org%2Fcli&page=1&page_token=eyJmaWxlX25hbWUiOiJzY3JpcHRzL3NraWxscyIsInRyZWVfb2lkIjoiZjQ5YTFiNDc3ZGM3YjRiNWM2YjFhYWYwZTkyYWI3MGEzNWQ4YTIxYiJ9&pagination=keyset&path=scripts&per_page=3&recursive=true&ref=a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef&with_last_commit=false>; rel=\"next\""
+        },
+        "json": [
+          {
+            "id": "1215c0a27f1ea813cb3e842ff9a56b59bf0769bb",
+            "name": "govulncheck-to-gitlab",
+            "type": "tree",
+            "path": "scripts/govulncheck-to-gitlab",
+            "mode": "040000"
+          },
+          {
+            "id": "98567a556ce616e59cb22e0c15c1af91e98779c0",
+            "name": "release",
+            "type": "tree",
+            "path": "scripts/release",
+            "mode": "040000"
+          },
+          {
+            "id": "1ee282f77a507d27b9dd8b075e79eb909b6b2a01",
+            "name": "skills",
+            "type": "tree",
+            "path": "scripts/skills",
+            "mode": "040000"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/tree?id=gitlab-org%2Fcli&page=1&page_token=eyJmaWxlX25hbWUiOiJzY3JpcHRzL3NraWxscyIsInRyZWVfb2lkIjoiZjQ5YTFiNDc3ZGM3YjRiNWM2YjFhYWYwZTkyYWI3MGEzNWQ4YTIxYiJ9&pagination=keyset&path=scripts&per_page=3&recursive=true&ref=a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef&with_last_commit=false"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": [
+          {
+            "id": "6fa64cadf880782844e1c06b89a552efc119532a",
+            "name": "bootstrap.sh",
+            "type": "blob",
+            "path": "scripts/bootstrap.sh",
+            "mode": "100755"
+          },
+          {
+            "id": "0eb453a67ec1f140ada18146d48c089cd72d17ec",
+            "name": "changed-test-pkgs.sh",
+            "type": "blob",
+            "path": "scripts/changed-test-pkgs.sh",
+            "mode": "100755"
+          },
+          {
+            "id": "dfa6ce431acd893317971096b49b20558065b6e8",
+            "name": "changelog",
+            "type": "blob",
+            "path": "scripts/changelog",
+            "mode": "100755"
+          },
+          {
+            "id": "d350a7e5fef032b49d98b541ce9a850ee1a15fd8",
+            "name": "check-go-version.sh",
+            "type": "blob",
+            "path": "scripts/check-go-version.sh",
+            "mode": "100755"
+          }
+        ]
+      }
+    }
+  ]
+}

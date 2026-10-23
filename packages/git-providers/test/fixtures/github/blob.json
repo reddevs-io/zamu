@@ -1,0 +1,24 @@
+{
+  "description": "GET /repos/{owner}/{repo}/git/blobs/{file_sha}: base64 content with line breaks.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/0ce5121b11a1529729c96bff8616ec5ba65857ea"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "0ce5121b11a1529729c96bff8616ec5ba65857ea",
+          "node_id": "B_kwDOO2LIE9oAKDBjZTUxMjFiMTFhMTUyOTcyOWM5NmJmZjg2MTZlYzViYTY1ODU3ZWE",
+          "size": 93,
+          "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/0ce5121b11a1529729c96bff8616ec5ba65857ea",
+          "content": "IyBBcmNoaXZlZCBEcmFmdHMKCkRyYWZ0cyB0aGF0IHdlcmUgcmVtb3ZlZCBm\ncm9tIHRoZSBkcmFmdHMgbGlzdCBidXQgYXJlIGtlcHQgZm9yIHJlZmVyZW5j\nZS4K\n",
+          "encoding": "base64"
+        }
+      }
+    }
+  ]
+}

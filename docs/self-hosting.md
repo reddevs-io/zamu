@@ -2,12 +2,12 @@
 
 project-management runs as one Docker image with three roles, started by `docker-compose.yml`:
 
-| Service   | What it does                                                                |
-| --------- | --------------------------------------------------------------------------- |
-| `db`      | Postgres 18. The only service that keeps state, in the `pgdata` volume.     |
-| `migrate` | Applies database migrations, then exits. Runs on every `docker compose up`. |
-| `web`     | The web app, the REST API (`/api/v1`) and sign-in. Listens on port 3000.    |
-| `worker`  | Background jobs (pg-boss): ends due cycles hourly, expires invitations.     |
+| Service   | What it does                                                                               |
+| --------- | ------------------------------------------------------------------------------------------ |
+| `db`      | Postgres 18. The only service that keeps state, in the `pgdata` volume.                    |
+| `migrate` | Applies database migrations, then exits. Runs on every `docker compose up`.                |
+| `web`     | The web app, the REST API (`/api/v1`) and sign-in. Listens on port 3000.                   |
+| `worker`  | Background jobs (pg-boss): ends due cycles, expires invitations, reads Backlog.md mirrors. |
 
 `web` and `worker` start only after `migrate` has finished without errors.
 
@@ -28,17 +28,20 @@ cp .env.example .env
 
 Edit `.env`:
 
-| Variable             | Required | Default                    | Meaning                                                                                                |
-| -------------------- | -------- | -------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `BETTER_AUTH_SECRET` | yes      | none                       | Signs sessions. 32 characters or more: `openssl rand -base64 32`. Compose refuses to start without it. |
-| `BETTER_AUTH_URL`    | no       | `http://localhost:3000`    | The URL people type in their browser. Sign-in fails when it does not match.                            |
-| `PUBLIC_URL`         | no       | `http://localhost:3000`    | Base URL for invitation links. Use the same value as `BETTER_AUTH_URL`.                                |
-| `PORT`               | no       | `3000`                     | Host port the web app is published on.                                                                 |
-| `POSTGRES_USER`      | no       | `postgres`                 | Database user.                                                                                         |
-| `POSTGRES_PASSWORD`  | no       | `postgres`                 | Database password. Set it before the first start: Postgres only reads it when it creates the volume.   |
-| `POSTGRES_DB`        | no       | `project_management`       | Database name.                                                                                         |
-| `PM_IMAGE`           | no       | `project-management:local` | Tag of the image compose builds and runs.                                                              |
-| `APP_TIME_ZONE`      | no       | `UTC`                      | IANA time zone, such as `Europe/Brussels`. Decides when "today" starts for cycles. See below.          |
+| Variable                  | Required | Default                    | Meaning                                                                                                                       |
+| ------------------------- | -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_SECRET`      | yes      | none                       | Signs sessions. 32 characters or more: `openssl rand -base64 32`. Compose refuses to start without it.                        |
+| `BETTER_AUTH_URL`         | no       | `http://localhost:3000`    | The URL people type in their browser. Sign-in fails when it does not match.                                                   |
+| `PUBLIC_URL`              | no       | `http://localhost:3000`    | Base URL for invitation links. Use the same value as `BETTER_AUTH_URL`.                                                       |
+| `PORT`                    | no       | `3000`                     | Host port the web app is published on.                                                                                        |
+| `POSTGRES_USER`           | no       | `postgres`                 | Database user.                                                                                                                |
+| `POSTGRES_PASSWORD`       | no       | `postgres`                 | Database password. Set it before the first start: Postgres only reads it when it creates the volume.                          |
+| `POSTGRES_DB`             | no       | `project_management`       | Database name.                                                                                                                |
+| `PM_IMAGE`                | no       | `project-management:local` | Tag of the image compose builds and runs.                                                                                     |
+| `APP_TIME_ZONE`           | no       | `UTC`                      | IANA time zone, such as `Europe/Brussels`. Decides when "today" starts for cycles. See below.                                 |
+| `APP_ENCRYPTION_KEY`      | no       | none                       | Encrypts git tokens. Without it, git connections and Backlog.md mirrors are off. See [below](#git-connections-and-backlogmd). |
+| `GIT_ALLOW_PRIVATE_HOSTS` | no       | `false`                    | `true` lets git connections reach hosts on private networks.                                                                  |
+| `GIT_HTTP_HOSTS`          | no       | none                       | Comma-separated git hosts reached over plain HTTP. For test containers only.                                                  |
 
 `DATABASE_URL` and `TEST_DATABASE_URL` in `.env` are for local development. Compose ignores them: the
 containers reach Postgres as `db` on their own network.
@@ -55,6 +58,110 @@ after midnight Brussels time. The web app uses the same zone for days left and o
 
 The zone is one setting for the whole server. A team spread over several zones sees cycles end at that
 zone's midnight. An invalid name stops both services at start: `docker compose logs web worker` names it.
+
+## Git connections and Backlog.md
+
+Projects can mirror or import the tasks a repository keeps in a Backlog.md folder (see
+[backlog-md.md](backlog-md.md)). The server reads the files through the git host's API with an access token
+that an admin saves in Settings > Git connections. Four settings matter for that.
+
+### APP_ENCRYPTION_KEY
+
+The server encrypts the access tokens and the webhook secrets in the database with this key (AES-256-GCM). It
+is 32 random bytes, base64-encoded:
+
+```sh
+openssl rand -base64 32
+```
+
+Put it in `.env` and run `docker compose up -d`. The web app and the worker both need it, and compose gives
+it to both.
+
+Without the key the server starts and works as before, but the Git connections page and the Backlog.md setup
+say that the key must be set, and nobody can add a connection. Mirrors that already exist pause at their next
+refresh. A key that is set but is not base64, or does not decode to 32 bytes, stops the web app and the worker
+at start; `docker compose logs web worker` says why.
+
+Back the key up, and keep it apart from the database dumps: a dump plus its key gives access to every saved
+token. A database restored without its key still runs, but the saved tokens cannot be read. If the key is
+lost or changed:
+- mirrors pause with "A stored secret cannot be read with the current APP_ENCRYPTION_KEY";
+- an admin edits each connection in Settings > Git connections and pastes the token again, which resumes its
+  mirrors;
+- webhooks of existing mirrors stop working, because their secrets cannot be read and there is no way yet to
+  issue a new one. Those mirrors still refresh every hour, on Refresh now, and with `pm backlog refresh`.
+
+There is no key rotation. Keep the same key for the life of the server.
+
+### Private networks: GIT_ALLOW_PRIVATE_HOSTS
+
+A connection makes the server call whatever host an admin typed. By default, every request first checks that
+the host resolves to a public address, so a connection cannot reach services inside your network. For a
+self-hosted GitLab, Gitea or Forgejo on a private network, set:
+
+```sh
+GIT_ALLOW_PRIVATE_HOSTS=true
+```
+
+Loopback and private ranges are then allowed. Link-local addresses (`169.254.0.0/16`) and cloud metadata
+addresses (`fd00:ec2::254`) are always refused. The check runs before every request and every redirect.
+
+### Plain HTTP: GIT_HTTP_HOSTS
+
+Connections use HTTPS. `GIT_HTTP_HOSTS` lists hosts, with or without their port, that the server reaches
+over plain HTTP instead, for example a Forgejo test container:
+
+```sh
+GIT_HTTP_HOSTS=forgejo:3000,localhost
+```
+
+The token travels in clear text on those connections. Do not list a production git host.
+
+### Custom certificate authorities: NODE_EXTRA_CA_CERTS
+
+If your git host's certificate comes from an internal CA, give Node the CA certificate in PEM format. Compose
+reads a `docker-compose.override.yml` next to `docker-compose.yml` on its own, so add one:
+
+```yaml
+services:
+  web:
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/internal-ca.pem
+    volumes:
+      - /etc/pm/internal-ca.pem:/certs/internal-ca.pem:ro
+  worker:
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/internal-ca.pem
+    volumes:
+      - /etc/pm/internal-ca.pem:/certs/internal-ca.pem:ro
+```
+
+Keep the certificate outside the checkout and readable by everyone (the containers run as the `node` user).
+Node reads the file once at start, so run `docker compose up -d` after you change it. Without it, testing the
+connection fails with "Host unreachable" and a certificate error code, such as
+`UNABLE_TO_VERIFY_LEAF_SIGNATURE`.
+
+### Webhooks
+
+A mirror refreshes within seconds of a push when the git host can deliver a webhook to
+
+```text
+{PUBLIC_URL}/api/webhooks/backlog/<id>
+```
+
+The URL is built from `PUBLIC_URL`, so set that to the address the git host can reach. Things to check:
+- GitHub.com and GitLab.com need a public URL. Behind a firewall, allow `POST` to `/api/webhooks/backlog/`
+  from the host's webhook addresses.
+- A reverse proxy must pass the request body untouched. Push payloads are usually small, but a push with many
+  commits can pass nginx's default 1 MB limit (`client_max_body_size`). The app accepts up to 25 MB.
+- A self-hosted GitLab refuses webhooks to private addresses unless an admin allows them (Admin > Settings >
+  Network > Outbound requests > Allow requests to the local network from webhooks and integrations).
+- Gitea and Forgejo refuse them unless `[webhook] ALLOWED_HOST_LIST` in `app.ini` includes the app's
+  address (for example `private` or the host name).
+
+Without a working webhook, mirrors still read the default branch every hour, at 15 minutes past the hour
+(UTC), and on Refresh now. The webhook dialog in Settings > Backlog.md shows when the last notification
+arrived.
 
 ## Start
 
@@ -178,7 +285,7 @@ until you pick one of these:
 
 | Port | Service | Published                                                                |
 | ---- | ------- | ------------------------------------------------------------------------ |
-| 3000 | `web`   | Yes, on the host port in `PORT`.                                         |
+| 3000 | `web`   | Yes, on the host port in `PORT`. Git hosts send webhooks to it too.      |
 | 5432 | `db`    | No. Only `migrate`, `web` and `worker` reach it, on the compose network. |
 
 The worker listens on no port. Because Postgres is not published, this stack can run next to another Postgres
@@ -214,7 +321,8 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 ```
 
 This works while the app runs. Keep the dumps outside the checkout (anything in it ends up in the image build
-context) and copy them to another machine.
+context) and copy them to another machine. Back up `APP_ENCRYPTION_KEY` as well, stored apart from the dumps: without
+it, a restored database cannot read its git tokens (see [APP_ENCRYPTION_KEY](#app_encryption_key)).
 
 To restore, stop the app, recreate the database, load the dump and start again:
 
@@ -244,8 +352,14 @@ If a migration fails, `web` and `worker` do not start: `docker compose logs migr
 
 Upgrading from 0.1.x (M1) adds milestones, cycles, comments and the board. The migration gives every
 existing task a board position that keeps its list order (priority, then most recently updated) inside its
-status, and turns milestones and cycles on for every project. Nothing else needs doing. The end-to-end
-suite checks this path: it starts 0.1.1, adds data, then switches to the new image.
+status, and turns milestones and cycles on for every project. Nothing else needs doing.
+
+Upgrading from 0.3.x (M2.1) to 0.4 (M3) adds git connections and Backlog.md mirrors. The migration only adds
+tables and columns: every task keeps its key. Set `APP_ENCRYPTION_KEY` before or after the upgrade to turn
+the new features on.
+
+The end-to-end suite checks both paths: it starts 0.1.1 and adds data, switches to 0.3.0 and adds more, then
+switches to the new image.
 
 ## The CLI in the image
 

@@ -1,10 +1,10 @@
 // The pg-boss worker: starts pg-boss (creating or migrating its schema), creates the queues core
 // declares, registers a handler per job name, schedules core's recurring jobs and stops cleanly.
-import { ensureQueues, JOB_NAMES, JOB_SCHEDULES } from '@pm/core';
+import { createJobQueue, ensureQueues, JOB_NAMES, JOB_SCHEDULES } from '@pm/core';
 import { createDb, type Db, type DbHandle } from '@pm/db';
 import { PgBoss } from 'pg-boss';
 import { createLogger, type Logger } from './logger';
-import { runJob } from './run-job';
+import { type RunJobContext, runJob } from './run-job';
 
 export interface WorkerOptions {
   databaseUrl: string;
@@ -17,6 +17,8 @@ export interface WorkerOptions {
   pollingIntervalSeconds?: number;
   /** APP_TIME_ZONE for core jobs (cycle ends). Default UTC. */
   timeZone?: string;
+  /** APP_ENCRYPTION_KEY and the git host settings for the Backlog.md jobs (see readWorkerConfig). */
+  git?: RunJobContext['git'];
 }
 
 export interface Worker {
@@ -37,6 +39,7 @@ export async function startWorker(options: WorkerOptions): Promise<Worker> {
     shutdownTimeoutMs = 8_000,
     pollingIntervalSeconds,
     timeZone,
+    git,
   } = options;
 
   logger.info('worker starting', { jobs: JOB_NAMES });
@@ -76,10 +79,18 @@ export async function startWorker(options: WorkerOptions): Promise<Worker> {
 
     // pg-boss rejects an explicit `pollingIntervalSeconds: undefined`, so the key is only set when given.
     const workOptions = pollingIntervalSeconds === undefined ? {} : { pollingIntervalSeconds };
+    // Handlers enqueue follow-up jobs (the Backlog.md poll queues refreshes) through the same boss.
+    const context: RunJobContext = {
+      db,
+      logger,
+      jobs: createJobQueue(boss),
+      ...(timeZone ? { timeZone } : {}),
+      ...(git ? { git } : {}),
+    };
     for (const name of JOB_NAMES) {
       // pg-boss fetches one job at a time (batchSize 1); the returned value becomes the job's output.
       await boss.work<unknown>(name, workOptions, async ([job]) =>
-        job ? runJob(name, job, timeZone ? { db, logger, timeZone } : { db, logger }) : undefined,
+        job ? runJob(name, job, context) : undefined,
       );
     }
 
@@ -89,7 +100,7 @@ export async function startWorker(options: WorkerOptions): Promise<Worker> {
     throw error;
   }
 
-  logger.info('worker ready', { jobs: JOB_NAMES });
+  logger.info('worker ready', { jobs: JOB_NAMES, encryption: git?.encryptionKey ? 'ready' : 'off' });
   return { boss, db, pool, stop };
 }
 

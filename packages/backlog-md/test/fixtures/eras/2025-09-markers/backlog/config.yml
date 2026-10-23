@@ -1,0 +1,11 @@
+project_name: "Payments API"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "In Review", "Done"]
+labels: ["api", "webhooks"]
+priorities:
+  - high
+  - medium
+  - low
+date_format: yyyy-mm-dd hh:mm
+auto_commit: false
+task_prefix: "pay"

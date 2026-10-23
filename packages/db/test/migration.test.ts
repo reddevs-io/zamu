@@ -165,3 +165,132 @@ describe('M2 migration on an M1 database with data', () => {
     expect(actors.rows[0]?.missing).toBe(0);
   });
 });
+
+const M2_1_MIGRATIONS = [
+  '20261022182359_init',
+  '20261023083529_m2_work_views',
+  '20261023144736_m2_1_project_repository',
+];
+
+describe('M3 migration on an M2.1 database with data', () => {
+  let url: string;
+  let folder: string;
+  let db: Db;
+  let end: () => Promise<void>;
+
+  const OWNER = '0190a1b2-0000-7000-8000-0000000000a1';
+  const WORKSPACE = '0190a1b2-0000-7000-8000-0000000000b1';
+  const PAY = '0190a1b2-0000-7000-8000-0000000000c1';
+  const WEB = '0190a1b2-0000-7000-8000-0000000000c2';
+
+  beforeAll(async () => {
+    folder = mkdtempSync(join(tmpdir(), 'pm-m2-1-migrations-'));
+    for (const name of M2_1_MIGRATIONS) {
+      cpSync(join(migrationsFolder, name), join(folder, name), { recursive: true });
+    }
+    url = withDatabase(testServerUrl(), uniqueDatabaseName('pm_test_upgrade_m3'));
+    await createDatabase(url);
+    await migrateFrom(url, folder);
+    const handle = createDb(url);
+    db = handle.db;
+    end = () => handle.pool.end();
+  });
+
+  afterAll(async () => {
+    await end?.();
+    if (url) await dropDatabase(url);
+    if (folder) rmSync(folder, { recursive: true, force: true });
+  });
+
+  /** Task keys as M2.1 builds them: project key, dash, number. */
+  async function keys() {
+    const result = await db.execute<{ key: string }>(sql`
+      select p.key || '-' || t.number as key from task t join project p on p.id = t.project_id
+      order by p.key, t.number`);
+    return result.rows.map((row) => row.key);
+  }
+
+  async function insertTask(projectId: string, number: number, keySuffix?: string) {
+    if (keySuffix === undefined) {
+      return db.execute(sql`insert into task (project_id, number, title, created_by_id)
+        values (${projectId}, ${number}, ${`Task ${number}`}, ${OWNER})`);
+    }
+    return db.execute(sql`insert into task (project_id, number, key_suffix, title, created_by_id)
+      values (${projectId}, ${number}, ${keySuffix}, ${`Task ${number}.${keySuffix}`}, ${OWNER})`);
+  }
+
+  async function pgCode(promise: Promise<unknown>): Promise<string | undefined> {
+    try {
+      await promise;
+    } catch (error) {
+      const cause = (error as { cause?: { code?: string } }).cause;
+      return cause?.code ?? (error as { code?: string }).code;
+    }
+    return undefined;
+  }
+
+  it('keeps every task key, row and activity, and the one-task-per-number rule', async () => {
+    // M2.1 data, written with raw SQL against the M2.1 schema.
+    await db.execute(sql`insert into "user" (id, name, email) values (${OWNER}, 'Ana', 'ana@example.com')`);
+    await db.execute(
+      sql`insert into organization (id, name, slug) values (${WORKSPACE}, 'Reddevs', 'reddevs')`,
+    );
+    await db.execute(
+      sql`insert into member (organization_id, user_id, role) values (${WORKSPACE}, ${OWNER}, 'owner')`,
+    );
+    await db.execute(sql`
+      insert into project (id, workspace_id, key, name, next_task_number, repository, repository_key) values
+        (${PAY}, ${WORKSPACE}, 'PAY', 'Payments', 26, 'git@gitlab.com:reddevs/payments.git', 'gitlab.com/reddevs/payments'),
+        (${WEB}, ${WORKSPACE}, 'WEB', 'Website', 4, null, null)`);
+    for (let number = 1; number <= 25; number++) await insertTask(PAY, number);
+    for (let number = 1; number <= 3; number++) await insertTask(WEB, number);
+    await db.execute(sql`
+      insert into activity (workspace_id, project_id, task_id, actor_id, type, changes)
+      select ${WORKSPACE}, project_id, id, ${OWNER}, 'task.created', '[]'::jsonb from task`);
+    await db.execute(sql`
+      insert into activity (workspace_id, project_id, task_id, actor_id, type, changes)
+      select ${WORKSPACE}, project_id, id, null, 'cycle.ended', '[{"field":"cycle","from":null,"to":null}]'::jsonb
+      from task where number = 1`);
+
+    const keysBefore = await keys();
+    const counts = await rowCounts(db);
+
+    await migrateFrom(url, migrationsFolder);
+
+    expect(await keys()).toEqual(keysBefore);
+    expect(keysBefore).toHaveLength(28);
+    expect(await rowCounts(db)).toEqual(counts);
+
+    const tasks = await db.execute<{ untouched: number }>(sql`
+      select count(*)::int as untouched from task
+      where key_suffix is null and backlog_id is null and backlog_data is null and hidden_at is null`);
+    expect(tasks.rows[0]?.untouched).toBe(28);
+
+    const origins = await db.execute<{ origin: string; origin_ref: string | null; count: number }>(sql`
+      select origin, origin_ref, count(*)::int as count from activity group by origin, origin_ref`);
+    expect(origins.rows).toEqual([{ origin: 'app', origin_ref: null, count: 30 }]);
+
+    const milestones = await db.execute<{ count: number }>(
+      sql`select count(*)::int as count from milestone where backlog_id is not null or hidden_at is not null`,
+    );
+    expect(milestones.rows[0]?.count).toBe(0);
+
+    // Old rule: one task per number in a project, numbers repeat across projects.
+    expect(await pgCode(insertTask(PAY, 1))).toBe('23505');
+    await insertTask(WEB, 25);
+
+    // New rule: subtasks share the number with distinct suffixes; the same suffix twice is refused.
+    await insertTask(PAY, 7, '1');
+    await insertTask(PAY, 7, '2');
+    await insertTask(PAY, 7, '1.2');
+    expect(await pgCode(insertTask(PAY, 7, '1'))).toBe('23505');
+    expect(await pgCode(insertTask(PAY, 7, '0'))).toBe('23514');
+    expect(await pgCode(insertTask(PAY, 7, '1.'))).toBe('23514');
+    expect(await pgCode(insertTask(PAY, 7, '01'))).toBe('23514');
+
+    const index = await db.execute<{ indexname: string }>(
+      sql`select indexname from pg_indexes where tablename = 'task' and indexname = 'task_projectId_number_unique'`,
+    );
+    expect(index.rows).toEqual([]);
+  });
+});

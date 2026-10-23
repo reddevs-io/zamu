@@ -1,0 +1,20 @@
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { GeneralSettings } from '~/features/project-settings/GeneralSettings';
+
+// General settings of a project: name, key, description, repository, planning switches. The Edit
+// action of the projects table opens this page.
+export const Route = createFileRoute('/_app/p/$projectKey/settings/')({
+  beforeLoad: ({ params }) => {
+    const upper = params.projectKey.toUpperCase();
+    if (upper !== params.projectKey) {
+      throw redirect({ to: '/p/$projectKey/settings', params: { projectKey: upper }, replace: true });
+    }
+  },
+  head: ({ params }) => ({ meta: [{ title: `Settings · ${params.projectKey} · project-management` }] }),
+  component: GeneralRoute,
+});
+
+function GeneralRoute() {
+  const { projectKey } = Route.useParams();
+  return <GeneralSettings projectKey={projectKey} />;
+}

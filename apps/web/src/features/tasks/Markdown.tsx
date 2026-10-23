@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '~/ui';
+import { CheckMark, cn } from '~/ui';
 import { findCheckboxes } from './format';
 
 // Task descriptions. react-markdown never renders raw HTML (it shows as text) and its default URL
@@ -13,12 +13,23 @@ export interface MarkdownProps {
   size?: 'pane' | 'page';
   /** Called with the checkbox index (document order) when someone ticks a box. Omit for read-only. */
   onToggleCheckbox?: (index: number) => void;
+  /**
+   * `backlog`: a description built from Backlog.md sections. Read-only checklists drawn like Backlog.md
+   * acceptance criteria (a ticked box, no strike-through) and smaller section headings.
+   */
+  variant?: 'default' | 'backlog';
   className?: string;
 }
 
 type HastNode = { position?: { start?: { line?: number } } } | undefined;
 
-export function Markdown({ source, size = 'pane', onToggleCheckbox, className }: MarkdownProps) {
+export function Markdown({
+  source,
+  size = 'pane',
+  onToggleCheckbox,
+  variant = 'default',
+  className,
+}: MarkdownProps) {
   // The renderers below are component types: they must keep their identity across renders, or React
   // remounts every element of the description (and a checkbox being clicked goes away). So they read
   // the current checkboxes and callback from refs.
@@ -26,7 +37,8 @@ export function Markdown({ source, size = 'pane', onToggleCheckbox, className }:
   checkboxes.current = useMemo(() => findCheckboxes(source), [source]);
   const toggleRef = useRef(onToggleCheckbox);
   toggleRef.current = onToggleCheckbox;
-  const editable = onToggleCheckbox != null;
+  const editable = onToggleCheckbox != null && variant === 'default';
+  const backlog = variant === 'backlog';
 
   const components = useMemo<Components>(() => {
     const checkboxAt = (node: HastNode) => {
@@ -45,7 +57,12 @@ export function Markdown({ source, size = 'pane', onToggleCheckbox, className }:
         />
       ),
       h1: ({ node: _node, ...props }) => <h3 {...props} className="m-0 text-[16px] font-semibold" />,
-      h2: ({ node: _node, ...props }) => <h3 {...props} className="m-0 text-[15px] font-semibold" />,
+      h2: ({ node: _node, ...props }) =>
+        backlog ? (
+          <h4 {...props} className="m-0 mt-1 text-[13px] font-semibold" />
+        ) : (
+          <h3 {...props} className="m-0 text-[15px] font-semibold" />
+        ),
       h3: ({ node: _node, ...props }) => <h4 {...props} className="m-0 text-[14px] font-semibold" />,
       h4: ({ node: _node, ...props }) => <h5 {...props} className="m-0 text-[13px] font-semibold" />,
       ul: ({ node: _node, className: listClass, ...props }) => (
@@ -64,6 +81,14 @@ export function Markdown({ source, size = 'pane', onToggleCheckbox, className }:
         if (!itemClass?.includes('task-list-item')) return <li {...props}>{children}</li>;
         const box = checkboxAt(node as HastNode);
         const checked = box?.checked ?? false;
+        if (backlog) {
+          return (
+            <li {...props} data-checked={checked || undefined} className="flex items-start gap-2">
+              <CheckMark checked={checked} />
+              <span className="min-w-0">{children}</span>
+            </li>
+          );
+        }
         return (
           <li {...props} className="flex items-baseline gap-2.5">
             <CheckboxSquare
@@ -113,7 +138,7 @@ export function Markdown({ source, size = 'pane', onToggleCheckbox, className }:
       ),
       img: ({ node: _node, alt, ...props }) => <img {...props} alt={alt ?? ''} className="max-w-full" />,
     };
-  }, [editable, size]);
+  }, [editable, size, backlog]);
 
   return (
     <div

@@ -1,0 +1,44 @@
+{
+  "description": "GET /repos/{owner}/{repo} and GET /repos/{owner}/{repo}/branches/{branch}.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/MrLesk/Backlog.md"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "id": 996329491,
+          "node_id": "R_kgDOO2LIEw",
+          "name": "Backlog.md",
+          "full_name": "MrLesk/Backlog.md",
+          "private": false,
+          "html_url": "https://github.com/MrLesk/Backlog.md",
+          "default_branch": "main",
+          "visibility": "public"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/MrLesk/Backlog.md/branches/main"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "name": "main",
+          "commit": {
+            "sha": "6f988de052b8d8ef2eac2828ade7d8690ac7213f",
+            "url": "https://api.github.com/repos/MrLesk/Backlog.md/commits/6f988de052b8d8ef2eac2828ade7d8690ac7213f"
+          },
+          "protected": false
+        }
+      }
+    }
+  ]
+}

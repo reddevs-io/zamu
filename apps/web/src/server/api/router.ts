@@ -9,6 +9,7 @@ import {
   deleteComment,
   deleteMilestone,
   endCycle,
+  getBacklogStatus,
   getCycle,
   getDashboard,
   getDashboardCounts,
@@ -23,6 +24,7 @@ import {
   listTaskActivity,
   listTasks,
   listTaskTimeline,
+  requestBacklogRefresh,
   updateComment,
   updateCycle,
   updateMe,
@@ -95,6 +97,14 @@ export const router = api.router({
       updateCycle(context.core, context.actor, input),
     ),
     end: api.cycles.end.handler(({ context, input }) => endCycle(context.core, context.actor, input)),
+  },
+  backlog: {
+    status: api.backlog.status.handler(({ context, input }) =>
+      getBacklogStatus(context.core, context.actor, input),
+    ),
+    refresh: api.backlog.refresh.handler(({ context, input }) =>
+      requestBacklogRefresh(context.core, context.actor, input),
+    ),
   },
   dashboard: {
     get: api.dashboard.get.handler(({ context, input }) => getDashboard(context.core, context.actor, input)),

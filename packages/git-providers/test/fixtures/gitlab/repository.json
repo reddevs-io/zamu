@@ -1,0 +1,43 @@
+{
+  "description": "GET /projects/:id with the URL-encoded path, and GET /projects/:id/repository/branches/:branch.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "id": 34675721,
+          "name": "cli",
+          "path_with_namespace": "gitlab-org/cli",
+          "default_branch": "main",
+          "web_url": "https://gitlab.com/gitlab-org/cli",
+          "visibility": "public"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/repository/branches/main"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "name": "main",
+          "commit": {
+            "id": "a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef",
+            "short_id": "a6fd50ce"
+          },
+          "protected": true,
+          "default": true
+        }
+      }
+    }
+  ]
+}

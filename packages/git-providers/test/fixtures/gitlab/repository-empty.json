@@ -1,0 +1,22 @@
+{
+  "description": "A project without commits has default_branch null.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/acme%2Fempty"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "id": 9,
+          "path_with_namespace": "acme/empty",
+          "default_branch": null,
+          "web_url": "https://gitlab.com/acme/empty"
+        }
+      }
+    }
+  ]
+}

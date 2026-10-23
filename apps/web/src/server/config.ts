@@ -2,7 +2,7 @@
 // refuses to start with one message listing every problem.
 // Framework-free: the startup plugin, getServerContext and tests import it.
 import { type AuthConfig, AuthConfigError, readAuthConfig } from '@pm/auth';
-import { isValidTimeZone } from '@pm/core';
+import { isValidTimeZone, loadEncryptionKey, loadGitHosts } from '@pm/core';
 
 /** Better Auth signs sessions with BETTER_AUTH_SECRET; shorter secrets are refused. */
 export const MIN_SECRET_LENGTH = 32;
@@ -24,6 +24,9 @@ export interface ServerEnv {
   PASSWORD_LOGIN?: string | undefined;
   TRUSTED_IP_HEADERS?: string | undefined;
   APP_TIME_ZONE?: string | undefined;
+  APP_ENCRYPTION_KEY?: string | undefined;
+  GIT_ALLOW_PRIVATE_HOSTS?: string | undefined;
+  GIT_HTTP_HOSTS?: string | undefined;
 }
 
 export interface ServerConfig {
@@ -36,6 +39,13 @@ export interface ServerConfig {
   auth: AuthConfig;
   /** APP_TIME_ZONE, an IANA zone name. Default UTC. */
   timeZone: string;
+  /**
+   * APP_ENCRYPTION_KEY decoded (32 bytes). Optional: without it the server runs and git connections
+   * and Backlog.md mirrors are off. A key that is set but not 32 bytes of base64 is a problem.
+   */
+  encryptionKey: Uint8Array | undefined;
+  /** GIT_ALLOW_PRIVATE_HOSTS and GIT_HTTP_HOSTS. */
+  gitHosts: { allowPrivate: boolean; httpHosts: string[] };
 }
 
 export class ServerConfigError extends Error {
@@ -54,6 +64,10 @@ function httpUrl(name: string, value: string, problems: string[]): string {
   }
   problems.push(`${name} must be an http:// or https:// URL (got "${value}").`);
   return value;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** Reads and checks every variable the web server needs. Throws ServerConfigError listing all problems. */
@@ -93,6 +107,21 @@ export function readServerConfig(env: ServerEnv = process.env): ServerConfig {
     problems.push(`APP_TIME_ZONE must be an IANA time zone such as Europe/Paris (got "${timeZone}").`);
   }
 
+  // The loaders' messages never echo the key.
+  let encryptionKey: Uint8Array | undefined;
+  try {
+    encryptionKey = loadEncryptionKey(env.APP_ENCRYPTION_KEY);
+  } catch (error) {
+    problems.push(messageOf(error));
+  }
+
+  let gitHosts: ServerConfig['gitHosts'] = { allowPrivate: false, httpHosts: [] };
+  try {
+    gitHosts = loadGitHosts(env);
+  } catch (error) {
+    problems.push(`${messageOf(error)}.`);
+  }
+
   if (problems.length > 0) throw new ServerConfigError(problems);
-  return { databaseUrl, secret, baseUrl, publicUrl, auth, timeZone };
+  return { databaseUrl, secret, baseUrl, publicUrl, auth, timeZone, encryptionKey, gitHosts };
 }

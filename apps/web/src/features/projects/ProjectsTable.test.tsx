@@ -97,4 +97,50 @@ describe('ProjectsTable', () => {
     expect(skeletonRows.length).toBeGreaterThan(0);
     for (const skeleton of skeletonRows) expect(skeleton.style.height).toBe('65px');
   });
+
+  it('says where tasks come from and explains the sidebar marker', () => {
+    const summary = {
+      mode: 'mirror' as const,
+      state: 'failed' as const,
+      defaultBranch: 'main',
+      lastReadAt: '2026-10-20T10:00:00.000Z',
+      lastReadCommit: 'a1b2c3d',
+      lastTrigger: 'webhook' as const,
+      problems: { files: 0, values: 0 },
+      hidden: 0,
+      detachedAt: null,
+    };
+    render(
+      <ProjectsTable
+        projects={[
+          project({ backlog: summary }),
+          project({
+            id: '10000000-0000-4000-8000-000000000004',
+            key: 'WEB',
+            name: 'Web app',
+            backlog: {
+              ...summary,
+              mode: 'import',
+              state: 'detached',
+              detachedAt: '2026-10-21T10:00:00.000Z',
+            },
+          }),
+          PROJECTS[1] as ProjectWithCounts,
+        ]}
+        onOpen={vi.fn()}
+      />,
+    );
+    expect(within(rowOf('Payments')).getByText('Backlog.md mirror')).toBeInTheDocument();
+    expect(within(rowOf('Payments')).getByRole('img', { name: 'Last refresh failed' })).toBeInTheDocument();
+    expect(within(rowOf('Web app')).getByText('This app · imported')).toBeInTheDocument();
+    expect(within(rowOf('Infra')).getByText('This app')).toBeInTheDocument();
+    expect(
+      screen.getByText('The small square next to a project key in the sidebar marks a Backlog.md mirror.'),
+    ).toBeInTheDocument();
+  });
+
+  it('leaves the marker note out when nothing mirrors', () => {
+    render(<ProjectsTable projects={PROJECTS} onOpen={vi.fn()} />);
+    expect(screen.queryByText(/marks a Backlog\.md mirror/)).not.toBeInTheDocument();
+  });
 });

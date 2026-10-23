@@ -21,6 +21,9 @@ What works today (milestone M4):
 - Comments in the task history, in Markdown, with @mentions of people and agents. The history shows
   comments and changes in one list.
 - My tasks: everything assigned to you, across projects.
+- Backlog.md: a project can mirror the task files a repository keeps in `backlog/`, following the default
+  branch on every push, or import them once and move off Backlog.md. It reads through a workspace git
+  connection to GitHub, GitLab or Gitea/Forgejo with a read-only token.
 - Light, dark or system theme, saved to your account.
 - Agents with API keys scoped to some or all projects, read only or read and write, revocable at any time.
 - The `pm` CLI with `--json` output and stable exit codes, over a REST API at `/api/v1` with an OpenAPI
@@ -54,6 +57,7 @@ On the agent's machine, build the CLI and set `PM_URL` and `PM_KEY`, as describe
 
 - [Self-hosting](docs/self-hosting.md): configuration, first run, ports, backups and upgrades.
 - [Agents](docs/agents.md): adding agents, scoping keys, running `pm` in an agent's environment, `--json` output.
+- [Backlog.md](docs/backlog-md.md): git connections, mirrors and imports, mappings, webhooks, detach.
 - [CLI reference](apps/cli/README.md): every `pm` command and option.
 
 ## Development
@@ -79,22 +83,30 @@ pnpm e2e                                      # Playwright against the docker co
 ```
 
 `pnpm e2e` builds the CLI and the image, starts the compose stack as project `pm-e2e` on a fresh volume at
-http://localhost:3100 and runs the specs in `e2e/` in file order, then removes the stack. It leaves the
-development database alone. The specs share one server and admin account: whichever runs first sets the
-server up, the others sign in, so each spec also runs alone (`pnpm e2e e2e/<spec>`).
+http://localhost:3100 and runs the specs in `e2e/`, then removes the stack. It leaves the development
+database alone. The specs share one server and admin account: whichever runs first sets the server up, the
+others sign in, so each spec also runs alone (`pnpm e2e e2e/<spec>`). The stack sets `APP_ENCRYPTION_KEY`
+and the git settings the Backlog.md specs need (`e2e/stack.ts`).
 - `dashboard.spec.ts`: the dashboard. An agent puts a task in review and mentions its person from the CLI,
   the person answers the mention from the dashboard with the keyboard, the rail count follows, and
   `pm dashboard --json` matches the API.
 - `person-and-agent.spec.ts`: the M1 flow, from setup (or sign-in) to an agent working through the CLI.
-- `upgrade.spec.ts`: starts a second stack (`pm-e2e-upgrade`, port 3101) on release 0.1.1, adds data, then
-  switches it to the new image and checks the migrations and the board. The 0.1.1 image comes from
-  `E2E_M1_IMAGE` (pulled when missing), or is built once from the git tag `0.1.1` as
-  `project-management:m1-0.1.1`, which takes a few minutes the first time.
+- `upgrade.spec.ts`: starts a second stack (`pm-e2e-upgrade`, port 3101) on release 0.1.1 and adds data,
+  switches it to M2.1 (0.3.0) and adds more, then switches it to the new image and checks that every key
+  and route still works. The older images come from `E2E_M1_IMAGE` and `E2E_M2_1_IMAGE` (pulled when
+  missing), or are built once from git as `project-management:m1-0.1.1` and `project-management:m2.1-<ref>`,
+  which takes a few minutes each the first time.
 - `work-views.spec.ts`: the board, milestones, cycles, comments with mentions from the web and the CLI,
   My tasks and the theme.
+- `backlog-mirror.spec.ts` and `backlog-import.spec.ts` (Playwright project `backlog-md`, after the others):
+  each starts its own Forgejo container from `docker/forgejo/`, attaches it to the stack's network and
+  removes it at the end. They cover connections, setup, the mirrored views, webhooks, refreshes, `pm backlog`,
+  refused changes, detach and import.
 
-`E2E_KEEP_STACK=1` keeps the stacks running after the run, `E2E_SKIP_BUILD=1` reuses the last image,
-`E2E_PORT` and `E2E_UPGRADE_PORT` change the ports, and `E2E_SKIP_UPGRADE=1` skips the upgrade test.
+`E2E_KEEP_STACK=1` keeps the stacks (and the Forgejo containers) running after the run, `E2E_SKIP_BUILD=1`
+reuses the last image, `E2E_COMPOSE_PROJECT`, `E2E_PORT`, `E2E_UPGRADE_PORT` and `PM_IMAGE` change the
+project name, ports and image tag (use them when another checkout runs the suite on the same machine),
+`E2E_SKIP_UPGRADE=1` skips the upgrade test and `E2E_SKIP_BACKLOG=1` skips the Backlog.md specs.
 
 ## License
 

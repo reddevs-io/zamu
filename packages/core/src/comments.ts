@@ -110,7 +110,7 @@ async function replaceMentions(tx: Tx, commentId: string, userIds: string[]) {
  */
 async function findOwnComment(tx: Tx, actor: Actor, id: string, verb: 'edit' | 'delete') {
   const [found] = await tx
-    .select({ comment, projectKey: project.key, taskNumber: task.number })
+    .select({ comment, projectKey: project.key, taskNumber: task.number, keySuffix: task.keySuffix })
     .from(comment)
     .innerJoin(task, eq(task.id, comment.taskId))
     .innerJoin(project, eq(project.id, comment.projectId))
@@ -125,7 +125,7 @@ async function findOwnComment(tx: Tx, actor: Actor, id: string, verb: 'edit' | '
     throw new Forbidden(`Only the author can ${verb} this comment`);
   }
   if (found.comment.deletedAt) throw new Conflict('This comment was deleted');
-  return { row: found.comment, taskKey: formatTaskKey(found.projectKey, found.taskNumber) };
+  return { row: found.comment, taskKey: formatTaskKey(found.projectKey, found.taskNumber, found.keySuffix) };
 }
 
 // ---------------------------------------------------------------------------
@@ -138,10 +138,12 @@ export async function listComments(
   actor: Actor,
   input: z.input<typeof ListCommentsInput>,
 ): Promise<CommentList> {
-  const { key } = parseInput(ListCommentsInput, input);
-  const { project: projectRow, task: taskRow } = await findTask(db, actor, key);
+  const { key, project: narrow } = parseInput(ListCommentsInput, input);
+  const { project: projectRow, task: taskRow } = await findTask(db, actor, key, { project: narrow });
   const rows = await loadTaskCommentRows(db, taskRow.id);
-  return { items: await toComments(db, formatTaskKey(projectRow.key, taskRow.number), rows) };
+  return {
+    items: await toComments(db, formatTaskKey(projectRow.key, taskRow.number, taskRow.keySuffix), rows),
+  };
 }
 
 /** Comments on a task as the actor (for agents, on behalf of their responsible human). */
@@ -152,7 +154,9 @@ export async function createComment(
 ): Promise<Comment> {
   const parsed = parseInput(CreateCommentInput, input);
   return db.transaction(async (tx) => {
-    const { project: projectRow, task: taskRow } = await findTask(tx, actor, parsed.key);
+    const { project: projectRow, task: taskRow } = await findTask(tx, actor, parsed.key, {
+      project: parsed.project,
+    });
     authorize(actor, 'task.write', { type: 'project', projectId: projectRow.id });
     const { body, userIds } = await prepareBody(tx, actor, parsed.body);
     const [row] = await tx
@@ -168,7 +172,7 @@ export async function createComment(
       .returning();
     if (!row) throw new Error('comment insert returned no row');
     await replaceMentions(tx, row.id, userIds);
-    return toComment(tx, formatTaskKey(projectRow.key, taskRow.number), row);
+    return toComment(tx, formatTaskKey(projectRow.key, taskRow.number, taskRow.keySuffix), row);
   });
 }
 

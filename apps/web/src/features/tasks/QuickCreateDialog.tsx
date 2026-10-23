@@ -2,6 +2,7 @@ import type { Priority, TaskStatus } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import { isMirrored } from '~/features/project-header/mirror';
 import { useQuickCreate } from '~/features/shell/quick-create';
 import {
   Banner,
@@ -172,11 +173,14 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
     { allowInOverlays: true },
   );
 
-  const projectItems: OptionItem[] = (projects ?? []).map((item) => ({
-    id: item.key,
-    label: item.name,
-    prefix: <span className="font-mono text-[10px]">{item.key}</span>,
-  }));
+  // Mirrored projects take new tasks in Backlog.md, so the picker leaves them out.
+  const projectItems: OptionItem[] = (projects ?? [])
+    .filter((item) => !isMirrored(item))
+    .map((item) => ({
+      id: item.key,
+      label: item.name,
+      prefix: <span className="font-mono text-[10px]">{item.key}</span>,
+    }));
   const error = create.isError ? describeError(create.error) : null;
 
   return (

@@ -2,6 +2,7 @@
  * Ledger (2a) design tokens, ported from .agent/design/m1/final/source/ledger.css.
  *
  * M2 tokens (--warn … --track) come from .agent/design/m2/source/ledger-m2.css.
+ * M3 tokens (--sys-bg … --src-bg) come from .agent/design/m3/source/ledger-m3.css.
  *
  * The page follows prefers-color-scheme. A `.light` or `.dark` class on any element forces that theme
  * for its subtree: on <html> it is the saved theme choice (no class = System); the /__ui gallery and
@@ -42,6 +43,11 @@
   --mention-bg: oklch(0.94 0.03 262);
   --comment-bg: oklch(0.998 0.002 240);
   --track: oklch(0.92 0.006 245);
+  /* M3 (ledger-m3.css) */
+  --sys-bg: oklch(0.3 0.02 255);
+  --sys-fg: oklch(0.98 0.004 240);
+  --hatch: oklch(0.2 0.02 255 / 0.045);
+  --src-bg: oklch(0.972 0.006 240);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -77,6 +83,11 @@
     --mention-bg: oklch(0.29 0.05 262);
     --comment-bg: oklch(0.215 0.013 255);
     --track: oklch(0.3 0.013 255);
+    /* M3 (ledger-m3.css) */
+    --sys-bg: oklch(0.86 0.01 250);
+    --sys-fg: oklch(0.18 0.012 255);
+    --hatch: oklch(1 0 0 / 0.045);
+    --src-bg: oklch(0.2 0.013 255);
   }
 }
 
@@ -112,4 +123,9 @@
   --mention-bg: oklch(0.29 0.05 262);
   --comment-bg: oklch(0.215 0.013 255);
   --track: oklch(0.3 0.013 255);
+  /* M3 (ledger-m3.css) */
+  --sys-bg: oklch(0.86 0.01 250);
+  --sys-fg: oklch(0.18 0.012 255);
+  --hatch: oklch(1 0 0 / 0.045);
+  --src-bg: oklch(0.2 0.013 255);
 }

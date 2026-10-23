@@ -278,23 +278,28 @@ describe('project header tabs', () => {
     },
   };
 
-  it('shows Tasks, Milestones and Cycles with their notes', () => {
+  it('shows Tasks, Milestones, Cycles with their notes, then Settings', () => {
     const tabs = projectTabs(project, 3);
     expect(tabs.map((tab) => [tab.id, tab.href, tab.count ?? tab.note])).toEqual([
       ['tasks', '/p/PAY', 12],
       ['milestones', '/p/PAY/milestones', 3],
       ['cycles', '/p/PAY/cycles', 'C12 · 3d left'],
+      ['settings', '/p/PAY/settings', undefined],
     ]);
     expect(cycleNote(null)).toBeUndefined();
     expect(cycleElapsed(project.currentCycle)).toBeCloseTo(11 / 14);
     expect(projectViewHref('PAY', 'cycles')).toBe('/p/PAY/cycles');
   });
 
-  it('leaves out turned-off features, and the whole row when both are off', () => {
+  it('leaves out turned-off features; Tasks and Settings always stay', () => {
     expect(projectTabs({ ...project, usesCycles: false }).map((tab) => tab.id)).toEqual([
       'tasks',
       'milestones',
+      'settings',
     ]);
-    expect(projectTabs({ ...project, usesMilestones: false, usesCycles: false })).toEqual([]);
+    expect(
+      projectTabs({ ...project, usesMilestones: false, usesCycles: false }).map((tab) => tab.id),
+    ).toEqual(['tasks', 'settings']);
+    expect(projectViewHref('PAY', 'settings')).toBe('/p/PAY/settings');
   });
 });

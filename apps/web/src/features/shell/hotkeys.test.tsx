@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createRefusalText } from '~/features/project-header/mirror';
 import { SearchField, TextField, useHotkeys } from '~/ui';
 import { GO_TO_WINDOW_MS, useGoToHotkeys, useShellHotkeys } from './hotkeys';
 import { NewProjectProvider, useNewProject } from './new-project';
@@ -49,6 +50,19 @@ function Providers({ children }: { children: ReactNode }) {
   );
 }
 
+const MIRRORED_TEXT = createRefusalText('Payments');
+
+/** The shell's providers with PAY mirrored from Backlog.md. */
+function MirroredProviders({ children }: { children: ReactNode }) {
+  return (
+    <QuickCreateProvider refuse={(key) => (key === 'PAY' ? MIRRORED_TEXT : null)}>
+      <NewProjectProvider>
+        <PageSearchProvider>{children}</PageSearchProvider>
+      </NewProjectProvider>
+    </QuickCreateProvider>
+  );
+}
+
 describe('useShellHotkeys', () => {
   it('C opens quick create in the current project', async () => {
     const user = userEvent.setup();
@@ -88,6 +102,23 @@ describe('useShellHotkeys', () => {
     expect(screen.getByLabelText('quick create')).toHaveTextContent('closed');
     expect(screen.getByLabelText('new project')).toHaveTextContent('closed');
     expect(screen.getByLabelText('Notes')).toHaveValue('cp/');
+  });
+
+  it('C in a project mirrored from Backlog.md shows the refusal instead of the dialog', async () => {
+    const user = userEvent.setup();
+    const text = MIRRORED_TEXT;
+    const { unmount } = render(<Probe projectKey="PAY" />, { wrapper: MirroredProviders });
+    await user.keyboard('c');
+    expect(screen.getByLabelText('quick create')).toHaveTextContent('closed');
+    expect(screen.getByText(text).closest('[role="status"]')).toBeInTheDocument();
+    expect(text).toBe(
+      'Tasks in Payments come from Backlog.md. Add a file under backlog/tasks/, or run backlog task create, and push. It shows up here after the next refresh.',
+    );
+    unmount();
+    // Other projects still open the dialog.
+    render(<Probe projectKey="WEB" />, { wrapper: MirroredProviders });
+    await user.keyboard('c');
+    expect(screen.getByLabelText('quick create')).toHaveTextContent('open:WEB');
   });
 
   it('falls back to the first search field in <main>', async () => {

@@ -13,7 +13,8 @@
       "!**/migrations/meta",
       "!**/*.svg",
       "!memory-bank",
-      "!.agent"
+      "!.agent",
+      "!packages/backlog-md/test/fixtures"
     ]
   },
   "formatter": {

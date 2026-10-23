@@ -1,5 +1,9 @@
+import { parseBacklogId, safeParseTaskKey } from '@pm/contracts';
 import type { QueryClient } from '@tanstack/react-query';
 import { boardColumnQuery } from '~/features/board/queries';
+import { orpc } from '~/lib/orpc';
+import { isClientError } from './errors';
+import { backlogHistoryQuery } from './MirroredTask';
 import { membersQuery, meQuery, projectsQuery, taskListQuery, taskQuery, timelineQuery } from './queries';
 import {
   BOARD_FOLDED,
@@ -42,12 +46,43 @@ function prefetchBoard(queryClient: QueryClient, projectKey: string, search: Tas
 
 export function prefetchTaskPage(queryClient: QueryClient, taskKey: string) {
   return Promise.all([
-    queryClient.prefetchQuery(taskQuery(taskKey)),
+    queryClient.prefetchQuery(taskQuery(taskKey)).then(() => {
+      // A task from Backlog.md also shows the project's first read and detach in its history.
+      const task = queryClient.getQueryData(taskQuery(taskKey).queryKey);
+      return task?.backlog ? queryClient.prefetchQuery(backlogHistoryQuery(task.project.key)) : undefined;
+    }),
     queryClient.prefetchQuery(timelineQuery(taskKey)),
     queryClient.prefetchQuery(projectsQuery()),
     queryClient.prefetchQuery(membersQuery()),
     queryClient.prefetchQuery(meQuery()),
   ]);
+}
+
+/**
+ * Where /p/$projectKey/$taskKey should point: the same path for a task key of that project (any case is
+ * upper-cased), the task's own key for a Backlog.md ID (BACK-786.1, back-007) or another project's
+ * key, null when there is no such task.
+ */
+export async function canonicalTaskPath(
+  queryClient: QueryClient,
+  projectKeyParam: string,
+  taskKeyParam: string,
+): Promise<{ projectKey: string; taskKey: string } | null> {
+  const projectKey = projectKeyParam.toUpperCase();
+  const key = taskKeyParam.trim().toUpperCase();
+  const parts = safeParseTaskKey(key);
+  if (parts && parts.projectKey === projectKey) return { projectKey, taskKey: key };
+  if (!parts && !parseBacklogId(key)) return null;
+  try {
+    const task = await queryClient.fetchQuery(
+      orpc.tasks.get.queryOptions({ input: { key, project: projectKey }, retry: false }),
+    );
+    queryClient.setQueryData(taskQuery(task.key).queryKey, task);
+    return { projectKey: task.project.key, taskKey: task.key };
+  } catch (error) {
+    if (isClientError(error)) return null;
+    throw error;
+  }
 }
 
 /** Awaits on the server only. */

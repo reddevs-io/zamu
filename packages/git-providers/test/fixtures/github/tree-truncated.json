@@ -1,0 +1,169 @@
+{
+  "description": "A recursive listing that comes back truncated: the adapter lists subtrees one by one. Symlinks and submodules are skipped.",
+  "source": "Hand-written from the provider API docs.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000c0"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "00000000000000000000000000000000000000c0",
+          "truncated": false,
+          "tree": [
+            {
+              "path": "backlog",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "00000000000000000000000000000000000000a1",
+              "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a1"
+            },
+            {
+              "path": "README.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b0",
+              "size": 10,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a1?recursive=1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "00000000000000000000000000000000000000a1",
+          "truncated": true,
+          "tree": [
+            {
+              "path": "config.yml",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b1",
+              "size": 120,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "00000000000000000000000000000000000000a1",
+          "truncated": false,
+          "tree": [
+            {
+              "path": "config.yml",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b1",
+              "size": 120,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b1"
+            },
+            {
+              "path": "tasks",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "00000000000000000000000000000000000000a2",
+              "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a2"
+            },
+            {
+              "path": "latest.md",
+              "mode": "120000",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b9",
+              "size": 22,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b9"
+            },
+            {
+              "path": "vendor",
+              "mode": "160000",
+              "type": "commit",
+              "sha": "00000000000000000000000000000000000000d0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a2"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "00000000000000000000000000000000000000a2",
+          "truncated": false,
+          "tree": [
+            {
+              "path": "task-1 - First.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b2",
+              "size": 300,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b2"
+            },
+            {
+              "path": "task-2 - Second.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b3",
+              "size": 310,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b3"
+            },
+            {
+              "path": "nested",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "00000000000000000000000000000000000000a3",
+              "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a3"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/acme/big/git/trees/00000000000000000000000000000000000000a3"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "00000000000000000000000000000000000000a3",
+          "truncated": false,
+          "tree": [
+            {
+              "path": "task-3 - Third.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "00000000000000000000000000000000000000b4",
+              "size": 320,
+              "url": "https://api.github.com/repos/acme/big/git/blobs/00000000000000000000000000000000000000b4"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

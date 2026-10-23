@@ -20,6 +20,10 @@ export interface CliIo {
   columns?: number;
   /** Replaces the global fetch (tests pass the in-process API handler). */
   fetch?: FetchLike;
+  /** Waits between polls (pm backlog refresh --wait). Default: a timer. Tests pass a fake. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Current time in milliseconds. Default: Date.now. */
+  now?: () => number;
 }
 
 async function readAll(stream: NodeJS.ReadableStream): Promise<string> {

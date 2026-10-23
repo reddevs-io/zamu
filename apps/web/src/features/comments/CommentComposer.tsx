@@ -24,10 +24,12 @@ export interface CommentComposerProps {
   members: readonly Member[];
   /** Called with the new comment's id once the server saved it. */
   onSent?: (commentId: string) => void;
+  /** Overrides the composer's default placeholder (mirrored and hidden tasks). */
+  placeholder?: string | undefined;
   className?: string;
 }
 
-export function CommentComposer({ taskKey, members, onSent, className }: CommentComposerProps) {
+export function CommentComposer({ taskKey, members, onSent, placeholder, className }: CommentComposerProps) {
   const [value, setValueState] = useState(() => drafts.get(taskKey) ?? '');
   const [mode, setMode] = useState<ComposerMode>('write');
   const create = useCreateComment(taskKey);
@@ -90,6 +92,7 @@ export function CommentComposer({ taskKey, members, onSent, className }: Comment
       onKeyDown={picker.onKeyDown}
       textAreaProps={picker.textAreaProps}
       overlay={picker.overlay}
+      {...(placeholder ? { placeholder } : {})}
       className={className}
     />
   );

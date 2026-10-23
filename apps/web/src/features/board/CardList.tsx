@@ -50,6 +50,15 @@ export interface CardListProps {
   features: CardFeatures;
   /** Turns drag and drop off (while loading). */
   isDisabled?: boolean;
+  /**
+   * Refuses every drop (a card whose status comes from Backlog.md is being dragged from another
+   * column). Drags out of the list still work.
+   */
+  refuseDrops?: boolean;
+  /** A drag of one of these cards started (keyboard or pointer). */
+  onDragStart?: (key: string) => void;
+  /** The drag ended, dropped or not. */
+  onDragEnd?: () => void;
   className?: string;
 }
 
@@ -86,6 +95,9 @@ export const CardList = memo(function CardList({
   onDrop,
   features,
   isDisabled = false,
+  refuseDrops = false,
+  onDragStart,
+  onDragEnd,
   className,
 }: CardListProps) {
   const byKey = useMemo(() => new Map(cards.map((card) => [card.key, card])), [cards]);
@@ -96,7 +108,12 @@ export const CardList = memo(function CardList({
       [...keys].map((key) => ({ [CARD_DRAG_TYPE]: String(key), 'text/plain': String(key) })),
     acceptedDragTypes: [CARD_DRAG_TYPE],
     getDropOperation: (target) =>
-      target.type === 'item' && target.dropPosition === 'on' ? 'cancel' : 'move',
+      refuseDrops || (target.type === 'item' && target.dropPosition === 'on') ? 'cancel' : 'move',
+    onDragStart: (event) => {
+      const key = [...event.keys][0];
+      if (key != null) onDragStart?.(String(key));
+    },
+    onDragEnd: () => onDragEnd?.(),
     onReorder: (event) => {
       const key = [...event.keys][0];
       if (key == null || event.target.dropPosition === 'on') return;

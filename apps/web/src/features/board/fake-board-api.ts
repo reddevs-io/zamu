@@ -36,12 +36,15 @@ export interface FakeBoardOptions {
   layout?: Partial<Record<TaskStatus, number>>;
   usesMilestones?: boolean;
   usesCycles?: boolean;
+  /** The project mirrors Backlog.md: status, assignee and milestone come from the files. */
+  mirrored?: boolean;
 }
 
 export function createFakeBoardApi({
   layout = { backlog: 1, todo: 2, in_progress: 2, in_review: 1, done: 1 },
   usesMilestones = true,
   usesCycles = true,
+  mirrored = false,
 }: FakeBoardOptions = {}) {
   const project = { id: '10000000-0000-4000-8000-000000000001', key: 'PAY', name: 'Payments' };
   const base = Date.parse('2026-10-20T10:00:00.000Z');
@@ -72,6 +75,9 @@ export function createFakeBoardApi({
         cycle: null,
         cycleAddedAt: null,
         rank: index + 1,
+        locked: mirrored
+          ? ['title', 'description', 'status', 'priority', 'assignee', 'milestone', 'createdAt']
+          : [],
         createdAt: new Date(base).toISOString(),
         updatedAt: new Date(base + number * 1000).toISOString(),
       });
@@ -129,7 +135,20 @@ export function createFakeBoardApi({
               usesMilestones,
               usesCycles,
               currentCycle: null,
-              repository: null,
+              repository: mirrored ? 'https://gitlab.com/reddevs/payments.git' : null,
+              backlog: mirrored
+                ? {
+                    mode: 'mirror',
+                    state: 'healthy',
+                    defaultBranch: 'main',
+                    lastReadAt: new Date(base).toISOString(),
+                    lastReadCommit: 'a1b2c3d4e5f6',
+                    lastTrigger: 'webhook',
+                    problems: { files: 0, values: 0 },
+                    hidden: 0,
+                    detachedAt: null,
+                  }
+                : null,
               createdAt: new Date(base).toISOString(),
               updatedAt: new Date(base).toISOString(),
               openCounts: {

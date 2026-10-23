@@ -1,0 +1,160 @@
+{
+  "description": "Folder lookup in the root tree (by commit), then one recursive call on the folder tree.",
+  "source": "Recorded 2026-10-23 without a token against a public repository, trimmed.",
+  "exchanges": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/6f988de052b8d8ef2eac2828ade7d8690ac7213f"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "6f988de052b8d8ef2eac2828ade7d8690ac7213f",
+          "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/6f988de052b8d8ef2eac2828ade7d8690ac7213f",
+          "tree": [
+            {
+              "path": ".github",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "18529f067ad55ea707633fb6c94c3933c0f84962",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/18529f067ad55ea707633fb6c94c3933c0f84962"
+            },
+            {
+              "path": "README.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "6b8b2877bf1c0a3cd7ddbd64604bf9cbfb1d315d",
+              "size": 20249,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/6b8b2877bf1c0a3cd7ddbd64604bf9cbfb1d315d"
+            },
+            {
+              "path": "backlog",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "8d6d26dc1c46cf164cace1c1657cb94eb97a5e91",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/8d6d26dc1c46cf164cace1c1657cb94eb97a5e91"
+            },
+            {
+              "path": "package.json",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "b8938d6668e0d57ebe0d383547312606b50bf80d",
+              "size": 2758,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/b8938d6668e0d57ebe0d383547312606b50bf80d"
+            },
+            {
+              "path": "src",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "66a33711b92b5d6b7b869b0f44bc57d8f8b6af8f",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/66a33711b92b5d6b7b869b0f44bc57d8f8b6af8f"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/8d6d26dc1c46cf164cace1c1657cb94eb97a5e91?recursive=1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {},
+        "json": {
+          "sha": "8d6d26dc1c46cf164cace1c1657cb94eb97a5e91",
+          "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/8d6d26dc1c46cf164cace1c1657cb94eb97a5e91",
+          "tree": [
+            {
+              "path": "archive",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "dfb147197694c74eaf4f9d22e45682ca430724df",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/dfb147197694c74eaf4f9d22e45682ca430724df"
+            },
+            {
+              "path": "archive/drafts",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "6ae2001b004919ecd2929e7e7077dc36a24e2ee3",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/6ae2001b004919ecd2929e7e7077dc36a24e2ee3"
+            },
+            {
+              "path": "archive/drafts/readme.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "0ce5121b11a1529729c96bff8616ec5ba65857ea",
+              "size": 93,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/0ce5121b11a1529729c96bff8616ec5ba65857ea"
+            },
+            {
+              "path": "config.yml",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "2270ba13726cdd5ae47d492fe96df637cff8d9c0",
+              "size": 553,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/2270ba13726cdd5ae47d492fe96df637cff8d9c0"
+            },
+            {
+              "path": "docs",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "bb8dd27e34ea9197d0d19a95b94ba7b2ffa5f12a",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/bb8dd27e34ea9197d0d19a95b94ba7b2ffa5f12a"
+            },
+            {
+              "path": "drafts",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "535f5b5b2944c76e408d29d70d421e8e8e2c8d5d",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/535f5b5b2944c76e408d29d70d421e8e8e2c8d5d"
+            },
+            {
+              "path": "drafts/draft-1 - Agents-add-board-export-step-to-agent-DoD.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "9569a1601d440cfed5757d9e81154434a1d44bfd",
+              "size": 668,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/9569a1601d440cfed5757d9e81154434a1d44bfd"
+            },
+            {
+              "path": "tasks",
+              "mode": "040000",
+              "type": "tree",
+              "sha": "40a5ec66f2782e57326b370a8babbb5d8c3bf6f3",
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/trees/40a5ec66f2782e57326b370a8babbb5d8c3bf6f3"
+            },
+            {
+              "path": "tasks/back-200 - Add-Claude-Code-integration-with-workflow-commands-during-init.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "17ea36e487e720a8186c34c8b5e6356cf154f86e",
+              "size": 1514,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/17ea36e487e720a8186c34c8b5e6356cf154f86e"
+            },
+            {
+              "path": "tasks/back-208 - Add-paste-as-markdown-support-in-Web-UI.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "3c4ce38aac3394d43ce1e6a9dc27ca55757e720e",
+              "size": 1294,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/3c4ce38aac3394d43ce1e6a9dc27ca55757e720e"
+            },
+            {
+              "path": "tasks/back-222 - Improve-task-and-subtask-visualization-in-web-UI.md",
+              "mode": "100644",
+              "type": "blob",
+              "sha": "8fdf1e9eeb7bbf0cb04c5357460ac576b254d95a",
+              "size": 2011,
+              "url": "https://api.github.com/repos/MrLesk/Backlog.md/git/blobs/8fdf1e9eeb7bbf0cb04c5357460ac576b254d95a"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    }
+  ]
+}

@@ -35,6 +35,13 @@ x-app: &app
     TRUSTED_IP_HEADERS: ${TRUSTED_IP_HEADERS:-}
     # IANA time zone that decides when cycles end (midnight on their end date). Empty means UTC.
     APP_TIME_ZONE: ${APP_TIME_ZONE:-}
+    # Encrypts git connection tokens and webhook secrets (openssl rand -base64 32). Empty: git connections
+    # and Backlog.md mirrors are disabled. Back it up with the database. See docs/self-hosting.md.
+    APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-}
+    # Git connections to private-network hosts (self-hosted GitLab or Forgejo next to the app), and hosts
+    # reached over plain HTTP (test containers only). See docs/self-hosting.md.
+    GIT_ALLOW_PRIVATE_HOSTS: ${GIT_ALLOW_PRIVATE_HOSTS:-}
+    GIT_HTTP_HOSTS: ${GIT_HTTP_HOSTS:-}
 
 services:
   db:

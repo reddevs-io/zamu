@@ -1,5 +1,6 @@
 // Helpers shared by the commands: input parsing, stdin text, choice normalisation and the name
 // lookups (members, milestones) that turn what people type into the ids the API takes.
+import { ORPCError } from '@orpc/client';
 import {
   ASSIGNEE_AGENTS,
   ASSIGNEE_ME,
@@ -14,6 +15,8 @@ import type { ApiClient } from '../client';
 import type { CommandContext } from '../context';
 import { inputError, notFoundError, usageError } from '../errors';
 import { personLabel } from '../format';
+import { refPrefix } from '../mirrored';
+import { resolveProject } from '../project';
 
 /** `In progress`, `in-progress` and `IN_PROGRESS` all mean in_progress. */
 export function normalizeChoice(value: string): string {
@@ -138,4 +141,53 @@ export async function resolveMilestone(
     'milestone',
     matches.map((milestone) => `${milestone.id}  ${milestone.name}`),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Task references (M3)
+// ---------------------------------------------------------------------------
+
+/** A task as the API addresses it: app key or Backlog.md id, and the project that narrows an id. */
+export interface TaskRef {
+  key: string;
+  project?: string;
+}
+
+/**
+ * The reference for a task argument. App keys (PAY-786.1) name their project. A Backlog.md id
+ * (BACK-786.1) is looked up in the project from --project, PM_PROJECT or .pm.json when its prefix
+ * is not that project's key. The git remote needs a server call, so withTaskRef tries it only when
+ * the lookup without a project fails.
+ */
+export async function taskRef(context: CommandContext, key: string, project?: string): Promise<TaskRef> {
+  const ref: TaskRef =
+    project !== undefined
+      ? { key, project }
+      : await resolveProject(context, undefined, { remote: false }).then((found) =>
+          found && found.key !== refPrefix(key) ? { key, project: found.key } : { key },
+        );
+  context.target = { ...context.target, task: ref };
+  return ref;
+}
+
+/**
+ * Runs `call` with the reference. When the task is not found (404) or the id is in several projects
+ * (422) and no project narrowed it, tries again in the project linked to this clone's git remote.
+ */
+export async function withTaskRef<T>(
+  context: CommandContext,
+  ref: TaskRef,
+  call: (ref: TaskRef) => Promise<T>,
+): Promise<T> {
+  try {
+    return await call(ref);
+  } catch (error) {
+    if (ref.project !== undefined || !(error instanceof ORPCError)) throw error;
+    if (error.status !== 404 && error.status !== 422) throw error;
+    const found = await resolveProject(context).catch(() => null);
+    if (found?.source !== 'remote' || found.key === refPrefix(ref.key)) throw error;
+    const narrowed = { ...ref, project: found.key };
+    context.target = { ...context.target, task: narrowed };
+    return call(narrowed);
+  }
 }

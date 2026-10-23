@@ -16,6 +16,18 @@ export interface CommandContext {
   url?: string;
   /** Client with the resolved credentials (PM_URL / PM_KEY, else the config file). */
   client: () => Promise<ApiClient>;
+  /**
+   * What the command works on, set by commands before they call the API. A Backlog.md mirror error
+   * uses it to name the task's file branch and what is still allowed (see describeFailure).
+   */
+  target?: CommandTarget;
+}
+
+export interface CommandTarget {
+  /** A task reference as sent: app key or Backlog.md id, with the project that narrows it. */
+  task?: { key: string; project?: string };
+  /** The project key, when the command names one. */
+  project?: string;
 }
 
 export function createContext(io: CliIo, json: boolean): CommandContext {
@@ -63,6 +75,6 @@ export function reportError(context: CommandContext, error: CliError): void {
     printJson(context, cliOutput('error', error.problem));
     return;
   }
-  const lines = [`pm: ${error.message}`, ...error.hints.map((hint) => `  ${hint}`)];
+  const lines = error.lines ?? [`pm: ${error.message}`, ...error.hints.map((hint) => `  ${hint}`)];
   context.io.stderr(`${lines.join('\n')}\n`);
 }
