@@ -2,6 +2,7 @@
 // (or the subset a service asks for) with the actor of each request.
 import type { Auth } from '@pm/auth';
 import type { Db } from '@pm/db';
+import type { createProvider, GitProvider, LookupFn } from '@pm/git-providers';
 import type { JobQueue } from './jobs';
 
 export interface DbContext {
@@ -23,7 +24,23 @@ export interface LinkContext extends DbContext {
   publicUrl: string;
 }
 
-export interface CoreContext extends AuthContext, LinkContext {
+/** Builds a git provider client. Tests inject a fake; adapters pass @pm/git-providers' createProvider. */
+export type ProviderFactory = (options: Parameters<typeof createProvider>[0]) => GitProvider;
+
+/** Services that read repositories (git connections, Backlog.md mirrors) need these. */
+export interface GitContext extends DbContext {
+  /** The decoded APP_ENCRYPTION_KEY (32 bytes). Undefined: git connections and mirrors are disabled. */
+  encryptionKey?: Uint8Array;
+  /** Default: @pm/git-providers createProvider. */
+  providerFactory?: ProviderFactory;
+  /**
+   * GIT_ALLOW_PRIVATE_HOSTS and GIT_HTTP_HOSTS. Default: public hosts only, HTTPS only. `lookup`
+   * replaces DNS resolution in tests; production leaves it unset.
+   */
+  gitHosts?: { allowPrivate: boolean; httpHosts: string[]; lookup?: LookupFn };
+}
+
+export interface CoreContext extends AuthContext, LinkContext, GitContext {
   /** Producer for background jobs. Optional: services that enqueue nothing work without it. */
   jobs?: JobQueue;
 }

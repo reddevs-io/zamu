@@ -10,6 +10,12 @@
 //   Editing or deleting a comment also needs authorship, which comments.ts checks.
 // - Turning milestones or cycles on or off: project.update.
 // - Your own preferences (theme): people through a session only; API keys get 403.
+// M3 (section 5 "Authorization (additions)" of the M3 plan):
+// - Git connections: owners and admins manage them; everyone lists them (workspace.read), never
+//   seeing tokens.
+// - Backlog.md: set up, edit mappings, show the webhook secret and detach are for owners and
+//   admins; refreshing is for them and for agents whose key can write the project; anyone who can
+//   read the project reads the source status and its problems.
 import type { Actor, WorkspaceRole } from '@pm/auth';
 import { Forbidden } from './errors';
 
@@ -49,7 +55,15 @@ export type Action =
   /** Create an API key for `owner`. */
   | 'apiKey.create'
   /** Revoke an API key owned by `owner`. */
-  | 'apiKey.revoke';
+  | 'apiKey.revoke'
+  /** Add, change, test and delete git connections. Listing them needs only workspace.read. */
+  | 'connection.manage'
+  /** Set up a Backlog.md source, edit its mappings, folder and connection, see the webhook secret, detach. */
+  | 'backlog.manage'
+  /** Ask for a Backlog.md refresh now (Refresh now, pm backlog refresh). */
+  | 'backlog.refresh'
+  /** Read a project's Backlog.md source status and problems. */
+  | 'backlog.read';
 
 export function isAdmin(actor: Actor): boolean {
   return actor.role === 'owner' || actor.role === 'admin';
@@ -119,6 +133,23 @@ export function can(actor: Actor, action: Action, resource?: Resource): boolean 
       // Admins may revoke anyone's key in the workspace (key hygiene); they never create keys for people.
       return action === 'apiKey.revoke' && isAdmin(actor);
     }
+    case 'connection.manage':
+      return isAdmin(actor) && canManageSettings(actor);
+    case 'backlog.manage': {
+      const projectId = projectIdOf(resource);
+      return (
+        projectId !== null && isAdmin(actor) && canManageSettings(actor) && keyCoversProject(actor, projectId)
+      );
+    }
+    case 'backlog.refresh': {
+      const projectId = projectIdOf(resource);
+      if (projectId === null || !keyCoversProject(actor, projectId) || !keyCanWrite(actor)) return false;
+      return isAdmin(actor) || actor.kind === 'agent';
+    }
+    case 'backlog.read': {
+      const projectId = projectIdOf(resource);
+      return projectId !== null && keyCoversProject(actor, projectId);
+    }
   }
 }
 
@@ -134,6 +165,10 @@ const MESSAGES: Record<Action, string> = {
   'apiKey.list': 'You can see only your own keys and keys of agents you are responsible for',
   'apiKey.create': 'You can create keys only for yourself or for agents you are responsible for',
   'apiKey.revoke': 'You can revoke only your own keys or keys of agents you are responsible for',
+  'connection.manage': 'Only workspace admins can add, change or delete git connections',
+  'backlog.manage': 'Only workspace admins can set up, change or detach Backlog.md',
+  'backlog.refresh': 'Only workspace admins and agents with write access can refresh Backlog.md',
+  'backlog.read': 'Your API key does not cover this project',
 };
 
 /** Throws Forbidden unless `actor` may perform `action` on `resource`. */
@@ -142,7 +177,12 @@ export function authorize(actor: Actor, action: Action, resource?: Resource): vo
   let message = MESSAGES[action];
   if (actor.kind === 'agent' && (action === 'member.manage' || action.startsWith('apiKey.'))) {
     message = 'Agents cannot manage members, agents or API keys';
-  } else if (actor.scope?.access === 'read' && action !== 'project.read' && action !== 'profile.update') {
+  } else if (
+    actor.scope?.access === 'read' &&
+    action !== 'project.read' &&
+    action !== 'backlog.read' &&
+    action !== 'profile.update'
+  ) {
     message = 'This API key is read-only';
   }
   throw new Forbidden(message);

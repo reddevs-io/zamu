@@ -1,7 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { enqueueBacklogRefresh, REFRESH_THROTTLE_SECONDS } from './backlog/refresh';
 import {
+  BACKLOG_POLL,
+  BACKLOG_REFRESH,
   CYCLES_END_DUE,
   createJobQueue,
   enqueue,
@@ -9,7 +12,9 @@ import {
   INVITATIONS_EXPIRE,
   isJobName,
   JOB_NAMES,
+  JOB_QUEUE_OPTIONS,
   JOB_SCHEDULES,
+  type JobQueue,
   parseJobPayload,
 } from './jobs';
 import { type TestContext, testContext } from './testing/fixtures';
@@ -39,12 +44,23 @@ describe('jobs', () => {
   }
 
   it('exports names, payload schemas and the schedules', () => {
-    expect(JOB_NAMES).toEqual(['invitations.expire', 'cycles.end-due']);
+    expect(JOB_NAMES).toEqual(['invitations.expire', 'cycles.end-due', 'backlog.refresh', 'backlog.poll']);
     expect(isJobName('invitations.expire')).toBe(true);
     expect(isJobName('cycles.end-due')).toBe(true);
     expect(isJobName('nope')).toBe(false);
     expect(JOB_SCHEDULES[INVITATIONS_EXPIRE]).toEqual({ cron: '0 3 * * *', tz: 'UTC', data: {} });
     expect(JOB_SCHEDULES[CYCLES_END_DUE]).toEqual({ cron: '0 * * * *', tz: 'UTC', data: {} });
+    expect(JOB_SCHEDULES[BACKLOG_POLL]).toEqual({ cron: '15 * * * *', tz: 'UTC', data: {} });
+    expect(JOB_SCHEDULES[BACKLOG_REFRESH]).toBeUndefined();
+    expect(JOB_QUEUE_OPTIONS[BACKLOG_REFRESH]).toEqual({ policy: 'stately' });
+    const sourceId = crypto.randomUUID();
+    expect(parseJobPayload(BACKLOG_REFRESH, { sourceId, trigger: 'webhook' })).toEqual({
+      sourceId,
+      trigger: 'webhook',
+    });
+    expect(() => parseJobPayload(BACKLOG_REFRESH, { sourceId, trigger: 'push' })).toThrow();
+    expect(() => parseJobPayload(BACKLOG_REFRESH, { sourceId: 'nope', trigger: 'poll' })).toThrow();
+    expect(parseJobPayload(BACKLOG_POLL, {})).toEqual({});
     expect(parseJobPayload(CYCLES_END_DUE, { now: '2040-01-01T00:00:00Z' })).toEqual({
       now: '2040-01-01T00:00:00Z',
     });
@@ -83,5 +99,83 @@ describe('jobs', () => {
     await expect(
       ctx.db.transaction((tx) => enqueue(boss, tx, INVITATIONS_EXPIRE, { now: 'not a date' })),
     ).rejects.toThrow();
+  });
+
+  it('creates backlog.refresh as a stately queue', async () => {
+    const queue = await boss.getQueue(BACKLOG_REFRESH);
+    expect(queue?.policy).toBe('stately');
+  });
+
+  it('queues asked-for refreshes without the debounce slot, webhooks and polls with it', async () => {
+    const sent: { trigger: string; options: unknown }[] = [];
+    const fake = {
+      enqueue: async (_tx: unknown, _name: string, data: { trigger: string }, options?: unknown) => {
+        sent.push({ trigger: data.trigger, options });
+        return 'job';
+      },
+    } as unknown as JobQueue;
+    const sourceId = crypto.randomUUID();
+    for (const trigger of ['manual', 'cli', 'setup', 'webhook', 'poll'] as const) {
+      await ctx.db.transaction((tx) => enqueueBacklogRefresh({ jobs: fake }, tx, sourceId, trigger));
+    }
+    const debounced = sent.filter(
+      (entry) => (entry.options as { singletonSeconds?: number }).singletonSeconds,
+    );
+    expect(debounced.map((entry) => entry.trigger)).toEqual(['webhook', 'poll']);
+    expect(
+      sent.every((entry) => (entry.options as { singletonKey?: string }).singletonKey === sourceId),
+    ).toBe(true);
+  });
+
+  it('collapses refresh triggers for one source into one queued run', async () => {
+    const queue = createJobQueue(boss);
+    const sourceId = crypto.randomUUID();
+    const other = crypto.randomUUID();
+    const first = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    const second = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'manual'),
+    );
+    const third = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'poll'),
+    );
+    const elsewhere = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, other, 'webhook'),
+    );
+    expect(first).toBeTruthy();
+    expect(second).toBeNull();
+    expect(third).toBeNull();
+    expect(elsewhere).toBeTruthy();
+    const job = await boss.getJobById(BACKLOG_REFRESH, first as string);
+    expect(job).toMatchObject({ data: { sourceId, trigger: 'webhook' }, singletonKey: sourceId });
+    const result = await ctx.db.execute<{ n: number }>(
+      sql`select count(*)::int as n from pgboss.job where name = ${BACKLOG_REFRESH} and singleton_key = ${sourceId}`,
+    );
+    expect(result.rows[0]?.n).toBe(1);
+    expect(REFRESH_THROTTLE_SECONDS).toBe(60);
+  });
+
+  it('queues one more run while a refresh of the source is running', async () => {
+    const queue = createJobQueue(boss);
+    const sourceId = crypto.randomUUID();
+    const first = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    // Start it: the job becomes active.
+    const fetched = await boss.fetch(BACKLOG_REFRESH, { batchSize: 20 });
+    expect(fetched.map((job) => job.id)).toContain(first);
+    const during = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect(during).toBeTruthy();
+    const again = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect(again).toBeNull();
+    // A burst lands in the next 60-second slot: it starts after the current slot ends.
+    const queued = await boss.getJobById(BACKLOG_REFRESH, during as string);
+    expect(queued?.startAfter.getTime()).toBeGreaterThan(Date.now() - 1000);
+    await boss.complete(BACKLOG_REFRESH, first as string);
   });
 });

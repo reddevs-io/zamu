@@ -1,42 +1,60 @@
 // Tasks: list, get by key, create, update. Every write records activity in the same transaction.
+// M3: tasks of a project mirrored from Backlog.md carry their Backlog.md block, keep the fields
+// Backlog.md owns locked (TASK_MIRRORED), and hide while their file is gone from the default branch.
 import {
   ASSIGNEE_AGENTS,
   ASSIGNEE_ME,
+  BacklogBlock,
+  type BacklogTaskLink,
   CreateTaskInput,
   type CycleSelector,
   DEFAULT_TASK_PRIORITY,
   DEFAULT_TASK_STATUS,
   FILTER_NONE,
+  formatBacklogId,
   formatTaskKey,
   GetTaskInput,
   ListTasksInput,
   type Priority,
+  parseBacklogId,
+  parseRepositoryUrl,
   parseTaskKey,
   priorityFromValue,
   priorityToValue,
+  TASK_OWNED_FIELDS,
   TASK_STATUS_LABELS,
   TASK_STATUSES,
   Task,
+  type TaskBacklog,
   TaskListPage,
+  type TaskOwnedField,
   type TaskPosition,
   type TaskStatus,
   UpdateTaskInput,
 } from '@pm/contracts';
 import { type DbOrTx, schema, type Tx } from '@pm/db';
-import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
+import { createProvider, hostnameOf } from '@pm/git-providers';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { recordActivity, type StoredChange } from './activity';
 import { type Actor, authorize } from './authz';
-import type { DbContext } from './context';
+import type { DbContext, GitContext } from './context';
 import { type ClockContext, type CycleRow, cycleStateOn, resolveCycleSelector, todayIn } from './cycles';
-import { Invalid, NotFound, parseInput, TaskChanged } from './errors';
+import { Invalid, NotFound, ProjectMirrored, parseInput, TaskChanged, TaskMirrored } from './errors';
 import {
+  type BacklogSourceRow,
+  backlogFilePath,
   findProjectByKey,
   findTask,
+  loadBacklogSource,
   loadUsers,
   type MilestoneRow,
+  mirroredProjectIds,
   type ProjectRow,
   readableProjects,
+  shellWord,
+  sourceIsActive,
+  sourceMirrors,
   type TaskRow,
   type UserRow,
   userRef,
@@ -44,11 +62,29 @@ import {
 } from './internal';
 import { activateMilestoneForTask } from './milestones';
 
-const { cycle, milestone, project, task, user } = schema;
+const { comment, cycle, gitConnection, milestone, project, task, user } = schema;
 type TaskInsert = typeof task.$inferInsert;
 
-/** Context of the task services: the database plus the optional clock that dates cycles. */
-export type TaskContext = DbContext & ClockContext;
+/**
+ * Context of the task services: the database plus the optional clock that dates cycles, and the
+ * git host settings that decide whether file links use http (GIT_HTTP_HOSTS).
+ */
+export type TaskContext = DbContext & ClockContext & Pick<GitContext, 'gitHosts'>;
+
+/** What mapping a task needs besides its row: today (cycle states) and the git host settings. */
+interface TaskView {
+  today: string;
+  gitHosts?: GitContext['gitHosts'];
+}
+
+function viewOf(ctx: TaskContext): TaskView {
+  return { today: todayIn(ctx), gitHosts: ctx.gitHosts };
+}
+
+/** The locked fields of a task in a project that does (true) or does not mirror Backlog.md. */
+function lockedFields(mirrored: boolean): TaskOwnedField[] {
+  return mirrored ? [...TASK_OWNED_FIELDS] : [];
+}
 
 /** Statuses that count as started: moving a task into one activates its milestone. */
 const STARTED_STATUSES: ReadonlySet<TaskStatus> = new Set(['in_progress', 'in_review']);
@@ -133,13 +169,134 @@ async function planningRefs(db: DbOrTx, rows: PlanningRow[], today: string) {
   };
 }
 
-async function toTask(db: DbOrTx, projectRow: ProjectRow, row: TaskRow, today: string): Promise<Task> {
+/** A Backlog.md id in canonical form (BACK-12), or the value upper-cased when it is not one. */
+function canonicalBacklogId(value: string): string {
+  const parts = parseBacklogId(value);
+  return parts ? formatBacklogId(parts) : value.trim().toUpperCase();
+}
+
+/** Web page of a Backlog.md file on the provider, or null when the source cannot say. */
+async function backlogFileUrl(
+  db: DbOrTx,
+  projectRow: ProjectRow,
+  source: BacklogSourceRow,
+  file: string,
+  gitHosts: TaskView['gitHosts'],
+): Promise<string | null> {
+  if (!source.connectionId || !source.defaultBranch || !projectRow.repository) return null;
+  const repository = parseRepositoryUrl(projectRow.repository);
+  if (!repository) return null;
+  const [connection] = await db
+    .select({ provider: gitConnection.provider, host: gitConnection.host })
+    .from(gitConnection)
+    .where(eq(gitConnection.id, source.connectionId))
+    .limit(1);
+  if (!connection) return null;
+  const hostname = hostnameOf(connection.host);
+  const allowHttp = (gitHosts?.httpHosts ?? []).some((host) => host === connection.host || host === hostname);
+  try {
+    // No token: fileUrl only builds a link and never calls the provider.
+    const provider = createProvider({
+      provider: connection.provider,
+      host: connection.host,
+      token: '',
+      allowHttp,
+    });
+    return provider.fileUrl(repository.path, source.defaultBranch, file);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The Backlog.md origin of a task as task shapes carry it: the block with dependencies, parent and
+ * subtasks resolved to tasks of the same project and assignee values to members, plus the file
+ * it was last read from (null once the file is gone or after detach).
+ */
+async function taskBacklog(
+  db: DbOrTx,
+  projectRow: ProjectRow,
+  row: TaskRow & { backlogId: string },
+  source: BacklogSourceRow | null,
+  gitHosts: TaskView['gitHosts'],
+): Promise<z.input<typeof TaskBacklog>> {
+  const parsed = BacklogBlock.safeParse(row.backlogData ?? {});
+  const block = parsed.success ? parsed.data : BacklogBlock.parse({});
+  const linkIds = [
+    ...new Set(
+      [...block.dependencies, ...(block.parentId ? [block.parentId] : []), ...block.subtasks].map(
+        canonicalBacklogId,
+      ),
+    ),
+  ];
+  const linked =
+    linkIds.length === 0
+      ? []
+      : await db
+          .select({
+            backlogId: task.backlogId,
+            number: task.number,
+            keySuffix: task.keySuffix,
+            title: task.title,
+            status: task.status,
+            hiddenAt: task.hiddenAt,
+          })
+          .from(task)
+          .where(and(eq(task.projectId, projectRow.id), inArray(task.backlogId, linkIds)))
+          // Visible tasks win when an id is (briefly) on two tasks.
+          .orderBy(sql`${task.hiddenAt} is not null`, asc(task.id));
+  const byId = new Map<string, (typeof linked)[number]>();
+  for (const item of linked) if (item.backlogId && !byId.has(item.backlogId)) byId.set(item.backlogId, item);
+  const link = (id: string): BacklogTaskLink => {
+    const found = byId.get(canonicalBacklogId(id));
+    return {
+      id,
+      task: found
+        ? {
+            key: formatTaskKey(projectRow.key, found.number, found.keySuffix),
+            title: found.title,
+            status: found.status,
+            hidden: found.hiddenAt !== null,
+          }
+        : null,
+    };
+  };
+  const users = await loadUsers(
+    db,
+    block.assignees.flatMap((value) => (value.userId ? [value.userId] : [])),
+  );
+  // Detach keeps the backlog_file rows, so a detached task still links to the file it came from.
+  const file = source ? await backlogFilePath(db, source, { taskId: row.id }) : null;
+  const fileUrl = file && source ? await backlogFileUrl(db, projectRow, source, file, gitHosts) : null;
+  const { assignees, dependencies, parentId, subtasks, ...rest } = block;
+  return {
+    id: row.backlogId,
+    file,
+    fileUrl,
+    data: {
+      ...rest,
+      assignees: assignees.map((value) => {
+        const member = value.userId ? users.get(value.userId) : undefined;
+        return { value: value.value, user: member ? userRef(member) : null };
+      }),
+      dependencies: dependencies.map(link),
+      parent: parentId ? link(parentId) : null,
+      subtasks: subtasks.map(link),
+    },
+  };
+}
+
+async function toTask(db: DbOrTx, projectRow: ProjectRow, row: TaskRow, view: TaskView): Promise<Task> {
   // Sequential: toTask runs inside transactions, where queries share one connection.
   const users = await usersFor(db, [row.assigneeId, row.createdById, row.createdOnBehalfOfId]);
-  const refs = await planningRefs(db, [row], today);
+  const refs = await planningRefs(db, [row], view.today);
+  const source = await loadBacklogSource(db, projectRow.id);
+  const backlog = row.backlogId
+    ? await taskBacklog(db, projectRow, { ...row, backlogId: row.backlogId }, source, view.gitHosts)
+    : null;
   return Task.parse({
     id: row.id,
-    key: formatTaskKey(projectRow.key, row.number),
+    key: formatTaskKey(projectRow.key, row.number, row.keySuffix),
     number: row.number,
     project: { id: projectRow.id, key: projectRow.key, name: projectRow.name },
     title: row.title,
@@ -153,6 +310,10 @@ async function toTask(db: DbOrTx, projectRow: ProjectRow, row: TaskRow, today: s
     cycle: refs.cycle(row),
     cycleAddedAt: row.cycleAddedAt,
     rank: row.rank,
+    backlog,
+    locked: lockedFields(sourceMirrors(source)),
+    hidden: row.hiddenAt !== null,
+    hiddenAt: row.hiddenAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -252,7 +413,8 @@ async function cycleIdsFor(
  * One page of tasks in list order (status, then priority highest first, then last update newest
  * first) or board order (status, then rank). Without `project`, the page spans every project the
  * actor can read in the workspace. `counts` covers every status for the same filters, ignoring the
- * status filter, so the UI can show group sizes.
+ * status filter, so the UI can show group sizes. Hidden tasks (file gone from Backlog.md) are left
+ * out of the page and the counts unless `hidden` is only or include.
  */
 export async function listTasks(
   ctx: TaskContext,
@@ -287,10 +449,19 @@ export async function listTasks(
     // No such cycle anywhere: nothing matches.
     conditions.push(ids.length === 0 ? sql`false` : inArray(task.cycleId, ids));
   }
+  if (filters.hidden === 'only') conditions.push(isNotNull(task.hiddenAt));
+  else if (filters.hidden !== 'include') conditions.push(isNull(task.hiddenAt));
   if (filters.q) {
     const pattern = `%${escapeLike(filters.q)}%`;
     conditions.push(
-      or(ilike(task.title, pattern), ilike(sql`${project.key} || '-' || ${task.number}::text`, pattern)),
+      or(
+        ilike(task.title, pattern),
+        ilike(
+          sql`${project.key} || '-' || ${task.number}::text || coalesce('.' || ${task.keySuffix}, '')`,
+          pattern,
+        ),
+        ilike(task.backlogId, pattern),
+      ),
     );
   }
   const statusCondition = filters.status ? inArray(task.status, filters.status) : undefined;
@@ -336,7 +507,8 @@ export async function listTasks(
     );
   }
 
-  const [users, refs] = await Promise.all([
+  const pageIds = page.map((row) => row.task.id);
+  const [users, refs, mirrored, comments] = await Promise.all([
     usersFor(
       db,
       page.map((row) => row.task.assigneeId),
@@ -346,13 +518,18 @@ export async function listTasks(
       page.map((row) => row.task),
       todayIn(ctx),
     ),
+    mirroredProjectIds(
+      db,
+      page.map((row) => row.project.id),
+    ),
+    liveCommentCounts(db, pageIds),
   ]);
   for (const row of countRows) counts[row.status] = row.count;
 
   return TaskListPage.parse({
     items: page.map(({ task: row, project: projectRef }) => ({
       id: row.id,
-      key: formatTaskKey(projectRef.key, row.number),
+      key: formatTaskKey(projectRef.key, row.number, row.keySuffix),
       number: row.number,
       project: projectRef,
       title: row.title,
@@ -363,6 +540,11 @@ export async function listTasks(
       cycle: refs.cycle(row),
       cycleAddedAt: row.cycleAddedAt,
       rank: row.rank,
+      backlogId: row.backlogId,
+      locked: lockedFields(mirrored.has(projectRef.id)),
+      hidden: row.hiddenAt !== null,
+      hiddenAt: row.hiddenAt,
+      commentCount: comments.get(row.id) ?? 0,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     })),
@@ -371,15 +553,30 @@ export async function listTasks(
   });
 }
 
+/** Comments that are not deleted, per task id; tasks without any are left out. */
+async function liveCommentCounts(db: DbOrTx, taskIds: string[]): Promise<Map<string, number>> {
+  if (taskIds.length === 0) return new Map();
+  const rows = await db
+    .select({ taskId: comment.taskId, count: sql<number>`count(*)`.mapWith(Number) })
+    .from(comment)
+    .where(and(inArray(comment.taskId, taskIds), isNull(comment.deletedAt)))
+    .groupBy(comment.taskId);
+  return new Map(rows.map((row) => [row.taskId, row.count]));
+}
+
 // ---------------------------------------------------------------------------
 // Get
 // ---------------------------------------------------------------------------
 
-/** A task by key, e.g. PAY-142. NotFound outside the workspace; Forbidden outside the key's scope. */
+/**
+ * A task by key (PAY-142, PAY-786.1) or by Backlog.md id (BACK-786.1, narrowed by `project` when
+ * given). Hidden tasks are found too. NotFound outside the workspace; Forbidden outside the key's
+ * scope.
+ */
 export async function getTask(ctx: TaskContext, actor: Actor, input: z.input<typeof GetTaskInput>) {
-  const { key } = parseInput(GetTaskInput, input);
-  const found = await findTask(ctx.db, actor, key);
-  return toTask(ctx.db, found.project, found.task, todayIn(ctx));
+  const { key, project: projectKey } = parseInput(GetTaskInput, input);
+  const found = await findTask(ctx.db, actor, key, { project: projectKey });
+  return toTask(ctx.db, found.project, found.task, viewOf(ctx));
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +697,7 @@ async function rankForPosition(
   const before = 'before' in position;
   const refKey = before ? position.before : position.after;
   const path = before ? 'position.before' : 'position.after';
-  const { projectKey, number } = parseTaskKey(refKey);
+  const { projectKey, number, suffix } = parseTaskKey(refKey);
   if (projectKey !== projectRow.key) {
     throw invalidField(path, `${refKey} is not in project ${projectRow.key}`);
   }
@@ -509,7 +706,13 @@ async function rankForPosition(
     const [ref] = await tx
       .select({ id: task.id, rank: task.rank, status: task.status })
       .from(task)
-      .where(and(eq(task.projectId, projectRow.id), eq(task.number, number)))
+      .where(
+        and(
+          eq(task.projectId, projectRow.id),
+          eq(task.number, number),
+          suffix === null ? isNull(task.keySuffix) : eq(task.keySuffix, suffix),
+        ),
+      )
       .limit(1);
     if (!ref) throw invalidField(path, `Task ${refKey} not found`);
     if (ref.id === movingId) throw invalidField(path, 'A task cannot be placed next to itself');
@@ -563,6 +766,14 @@ export async function createTask(
     // and a rank above the column's current top; a cycle cannot end while the task joins it.
     const projectRow = await findProjectByKey(tx, actor, parsed.project, { forUpdate: true });
     authorize(actor, 'task.write', { type: 'project', projectId: projectRow.id });
+    const source = await loadBacklogSource(tx, projectRow.id);
+    if (sourceMirrors(source)) throw projectMirroredCreate(projectRow, source, parsed.title);
+    // An import that has not finished its first read still needs every number it will take.
+    if (sourceIsActive(source)) {
+      throw new ProjectMirrored(
+        `${projectRow.name} is importing from Backlog.md. Add tasks once the import has finished.`,
+      );
+    }
     const assigneeId = (await resolveAssignee(tx, actor, parsed.assignee)) ?? null;
     const milestoneRow = (await resolveMilestone(tx, projectRow, parsed.milestone)) ?? null;
     const cycleRow = (await resolveCycle(tx, ctx, projectRow, parsed.cycle)) ?? null;
@@ -616,7 +827,7 @@ export async function createTask(
       changes,
     });
 
-    return toTask(tx, projectRow, row, todayIn(ctx));
+    return toTask(tx, projectRow, row, viewOf(ctx));
   });
 }
 
@@ -629,6 +840,10 @@ export async function createTask(
  *   Rank is not recorded as activity.
  * - A task that ends up started (In progress, In review) after a status or milestone change
  *   activates its milestone.
+ * - M3: in a project that mirrors Backlog.md, a change to a field Backlog.md owns (title,
+ *   description, status, priority, assignee, milestone) fails with TaskMirrored, which names the
+ *   field, the file and a `backlog task edit` hint. A board move to another column is a status
+ *   change and fails the same way. Cycle and rank within the column stay editable.
  */
 export async function updateTask(
   ctx: TaskContext,
@@ -636,7 +851,7 @@ export async function updateTask(
   input: z.input<typeof UpdateTaskInput>,
 ): Promise<Task> {
   const parsed = parseInput(UpdateTaskInput, input);
-  const today = todayIn(ctx);
+  const view = viewOf(ctx);
   return ctx.db.transaction(async (tx) => {
     // Rank changes may renumber the column, and ending a cycle moves tasks under the project lock:
     // take it first for those changes (see findTask).
@@ -645,6 +860,7 @@ export async function updateTask(
     const { project: projectRow, task: current } = await findTask(tx, actor, parsed.key, {
       forUpdate: true,
       lockProject,
+      project: parsed.project,
     });
     authorize(actor, 'task.write', { type: 'project', projectId: projectRow.id });
 
@@ -655,7 +871,7 @@ export async function updateTask(
         })
         .from(task)
         .where(eq(task.id, current.id));
-      if (check?.stale) throw new TaskChanged(await toTask(tx, projectRow, current, today));
+      if (check?.stale) throw new TaskChanged(await toTask(tx, projectRow, current, view));
     }
 
     const set: Partial<TaskInsert> = {};
@@ -713,6 +929,14 @@ export async function updateTask(
       }
     }
 
+    const owned = changes.find((change) => isOwnedChange(change));
+    if (owned) {
+      const source = await loadBacklogSource(tx, projectRow.id);
+      if (sourceMirrors(source)) {
+        throw await taskMirrored(tx, projectRow, current, source as BacklogSourceRow, owned);
+      }
+    }
+
     const status = set.status ?? current.status;
     if (parsed.position) {
       set.rank = await rankForPosition(tx, projectRow, current.id, status, parsed.position);
@@ -720,7 +944,7 @@ export async function updateTask(
       set.rank = await topRank(tx, projectRow.id, status, current.id);
     }
 
-    if (Object.keys(set).length === 0) return toTask(tx, projectRow, current, today);
+    if (Object.keys(set).length === 0) return toTask(tx, projectRow, current, view);
 
     const [row] = await tx
       .update(task)
@@ -740,7 +964,7 @@ export async function updateTask(
         changes,
       });
     }
-    return toTask(tx, projectRow, row, today);
+    return toTask(tx, projectRow, row, view);
   });
 }
 
@@ -749,4 +973,139 @@ async function sameCycle(tx: Tx, cycleId: string, selector: CycleSelector): Prom
   if (typeof selector !== 'number') return false;
   const [row] = await tx.select({ number: cycle.number }).from(cycle).where(eq(cycle.id, cycleId)).limit(1);
   return row?.number === selector;
+}
+
+// ---------------------------------------------------------------------------
+// Backlog.md locks (M3)
+// ---------------------------------------------------------------------------
+
+/** How a TaskMirrored message names each owned field. */
+const OWNED_FIELD_LABELS: Record<TaskOwnedField, string> = {
+  title: 'title',
+  description: 'description',
+  status: 'status',
+  priority: 'priority',
+  assignee: 'assignee',
+  milestone: 'milestone',
+  createdAt: 'created date',
+};
+
+/** A change updateTask can make; isOwnedChange picks the ones to fields Backlog.md owns. */
+type OwnedChange = Exclude<StoredChange, { field: 'backlog' }>;
+
+/** True for changes to fields Backlog.md owns (every task field but cycle). */
+function isOwnedChange(change: StoredChange): change is OwnedChange {
+  return (TASK_OWNED_FIELDS as readonly string[]).includes(change.field);
+}
+
+/** The Backlog.md value a mapping turns into `to`: a row chosen by name or by hand before a fallback. */
+function mappedFrom<T extends { from: string; how: string }>(
+  rows: T[] | undefined,
+  matches: (row: T) => boolean,
+) {
+  const candidates = (rows ?? []).filter(matches);
+  return (candidates.find((row) => row.how !== 'fallback') ?? candidates[0])?.from ?? null;
+}
+
+/**
+ * The `backlog task edit` arguments that make the same change in Backlog.md, or a sentence when
+ * the CLI has no flag for it. Flags from Backlog.md's CLI (src/cli.ts, configureEditCommand).
+ */
+async function editArguments(
+  tx: Tx,
+  source: BacklogSourceRow,
+  change: OwnedChange,
+): Promise<{ flags: string } | { text: string }> {
+  const mappings = source.mappings;
+  switch (change.field) {
+    case 'title':
+      return { flags: `-t ${shellWord(change.to ?? '')}` };
+    case 'description': {
+      const text = change.to ?? '';
+      const short = text.length <= 80 && !text.includes('\n');
+      return { flags: `-d ${short ? shellWord(text) : '"<description>"'}` };
+    }
+    case 'status': {
+      if (!change.to) return { text: 'Change status in the task file and push' };
+      const status = change.to;
+      const value = mappedFrom(mappings.status, (row) => row.to === status) ?? TASK_STATUS_LABELS[status];
+      return { flags: `-s ${shellWord(value)}` };
+    }
+    case 'priority': {
+      const priority = change.to ?? 'none';
+      const value =
+        mappedFrom(mappings.priority, (row) => row.to === priority) ??
+        (priority === 'none' ? null : priority);
+      return value
+        ? { flags: `--priority ${shellWord(value)}` }
+        : { text: 'Remove priority from the task file and push' };
+    }
+    case 'assignee': {
+      if (!change.to) return { flags: '-a ""' };
+      const userId = change.to;
+      const mapped = mappedFrom(mappings.assignee, (row) => row.userId === userId);
+      if (mapped) return { flags: `-a ${shellWord(mapped)}` };
+      const member = (await loadUsers(tx, [userId])).get(userId);
+      return { flags: `-a ${shellWord(`@${member?.name ?? 'name'}`)}` };
+    }
+    case 'milestone': {
+      if (!change.to) return { flags: '--clear-milestone' };
+      const [target] = await tx
+        .select({ name: milestone.name, backlogId: milestone.backlogId })
+        .from(milestone)
+        .where(eq(milestone.id, change.to))
+        .limit(1);
+      return { flags: `-m ${shellWord(target?.backlogId ?? target?.name ?? '')}` };
+    }
+    case 'cycle':
+      // Not owned (isOwnedChange leaves it out); here for completeness.
+      return { text: 'Cycles are set here, not in Backlog.md' };
+  }
+}
+
+/** A `backlog task edit` (or `backlog draft edit`) hint for `change` on the task with `backlogId`. */
+async function taskEditHint(
+  tx: Tx,
+  source: BacklogSourceRow,
+  row: TaskRow,
+  backlogId: string,
+  change: OwnedChange,
+): Promise<string> {
+  const parts = parseBacklogId(backlogId);
+  const id = parts ? formatTaskKey('', parts.number, parts.suffix).slice(1) : backlogId;
+  const block = BacklogBlock.safeParse(row.backlogData ?? {});
+  const command = block.success && block.data.kind === 'draft' ? 'draft' : 'task';
+  const args = await editArguments(tx, source, change);
+  return 'flags' in args ? `backlog ${command} edit ${id} ${args.flags}` : args.text;
+}
+
+/** TaskMirrored for `change` on a task of a mirrored project, with field, file, Backlog.md id and hint. */
+async function taskMirrored(
+  tx: Tx,
+  projectRow: ProjectRow,
+  row: TaskRow,
+  source: BacklogSourceRow,
+  change: OwnedChange,
+): Promise<TaskMirrored> {
+  const key = formatTaskKey(projectRow.key, row.number, row.keySuffix);
+  const file = await backlogFilePath(tx, source, { taskId: row.id });
+  const hint = row.backlogId ? await taskEditHint(tx, source, row, row.backlogId, change) : undefined;
+  return new TaskMirrored(
+    `${key} is mirrored from Backlog.md, so its ${OWNED_FIELD_LABELS[change.field as TaskOwnedField]} can't change here`,
+    {
+      field: change.field,
+      ...(file ? { file } : {}),
+      ...(row.backlogId ? { backlogId: row.backlogId } : {}),
+      ...(hint ? { hint } : {}),
+    },
+  );
+}
+
+/** ProjectMirrored for a new task in a mirrored project: tasks are added in Backlog.md. */
+function projectMirroredCreate(projectRow: ProjectRow, source: BacklogSourceRow | null, title: string) {
+  const folder = source?.folder ?? source?.folderOverride ?? 'backlog';
+  return new ProjectMirrored(
+    `Tasks in ${projectRow.name} come from Backlog.md. Add a file under ${folder}/tasks/, or run backlog task create, and push. It shows up here after the next refresh.`,
+    { hint: `backlog task create ${shellWord(title)}` },
+  );
 }

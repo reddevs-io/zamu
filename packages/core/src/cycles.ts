@@ -255,7 +255,8 @@ async function cycleCounts(
     .from(task)
     .innerJoin(cycle, eq(cycle.id, task.cycleId))
     .leftJoin(user, eq(user.id, task.assigneeId))
-    .where(inArray(task.cycleId, cycleIds))
+    // Tasks removed from Backlog.md stay in their cycle but count nowhere.
+    .where(and(inArray(task.cycleId, cycleIds), isNull(task.hiddenAt)))
     .groupBy(cycle.id);
   for (const { cycleId, ...counts } of rows) result.set(cycleId, counts);
   return result;
@@ -322,6 +323,7 @@ async function toCycleDetail(
     .select({
       taskId: task.id,
       number: task.number,
+      keySuffix: task.keySuffix,
       title: task.title,
       status: task.status,
       statusAtEnd: cycleRollover.statusAtEnd,
@@ -338,7 +340,12 @@ async function toCycleDetail(
   return CycleDetail.parse({
     ...base,
     rollovers: rollovers.map((r) => ({
-      task: { id: r.taskId, key: formatTaskKey(projectRow.key, r.number), title: r.title, status: r.status },
+      task: {
+        id: r.taskId,
+        key: formatTaskKey(projectRow.key, r.number, r.keySuffix),
+        title: r.title,
+        status: r.status,
+      },
       statusAtEnd: r.statusAtEnd,
       movedTo: r.toId && r.toNumber !== null ? { id: r.toId, number: r.toNumber, name: r.toName } : null,
       createdAt: r.createdAt,
@@ -590,7 +597,8 @@ async function endLockedCycle(
       afterStart: sql<boolean>`coalesce(${task.cycleAddedAt} > (${current.startsOn}::date::timestamp at time zone ${timeZone}), false)`,
     })
     .from(task)
-    .where(eq(task.cycleId, current.id))
+    // Hidden tasks (removed from Backlog.md) do not roll over; they stay in the ended cycle.
+    .where(and(eq(task.cycleId, current.id), isNull(task.hiddenAt)))
     .for('update');
   const unfinished = tasks.filter((t) => t.status !== 'done' && t.status !== 'canceled');
 

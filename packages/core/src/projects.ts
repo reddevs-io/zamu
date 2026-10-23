@@ -1,32 +1,125 @@
 // Projects: list with open counts, create, update, and the milestone and cycle switches.
+// M3: project shapes carry their Backlog.md source summary. While a source is active the key is
+// fixed, milestones stay on and the repository cannot point elsewhere; clearing it pauses the mirror.
 import {
+  BacklogProblem,
   CreateProjectInput,
   type CurrentCycle,
   OPEN_TASK_STATUSES,
+  PROJECT_OWNED_FIELDS,
   Project,
+  type ProjectBacklogSummary,
   ProjectList,
+  type ProjectOwnedField,
   parseRepositoryUrl,
   UpdateProjectInput,
   type UserRef,
 } from '@pm/contracts';
 import { type DbOrTx, schema } from '@pm/db';
-import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, can } from './authz';
 import type { DbContext } from './context';
 import { type ClockContext, currentCycles } from './cycles';
-import { Conflict, isUniqueViolation, parseInput } from './errors';
-import { findProjectByKey, type ProjectRow, toDate, userRef } from './internal';
+import { Conflict, isUniqueViolation, ProjectMirrored, parseInput } from './errors';
+import {
+  type BacklogSourceRow,
+  findProjectByKey,
+  loadBacklogSource,
+  type ProjectRow,
+  sourceIsActive,
+  toDate,
+  userRef,
+} from './internal';
 
-const { project, task, user } = schema;
+export { isMirrored } from './internal';
+
+const { backlogFile, backlogSource, project, task, user } = schema;
+
+/**
+ * backlog_source.last_error of a mirror paused because its project's repository was cleared. The
+ * mirror engine resumes such a source once the project has a repository again.
+ */
+export const REPOSITORY_CLEARED_ERROR =
+  'The project has no repository, so the mirror is paused. Add the repository again to resume it.';
+
+/** Project fields an active Backlog.md source constrains (see PROJECT_OWNED_FIELDS). */
+function lockedProjectFields(backlog: ProjectBacklogSummary | null | undefined): ProjectOwnedField[] {
+  return backlog && backlog.state !== 'detached' ? [...PROJECT_OWNED_FIELDS] : [];
+}
+
+/**
+ * The Backlog.md source summary of each project in `projectIds` that has a source (detached ones
+ * included); projects without a source are left out. problems.files counts distinct files skipped
+ * or read with a warning; problems.values counts values that fell back; hidden counts tasks whose
+ * file is gone.
+ */
+export async function backlogSummaryFor(
+  db: DbOrTx,
+  projectIds: string[],
+): Promise<Map<string, ProjectBacklogSummary>> {
+  const result = new Map<string, ProjectBacklogSummary>();
+  const unique = [...new Set(projectIds)];
+  if (unique.length === 0) return result;
+  const sources = await db.select().from(backlogSource).where(inArray(backlogSource.projectId, unique));
+  if (sources.length === 0) return result;
+  // Sequential: `db` may be a transaction, whose queries share one connection.
+  const hiddenRows = await db
+    .select({ projectId: task.projectId, count: sql<number>`count(*)`.mapWith(Number) })
+    .from(task)
+    .where(and(inArray(task.projectId, unique), isNotNull(task.hiddenAt)))
+    .groupBy(task.projectId);
+  const failedFiles = await db
+    .select({ sourceId: backlogFile.sourceId, path: backlogFile.path })
+    .from(backlogFile)
+    .where(
+      and(
+        inArray(
+          backlogFile.sourceId,
+          sources.map((row) => row.id),
+        ),
+        isNotNull(backlogFile.error),
+      ),
+    );
+  const hidden = new Map(hiddenRows.map((row) => [row.projectId, row.count]));
+  for (const source of sources) {
+    const files = new Set(failedFiles.filter((row) => row.sourceId === source.id).map((row) => row.path));
+    let values = 0;
+    for (const warning of source.warnings ?? []) {
+      const parsed = BacklogProblem.safeParse(warning);
+      if (!parsed.success) continue;
+      if (parsed.data.kind === 'file') files.add(parsed.data.path);
+      else values += 1;
+    }
+    result.set(source.projectId, {
+      mode: source.mode,
+      state: source.state,
+      defaultBranch: source.defaultBranch,
+      lastReadAt: source.lastReadAt ? source.lastReadAt.toISOString() : null,
+      lastReadCommit: source.lastReadCommit,
+      lastTrigger: source.lastTrigger,
+      problems: { files: files.size, values },
+      hidden: hidden.get(source.projectId) ?? 0,
+      detachedAt: source.detachedAt ? source.detachedAt.toISOString() : null,
+    });
+  }
+  return result;
+}
 
 const PROJECT_KEY_UNIQUE = 'project_workspaceId_key_unique';
 const PROJECT_REPOSITORY_UNIQUE = 'project_workspaceId_repositoryKey_unique';
 
 type ProjectContext = DbContext & ClockContext;
 
-/** The contract shape. `currentCycle` is dropped when the project does not use cycles. */
-export function toProject(row: ProjectRow, currentCycle: CurrentCycle | null = null): Project {
+/**
+ * The contract shape. `currentCycle` is dropped when the project does not use cycles. `backlog`
+ * is the project's Backlog.md source summary (backlogSummaryFor), null without a source.
+ */
+export function toProject(
+  row: ProjectRow,
+  currentCycle: CurrentCycle | null = null,
+  backlog: ProjectBacklogSummary | null = null,
+): Project {
   return Project.parse({
     id: row.id,
     key: row.key,
@@ -36,16 +129,19 @@ export function toProject(row: ProjectRow, currentCycle: CurrentCycle | null = n
     usesCycles: row.usesCycles,
     currentCycle: row.usesCycles ? currentCycle : null,
     repository: row.repository,
+    backlog,
+    locked: lockedProjectFields(backlog),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
 }
 
-/** toProject with the current cycle looked up. */
+/** toProject with the current cycle and the Backlog.md summary looked up. */
 async function toProjectWithCycle(ctx: ProjectContext, db: DbOrTx, row: ProjectRow): Promise<Project> {
-  if (!row.usesCycles) return toProject(row);
+  const backlog = (await backlogSummaryFor(db, [row.id])).get(row.id) ?? null;
+  if (!row.usesCycles) return toProject(row, null, backlog);
   const cycles = await currentCycles(db, [row.id], ctx);
-  return toProject(row, cycles.get(row.id) ?? null);
+  return toProject(row, cycles.get(row.id) ?? null, backlog);
 }
 
 function keyTaken(key: string): Conflict {
@@ -103,11 +199,14 @@ function repositoryRace(short: string | null): Conflict {
 }
 
 const openCount = (status: string) =>
-  sql<number>`count(${task.id}) filter (where ${task.status} = ${status})`.mapWith(Number);
+  sql<number>`count(${task.id}) filter (where ${task.status} = ${status} and ${task.hiddenAt} is null)`.mapWith(
+    Number,
+  );
 
 /**
  * Projects the actor can read, with open task counts per status, the distinct assignees of open
- * tasks (people first), the last activity time and the current cycle. Most recently active first.
+ * tasks (people first), the last activity time, the current cycle and the Backlog.md source.
+ * Hidden tasks count nowhere. Most recently active first.
  */
 export async function listProjects(ctx: ProjectContext, actor: Actor): Promise<ProjectList> {
   const { db } = ctx;
@@ -138,7 +237,7 @@ export async function listProjects(ctx: ProjectContext, actor: Actor): Promise<P
   const visible = rows.filter((row) =>
     can(actor, 'project.read', { type: 'project', projectId: row.project.id }),
   );
-  const [assignees, cycles] = await Promise.all([
+  const [assignees, cycles, backlogs] = await Promise.all([
     openAssignees(
       { db },
       visible.map((row) => row.project.id),
@@ -147,6 +246,10 @@ export async function listProjects(ctx: ProjectContext, actor: Actor): Promise<P
       db,
       visible.filter((row) => row.project.usesCycles).map((row) => row.project.id),
       ctx,
+    ),
+    backlogSummaryFor(
+      db,
+      visible.map((row) => row.project.id),
     ),
   ]);
 
@@ -159,7 +262,7 @@ export async function listProjects(ctx: ProjectContext, actor: Actor): Promise<P
         in_review: row.in_review,
       };
       return {
-        ...toProject(row.project, cycles.get(row.project.id) ?? null),
+        ...toProject(row.project, cycles.get(row.project.id) ?? null, backlogs.get(row.project.id) ?? null),
         openCounts,
         openCount: Object.values(openCounts).reduce((sum, n) => sum + n, 0),
         lastActivityAt: toDate(row.lastActivityAt),
@@ -177,7 +280,13 @@ async function openAssignees({ db }: DbContext, projectIds: string[]): Promise<M
     .selectDistinct({ projectId: task.projectId, id: user.id, name: user.name, kind: user.kind })
     .from(task)
     .innerJoin(user, eq(user.id, task.assigneeId))
-    .where(and(inArray(task.projectId, projectIds), inArray(task.status, [...OPEN_TASK_STATUSES])))
+    .where(
+      and(
+        inArray(task.projectId, projectIds),
+        inArray(task.status, [...OPEN_TASK_STATUSES]),
+        isNull(task.hiddenAt),
+      ),
+    )
     .orderBy(asc(task.projectId), desc(user.kind), asc(user.name), asc(user.id)); // 'person' > 'agent'
   for (const row of rows) {
     const list = result.get(row.projectId) ?? [];
@@ -219,6 +328,11 @@ export async function createProject(
  * Updates name, description, key, repository or the milestone and cycle switches. The key can change only
  * while the project has no tasks, because task keys embed it. Conflict otherwise, or when the new
  * key is taken. Turning a switch off keeps the milestones or cycles; turning it on shows them again.
+ *
+ * M3, while the project has a Backlog.md source that is not detached: the key cannot change and
+ * milestones cannot be turned off (ProjectMirrored). The repository cannot point at another
+ * repository; clearing it is allowed and pauses the source (REPOSITORY_CLEARED_ERROR), and adding
+ * one back to a cleared project clears that error for the mirror engine to resume.
  */
 export async function updateProject(
   ctx: ProjectContext,
@@ -231,6 +345,8 @@ export async function updateProject(
       // Locking the row also serialises against task creation, which updates next_task_number.
       const current = await findProjectByKey(tx, actor, parsed.project, { forUpdate: true });
       authorize(actor, 'project.update', { type: 'project', projectId: current.id });
+      const source = await loadBacklogSource(tx, current.id, { forUpdate: true });
+      const active = sourceIsActive(source);
 
       const changes: Partial<typeof project.$inferInsert> = {};
       if (parsed.name !== undefined && parsed.name !== current.name) changes.name = parsed.name;
@@ -239,6 +355,12 @@ export async function updateProject(
         if (description !== current.description) changes.description = description;
       }
       if (parsed.key !== undefined && parsed.key !== current.key) {
+        if (active) {
+          throw new ProjectMirrored(
+            `The key of ${current.key} can't change while it reads Backlog.md: task keys come from the files`,
+            { field: 'key', hint: 'Detach the project from Backlog.md first' },
+          );
+        }
         const [existing] = await tx
           .select({ id: task.id })
           .from(task)
@@ -250,6 +372,12 @@ export async function updateProject(
         changes.key = parsed.key;
       }
       if (parsed.usesMilestones !== undefined && parsed.usesMilestones !== current.usesMilestones) {
+        if (active && !parsed.usesMilestones) {
+          throw new ProjectMirrored(
+            `Milestones stay on while ${current.key} reads Backlog.md: its milestones live here`,
+            { field: 'usesMilestones', hint: 'Detach the project from Backlog.md first' },
+          );
+        }
         changes.usesMilestones = parsed.usesMilestones;
       }
       if (parsed.usesCycles !== undefined && parsed.usesCycles !== current.usesCycles) {
@@ -258,8 +386,20 @@ export async function updateProject(
       if (parsed.repository !== undefined) {
         const repo = repositoryColumns(parsed.repository);
         if (repo.repository !== current.repository) {
+          if (
+            active &&
+            repo.repositoryKey &&
+            current.repositoryKey &&
+            repo.repositoryKey !== current.repositoryKey
+          ) {
+            throw new ProjectMirrored(
+              `${current.key} reads Backlog.md from ${current.repository}, so its repository can't point elsewhere. Clearing it pauses the mirror.`,
+              { field: 'repository', hint: 'Detach the project from Backlog.md first' },
+            );
+          }
           if (repo.repositoryKey) await assertRepositoryFree(tx, actor, repo.repositoryKey, current.id);
           Object.assign(changes, repo);
+          if (active && source) await pauseOrResumeForRepository(tx, source, repo.repository);
         }
       }
       if (Object.keys(changes).length === 0) return toProjectWithCycle(ctx, tx, current);
@@ -274,5 +414,24 @@ export async function updateProject(
       throw repositoryRace(parsed.repository ? (parseRepositoryUrl(parsed.repository)?.short ?? null) : null);
     }
     throw error;
+  }
+}
+
+/**
+ * Clearing the repository of a project with an active source pauses the source; adding it back
+ * clears REPOSITORY_CLEARED_ERROR (the state stays paused until the mirror engine reads again).
+ */
+async function pauseOrResumeForRepository(
+  tx: DbOrTx,
+  source: BacklogSourceRow,
+  repository: string | null,
+): Promise<void> {
+  if (repository === null) {
+    await tx
+      .update(backlogSource)
+      .set({ state: 'paused', lastError: REPOSITORY_CLEARED_ERROR })
+      .where(eq(backlogSource.id, source.id));
+  } else if (source.lastError === REPOSITORY_CLEARED_ERROR) {
+    await tx.update(backlogSource).set({ lastError: null }).where(eq(backlogSource.id, source.id));
   }
 }

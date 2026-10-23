@@ -4,9 +4,10 @@
 // parseJobPayload and schedules the entries of JOB_SCHEDULES. Producers call enqueue(boss, tx, ...)
 // inside the Drizzle transaction of the write that triggers the job, so the job row only exists if
 // that transaction commits.
+import { BacklogTrigger } from '@pm/contracts';
 import type { Tx } from '@pm/db';
 import { sql } from 'drizzle-orm';
-import { fromDrizzle, type PgBoss, type Db as PgBossDb, type SendOptions } from 'pg-boss';
+import { fromDrizzle, type PgBoss, type Db as PgBossDb, type Queue, type SendOptions } from 'pg-boss';
 import { z } from 'zod';
 
 /** Marks expired pending invitations. Payload: `{}` (`now` overrides the clock in tests). */
@@ -18,6 +19,19 @@ export const INVITATIONS_EXPIRE = 'invitations.expire';
  */
 export const CYCLES_END_DUE = 'cycles.end-due';
 
+/**
+ * Reads one Backlog.md source and applies the difference (M3). Payload: `{ sourceId, trigger }`.
+ * Enqueue with enqueueBacklogRefresh (backlog/refresh.ts): one queued run per source, bursts within
+ * 60 seconds collapse into one run.
+ */
+export const BACKLOG_REFRESH = 'backlog.refresh';
+
+/**
+ * Hourly: enqueues a refresh (trigger poll) for every mirror that is not detached; each run stops
+ * early when the default branch head has not moved. Payload: `{}` (`now` overrides the clock).
+ */
+export const BACKLOG_POLL = 'backlog.poll';
+
 /** Payload of jobs that only take an optional clock override. */
 const ClockPayload = z.object({
   /** ISO timestamp to treat as "now". Omitted in production: the worker uses the current time. */
@@ -28,6 +42,8 @@ const ClockPayload = z.object({
 export const jobPayloadSchemas = {
   [INVITATIONS_EXPIRE]: ClockPayload,
   [CYCLES_END_DUE]: ClockPayload,
+  [BACKLOG_REFRESH]: z.object({ sourceId: z.uuid(), trigger: BacklogTrigger }),
+  [BACKLOG_POLL]: ClockPayload,
 } as const;
 
 export type JobName = keyof typeof jobPayloadSchemas;
@@ -48,6 +64,9 @@ export interface JobSchedule {
   data: Record<string, unknown>;
 }
 
+/** Minute past each hour of the backlog.poll schedule (status pages show the next poll). */
+export const BACKLOG_POLL_CRON_MINUTE = 15;
+
 /** Recurring jobs. The worker passes each to boss.schedule(name, cron, data, { tz }). */
 export const JOB_SCHEDULES: Partial<Record<JobName, JobSchedule>> = {
   // Daily at 03:00 UTC.
@@ -55,6 +74,16 @@ export const JOB_SCHEDULES: Partial<Record<JobName, JobSchedule>> = {
   // Hourly, on the hour. "Today" comes from APP_TIME_ZONE in the handler's context, so a cycle ends
   // within the hour after midnight there (zones with a half-hour offset: within 30 minutes later).
   [CYCLES_END_DUE]: { cron: '0 * * * *', tz: 'UTC', data: {} },
+  // Hourly at :15, away from the cycle job on the hour.
+  [BACKLOG_POLL]: { cron: `${BACKLOG_POLL_CRON_MINUTE} * * * *`, tz: 'UTC', data: {} },
+};
+
+/**
+ * Queue options per job name, passed to createQueue. backlog.refresh is `stately`: per source
+ * (singletonKey) at most one queued and one running job.
+ */
+export const JOB_QUEUE_OPTIONS: Partial<Record<JobName, Omit<Queue, 'name'>>> = {
+  [BACKLOG_REFRESH]: { policy: 'stately' },
 };
 
 export function isJobName(name: string): name is JobName {
@@ -68,7 +97,7 @@ export function parseJobPayload<N extends JobName>(name: N, data: unknown): JobP
 
 /** Creates every queue in JOB_NAMES. Idempotent; call after boss.start() in the worker and producers. */
 export async function ensureQueues(boss: PgBoss): Promise<void> {
-  for (const name of JOB_NAMES) await boss.createQueue(name);
+  for (const name of JOB_NAMES) await boss.createQueue(name, JOB_QUEUE_OPTIONS[name]);
 }
 
 /**

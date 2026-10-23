@@ -117,3 +117,65 @@ describe('can', () => {
     expect(can(agent({ projects: [p1], access: 'read' }), 'project.update', project(p1))).toBe(false);
   });
 });
+
+describe('M3 actions', () => {
+  it('lets owners and admins manage git connections, people only', () => {
+    expect(can(person('owner'), 'connection.manage')).toBe(true);
+    expect(can(person('admin'), 'connection.manage')).toBe(true);
+    expect(can(person('member'), 'connection.manage')).toBe(false);
+    expect(can(person('admin', { projects: 'all', access: 'write' }), 'connection.manage')).toBe(true);
+    expect(can(person('admin', { projects: [p1], access: 'write' }), 'connection.manage')).toBe(false);
+    expect(can(person('admin', { projects: 'all', access: 'read' }), 'connection.manage')).toBe(false);
+    expect(can({ ...agent({ projects: 'all', access: 'write' }), role: 'admin' }, 'connection.manage')).toBe(
+      false,
+    );
+    expect(() => authorize(person('member'), 'connection.manage')).toThrow(
+      new Forbidden('Only workspace admins can add, change or delete git connections'),
+    );
+  });
+
+  it('lets owners and admins manage Backlog.md sources within key scope', () => {
+    expect(can(person('owner'), 'backlog.manage', project(p1))).toBe(true);
+    expect(can(person('admin'), 'backlog.manage', project(p1))).toBe(true);
+    expect(can(person('member'), 'backlog.manage', project(p1))).toBe(false);
+    expect(can(person('admin'), 'backlog.manage')).toBe(false);
+    expect(can(person('admin', { projects: 'all', access: 'write' }), 'backlog.manage', project(p1))).toBe(
+      true,
+    );
+    expect(can(person('admin', { projects: [p2], access: 'write' }), 'backlog.manage', project(p1))).toBe(
+      false,
+    );
+    expect(can(agent({ projects: 'all', access: 'write' }), 'backlog.manage', project(p1))).toBe(false);
+    expect(() => authorize(person('member'), 'backlog.manage', project(p1))).toThrow(
+      new Forbidden('Only workspace admins can set up, change or detach Backlog.md'),
+    );
+  });
+
+  it('lets admins and agents whose key writes the project refresh', () => {
+    expect(can(person('owner'), 'backlog.refresh', project(p1))).toBe(true);
+    expect(can(person('admin'), 'backlog.refresh', project(p1))).toBe(true);
+    expect(can(person('member'), 'backlog.refresh', project(p1))).toBe(false);
+    expect(can(agent({ projects: [p1], access: 'write' }), 'backlog.refresh', project(p1))).toBe(true);
+    expect(can(agent({ projects: 'all', access: 'write' }), 'backlog.refresh', project(p1))).toBe(true);
+    expect(can(agent({ projects: [p2], access: 'write' }), 'backlog.refresh', project(p1))).toBe(false);
+    expect(can(agent({ projects: [p1], access: 'read' }), 'backlog.refresh', project(p1))).toBe(false);
+    expect(can(person('admin', { projects: [p1], access: 'read' }), 'backlog.refresh', project(p1))).toBe(
+      false,
+    );
+    expect(() =>
+      authorize(agent({ projects: [p1], access: 'read' }), 'backlog.refresh', project(p1)),
+    ).toThrow(new Forbidden('This API key is read-only'));
+    expect(() => authorize(person('member'), 'backlog.refresh', project(p1))).toThrow(
+      new Forbidden('Only workspace admins and agents with write access can refresh Backlog.md'),
+    );
+  });
+
+  it('lets anyone who reads the project read its source', () => {
+    expect(can(person('member'), 'backlog.read', project(p1))).toBe(true);
+    expect(can(agent({ projects: [p1], access: 'read' }), 'backlog.read', project(p1))).toBe(true);
+    expect(can(agent({ projects: [p2], access: 'read' }), 'backlog.read', project(p1))).toBe(false);
+    expect(() => authorize(agent({ projects: [p2], access: 'read' }), 'backlog.read', project(p1))).toThrow(
+      new Forbidden('Your API key does not cover this project'),
+    );
+  });
+});
