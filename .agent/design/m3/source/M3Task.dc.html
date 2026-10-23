@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<style>
+.tt-grid{display:grid;grid-template-columns:420px minmax(0,1fr);min-width:0;min-height:0}
+.tt-list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
+.tt-row{height:34px;display:grid;grid-template-columns:76px minmax(0,1fr) 22px;gap:10px;align-items:center;padding:0 20px;border-bottom:1px solid var(--line-2)}
+.tt-rowsel{height:34px;display:grid;grid-template-columns:76px minmax(0,1fr) 22px;gap:10px;align-items:center;padding:0 20px;border-bottom:1px solid var(--line-2);background:var(--sel)}
+.tt-detail{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.tt-dbody{flex:1;min-height:0;overflow:hidden;padding:16px 28px 0}
+.tt-props{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);flex:none}
+.tt-cell{padding:7px 10px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px;min-width:0}
+.tt-cell:nth-child(3n){border-right:0}
+.tt-cell:nth-last-child(-n+3){border-bottom:0}
+.tt-cellon{padding:7px 10px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px;min-width:0;outline:2px solid var(--focus);outline-offset:-2px}
+.tt-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500}
+.tt-cvl{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500;color:var(--fg)}
+.tt-fold{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;flex:none}
+.tt-feed{display:flex;flex-direction:column;gap:10px}
+.tt-act{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:12.5px;color:var(--muted);padding:0 2px}
+.tt-act b{color:var(--fg);font-weight:600}
+.tt-dot{width:7px;height:7px;border-radius:50%;background:var(--line);justify-self:center}
+.tt-dota{width:7px;height:7px;background:var(--accent);justify-self:center}
+.tt-cmtwrap{display:grid;grid-template-columns:18px minmax(0,1fr);gap:10px;align-items:start}
+.tt-compwrap{flex:none;padding:12px 28px 16px;border-top:1px solid var(--line);background:var(--bg)}
+.tt-stack{display:flex;flex-direction:column;gap:14px}
+.tt-pop{position:absolute;left:28px;width:380px;z-index:6}
+.tt-src{color:var(--muted);font-size:11.5px;font-family:"Martian Mono",ui-monospace,monospace}
+.tt-dim{opacity:0.6}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">38</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <div class="tt-grid">
+      <section class="tt-list">
+        <header class="lg-head"><div><h1 class="lg-h1">Payments</h1><div class="lg-sub m3-src"><span class="lg-mono">PAY</span><span>· 38 open ·</span><span class="{{ srcDot }}"></span><span>{{ srcText }}</span></div></div></header>
+        <div class="lg-g"><span class="{{ groupSq }}"></span><span>{{ groupName }}</span><span class="lg-gc">9</span></div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div class="{{ r.cls }}"><span class="lg-key">{{ r.key }}</span><span class="lg-trunc">{{ r.title }}</span><span class="{{ r.avCls }}" style="--h:{{ r.hue }}">{{ r.ini }}</span></div>
+        </sc-for>
+      </section>
+      <section class="tt-detail">
+        <header class="lg-head"><span class="lg-mono">{{ key }}</span><span class="lg-tag" style="text-transform:none;letter-spacing:0;font-family:'Martian Mono',monospace;font-weight:500">{{ bid }}</span><span class="lg-sp"></span><a class="lg-muted" href="#">Open as page</a><span class="lg-kbd">Esc</span></header>
+        <div class="tt-dbody">
+          <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+            <div class="tt-stack"><span class="lg-skel" style="height:30px"></span><span class="lg-skel" style="width:70%;height:14px"></span><div class="tt-props"><sc-for list="{{ skel6 }}" as="k" hint-placeholder-count="6"><div class="tt-cell"><span class="lg-skel" style="width:40px"></span><span class="lg-skel" style="width:{{ k }}px"></span></div></sc-for></div><span class="lg-skel" style="height:120px"></span></div>
+          </sc-if>
+          <sc-if value="{{ isReady }}" hint-placeholder-val="{{ true }}">
+          <div class="tt-stack" style="transform:translateY(-{{ scrollY }}px)">
+            <sc-if value="{{ isRemoved }}" hint-placeholder-val="{{ false }}">
+              <div class="lg-banner" style="border-color:var(--line);background:var(--band);align-items:flex-start"><span class="m3-dot m3-pz" style="margin-top:5px"></span><span style="line-height:1.55"><b>Removed from Backlog.md on Oct 22.</b> Its file is no longer on <span class="lg-mono" style="font-size:11px">main</span> (last seen at commit 77ab210), so the task is hidden from lists, the board and My tasks. The comments stay. If the file comes back, so does the task.</span></div>
+            </sc-if>
+            <sc-if value="{{ showStrip }}" hint-placeholder-val="{{ true }}">
+              <div class="m3-strip"><span class="m3-sys">B</span><span style="flex:none">{{ stripLead }}</span><span class="m3-path" title="backlog/tasks/back-786 - Retry-failed-webhook-deliveries-with-exponential-backoff.md">backlog/tasks/back-786 - Retry-failed-webhook-deliveries-with-exponential-backoff.md</span><span class="lg-sp"></span><a href="#" style="color:var(--accent);white-space:nowrap">{{ stripLink }}</a></div>
+            </sc-if>
+            <h2 class="lg-h2" style="font-size:20px">{{ title }}</h2>
+            <div class="tt-props">
+              <div class="{{ cStatus }}"><span class="lg-cap">Status <span class="m3-own">{{ own }}</span></span><span class="tt-cvl"><span class="{{ stSq }}"></span>{{ stName }}</span></div>
+              <div class="{{ cLock }}"><span class="lg-cap">Priority <span class="m3-own">{{ own }}</span></span><span class="tt-cvl"><span class="lg-pri">■■■</span>High</span></div>
+              <div class="{{ cLock }}"><span class="lg-cap">Assignee <span class="m3-own">{{ own }}</span></span><span class="tt-cvl"><span class="lg-ag">C</span>claude-dev<span class="lg-for" style="font-weight:400">{{ alsoTxt }}</span></span></div>
+              <div class="{{ cLock }}"><span class="lg-cap">Milestone <span class="m3-own">{{ own }}</span></span><span class="tt-cvl"><span class="m2-ms"></span>{{ msName }}<span class="lg-for" style="font-weight:400">{{ msId }}</span></span></div>
+              <div class="tt-cell"><span class="lg-cap">Cycle <span class="lg-kbd" style="letter-spacing:0">⇧C</span></span><span class="tt-cv"><span class="m2-cyon" style="--p:60%"></span>Cycle 4<span class="lg-for" style="font-weight:400">3d left</span></span></div>
+              <div class="{{ cLock }}"><span class="lg-cap">Created <span class="m3-own">{{ own }}</span></span><span class="tt-cvl">@ana<span class="lg-for" style="font-weight:400">{{ created }}</span></span></div>
+            </div>
+
+            <sc-if value="{{ descOpen }}" hint-placeholder-val="{{ false }}">
+              <div class="tt-fold"><span class="lg-faint">▾</span><span style="color:var(--fg);font-weight:600">Description</span><span class="lg-faint">· built from 7 Backlog.md sections</span></div>
+              <div class="m3-doc" style="padding:12px 14px;border:1px solid var(--line-2)">
+                <p>Deliveries that fail with a 5xx or time out should retry with exponential backoff: 30s, then doubling, six attempts in total. Merchants see each attempt in the dashboard.</p>
+                <h4>Acceptance criteria</h4>
+                <div class="m3-ck"><span class="m3-ckon"></span><span>#1 Retries follow 30s, 1m, 2m, 4m, 8m, 16m with ±20% jitter</span></div>
+                <div class="m3-ck"><span class="m3-ckon"></span><span>#2 4xx stops retrying, except 408 and 429</span></div>
+                <div class="m3-ck"><span class="m3-ckbox"></span><span>#3 A 429 waits for Retry-After and doesn't use an attempt</span></div>
+                <div class="m3-ck"><span class="m3-ckbox"></span><span>#4 The dashboard lists every attempt with its status code</span></div>
+                <h4>Definition of done</h4>
+                <div class="m3-ck"><span class="m3-ckon"></span><span>#1 Tests pass in CI</span></div>
+                <div class="m3-ck"><span class="m3-ckbox"></span><span>#2 Merchant docs updated</span></div>
+                <h4>Implementation plan</h4>
+                <ul><li>Move delivery into a pg-boss job with <span class="lg-codei">retryLimit: 6</span></li><li>Compute the delay in <span class="lg-codei">nextDelay(attempt, retryAfter)</span></li><li>Store attempts in <span class="lg-codei">webhook_attempt</span></li></ul>
+                <h4>Implementation notes</h4>
+                <p>pg-boss retryBackoff doubles from retryDelay, so the 30s base works without custom code. Jitter is ours.</p>
+                <h4>Comments from Backlog.md</h4>
+                <p><span class="lg-mono" style="font-size:11px">@tomas · 2026-10-14T10:02:00Z</span><br />Should 429 count toward the six? Some providers send it for minutes during deploys.</p>
+                <h4>Final summary</h4>
+                <p class="lg-faint">Empty in the file.</p>
+              </div>
+            </sc-if>
+            <sc-if value="{{ descClosed }}" hint-placeholder-val="{{ true }}">
+              <div class="tt-fold"><span class="lg-faint">▸</span><span>Description</span><span class="lg-faint">· {{ descNote }}</span></div>
+            </sc-if>
+
+            <div class="m3-bmd">
+              <div class="m3-bmdh"><span class="m3-sys">B</span><b>Backlog.md</b><span class="lg-mono" style="font-size:11px;color:var(--muted)">{{ bid }}</span><span class="lg-sp"></span><span class="lg-faint" style="font-size:11.5px">{{ bmdNote }}</span></div>
+              <div class="m3-kv"><span class="m3-k">Labels</span><span class="m3-vals"><sc-for list="{{ labels }}" as="l" hint-placeholder-count="3"><span class="m3-lbl">{{ l }}</span></sc-for></span></div>
+              <sc-if value="{{ hasAlso }}" hint-placeholder-val="{{ true }}"><div class="m3-kv"><span class="m3-k">Also assigned</span><span class="m3-vals"><span class="lg-who" style="color:var(--fg)"><span class="lg-ag">X</span>@codex <span class="lg-faint">is codex-ci</span></span><span class="lg-faint">·</span><span class="lg-who"><span class="m2-none"></span>@francis <span class="lg-faint">matches no member</span></span></span></div></sc-if>
+              <sc-if value="{{ hasDeps }}" hint-placeholder-val="{{ true }}"><div class="m3-kv"><span class="m3-k">Depends on</span><span class="m3-vals" style="flex-direction:column;flex-wrap:nowrap;gap:4px"><sc-for list="{{ deps }}" as="d" hint-placeholder-count="2"><sc-if value="{{ d.ok }}" hint-placeholder-val="{{ true }}"><a href="#" class="m3-tlink"><span class="{{ d.sq }}"></span><span class="lg-mono" style="font-size:10.5px;color:var(--muted)">{{ d.key }}</span><span class="lg-trunc">{{ d.title }}</span></a></sc-if><sc-if value="{{ d.miss }}" hint-placeholder-val="{{ false }}"><span class="m3-tmiss"><span class="lg-mono" style="font-size:10.5px">{{ d.key }}</span>no task with this ID</span></sc-if></sc-for></span></div></sc-if>
+              <sc-if value="{{ hasSubs }}" hint-placeholder-val="{{ true }}"><div class="m3-kv"><span class="m3-k">Subtasks</span><span class="m3-vals" style="flex-direction:column;flex-wrap:nowrap;gap:4px"><a href="#" class="m3-tlink"><span class="lg-sq lg-s-prog"></span><span class="lg-mono" style="font-size:10.5px;color:var(--muted)">PAY-786.1</span><span class="lg-trunc">Honour Retry-After on 429 responses</span></a><a href="#" class="m3-tlink"><span class="lg-sq lg-s-todo"></span><span class="lg-mono" style="font-size:10.5px;color:var(--muted)">PAY-786.2</span><span class="lg-trunc">Dead-letter queue after the sixth attempt</span></a></span></div></sc-if>
+              <div class="m3-kv"><span class="m3-k">Due · type</span><span>{{ dueType }}</span></div>
+              <sc-if value="{{ hasRefs }}" hint-placeholder-val="{{ true }}"><div class="m3-kv"><span class="m3-k">References</span><span class="m3-vals" style="flex-direction:column;flex-wrap:nowrap;gap:2px"><a href="#" class="lg-mono lg-trunc" style="font-size:11px">https://docs.stripe.com/webhooks#retries</a><span class="lg-mono lg-trunc" style="font-size:11px">src/webhooks/delivery.ts</span></span></div></sc-if>
+              <div class="m3-kv"><span class="m3-k">Other fields</span><span class="m3-vals"><span class="lg-mono" style="font-size:11px">{{ other1 }}</span><span class="lg-faint">·</span><span class="lg-mono" style="font-size:11px">{{ other2 }}</span></span></div>
+            </div>
+
+            <div class="lg-cap" style="padding-top:12px;border-top:1px solid var(--line);display:flex;gap:10px;flex:none"><span>Activity and comments</span><span class="lg-gc">{{ feedN }}</span></div>
+            <div class="tt-feed">
+              <sc-for list="{{ feed }}" as="f" hint-placeholder-count="5">
+                <sc-if value="{{ f.isAct }}" hint-placeholder-val="{{ true }}">
+                  <div class="tt-act"><span class="{{ f.dot }}"></span><span><b>{{ f.who }}</b>{{ f.forTxt }} {{ f.what }}<sc-if value="{{ f.commit }}" hint-placeholder-val="{{ false }}"> <span class="tt-src">{{ f.commit }}</span></sc-if></span><span class="lg-upd">{{ f.when }}</span></div>
+                </sc-if>
+                <sc-if value="{{ f.isCmt }}" hint-placeholder-val="{{ false }}">
+                  <div class="tt-cmtwrap"><span class="{{ f.avCls }}" style="--h:{{ f.hue }};margin-top:6px">{{ f.ini }}</span><div class="m2-cmt"><div class="m2-cmth"><b>{{ f.who }}</b><span>{{ f.forTxt }}</span><span class="lg-sp"></span><span class="lg-upd">{{ f.when }}</span></div><div class="m2-cmtb"><p>{{ f.text }}</p></div></div></div>
+                </sc-if>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ isLocked }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-pop tt-pop" style="top:224px" data-screen-label="Locked field explanation">
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;line-height:1.5">
+              <b>Status comes from Backlog.md</b>
+              <span class="lg-muted" style="font-size:12.5px">Change <span class="lg-codei">status:</span> in the task file on <span class="lg-mono" style="font-size:11px">main</span>, or ask an agent to. The task updates on the next refresh.</span>
+              <div class="lg-code" style="white-space:normal">backlog task edit 786 -s Done</div>
+              <span class="lg-faint" style="font-size:11.5px">pm and the API refuse the change with the same explanation (409, task_mirrored).</span>
+            </div>
+            <div class="lg-df" style="padding:8px 14px"><span class="lg-faint" style="font-size:11.5px">Opened by clicking Status. ⇧M on Milestone does the same.</span><span class="lg-sp"></span><button class="lg-btn2" style="height:28px">Copy path</button><button class="lg-btn" style="height:28px">Open file</button></div>
+          </div>
+        </sc-if>
+        <div class="tt-compwrap"><div class="m2-comp"><div class="m2-comptabs"><span class="m2-comptab">Write</span><span>Preview</span><span class="lg-sp"></span><span>Markdown</span></div><div class="m2-compbody" style="min-height:40px"><span class="lg-ph">{{ compPh }}</span></div><div class="m2-compfoot"><span style="display:flex;gap:6px;align-items:center"><span class="lg-kbd">M</span>to focus</span><span class="lg-sp"></span><button class="lg-btn" style="height:28px">Comment<span class="lg-btnk">⌘↵</span></button></div></div></div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["panel", "locked", "desc", "history", "long", "removed", "loading", "detached"], "default": "panel" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'panel';
+    const removed = state === 'removed';
+    const detached = state === 'detached';
+    const P = { ana: ['Ana Ruiz', 'AR', 25, 'lg-av'], tomas: ['Tomás Berg', 'TB', 220, 'lg-av'], claude: ['claude-dev', 'C', 0, 'lg-ag'], codex: ['codex-ci', 'X', 0, 'lg-ag'], none: ['', '', 0, 'm2-none'] };
+    const row = (key, title, who, sel) => ({ key, title, cls: sel ? 'tt-rowsel' : 'tt-row', ini: P[who][1], hue: P[who][2], avCls: P[who][3] });
+    const rows = removed ? [
+      row('PAY-233', 'Retry SEPA mandates after a bank holiday', 'claude', true), row('PAY-602', 'Spike: card network tokens', 'ana'), row('PAY-611', 'Old dashboard: CSV export button', 'tomas'), row('PAY-786.3', 'Alert merchants after 24h of failures', 'claude'), row('PAY-640', 'Refund reasons as a fixed list', 'none')
+    ] : [
+      row('PAY-786', 'Retry failed webhook deliveries with exponential backoff', 'claude', true), row('PAY-786.1', 'Honour Retry-After on 429 responses', 'claude'), row('PAY-797', 'Stream invoice PDFs instead of buffering them', 'codex'), row('PAY-805', 'Webhook signature check accepts expired timestamps', 'ana'), row('PAY-801', 'Merchant dashboard: failed deliveries', 'claude')
+    ];
+    const sys = (what, commit, when) => ({ isAct: true, isCmt: false, who: 'Backlog.md', forTxt: '', what, commit, when, dot: 'm3-sysdot' });
+    const act = (k, what, when, forWho) => ({ isAct: true, isCmt: false, who: P[k][0], dot: P[k][3] === 'lg-ag' ? 'tt-dota' : 'tt-dot', what, when, commit: '', forTxt: forWho ? ' for ' + forWho : '' });
+    const cmt = (k, text, when, forWho) => ({ isAct: false, isCmt: true, who: P[k][0], ini: P[k][1], hue: P[k][2], avCls: P[k][3], text, when, forTxt: forWho ? 'for ' + forWho : '' });
+    let feed = removed ? [
+      sys('imported the task with 411 others', 'a1b2c3d', 'Oct 23'),
+      cmt('ana', 'The bank moved the holiday file to a new URL. Keep this around until the new SEPA format lands.', 'Oct 21'),
+      sys('hid the task: its file is gone from main', '77ab210', 'Oct 22')
+    ] : [
+      sys('imported the task with 411 others', 'a1b2c3d', 'Oct 23'),
+      act('ana', 'added it to Cycle 4', 'Oct 23'),
+      sys('moved it from Todo to In progress', '3f2a1c9', '2h'),
+      cmt('tomas', 'The dashboard part can wait for the next cycle if it slips. Retries are what merchants asked for.', '1h'),
+      sys('checked acceptance criteria #1 and #2 and added the label retries', 'c4d81e2', '40m'),
+      cmt('claude', 'Retries are in. #3 needs a decision on 429: see the thread in Backlog.md comments.', '38m', 'Ana Ruiz'),
+      sys('changed priority from Medium to High', 'e91b07f', '12m')
+    ];
+    if (detached) feed = feed.concat([act('ana', 'detached Payments from Backlog.md. Every field is editable now.', 'just now')]);
+    let labels = ['webhooks', 'retries', 'reliability'];
+    if (state === 'long') labels = ['webhooks', 'retries', 'reliability', 'merchant-facing', 'pg-boss', 'needs-docs', 'q4', 'sla', 'p1-customer', 'acme-retail', 'observability', 'backend', 'api', 'breaking-change-maybe', 'security-review'];
+    if (removed) labels = ['sepa', 'bank-holidays'];
+    const dep = (key, title, sq) => ({ ok: true, miss: false, key, title, sq: 'lg-sq ' + sq });
+    let deps = [dep('PAY-805', 'Webhook signature check accepts expired timestamps', 'lg-s-prog'), { ok: false, miss: true, key: 'BACK-12', title: '' }];
+    if (state === 'long') deps = [dep('PAY-805', 'Webhook signature check accepts expired timestamps', 'lg-s-prog'), dep('PAY-799', 'Drop the v1 webhook payload format', 'lg-s-done'), dep('PAY-804', 'Log webhook response bodies up to 4 KB', 'lg-s-done'), dep('PAY-770', 'Per-merchant rate limits for outgoing webhooks, configurable from the dashboard and the API', 'lg-s-todo'), dep('PAY-771', 'Endpoint health score', 'lg-s-todo'), dep('PAY-640', 'Refund reasons as a fixed list', 'lg-s-cancel'), dep('PAY-702', 'Payout currency switch', 'lg-s-backlog'), { ok: false, miss: true, key: 'BACK-12', title: '' }, { ok: false, miss: true, key: 'BACK-9999', title: '' }, dep('PAY-786.1', 'Honour Retry-After on 429 responses', 'lg-s-prog')];
+    const lock = removed ? 'tt-cell m3-lock tt-dim' : (detached ? 'tt-cell' : 'tt-cell m3-lock');
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Mirrored task · ' + state,
+      srcDot: detached ? 'm3-dot m3-pz' : 'm3-dot m3-ok',
+      srcText: detached ? 'detached from Backlog.md' : 'Mirrored from Backlog.md · 3m ago',
+      groupSq: removed ? 'm3-dot m3-pz' : 'lg-sq lg-s-prog',
+      groupName: removed ? 'Removed from Backlog.md' : 'In progress',
+      rows,
+      key: removed ? 'PAY-233' : 'PAY-786',
+      bid: removed ? 'BACK-233' : 'BACK-786',
+      isLoading: state === 'loading',
+      isReady: state !== 'loading',
+      skel6: [80, 60, 90, 70, 60, 80],
+      isRemoved: removed,
+      showStrip: !removed,
+      stripLead: detached ? 'Was mirrored from' : 'Fields with a hatch come from',
+      stripLink: detached ? 'View file' : 'Open file',
+      title: removed ? 'Retry SEPA mandates after a bank holiday' : 'Retry failed webhook deliveries with exponential backoff',
+      own: detached ? '' : '· file',
+      stSq: removed ? 'lg-sq lg-s-todo' : 'lg-sq lg-s-prog',
+      stName: removed ? 'Todo' : 'In progress',
+      alsoTxt: removed ? '' : '+1 in Backlog.md',
+      msName: removed ? 'SEPA Direct Debit' : 'Webhooks v2',
+      msId: removed ? 'm-5' : 'm-3',
+      created: removed ? 'Sep 9, 16:40 UTC' : 'Oct 2, 09:14 UTC',
+      cStatus: state === 'locked' ? 'tt-cellon m3-lock' : lock,
+      cLock: lock,
+      descOpen: state === 'desc',
+      descClosed: state !== 'desc',
+      descNote: removed ? '2 sections from Backlog.md' : '7 sections from Backlog.md, 3 of 6 checklist items done',
+      bmdNote: detached ? 'kept from the import · read-only' : 'read-only · fields this app doesn’t have',
+      labels, deps,
+      hasAlso: !removed, hasDeps: !removed, hasSubs: !removed, hasRefs: !removed,
+      dueType: removed ? 'no due date · bug' : 'Nov 14, 2026 · feature',
+      other1: removed ? 'bank: sparkasse' : 'estimate: 5',
+      other2: removed ? 'region: DE' : 'customer: acme-retail',
+      feed, feedN: feed.length,
+      isLocked: state === 'locked',
+      compPh: removed ? 'Comments still work on hidden tasks.' : 'Comment here. Comments stay in this app and never go to the file.',
+      scrollY: { long: 250, desc: 120, history: 440 }[state] || 0
+    };
+  }
+}
+</script>
+</body>
+</html>

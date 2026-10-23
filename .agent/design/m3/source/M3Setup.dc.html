@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<style>
+.su-wrap{display:flex;flex-direction:column;min-width:0;min-height:0}
+.su-grid{flex:1;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr)}
+.su-nav{border-right:1px solid var(--line);padding:18px 10px;display:flex;flex-direction:column;gap:14px;background:var(--band)}
+.su-col{display:flex;flex-direction:column;min-height:0;min-width:0}
+.su-main{flex:1;min-height:0;overflow:hidden}
+.su-body{padding:22px 32px 28px;display:flex;flex-direction:column;gap:16px;max-width:880px}
+.su-foot{height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 32px;border-top:1px solid var(--line);background:var(--band)}
+.su-q{font-size:16px;font-weight:600;letter-spacing:-0.01em}
+.su-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.su-card{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border:1px solid var(--line);background:var(--surface)}
+.su-cardon{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border:1px solid var(--accent);background:var(--sel)}
+.su-cardh{display:flex;align-items:center;gap:10px;font-weight:600}
+.su-det{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);background:var(--surface);line-height:1.55}
+.su-dete{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--danger);background:var(--danger-bg);line-height:1.55}
+.su-detw{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--warn);background:var(--warn-bg);line-height:1.55}
+.su-det .m3-dot,.su-dete .m3-dot,.su-detw .m3-dot{margin-top:6px}
+.su-tree{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;color:var(--muted);margin-top:4px}
+.su-sec{display:flex;flex-direction:column;gap:8px}
+.su-sech{display:flex;align-items:baseline;gap:10px}
+.su-sample{border:1px solid var(--line);background:var(--surface)}
+.su-srow{display:grid;grid-template-columns:120px 18px 104px minmax(0,1fr) 120px;gap:10px;align-items:center;height:32px;padding:0 12px;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.su-srow:last-child{border-bottom:0}
+.su-stage{display:grid;grid-template-columns:18px minmax(0,1fr) 160px;gap:10px;align-items:center;height:34px;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.su-bar{display:flex;height:6px;background:var(--track)}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>{{ key }}</span><span class="lg-rn">{{ railN }}</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="su-wrap">
+      <header class="lg-head">
+        <div style="min-width:0"><h1 class="lg-h1">{{ title }}</h1><div class="lg-sub"><span class="lg-mono">{{ key }}</span> · {{ projName }} · nothing is written until you start</div></div>
+        <div class="lg-headr"><a class="lg-muted" href="#">Cancel</a><span class="lg-kbd">Esc</span></div>
+      </header>
+      <div class="su-grid">
+        <aside class="su-nav">
+          <div class="m3-steps">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="5">
+              <div class="{{ s.cls }}"><span class="{{ s.ncls }}">{{ s.n }}</span><span>{{ s.name }}</span><span class="lg-sp"></span><span class="lg-faint" style="font-size:11px;font-weight:400">{{ s.note }}</span></div>
+            </sc-for>
+          </div>
+          <div class="lg-hint" style="padding:0 12px;line-height:1.5">{{ navHint }}</div>
+        </aside>
+        <div class="su-col">
+          <div class="su-main">
+            <div class="su-body" style="transform:translateY(-{{ scrollY }}px)">
+
+              <sc-if value="{{ isMode }}" hint-placeholder-val="{{ true }}">
+                <div class="su-q">How should Payments use the Backlog.md files?</div>
+                <div class="su-two">
+                  <div class="su-cardon"><div class="su-cardh"><span class="lg-radioon"></span>Mirror</div><span class="lg-muted" style="font-size:12.5px;line-height:1.55">Follow the default branch. When a push changes a task file, the task here changes too. Fields from the files are read-only here; comments, cycles and card order are not.</span><span class="lg-faint" style="font-size:11.5px">For teams whose agents keep working in <span class="lg-codei">backlog/</span>.</span></div>
+                  <div class="su-card"><div class="su-cardh"><span class="lg-radio"></span>Import once</div><span class="lg-muted" style="font-size:12.5px;line-height:1.55">Read the files one time and detach. Every task is editable here afterwards, and the files stop mattering.</span><span class="lg-faint" style="font-size:11.5px">For moving off Backlog.md.</span></div>
+                </div>
+                <sc-if value="{{ isNotEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div class="su-dete"><span class="m3-dot m3-er"></span><div style="display:flex;flex-direction:column;gap:8px"><span><b>Payments already has 12 tasks.</b> Mirror and import need a project with no tasks, because Backlog.md numbers become the task keys and would collide with PAY-1 to PAY-12.</span><span style="display:flex;gap:8px"><button class="lg-btn" style="height:28px">New project from Backlog.md</button><button class="lg-btn2" style="height:28px">Back to Payments</button></span></div></div>
+                </sc-if>
+                <sc-if value="{{ isEmptyOk }}" hint-placeholder-val="{{ true }}">
+                  <div class="m3-strip"><span class="m3-dot m3-ok"></span><span>Payments has no tasks yet, so Backlog.md numbers can become its task keys.</span></div>
+                </sc-if>
+              </sc-if>
+
+              <sc-if value="{{ isSource }}" hint-placeholder-val="{{ false }}">
+                <div class="su-q">Where are the files?</div>
+                <div class="su-two">
+                  <div class="lg-field"><span class="lg-label">Connection</span><div class="lg-input"><span class="m3-prov" style="width:20px;height:20px;font-size:8.5px">GL</span>GitLab · reddevs<span class="lg-sp"></span><span class="lg-faint">▾</span></div><span class="lg-hint">Or <a href="#" style="color:var(--accent)">add a connection</a> without leaving this page.</span></div>
+                  <div class="lg-field"><span class="lg-label">Repository</span><div class="lg-input m3-lock"><span class="lg-mono" style="font-size:11.5px">gitlab.com/reddevs/payments</span></div><span class="lg-hint">From the project. Change it in General.</span></div>
+                </div>
+                <sc-if value="{{ isNoAccess }}" hint-placeholder-val="{{ false }}">
+                  <div class="su-dete"><span class="m3-dot m3-er"></span><span><b>GitLab · reddevs can't read this repository.</b> gitlab.com answered 404 for reddevs/payments. Give the token's user, reddevs-bot, at least the Reporter role in the project, or pick another connection.</span></div>
+                </sc-if>
+                <sc-if value="{{ hasBranch }}" hint-placeholder-val="{{ true }}">
+                  <div class="m3-facts" style="padding:4px 0"><span class="m3-fk">Default branch</span><span><span class="lg-mono" style="font-size:11.5px">main</span> <span class="lg-faint">· at a1b2c3d, 3m ago</span></span></div>
+                </sc-if>
+                <sc-if value="{{ isFound }}" hint-placeholder-val="{{ true }}">
+                  <div class="su-det"><span class="m3-dot m3-ok"></span><div style="min-width:0"><b>Found a Backlog.md folder at <span class="lg-mono" style="font-size:11.5px">backlog/</span></b><div class="lg-muted" style="font-size:12.5px">Project “Payments API”, task prefix <span class="lg-mono" style="font-size:11px">BACK</span>, 6 statuses.</div><div class="su-tree"><span>tasks/ 371</span><span>drafts/ 23</span><span>archive/tasks/ 339</span><span>completed/ 12</span><span>milestones/ 6</span><span>docs/ 14 · ignored</span><span>decisions/ 9 · ignored</span></div></div><span class="lg-sp"></span><a href="#" class="lg-muted" style="font-size:12px;white-space:nowrap">Use another folder</a></div>
+                  <sc-if value="{{ isKeyFit }}" hint-placeholder-val="{{ false }}">
+                    <div class="su-detw"><span class="m3-dot m3-wn"></span><span>The task prefix <span class="lg-mono" style="font-size:11px">BACKLOG</span> is longer than a project key can be (2 to 6 letters). Tasks get the key PAY: <span class="lg-mono" style="font-size:11px">BACKLOG-786</span> becomes <span class="lg-mono" style="font-size:11px">PAY-786</span>. Search and <span class="lg-codei">pm</span> still accept BACKLOG-786.</span></div>
+                  </sc-if>
+                  <sc-if value="{{ isKeyDiff }}" hint-placeholder-val="{{ true }}">
+                    <div class="m3-strip"><span class="lg-faint">i</span><span><span class="lg-mono" style="font-size:11px">BACK-786</span> becomes <span class="lg-mono" style="font-size:11px">PAY-786</span>. Search and <span class="lg-codei">pm</span> accept both. To keep them identical, change the project key to BACK in General first.</span></div>
+                  </sc-if>
+                </sc-if>
+                <sc-if value="{{ isNoFolder }}" hint-placeholder-val="{{ false }}">
+                  <div class="su-dete"><span class="m3-dot m3-er"></span><span><b>No Backlog.md folder on main.</b> Looked for <span class="lg-codei">backlog_directory</span> in backlog.config.yml, then <span class="lg-codei">backlog/</span>, then <span class="lg-codei">.backlog/</span>.</span></div>
+                  <div class="lg-field"><span class="lg-label">Folder</span><div class="lg-inputf"><span class="lg-mono" style="font-size:12px">docs/backlog</span><span class="lg-caret"></span><span class="lg-sp"></span><button class="lg-btn2" style="height:26px;font-size:12px">Look again</button></div><span class="lg-hint">Path from the repository root. It must hold a config.yml.</span></div>
+                </sc-if>
+              </sc-if>
+
+              <sc-if value="{{ isMaps }}" hint-placeholder-val="{{ false }}">
+                <div class="su-sech"><div class="su-q">Match Backlog.md values to this app</div><span class="lg-sp"></span><span class="lg-hint">Prefilled by name. You can change them later.</span></div>
+                <div class="su-sec">
+                  <div class="su-sech"><span class="lg-cap">Status</span><span class="lg-gc">{{ statusN }}</span><span class="lg-hint">Drafts always come in as Backlog.</span></div>
+                  <div class="m3-map">
+                    <div class="m3-maph"><span>In the files</span><span></span><span>Here</span><span style="text-align:right">Tasks</span></div>
+                    <sc-for list="{{ statusMaps }}" as="m" hint-placeholder-count="6">
+                      <div class="m3-maprow"><span class="m3-from">{{ m.from }}</span><span class="m3-arrow">→</span><span class="{{ m.selCls }}"><span class="{{ m.sq }}"></span>{{ m.to }}<span class="lg-sp"></span><span class="{{ m.howCls }}">{{ m.how }}</span><span class="lg-faint">▾</span></span><span class="m3-num" style="text-align:right">{{ m.n }}</span></div>
+                    </sc-for>
+                  </div>
+                </div>
+                <sc-if value="{{ showOtherMaps }}" hint-placeholder-val="{{ true }}">
+                  <div class="su-two" style="align-items:start">
+                    <div class="su-sec">
+                      <div class="su-sech"><span class="lg-cap">Priority</span><span class="lg-gc">3</span></div>
+                      <div class="m3-map">
+                        <sc-for list="{{ priMaps }}" as="m" hint-placeholder-count="3">
+                          <div class="m3-maprow" style="grid-template-columns:minmax(0,1fr) 16px 150px 40px"><span class="m3-from">{{ m.from }}</span><span class="m3-arrow">→</span><span class="m3-sel"><span class="{{ m.pcls }}">{{ m.bars }}</span>{{ m.to }}<span class="lg-sp"></span><span class="lg-faint">▾</span></span><span class="m3-num" style="text-align:right">{{ m.n }}</span></div>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div class="su-sec">
+                      <div class="su-sech"><span class="lg-cap">Assignees</span><span class="lg-gc">4</span><span class="lg-hint">The first match on a task becomes its assignee.</span></div>
+                      <div class="m3-map">
+                        <sc-for list="{{ whoMaps }}" as="m" hint-placeholder-count="4">
+                          <div class="m3-maprow" style="grid-template-columns:minmax(0,1fr) 16px 170px 36px"><span class="m3-from">{{ m.from }}</span><span class="m3-arrow">→</span><span class="{{ m.selCls }}"><sc-if value="{{ m.hasAv }}" hint-placeholder-val="{{ true }}"><span class="{{ m.avCls }}" style="--h:{{ m.hue }}">{{ m.ini }}</span></sc-if>{{ m.to }}<span class="lg-sp"></span><span class="lg-faint">▾</span></span><span class="m3-num" style="text-align:right">{{ m.n }}</span></div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </div>
+                </sc-if>
+              </sc-if>
+
+              <sc-if value="{{ isPreview }}" hint-placeholder-val="{{ false }}">
+                <div class="su-sech"><div class="su-q">{{ previewQ }}</div><span class="lg-sp"></span><span class="lg-hint">From commit a1b2c3d on main</span></div>
+                <div class="m2-stats" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+                  <sc-for list="{{ stats }}" as="s" hint-placeholder-count="5"><div class="m2-stat"><span class="lg-cap">{{ s.k }}</span><span class="m2-statv">{{ s.v }}</span><span class="lg-faint" style="font-size:11.5px">{{ s.note }}</span></div></sc-for>
+                </div>
+                <div class="su-sec">
+                  <div class="su-sech"><span class="lg-cap">Sample</span><span class="lg-hint">{{ sampleNote }}</span></div>
+                  <div class="su-sample">
+                    <sc-for list="{{ sample }}" as="r" hint-placeholder-count="6">
+                      <div class="su-srow"><span class="m3-from" style="color:var(--muted)">{{ r.from }}</span><span class="m3-arrow">→</span><span class="lg-mono" style="font-size:11px">{{ r.key }}</span><span class="lg-trunc">{{ r.title }}</span><span style="display:flex;align-items:center;gap:7px;color:var(--muted)"><span class="{{ r.sq }}"></span>{{ r.st }}</span></div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div class="su-two" style="align-items:start">
+                  <div class="su-sec"><div class="su-sech"><span class="lg-cap">Will be skipped</span><span class="lg-gc">{{ skipN }}</span><span class="lg-sp"></span><a href="#" class="lg-muted" style="font-size:12px">{{ skipMore }}</a></div>
+                    <div class="m3-issues"><sc-for list="{{ skips }}" as="i" hint-placeholder-count="3"><div class="m3-issue" style="grid-template-columns:10px minmax(0,1fr)"><span class="m3-dot m3-er"></span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span class="m3-path" style="direction:ltr">{{ i.file }}</span><span class="lg-muted">{{ i.why }}</span></span></div></sc-for></div>
+                  </div>
+                  <div class="su-sec"><div class="su-sech"><span class="lg-cap">Fallbacks</span><span class="lg-gc">2</span></div>
+                    <div class="m3-issues">
+                      <div class="m3-issue" style="grid-template-columns:10px minmax(0,1fr)"><span class="m3-dot m3-wn"></span><span>Status <span class="lg-codei">Blocked</span> on 2 tasks shows as Todo.</span></div>
+                      <div class="m3-issue" style="grid-template-columns:10px minmax(0,1fr)"><span class="m3-dot m3-wn"></span><span><span class="lg-codei">@francis</span> on 5 tasks matches no member; they stay unassigned and keep the name in their Backlog.md section.</span></div>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isRunning }}" hint-placeholder-val="{{ false }}">
+                <div class="su-q">Reading Backlog.md…</div>
+                <div style="display:flex;flex-direction:column;gap:8px"><div class="su-bar"><span class="m2-progd" style="width:52%;background:var(--accent)"></span></div><span class="lg-muted" style="font-size:12.5px">1,262 of 2,418 files read · about 40 seconds left</span></div>
+                <div>
+                  <div class="su-stage"><span class="m3-stepndone" style="width:16px;height:16px;font-size:9px">✓</span><span>Listed files on main at a1b2c3d</span><span class="m3-num" style="text-align:right">2,418 files · 1s</span></div>
+                  <div class="su-stage"><span class="m3-dot m3-run" style="justify-self:center"></span><b>Reading and checking task files</b><span class="m3-num" style="text-align:right">1,262 / 2,418</span></div>
+                  <div class="su-stage" style="color:var(--faint)"><span class="m3-stepn" style="width:16px;height:16px;font-size:8.5px">3</span><span>Creating 6 milestones</span><span></span></div>
+                  <div class="su-stage" style="color:var(--faint)"><span class="m3-stepn" style="width:16px;height:16px;font-size:8.5px">4</span><span>Creating tasks and the history entry</span><span></span></div>
+                </div>
+                <div class="lg-hint">You can leave this page. Tasks appear in Payments all at once when the read finishes; nothing shows half-done.</div>
+              </sc-if>
+
+              <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+                <div class="su-det" style="padding:16px"><span class="m3-dot m3-ok"></span><div style="display:flex;flex-direction:column;gap:4px"><b style="font-size:15px">Payments now mirrors gitlab.com/reddevs/payments</b><span class="lg-muted">412 tasks and 6 milestones, read from commit a1b2c3d in 38 seconds. 6 files were skipped; they're listed in Settings → Backlog.md.</span></div></div>
+                <div class="su-two">
+                  <div class="su-card"><b>Refresh on every push</b><span class="lg-muted" style="font-size:12.5px;line-height:1.5">Add a webhook in GitLab so changes show up within seconds. Without it, the mirror checks every hour.</span><span><button class="lg-btn2" style="height:28px;margin-top:4px">Set up the webhook</button></span></div>
+                  <div class="su-card"><b>Tell your agents</b><span class="lg-muted" style="font-size:12.5px;line-height:1.5">They keep editing <span class="lg-codei">backlog/</span> as before. <span class="lg-codei">pm</span> can read the tasks and comment, and <span class="lg-codei">pm backlog refresh</span> pulls changes right away.</span></div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+          <div class="su-foot">
+            <sc-if value="{{ hasBack }}" hint-placeholder-val="{{ true }}"><button class="lg-btn2">Back</button></sc-if>
+            <span class="lg-hint">{{ footHint }}</span>
+            <span class="lg-sp"></span>
+            <button class="lg-btn" style="{{ nextStyle }}">{{ nextLabel }}<span class="lg-btnk">⌘↵</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["mode", "notempty", "source", "nofolder", "noaccess", "keyfit", "maps", "mapslong", "preview", "previewlarge", "running", "done"], "default": "mode" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'mode';
+    const stepOf = { mode: 1, notempty: 1, source: 2, nofolder: 2, noaccess: 2, keyfit: 2, maps: 3, mapslong: 3, preview: 4, previewlarge: 4, running: 5, done: 5 }[state] || 1;
+    const names = ['Mode', 'Source', 'Mappings', 'Preview', 'Read'];
+    const notes = ['Mirror', 'backlog/', '13 values', '412 tasks', ''];
+    const steps = names.map((name, i) => {
+      const n = i + 1;
+      const done = n < stepOf || state === 'done';
+      return { n: done ? '✓' : n, name, note: done ? notes[i] : '', cls: n === stepOf ? 'm3-stepon' : 'm3-step', ncls: done ? 'm3-stepndone' : (n === stepOf ? 'm3-stepnon' : 'm3-stepn') };
+    });
+    const S = { todo: 'lg-sq lg-s-todo', prog: 'lg-sq lg-s-prog', rev: 'lg-sq lg-s-review', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel', backlog: 'lg-sq lg-s-backlog' };
+    const sm = (from, sq, to, how, n, warn, focus) => ({ from, sq: S[sq], to, how, n, howCls: warn ? 'm3-howwn' : 'm3-how', selCls: focus ? 'm3-selon' : (warn ? 'm3-selwn' : 'm3-sel') });
+    let statusMaps = [
+      sm('To Do', 'todo', 'Todo', 'by name', 24), sm('In Progress', 'prog', 'In progress', 'by name', 9), sm('Review', 'rev', 'In review', 'by name', 3), sm('Done', 'done', 'Done', 'by name', 690), sm('Won’t do', 'cancel', 'Canceled', 'by name', 7), sm('Blocked', 'todo', 'Todo', 'fallback', 2, true)
+    ];
+    if (state === 'mapslong') {
+      const extra = ['Triage', 'Needs info', 'Ready', 'Ready for dev', 'Spec', 'Design', 'Design review', 'Waiting on client', 'On hold', 'Paused', 'Doing', 'Pairing', 'Code review', 'QA', 'QA failed', 'Staging', 'Ready to ship', 'Shipped', 'Verified', 'Released to 10%', 'Released to 50%', 'Monitoring', 'Rolled back', 'Duplicate', 'Obsolete', 'Won’t fix', 'Icebox', 'Someday', 'Research', 'Spike done', 'Blocked by vendor', 'Blocked by legal', 'Needs a decision from the payments working group', 'Archived manually'];
+      const guess = (s) => /review|qa/i.test(s) ? ['rev', 'In review', 'by name'] : /ship|release|verified|done|monitor/i.test(s) ? ['done', 'Done', 'by name'] : /doing|pairing|staging|progress/i.test(s) ? ['prog', 'In progress', 'by name'] : /duplicate|obsolete|won|rolled/i.test(s) ? ['cancel', 'Canceled', 'by name'] : /icebox|someday|triage/i.test(s) ? ['backlog', 'Backlog', 'by name'] : ['todo', 'Todo', 'fallback', true];
+      statusMaps = statusMaps.concat(extra.map((e, i) => { const g = guess(e); return sm(e, g[0], g[1], g[2], (i * 7) % 23 + 1, !!g[3], i === 32); }));
+    }
+    const pm = (from, bars, pcls, to, n) => ({ from, bars, pcls, to, n });
+    const priMaps = [pm('high', '■■■', 'lg-pri', 'High', 41), pm('medium', '■■', 'lg-pri', 'Medium', 133), pm('low', '■', 'lg-prilow', 'Low', 88)];
+    const wm = (from, to, avCls, ini, hue, n, warn) => ({ from, to, avCls, ini, hue, n, hasAv: !!avCls, selCls: warn ? 'm3-selwn' : 'm3-sel' });
+    const whoMaps = [wm('@claude', 'claude-dev', 'lg-ag', 'C', 0, 219), wm('@ana', 'Ana Ruiz', 'lg-av', 'AR', 25, 64), wm('@codex', 'codex-ci', 'lg-ag', 'X', 0, 31), wm('@francis', 'No one', '', '', 0, 5, true)];
+    const large = state === 'previewlarge';
+    const stats = large ? [
+      { k: 'Tasks', v: '2,418', note: '214 open' }, { k: 'Drafts', v: '61', note: 'as Backlog' }, { k: 'Archived', v: '1,903', note: 'incl. 40 in completed/' }, { k: 'Subtasks', v: '388', note: 'keys like PAY-786.1' }, { k: 'Milestones', v: '17', note: '9 archived → Completed' }
+    ] : [
+      { k: 'Tasks', v: '412', note: '38 open' }, { k: 'Drafts', v: '23', note: 'as Backlog' }, { k: 'Archived', v: '351', note: 'incl. 12 in completed/' }, { k: 'Subtasks', v: '41', note: 'keys like PAY-786.1' }, { k: 'Milestones', v: '6', note: '2 archived → Completed' }
+    ];
+    const sr = (from, key, title, sq, st) => ({ from, key, title, sq: S[sq], st });
+    const sample = [
+      sr('BACK-786', 'PAY-786', 'Retry failed webhook deliveries with exponential backoff', 'prog', 'In progress'),
+      sr('BACK-786.1', 'PAY-786.1', 'Honour Retry-After on 429 responses', 'todo', 'Todo'),
+      sr('BACK-786.2', 'PAY-786.2', 'Dead-letter queue after the sixth attempt', 'todo', 'Todo'),
+      sr('BACK-801', 'PAY-801', 'Merchant dashboard: show failed deliveries per endpoint', 'rev', 'In review'),
+      sr('DRAFT-14', 'PAY-813', 'Idea: let merchants pause an endpoint', 'backlog', 'Backlog'),
+      sr('BACK-12', 'PAY-12', 'Split the ledger writer from the API process', 'done', 'Done · archived')
+    ];
+    const skipAll = [
+      { file: 'backlog/tasks/back-233 - Retry-SEPA-mandates.md', why: 'frontmatter is not valid YAML (line 4)' },
+      { file: 'backlog/tasks/back-240 - .md', why: 'no id in frontmatter or file name' },
+      { file: 'backlog/tasks/back-305.2 - Card-BIN-lookup.md', why: 'parent BACK-305 missing; comes in as a top-level task' }
+    ];
+    const prevNames = { mode: 'Mode', notempty: 'Mode', source: 'Source', nofolder: 'Source', noaccess: 'Source', keyfit: 'Source', maps: 'Mappings', mapslong: 'Mappings', preview: 'Preview', previewlarge: 'Preview', running: 'Read', done: 'Read' };
+    const nextLabel = { mode: 'Continue', notempty: 'Continue', source: 'Continue', nofolder: 'Continue', noaccess: 'Continue', keyfit: 'Continue', maps: 'Preview', mapslong: 'Preview', preview: 'Start mirroring', previewlarge: 'Start mirroring', running: 'Open Payments', done: 'Open Payments' }[state];
+    const blocked = ['notempty', 'nofolder', 'noaccess', 'running'].includes(state);
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Set up Backlog.md · ' + state,
+      title: 'Mirror Backlog.md into Payments',
+      key: 'PAY', projName: 'Payments', railN: state === 'done' ? 38 : (state === 'notempty' ? 12 : 0),
+      steps,
+      navHint: state === 'done' ? 'Done. Mappings and the webhook can be changed in Settings → Backlog.md.' : 'Step ' + stepOf + ' of 5 · ' + prevNames[state],
+      isMode: stepOf === 1, isNotEmpty: state === 'notempty', isEmptyOk: state === 'mode',
+      isSource: stepOf === 2, isNoAccess: state === 'noaccess', hasBranch: state !== 'noaccess', isFound: state === 'source' || state === 'keyfit', isKeyFit: state === 'keyfit', isKeyDiff: state === 'source', isNoFolder: state === 'nofolder',
+      isMaps: stepOf === 3, statusN: statusMaps.length, statusMaps, showOtherMaps: state === 'maps', priMaps, whoMaps,
+      isPreview: stepOf === 4, previewQ: large ? 'Mirror 2,418 tasks into Payments?' : 'Mirror 412 tasks into Payments?', stats,
+      sampleNote: large ? 'First 6 of 2,418, in Backlog.md order' : 'First 6 of 412, in Backlog.md order', sample,
+      skipN: large ? 30 : 3, skipMore: large ? 'Show all 30' : '', skips: skipAll,
+      isRunning: state === 'running', isDone: state === 'done',
+      hasBack: stepOf > 1 && stepOf < 5,
+      footHint: { 1: 'Nothing is written until the last step.', 2: 'Read access is enough.', 3: 'Unmapped values use the fallback and show a warning.', 4: 'Takes about a minute for 1,000 files.', 5: state === 'done' ? '' : 'Running in the background.' }[stepOf],
+      nextLabel, nextStyle: blocked ? 'opacity:0.45' : '',
+      scrollY: state === 'mapslong' ? 820 : 0
+    };
+  }
+}
+</script>
+</body>
+</html>

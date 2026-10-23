@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif;color:#1a1a1a}
+a{color:#1a1a1a}
+a:hover{color:#2a78d6}
+.dv-turn{padding:36px 44px 28px;border-bottom:1px solid rgba(0,0,0,0.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 15px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-desc{margin:0 0 18px;max-width:900px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.65);text-wrap:pretty}
+.dv-opts{display:flex;flex-wrap:wrap;gap:24px 24px;align-items:flex-start;max-width:2650px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:8px;scroll-margin-top:16px}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 12px/1.3 system-ui,sans-serif;color:rgba(0,0,0,0.6)}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,0.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-card{width:1280px;max-width:100%;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden}
+.dv-intro{display:grid;grid-template-columns:repeat(3,minmax(0,440px));gap:32px;font:12.5px/1.6 system-ui,sans-serif;color:rgba(0,0,0,0.72)}
+.dv-intro h3{margin:0 0 6px;font:600 12.5px/1.3 system-ui,sans-serif;color:#1a1a1a}
+.dv-intro ul,.dv-intro ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.dv-intro p{margin:0 0 8px;text-wrap:pretty}
+.dv-h{font:700 22px/1.2 system-ui,sans-serif;margin:0 0 6px}
+.dv-lead{font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.6);margin:0 0 24px;max-width:960px}
+.dv-cli{margin:24px 0 0;max-width:960px;background:#1d2127;color:#e6e8eb;border-radius:8px;padding:14px 16px;font:11.5px/1.65 ui-monospace,Menlo,monospace;white-space:pre-wrap}
+.dv-clih{font:600 12.5px/1.3 system-ui,sans-serif;margin:24px 0 8px;color:#1a1a1a}
+code{font:11.5px ui-monospace,Menlo,monospace;background:rgba(0,0,0,0.06);padding:0 4px;border-radius:3px}
+</style>
+</helmet>
+<section class="dv-turn" id="intro" data-screen-label="M3 screens · overview">
+  <h1 class="dv-h">M3 screens · Backlog.md mirror and import</h1>
+  <p class="dv-lead">Git connections in workspace settings, a new project settings page with a Backlog.md section, a five-step setup that previews before writing, New project from Backlog.md, the mirrored project in list and board, the mirrored task panel, and detach. Ledger direction; three new tokens in ledger-m3.css. Every frame is 1280×800, light and dark.</p>
+  <div class="dv-intro">
+    <div>
+      <h3>How “read-only” reads</h3>
+      <ul>
+        <li>Fields Backlog.md owns carry a faint diagonal hatch and the word <b>file</b> in their caption. No lock icons: the text says why.</li>
+        <li>A strip above the title names the source file and links to it at the provider.</li>
+        <li>Clicking a hatched field, or pressing ⇧M, opens a short note with the file and a <code>backlog task edit</code> example instead of the picker.</li>
+        <li>Cycle, comments and card order stay editable and look normal.</li>
+        <li>History lines from the mirror use a new actor: “Backlog.md”, a filled square, with the commit hash.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Calls made on the brief</h3>
+      <ol>
+        <li>The project settings page replaces the Edit project dialog. The dialog had no room for a Backlog.md section and would duplicate General. Edit in the projects table opens the page.</li>
+        <li>Mirror status lives in both places: a “Backlog.md” button in the project header opens a popover with state and Refresh now; Settings → Backlog.md has the full detail and the problem list.</li>
+        <li>Setup is a full page with five steps, not a dialog: the mapping tables and the preview need the width.</li>
+        <li>In a mirrored project, New is a dashed, disabled button; its tooltip says how to add a task in Backlog.md.</li>
+        <li>Removed tasks are found through a filter in the bar (“Removed from Backlog.md · Hidden 9”) and a link in settings.</li>
+        <li>Detach asks you to type the project key.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Decided after review (Oct 23)</h3>
+      <ol>
+        <li>New project from Backlog.md is drawn (section 6): repository, connection picked by host, detection, name and key from config.yml and the prefix, mode. It continues at the Mappings step.</li>
+        <li>The Milestones page of a mirrored project is not drawn. It uses the same hatch on name, date and status, and New milestone is disabled with the same tooltip as New task.</li>
+        <li>Admins can show the webhook secret again. No rotate in M3.</li>
+        <li>The app has no status shortcut. The note opens on click, and on ⇧M for the milestone.</li>
+      </ol>
+    </div>
+  </div>
+  <div class="dv-clih">What an agent sees from pm when it changes a locked field (text only, not designed)</div>
+  <div class="dv-cli">$ pm tasks update PAY-786 --status done
+error: PAY-786 is mirrored from Backlog.md, so its status can't change here (task_mirrored).
+  file:  backlog/tasks/back-786 - Retry-failed-webhook-deliveries-with-exponential-backoff.md (main)
+  edit the file and push, or run: backlog task edit 786 -s Done
+  still allowed here: comments (pm comments add PAY-786) and cycles (pm tasks update PAY-786 --cycle 4)</div>
+</section>
+<section class="dv-turn" id="t0" data-screen-label="Tokens and components">
+  <div class="dv-thd"><a class="dv-tid" href="#t0">0</a><span class="dv-tname">Tokens, components and shortcuts</span></div>
+  <div class="dv-opts"><sc-for list="{{ s0 }}" as="f" hint-placeholder-count="2"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="M3Tokens" theme="{{ f.theme }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+</section>
+<section class="dv-turn" id="t1" data-screen-label="Git connections">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Git connections · workspace settings</span></div>
+  <p class="dv-desc">One row per connection: provider letters, host, state, last check and the projects that use it. The add dialog tests the token before saving and spells out the read-only scope each provider needs.</p>
+  <div class="dv-opts"><sc-for list="{{ s1 }}" as="f" hint-placeholder-count="4"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="M3Connections" theme="{{ f.theme }}" state="{{ f.state }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+</section>
+<section class="dv-turn" id="t2" data-screen-label="Project settings">
+  <div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Project settings · General and Backlog.md</span></div>
+  <p class="dv-desc">A Settings tab joins Tasks, Milestones and Cycles. The Backlog.md section shows the state, where the files come from, the last good read, problems, mappings and the way out.</p>
+  <div class="dv-opts"><sc-for list="{{ s2 }}" as="f" hint-placeholder-count="4"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="M3ProjectSettings" theme="{{ f.theme }}" state="{{ f.state }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+</section>
+<section class="dv-turn" id="t6" data-screen-label="New project from Backlog.md">
+  <div class="dv-thd"><a class="dv-tid" href="#t6">6</a><span class="dv-tname">New project from Backlog.md · projects page</span></div>
+  <p class="dv-desc">Paste the repository; the connection is picked by host and the folder is checked right away. Name comes from project_name in config.yml, the key from the task prefix when it fits. Create and continue opens setup at Mappings, with Mode and Source already done.</p>
+  <div class="dv-opts"><sc-for list="{{ s6 }}" as="f" hint-placeholder-count="2"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="M3NewFrom" theme="{{ f.theme }}" state="{{ f.state }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+</section>
+<section class="dv-turn" id="t3" data-screen-label="Setup flow">
+  <div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Set up from Backlog.md · mode, source, mappings, preview, read</span></div>
+  <p class="dv-desc">Nothing is written before the last step. Each step says what it found; errors say what to change. Import uses the same five steps with “Import 412 tasks” on the last button.</p>
+  <div class="dv-opts"><sc-for list="{{ s3 }}" as="f" hint-placeholder-count="4"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="M3Setup" theme="{{ f.theme }}" state="{{ f.state }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+</section>
+<section class="dv-turn" id="t4" data-screen-label="Mirrored project">
+  <div class="dv-thd"><a class="dv-tid" href="#t4">4</a><span class="dv-tname">Mirrored project · list, board, projects table</span></div>
+  <p class="dv-desc">The header's Backlog.md button carries the mirror state everywhere in the project. Cards keep moving within their column; other columns refuse the drop and say why. A small square marks mirrored projects in the sidebar.</p>
+  <div class="dv-opts"><sc-for list="{{ s4 }}" as="f" hint-placeholder-count="4"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="M3Mirror" theme="{{ f.theme }}" state="{{ f.state }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+</section>
+<section class="dv-turn" id="t5" data-screen-label="Mirrored task">
+  <div class="dv-thd"><a class="dv-tid" href="#t5">5</a><span class="dv-tname">Mirrored task · panel</span></div>
+  <p class="dv-desc">Same panel as M2, with the source strip, hatched fields, the Backlog.md section for fields this app doesn't have, and history from the Backlog.md actor. The full page uses the same pieces in the M1 page layout.</p>
+  <div class="dv-opts"><sc-for list="{{ s5 }}" as="f" hint-placeholder-count="4"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="M3Task" theme="{{ f.theme }}" state="{{ f.state }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    const mk = (n, rows) => rows.map((r, i) => ({ id: n + String.fromCharCode(97 + i), state: r[0], theme: r[1], label: r[2] + ' · ' + r[1] }));
+    return {
+      s0: mk(0, [['', 'light', 'Tokens, components, shortcuts'], ['', 'dark', 'Tokens, components, shortcuts']]),
+      s1: mk(1, [
+        ['list', 'light', 'Four connections: working, unreachable, rejected, long host'], ['list', 'dark', 'Connections'],
+        ['testing', 'light', 'Add: testing the token'], ['ok', 'dark', 'Add: token works'], ['rejected', 'light', 'Add: token rejected'],
+        ['delete', 'dark', 'Delete: names the mirrors that pause'], ['empty', 'light', 'Empty'], ['loading', 'dark', 'Loading'], ['error', 'light', 'Error'], ['member', 'dark', 'Seen by a member']
+      ]),
+      s2: mk(2, [
+        ['general', 'light', 'General: replaces the Edit dialog'], ['none', 'light', 'Not set up, empty project'], ['none', 'dark', 'Not set up'],
+        ['healthy', 'light', 'Mirroring'], ['healthy', 'dark', 'Mirroring'], ['refreshing', 'light', 'Refreshing'], ['warnings', 'dark', '31 problems, long list'],
+        ['failed', 'light', 'Last refresh failed'], ['paused', 'dark', 'Paused: connection broken'], ['imported', 'light', 'Imported and detached, with history'],
+        ['webhook', 'light', 'Webhook instructions'], ['webhook', 'dark', 'Webhook instructions'], ['detach', 'dark', 'Detach confirmation'], ['member', 'light', 'Seen by a member'], ['loading', 'dark', 'Loading']
+      ]),
+      s6: mk(6, [['filled', 'light', 'Prefix BACK becomes the key'], ['filled', 'dark', 'Prefix BACK becomes the key'], ['longprefix', 'light', 'Prefix too long: pick a key']]),
+      s3: mk(3, [
+        ['mode', 'light', 'Mode'], ['mode', 'dark', 'Mode'], ['notempty', 'light', 'Refused: project has tasks'],
+        ['source', 'light', 'Source: folder found'], ['source', 'dark', 'Source: folder found'], ['nofolder', 'dark', 'Source: no folder, override'], ['noaccess', 'light', 'Source: token can’t read the repo'], ['keyfit', 'dark', 'Source: prefix too long for a key'],
+        ['maps', 'light', 'Mappings'], ['maps', 'dark', 'Mappings'], ['mapslong', 'light', 'Mappings: 40 statuses'],
+        ['preview', 'light', 'Preview'], ['preview', 'dark', 'Preview'], ['previewlarge', 'dark', 'Preview: 2,418 tasks, 30 skipped'],
+        ['running', 'light', 'Reading'], ['done', 'dark', 'Done']
+      ]),
+      s4: mk(4, [
+        ['list', 'light', 'List'], ['list', 'dark', 'List'], ['popover', 'light', 'Mirror status popover'], ['create', 'dark', 'New is disabled, with the reason'],
+        ['failed', 'dark', 'Last refresh failed'], ['board', 'light', 'Board: dragging a mirrored card'], ['board', 'dark', 'Board: dragging'], ['boardkeys', 'light', 'Board: ⇧L refused'],
+        ['hidden', 'dark', 'Removed from Backlog.md filter'], ['projects', 'light', 'Projects table and sidebar marker'], ['projects', 'dark', 'Projects table'],
+        ['detached', 'light', 'Right after detach'], ['loading', 'dark', 'Loading'], ['empty', 'light', 'Mirror with no task files']
+      ]),
+      s5: mk(5, [
+        ['panel', 'light', 'Panel'], ['panel', 'dark', 'Panel'], ['locked', 'light', 'Status clicked on a locked field'], ['desc', 'light', 'Description from seven sections'], ['desc', 'dark', 'Description'],
+        ['history', 'light', 'History with the Backlog.md actor'], ['history', 'dark', 'History'], ['long', 'dark', '15 labels, 10 dependencies'], ['removed', 'dark', 'Removed task, opened by URL'], ['loading', 'light', 'Loading'], ['detached', 'light', 'After detach: editable, record kept']
+      ])
+    };
+  }
+}
+</script>
+</body>
+</html>

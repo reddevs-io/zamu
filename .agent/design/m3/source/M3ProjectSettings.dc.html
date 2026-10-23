@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<style>
+.ps-wrap{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.ps-grid{flex:1;min-height:0;display:grid;grid-template-columns:200px minmax(0,1fr)}
+.ps-nav{border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:2px;background:var(--band)}
+.ps-ni{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--muted)}
+.ps-nion{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--fg);font-weight:600;background:var(--surface);box-shadow:inset 2px 0 0 var(--accent)}
+.ps-main{min-height:0;overflow:hidden;position:relative}
+.ps-body{padding:20px 28px 32px;display:flex;flex-direction:column;gap:16px;max-width:900px}
+.ps-h{display:flex;align-items:baseline;gap:10px}
+.ps-act{display:flex;gap:8px;margin-left:auto;align-items:center}
+.ps-mrow{display:grid;grid-template-columns:minmax(0,200px) 18px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.ps-mrow:last-child{border-bottom:0}
+.ps-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.ps-tabs{display:flex;gap:16px;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.ps-tab{display:flex;gap:6px;align-items:baseline;padding:0 0 7px;color:var(--muted)}
+.ps-tabon{display:flex;gap:6px;align-items:baseline;padding:0 0 7px;color:var(--fg);font-weight:600;box-shadow:inset 0 -2px 0 var(--fg)}
+.ps-ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;line-height:1.55}
+.ps-danger{border:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:14px 16px}
+.ps-gen{display:flex;flex-direction:column;gap:16px;max-width:560px}
+.ps-sw{display:flex;align-items:center;gap:10px;font-size:12.5px}
+.ps-hist{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
+.ps-hist b{color:var(--fg);font-weight:600}
+.ps-hdot{width:7px;height:7px;border-radius:50%;background:var(--line);justify-self:center}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="{{ railPay }}" href="#"><span>PAY</span><span class="lg-rn">38</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="{{ railOps }}" href="#"><span>OPS</span><span class="lg-rn">0</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">{{ meIni }}</span>
+    </nav>
+    <section class="ps-wrap">
+      <header class="lg-head">
+        <div style="min-width:0"><h1 class="lg-h1">{{ projName }}</h1>
+          <div class="lg-sub m3-src"><span class="lg-mono">{{ projKey }}</span><span>·</span><span>{{ projCount }}</span>
+            <sc-if value="{{ showSrc }}" hint-placeholder-val="{{ true }}"><span>·</span><span class="{{ srcDot }}"></span><span>{{ srcText }}</span></sc-if>
+          </div>
+        </div>
+        <div class="lg-headr"><div class="lg-search" style="width:150px"><span>Search</span><span class="lg-kbd">/</span></div></div>
+      </header>
+      <nav class="m2-tabs">
+        <a class="m2-tab" href="#">Tasks<span class="m2-tabn">{{ openN }}</span></a>
+        <a class="m2-tab" href="#"><span class="m2-ms"></span>Milestones<span class="m2-tabn">{{ msN }}</span></a>
+        <a class="m2-tabon" href="#">Settings</a>
+      </nav>
+      <div class="ps-grid">
+        <aside class="ps-nav">
+          <a class="{{ navGen }}" href="#">General</a>
+          <a class="{{ navBmd }}" href="#">Backlog.md<sc-if value="{{ navDot }}" hint-placeholder-val="{{ false }}"><span class="lg-sp"></span><span class="{{ srcDot }}"></span></sc-if></a>
+        </aside>
+        <div class="ps-main">
+          <div class="ps-body" style="transform:translateY(-{{ scrollY }}px)">
+
+            <sc-if value="{{ isGeneral }}" hint-placeholder-val="{{ false }}">
+              <div class="ps-gen">
+                <div class="lg-field"><span class="lg-label">Name</span><div class="lg-input">Payments</div></div>
+                <div class="lg-field"><span class="lg-label">Key</span><div class="lg-input m3-lock" style="color:var(--muted)"><span class="lg-mono" style="font-size:12px">PAY</span></div><span class="lg-hint">Task keys embed it, and this project has tasks, so it can't change.</span></div>
+                <div class="lg-field"><span class="lg-label">Description</span><div class="lg-input" style="height:auto;min-height:60px;align-items:flex-start;padding-top:9px">Card payments, refunds and the merchant webhooks.</div></div>
+                <div class="lg-field"><span class="lg-label">Repository</span><div class="lg-input"><span class="lg-mono" style="font-size:12px">git@gitlab.com:reddevs/payments.git</span></div><span class="lg-hint">Matches gitlab.com/reddevs/payments. The Backlog.md mirror reads this repository, so clearing it pauses the mirror.</span></div>
+                <div class="lg-field"><span class="lg-label">Planning</span>
+                  <span class="ps-sw"><span class="lg-toggleon m3-lock"></span>Milestones<span class="lg-faint">· stays on while Backlog.md is mirrored; its milestones live here</span></span>
+                  <span class="ps-sw"><span class="lg-toggleon"></span>Cycles</span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center"><button class="lg-btn">Save</button><span class="lg-hint">This page replaces the Edit project dialog. Edit in the projects table opens it.</span></div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+              <div class="m3-sec"><div class="m3-sech"><span class="lg-skel" style="width:140px"></span></div><div class="m3-secb"><sc-for list="{{ skel }}" as="k" hint-placeholder-count="6"><div class="m3-facts"><span class="lg-skel" style="width:90px"></span><span class="lg-skel" style="width:{{ k }}px"></span></div></sc-for></div></div>
+              <div class="m3-sec"><div class="m3-sech"><span class="lg-skel" style="width:100px"></span></div><div class="m3-secb"><span class="lg-skel" style="width:60%"></span><span class="lg-skel" style="width:40%"></span></div></div>
+            </sc-if>
+
+            <sc-if value="{{ isNone }}" hint-placeholder-val="{{ false }}">
+              <div class="lg-empty" style="max-width:600px;padding-top:12px">
+                <h2 class="lg-h2" style="font-size:19px">Bring in tasks from Backlog.md</h2>
+                <p class="lg-muted" style="margin:0;line-height:1.55">If the repository keeps tasks as Markdown files in a <span class="lg-codei">backlog/</span> folder, this project can read them from the default branch.</p>
+                <div class="ps-two" style="width:100%">
+                  <div class="lg-opt" style="align-items:flex-start;flex-direction:column;gap:6px;padding:14px"><b>Mirror</b><span class="lg-muted" style="font-size:12px;line-height:1.5">Keeps following the repository. Agents keep editing the files; the project updates on every push. Comments and cycles stay editable here.</span><button class="lg-btn" style="margin-top:6px">Set up a mirror</button></div>
+                  <div class="lg-opt" style="align-items:flex-start;flex-direction:column;gap:6px;padding:14px"><b>Import once</b><span class="lg-muted" style="font-size:12px;line-height:1.5">Reads the files one time, then the project is yours to edit. Use it to move off Backlog.md.</span><button class="lg-btn2" style="margin-top:6px">Import</button></div>
+                </div>
+                <span class="lg-hint">Repository: gitlab.com/reddevs/ops-runbooks, from General. Works on a project with no tasks.</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isBanner }}" hint-placeholder-val="{{ false }}">
+              <div class="{{ bannerCls }}" style="{{ bannerStyle }}"><span class="{{ bannerDot }}"></span><span style="flex:1;line-height:1.5">{{ bannerText }}</span><sc-if value="{{ bannerBtn }}" hint-placeholder-val="{{ false }}"><button class="lg-btn2" style="height:28px">{{ bannerBtn }}</button></sc-if></div>
+            </sc-if>
+
+            <sc-if value="{{ isStatus }}" hint-placeholder-val="{{ true }}">
+              <div class="m3-sec">
+                <div class="m3-sech"><span class="{{ srcDot }}"></span><b>{{ statusTitle }}</b><span class="lg-faint" style="font-size:12px">{{ statusSub }}</span>
+                  <sc-if value="{{ canAct }}" hint-placeholder-val="{{ true }}"><span class="ps-act"><span class="lg-kbd">⇧R</span><button class="lg-btn2" style="height:28px;{{ refreshStyle }}">{{ refreshLabel }}</button></span></sc-if>
+                </div>
+                <div class="m3-secb">
+                  <div class="m3-facts">
+                    <span class="m3-fk">Mode</span><span>{{ modeText }}</span>
+                    <span class="m3-fk">Repository</span><span><a href="#" class="lg-mono" style="font-size:11.5px">gitlab.com/reddevs/payments</a></span>
+                    <sc-if value="{{ isMirror }}" hint-placeholder-val="{{ true }}"><span class="m3-fk">Connection</span><span style="display:flex;gap:8px;align-items:center"><span class="m3-prov" style="width:20px;height:20px;font-size:8.5px">{{ connBadge }}</span>{{ connName }}<sc-if value="{{ isPaused }}" hint-placeholder-val="{{ false }}"><span class="m3-tagwn">Host unreachable</span></sc-if></span></sc-if>
+                    <span class="m3-fk">Branch and folder</span><span><span class="lg-mono" style="font-size:11.5px">main</span> <span class="lg-faint">(default branch)</span> · <span class="lg-mono" style="font-size:11.5px">backlog/</span> <span class="lg-faint">(found automatically)</span></span>
+                    <span class="m3-fk">{{ readLabel }}</span><span>{{ readText }} <a href="#" class="lg-mono" style="font-size:11px">{{ commit }}</a> <span class="lg-faint">{{ commitMsg }}</span></span>
+                    <sc-if value="{{ isMirror }}" hint-placeholder-val="{{ true }}"><span class="m3-fk">Next check</span><span>{{ nextText }}</span></sc-if>
+                    <sc-if value="{{ isMirror }}" hint-placeholder-val="{{ true }}"><span class="m3-fk">Webhook</span><span>{{ hookText }} <sc-if value="{{ canAct }}" hint-placeholder-val="{{ true }}"><a href="#" style="color:var(--accent)">Setup</a></sc-if></span></sc-if>
+                    <span class="m3-fk">Contents</span><span>412 tasks, 38 open · 6 milestones<sc-if value="{{ isMirror }}" hint-placeholder-val="{{ true }}"> · <a href="#" style="text-decoration:underline;text-decoration-color:var(--line)">9 hidden, removed from Backlog.md</a></sc-if></span>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isRefreshing }}" hint-placeholder-val="{{ false }}">
+              <div class="m3-strip"><span class="m3-dot m3-run"></span><span>Reading commit <span class="lg-mono" style="font-size:11px">c4d81e2</span>: 6 files changed since the last refresh. 3 of 6 read.</span><span class="lg-sp"></span><span class="m2-prog" style="max-width:120px"><span class="m2-progp" style="width:50%;opacity:1"></span></span></div>
+            </sc-if>
+
+            <sc-if value="{{ showIssues }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div class="ps-h"><span class="lg-cap">Problems in the last refresh</span><span class="lg-gc">{{ issueCount }}</span><span class="lg-sp"></span><sc-if value="{{ hasIssues }}" hint-placeholder-val="{{ false }}"><span class="lg-hint">Skipped files keep their last good version, if they had one.</span></sc-if></div>
+                <sc-if value="{{ noIssues }}" hint-placeholder-val="{{ true }}"><div class="m3-strip"><span class="m3-dot m3-ok"></span><span>None. Every file was read and every value is mapped.</span></div></sc-if>
+                <sc-if value="{{ hasIssues }}" hint-placeholder-val="{{ false }}">
+                  <div class="m3-issues">
+                    <sc-for list="{{ issues }}" as="i" hint-placeholder-count="6">
+                      <div class="m3-issue"><span class="{{ i.dot }}"></span><span class="m3-path" style="direction:ltr">{{ i.file }}</span><span class="lg-muted">{{ i.why }}</span></div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showMaps }}" hint-placeholder-val="{{ true }}">
+              <div class="m3-sec">
+                <div class="m3-sech"><b>Mappings</b><span class="lg-faint" style="font-size:12px">{{ mapSub }}</span><sc-if value="{{ canEditMaps }}" hint-placeholder-val="{{ true }}"><span class="ps-act"><button class="lg-btn2" style="height:28px">Edit mappings</button></span></sc-if></div>
+                <div class="m3-secb" style="gap:4px">
+                  <div class="ps-tabs"><span class="ps-tabon">Status<span class="m2-tabn">6</span></span><span class="ps-tab">Priority<span class="m2-tabn">3</span></span><span class="ps-tab">Assignees<span class="m2-tabn">4</span></span></div>
+                  <div>
+                    <sc-for list="{{ maps }}" as="m" hint-placeholder-count="6">
+                      <div class="ps-mrow"><span class="m3-from">{{ m.from }}</span><span class="m3-arrow">→</span><span style="display:flex;align-items:center;gap:7px"><span class="{{ m.sq }}"></span>{{ m.to }}<sc-if value="{{ m.fb }}" hint-placeholder-val="{{ false }}"><span class="m3-howwn">fallback</span></sc-if></span><span class="m3-num">{{ m.n }}</span></div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isImported }}" hint-placeholder-val="{{ false }}">
+              <div class="m3-sec">
+                <div class="m3-sech"><b>History</b><span class="lg-faint" style="font-size:12px">project-level entries</span></div>
+                <div class="m3-secb" style="gap:10px">
+                  <div class="ps-hist"><span class="m3-sysdot"></span><span><b>Backlog.md</b> imported 412 tasks and 6 milestones from gitlab.com/reddevs/payments <span class="lg-mono" style="font-size:11px">a1b2c3d</span></span><span class="lg-upd">Oct 23, 14:02</span></div>
+                  <div class="ps-hist"><span class="ps-hdot"></span><span><b>Ana Ruiz</b> detached Payments from Backlog.md. Every field is editable now.</span><span class="lg-upd">Oct 23, 14:02</span></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showDanger }}" hint-placeholder-val="{{ true }}">
+              <div class="ps-danger"><div style="flex:1;display:flex;flex-direction:column;gap:3px"><b>Stop mirroring and detach</b><span class="lg-muted" style="font-size:12px;line-height:1.5">Every task and milestone becomes editable here and the mirror stops for good. Use it when you move off Backlog.md.</span></div><button class="lg-btnd" style="height:32px">Detach…</button></div>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{ isWebhook }}" hint-placeholder-val="{{ false }}">
+            <div class="lg-scrim"></div>
+            <div class="lg-dialog" style="top:24px;width:640px" data-screen-label="Webhook setup">
+              <div class="lg-dh"><span style="font-weight:600">Refresh on every push</span><span class="lg-faint">optional</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+              <div class="lg-db" style="gap:14px">
+                <span style="line-height:1.55">Add a webhook in the repository so the mirror refreshes seconds after a push. Without one, the hourly check picks changes up.</span>
+                <div class="lg-field"><span class="lg-label">URL</span><div class="m3-copy"><span class="m3-copyv">https://pm.example.com/api/webhooks/backlog/01JB7Q4X2M9K</span><button class="m3-copyb">Copy</button></div></div>
+                <div class="lg-field"><span class="lg-label">Secret token</span><div class="m3-copy"><span class="m3-copyv">whsec_9Lq2………………………………Tz4</span><button class="m3-copyb">Show</button><button class="m3-copyb" style="border-left:0">Copy</button></div></div>
+                <div class="ps-tabs"><span class="ps-tab">GitHub</span><span class="ps-tabon">GitLab</span><span class="ps-tab">Gitea / Forgejo</span></div>
+                <ol class="ps-ol">
+                  <li>Open <b>gitlab.com/reddevs/payments</b> → Settings → Webhooks → Add new webhook.</li>
+                  <li>Paste the URL, and the secret into <b>Secret token</b>.</li>
+                  <li>Under Trigger, tick <b>Push events</b> only, for the <span class="lg-codei">main</span> branch.</li>
+                  <li>Save, then press <b>Test → Push events</b>. The line below turns green.</li>
+                </ol>
+                <div class="m3-strip"><span class="m3-dot m3-pz"></span><span>Last notification received: <b>never</b></span><span class="lg-sp"></span><span class="lg-faint">Listening…</span></div>
+              </div>
+              <div class="lg-df"><span class="lg-hint">Pushes to other branches are ignored.</span><span class="lg-sp"></span><button class="lg-btn2">Skip, hourly is fine</button><button class="lg-btn">Done</button></div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isDetach }}" hint-placeholder-val="{{ false }}">
+            <div class="lg-scrim"></div>
+            <div class="lg-dialog" style="top:60px;width:540px" data-screen-label="Detach confirmation">
+              <div class="lg-dh"><span style="font-weight:600">Detach Payments from Backlog.md?</span></div>
+              <div class="lg-db" style="gap:12px">
+                <span style="line-height:1.55">This can't be undone. Payments keeps all 412 tasks and 6 milestones as they are now, at commit <span class="lg-mono" style="font-size:11px">a1b2c3d</span>.</span>
+                <ul class="ps-ol" style="padding-left:18px">
+                  <li>Every field becomes editable here, by people and agents.</li>
+                  <li>Changes to the files no longer reach this project. Agents should stop editing <span class="lg-codei">backlog/</span> and use <span class="lg-codei">pm</span>.</li>
+                  <li>New tasks continue at PAY-813. The Backlog.md section stays on each task, read-only.</li>
+                  <li>9 hidden tasks stay hidden. You can delete them afterwards.</li>
+                  <li>Remove the webhook in GitLab; it will get 410 Gone from now on.</li>
+                </ul>
+                <div class="lg-field"><span class="lg-label">Type PAY to confirm</span><div class="lg-inputf"><span class="lg-mono" style="font-size:12px">PAY</span><span class="lg-caret"></span></div></div>
+              </div>
+              <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn2">Keep mirroring</button><button class="lg-btnd" style="height:32px;background:var(--danger);color:var(--on-accent);border-color:var(--danger)">Detach</button></div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["none", "general", "healthy", "refreshing", "warnings", "failed", "paused", "imported", "webhook", "detach", "member", "loading"], "default": "healthy" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'healthy';
+    const none = state === 'none';
+    const imported = state === 'imported';
+    const member = state === 'member';
+    const general = state === 'general';
+    const loading = state === 'loading';
+    const dot = { refreshing: 'm3-dot m3-run', warnings: 'm3-dot m3-wn', failed: 'm3-dot m3-er', paused: 'm3-dot m3-pz', imported: 'm3-dot m3-pz' }[state] || 'm3-dot m3-ok';
+    const srcText = {
+      healthy: 'Mirrored from Backlog.md · refreshed 3m ago', refreshing: 'Mirrored from Backlog.md · refreshing…', warnings: 'Mirrored from Backlog.md · 31 problems', failed: 'Mirrored from Backlog.md · last refresh failed', paused: 'Mirrored from Backlog.md · paused', imported: 'Imported from Backlog.md on Oct 23', webhook: 'Mirrored from Backlog.md · refreshed just now', loading: 'Mirrored from Backlog.md'
+    }[state] || 'Mirrored from Backlog.md · refreshed 3m ago';
+    const files = [
+      ['backlog/tasks/back-12 - Split-ledger-writer.md', 'dependencies must be a flat list (line 9)'],
+      ['backlog/tasks/back-233 - Retry-SEPA-mandates.md', 'frontmatter is not valid YAML: unclosed quote on line 4'],
+      ['backlog/tasks/back-240 - .md', 'no id in frontmatter, and the file name has no title'],
+      ['backlog/drafts/draft-7 - Payout-currency-switch.md', 'two files claim DRAFT-7; kept the newer one'],
+      ['backlog/tasks/back-305.2 - Card-BIN-lookup.md', 'parent BACK-305 does not exist; shown as a top-level task'],
+      ['backlog/archive/tasks/back-88 - Old-3DS-flow.md', 'created_date “31/02/24” is not a date; used the file’s first commit']
+    ];
+    const issues = [];
+    if (state === 'warnings') {
+      issues.push({ dot: 'm3-dot m3-wn', file: 'status “Blocked” · 2 tasks', why: 'not mapped, shown as Todo. Map it in Edit mappings.' });
+      for (let i = 0; i < 5; i++) for (const f of files) issues.push({ dot: 'm3-dot m3-er', file: i ? f[0].replace(/(back|draft)-(\d+)/, (m, p, n) => p + '-' + (Number(n) + i * 17)) : f[0], why: i ? f[1].replace(/(BACK|DRAFT)-(\d+)/, (m, p, n) => p + '-' + (Number(n) + i * 17)) : f[1] });
+    }
+    const maps = [
+      ['To Do', 'lg-sq lg-s-todo', 'Todo', 24], ['In Progress', 'lg-sq lg-s-prog', 'In progress', 9], ['Review', 'lg-sq lg-s-review', 'In review', 3], ['Done', 'lg-sq lg-s-done', 'Done', 367], ['Won’t do', 'lg-sq lg-s-cancel', 'Canceled', 7], ['Blocked', 'lg-sq lg-s-todo', 'Todo', 2, true]
+    ].map((m) => ({ from: m[0], sq: m[1], to: m[2], n: m[3], fb: !!m[4] }));
+    const neutral = 'border-color:var(--line);background:var(--band)';
+    const banner = {
+      failed: ['lg-banner', '', 'lg-bannerx', 'backlog/config.yml couldn’t be read: line 12, “statuses” must be a list. Nothing changed: tasks show commit 9f8e7d6 from 2h ago. Fix the file and push, or refresh once it’s fixed.', 'Refresh now'],
+      paused: ['lg-banner', neutral, 'm3-dot m3-pz', 'The mirror is paused: the connection Forgejo at home can’t reach git.home.example.com since 11:40. It retries every hour. Tasks stay as they were.', 'Use another connection'],
+      imported: ['lg-banner', neutral, 'm3-dot m3-pz', 'Imported once on Oct 23, 2026 by Ana Ruiz, then detached. Everything in this project is editable; the files in the repository no longer affect it.', ''],
+      member: ['lg-banner', neutral, 'm3-dot m3-pz', 'You can read this page. Owners and admins can refresh, change mappings or detach. You can still comment on tasks and put them in cycles.', '']
+    }[state];
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Project settings · Backlog.md · ' + state,
+      meIni: member ? 'TB' : 'AR',
+      railPay: none ? 'lg-rk' : 'lg-rkon',
+      railOps: none ? 'lg-rkon' : 'lg-rk',
+      projName: none ? 'Operations' : 'Payments',
+      projKey: none ? 'OPS' : 'PAY',
+      projCount: none ? 'no tasks yet' : '38 open',
+      openN: none ? 0 : 38,
+      msN: none ? 0 : 6,
+      showSrc: !none,
+      srcDot: dot,
+      srcText,
+      navGen: general ? 'ps-nion' : 'ps-ni',
+      navBmd: general ? 'ps-ni' : 'ps-nion',
+      navDot: !none && !general,
+      isGeneral: general,
+      isLoading: loading,
+      skel: [220, 160, 260, 180, 200, 140],
+      isNone: none,
+      isBanner: !!banner,
+      bannerCls: banner ? banner[0] : '',
+      bannerStyle: banner ? banner[1] : '',
+      bannerDot: banner ? banner[2] : '',
+      bannerText: banner ? banner[3] : '',
+      bannerBtn: banner ? banner[4] : '',
+      isStatus: !none && !general && !loading,
+      statusTitle: { refreshing: 'Refreshing', warnings: 'Mirroring, with problems', failed: 'Last refresh failed', paused: 'Paused', imported: 'Imported' }[state] || 'Mirroring',
+      statusSub: { refreshing: 'started 4s ago', warnings: '30 files skipped, 1 value unmapped', failed: '14m ago', paused: 'since 11:40', imported: 'detached Oct 23' }[state] || 'everything up to date',
+      canAct: !member && !imported,
+      refreshLabel: state === 'refreshing' ? 'Refreshing…' : 'Refresh now',
+      refreshStyle: state === 'refreshing' || state === 'paused' ? 'opacity:0.5' : '',
+      isMirror: !imported,
+      isPaused: state === 'paused',
+      connBadge: state === 'paused' ? 'FJ' : 'GL',
+      connName: state === 'paused' ? 'Forgejo at home' : 'GitLab · reddevs',
+      modeText: imported ? 'Imported once, then detached' : 'Mirror · follows the default branch',
+      readLabel: imported ? 'Read from' : 'Last good read',
+      readText: imported ? 'Oct 23, 14:02, commit' : (state === 'failed' ? '2h ago, by the hourly check, commit' : '3m ago, by webhook, commit'),
+      commit: state === 'failed' ? '9f8e7d6' : 'a1b2c3d',
+      commitMsg: state === 'failed' ? 'Add BACK-811 and BACK-812' : 'Merge branch ‘back-786-webhook-retries’',
+      nextText: state === 'paused' ? 'Retrying hourly, next at 13:40' : 'Hourly, next in 57m',
+      hookText: state === 'failed' ? 'Last notification 14m ago' : 'Last notification 3m ago',
+      isRefreshing: state === 'refreshing',
+      showIssues: !none && !general && !loading && !imported && state !== 'failed',
+      issueCount: issues.length,
+      hasIssues: issues.length > 0,
+      noIssues: issues.length === 0,
+      issues,
+      showMaps: !none && !general && !loading,
+      mapSub: imported ? 'used for the import' : 'applied on every refresh',
+      canEditMaps: !member && !imported,
+      maps,
+      isImported: imported,
+      showDanger: !none && !general && !loading && !imported && !member,
+      isWebhook: state === 'webhook',
+      isDetach: state === 'detach',
+      scrollY: state === 'warnings' ? 310 : 0
+    };
+  }
+}
+</script>
+</body>
+</html>
