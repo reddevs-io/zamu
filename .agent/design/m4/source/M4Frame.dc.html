@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+body{margin:0;background:#f0eee9}
+a{color:inherit}
+a:hover{color:#2a78d6}
+</style>
+</helmet>
+<div style="{{ box }}" data-screen-label="M4 single frame">
+  <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}"><dc-import name="M4Dashboard" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,1100px"></dc-import></sc-if>
+  <sc-if value="{{ isKit }}" hint-placeholder-val="{{ false }}"><dc-import name="M4Kit" theme="{{ theme }}" hint-size="1280px,1200px"></dc-import></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 1100 },
+  "c": { "editor": "enum", "options": ["dashboard", "kit"], "default": "dashboard" },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "text", "default": "mine" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    let q = {};
+    try { q = Object.fromEntries(new URLSearchParams(window.location.search)); } catch (e) { q = {}; }
+    const c = q.c || this.props.c || 'dashboard';
+    const width = q.width || this.props.width || '1280';
+    return {
+      theme: q.theme || this.props.theme || 'light',
+      state: q.state || this.props.state || 'mine',
+      width,
+      box: 'width:' + width + 'px;overflow:hidden',
+      isDash: c === 'dashboard',
+      isKit: c === 'kit'
+    };
+  }
+}
+</script>
+</body>
+</html>

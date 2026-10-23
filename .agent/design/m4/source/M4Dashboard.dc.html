@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m4.css" />
+<style>
+a{color:inherit}
+a:hover{color:var(--accent)}
+.d-grid{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
+.d-gridp{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-width:0;min-height:0}
+.d-panel{border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.d-pb{padding:20px 24px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.d-props{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line)}
+.d-cell{padding:8px 10px 9px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.d-cell:nth-child(2n){border-right:0}
+.d-cell:nth-last-child(-n+2){border-bottom:0}
+.d-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="{{ rootStyle }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="m4-rdon" href="#"><span>Dashboard</span><sc-if value="{{ badge }}" hint-placeholder-val="{{ true }}"><span class="m4-badge">{{ badge }}</span></sc-if></a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <sc-for list="{{ railKeys }}" as="k" hint-placeholder-count="4">
+        <a class="lg-rk" href="#"><span>{{ k.k }}</span><span class="lg-rn">{{ k.n }}</span></a>
+      </sc-for>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+
+    <div class="{{ gridCls }}">
+      <section class="m4-main">
+        <header class="lg-head">
+          <div style="min-width:0"><h1 class="lg-h1">Dashboard</h1><div class="lg-sub lg-trunc">{{ sub }}</div></div>
+          <div class="lg-headr">
+            <sc-if value="{{ showUpd }}" hint-placeholder-val="{{ true }}"><span class="m4-upd" title="{{ upd }}"><span class="{{ updDot }}"></span><sc-if value="{{ updText }}" hint-placeholder-val="{{ true }}"><span>{{ upd }}</span></sc-if></span></sc-if>
+            <sc-if value="{{ showScope }}" hint-placeholder-val="{{ true }}">
+              <span class="m4-scope"><span class="m2-seg"><span class="{{ segMine }}">Mine</span><span class="{{ segAll }}">Everyone</span></span><span class="lg-kbd">E</span></span>
+            </sc-if>
+            <sc-if value="{{ notPanel }}" hint-placeholder-val="{{ true }}"><div class="lg-search" style="width:140px"><span>Search</span><span class="lg-kbd">/</span></div></sc-if>
+            <button class="lg-btn">New<span class="lg-btnk">C</span></button>
+          </div>
+        </header>
+
+        <div class="m4-body">
+          <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+            <div class="lg-banner"><span class="lg-bannerx"></span><span style="flex:1">Couldn't load the dashboard. The server took too long to answer.</span><button class="lg-btn2" style="height:28px">Retry</button></div>
+          </sc-if>
+
+          <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
+            <div class="lg-empty" style="max-width:640px;padding-top:28px;gap:16px">
+              <h2 class="lg-h2">Nothing to show yet</h2>
+              <p class="lg-muted" style="margin:0;line-height:1.55;text-wrap:pretty">The dashboard collects what needs you across every project in Reddevs: work waiting for review, questions from people and agents, stalled tasks and close deadlines.</p>
+              <div class="m4-steps">
+                <div class="m4-step"><span class="m4-stepn">1</span><b>Create a project</b><span class="lg-muted" style="line-height:1.5">Give it a name and a short key like PAY. Link a repository if you have one.</span><button class="lg-btn" style="align-self:flex-start">New project<span class="lg-btnk">P</span></button></div>
+                <div class="m4-step"><span class="m4-stepn">2</span><b>Add an agent</b><span class="lg-muted" style="line-height:1.5">Agents get an API key and work through the pm command. Their tasks and questions show up here.</span><button class="lg-btn2" style="align-self:flex-start">Add an agent</button></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showQueue }}" hint-placeholder-val="{{ true }}">
+            <div class="m4-q" data-screen-label="Action queue">
+              <div class="m4-qh">
+                <span class="m4-qt">{{ qTitle }}</span>
+                <sc-if value="{{ qCount }}" hint-placeholder-val="{{ true }}"><span class="m4-qn">{{ qCount }}</span></sc-if>
+                <span class="lg-sp"></span>
+                <span class="m4-qnote">{{ qNote }}</span>
+              </div>
+
+              <sc-if value="{{ isClear }}" hint-placeholder-val="{{ false }}">
+                <div class="m4-clear"><span class="m4-check"></span><div class="m2-stack"><b style="font-size:13.5px">Nothing needs you right now</b><span class="lg-muted">Reviews, mentions, stalled work and deadlines for you and your agents land here. Checked just now.</span></div></div>
+              </sc-if>
+
+              <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+                <sc-for list="{{ skelGroups }}" as="sg" hint-placeholder-count="3">
+                  <div class="m4-gh"><span class="lg-skel" style="width:8px;height:8px"></span><span class="lg-skel" style="width:{{ sg }}px"></span></div>
+                  <sc-for list="{{ skelRows }}" as="k" hint-placeholder-count="2">
+                    <div class="m4-r m4-c"><span class="lg-skel" style="width:8px"></span><span class="lg-skel" style="width:48px"></span><span class="lg-skel" style="width:{{ k }}%"></span><span class="lg-skel" style="width:80px"></span><span class="lg-skel" style="width:120px"></span><span class="lg-skel" style="width:20px"></span><span class="lg-skel" style="width:60px;justify-self:end"></span></div>
+                  </sc-for>
+                </sc-for>
+              </sc-if>
+
+              <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+                <div class="{{ g.hCls }}">
+                  <sc-if value="{{ g.isReview }}" hint-placeholder-val="{{ true }}"><span class="lg-sq lg-s-review"></span></sc-if>
+                  <sc-if value="{{ g.isMention }}" hint-placeholder-val="{{ false }}"><span class="m4-at">@</span></sc-if>
+                  <sc-if value="{{ g.isStalled }}" hint-placeholder-val="{{ false }}"><span class="m4-st"></span></sc-if>
+                  <sc-if value="{{ g.isDeadline }}" hint-placeholder-val="{{ false }}"><span class="m4-dl"></span></sc-if>
+                  <span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span>
+                  <sc-if value="{{ g.empty }}" hint-placeholder-val="{{ false }}"><span class="m4-more" style="color:var(--faint)">{{ g.emptyText }}</span></sc-if>
+                  <span class="lg-sp"></span>
+                  <sc-if value="{{ g.more }}" hint-placeholder-val="{{ false }}"><span class="m4-more">{{ g.more }}<span class="lg-kbd">A</span></span></sc-if>
+                  <span class="lg-kbd">{{ g.k }}</span>
+                </div>
+                <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="2">
+                  <div class="{{ r.cls }}">
+                    <sc-if value="{{ r.isTask }}" hint-placeholder-val="{{ true }}">
+                      <span class="{{ r.sq }}"></span>
+                      <span class="lg-key">{{ r.key }}</span>
+                      <span class="lg-trunc">{{ r.title }}</span>
+                      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-cell"><span class="m4-pk">{{ r.pk }}</span><span class="lg-trunc lg-muted" style="font-size:12px">{{ r.proj }}</span></span>
+                        <span class="lg-who"><sc-if value="{{ r.agent }}" hint-placeholder-val="{{ true }}"><span class="lg-ag">{{ r.av }}</span></sc-if><sc-if value="{{ r.person }}" hint-placeholder-val="{{ false }}"><span class="lg-av" style="--h:{{ r.h }}">{{ r.av }}</span></sc-if><span style="color:var(--fg)">{{ r.who }}</span><sc-if value="{{ r.for }}" hint-placeholder-val="{{ true }}"><span class="lg-for">for {{ r.for }}</span></sc-if></span>
+                        <span class="{{ r.priCls }}">{{ r.pri }}</span>
+                      </sc-if>
+                      <span class="m4-meta"><sc-if value="{{ r.pill }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ r.pill }}</span></sc-if><sc-if value="{{ r.meta }}" hint-placeholder-val="{{ true }}"><span>{{ r.meta }}</span></sc-if></span>
+                    </sc-if>
+                    <sc-if value="{{ r.isMention }}" hint-placeholder-val="{{ false }}">
+                      <sc-if value="{{ r.agent }}" hint-placeholder-val="{{ true }}"><span class="lg-ag">{{ r.av }}</span></sc-if><sc-if value="{{ r.person }}" hint-placeholder-val="{{ false }}"><span class="lg-av" style="--h:{{ r.h }}">{{ r.av }}</span></sc-if>
+                      <span class="lg-key">{{ r.key }}</span>
+                      <span class="m4-stack">
+                        <span class="m4-line"><b>{{ r.who }}</b><sc-if value="{{ r.for }}" hint-placeholder-val="{{ true }}"><span class="lg-for">for {{ r.for }}</span></sc-if><sc-if value="{{ r.to }}" hint-placeholder-val="{{ false }}"><span class="m4-to">→</span><b>{{ r.to }}</b></sc-if><span class="lg-faint">on</span><span class="lg-trunc lg-muted">{{ r.title }}</span></span>
+                        <span class="m4-ex"><span class="m2-at">@{{ r.at }}</span> {{ r.t1 }}<sc-if value="{{ r.code }}" hint-placeholder-val="{{ false }}"> <code>{{ r.code }}</code> {{ r.t2 }}</sc-if></span>
+                      </span>
+                      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-cell"><span class="m4-pk">{{ r.pk }}</span><span class="lg-trunc lg-muted" style="font-size:12px">{{ r.proj }}</span></span>
+                        <span class="lg-faint" style="font-size:12px">{{ r.kind }}</span>
+                        <span class="{{ r.priCls }}">{{ r.pri }}</span>
+                      </sc-if>
+                      <span class="m4-meta">{{ r.meta }}</span>
+                    </sc-if>
+                    <sc-if value="{{ r.isDeadline }}" hint-placeholder-val="{{ false }}">
+                      <sc-if value="{{ r.ms }}" hint-placeholder-val="{{ true }}"><span class="m2-msf" style="color:var(--warn);margin-left:3px"></span></sc-if><sc-if value="{{ r.cy }}" hint-placeholder-val="{{ false }}"><span class="m2-cyon" style="--p:{{ r.pct }}%;color:var(--warn);margin-left:2px"></span></sc-if>
+                      <span class="lg-key">{{ r.pk }}</span>
+                      <span class="m4-line"><b class="lg-trunc">{{ r.title }}</b><span class="lg-faint" style="font-size:12px">{{ r.sub }}</span></span>
+                      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-cell"><span class="m2-prog"><span class="m2-progd" style="width:{{ r.pct }}%"></span></span><span class="m2-num">{{ r.done }}</span></span>
+                        <span class="lg-muted" style="font-size:12px">{{ r.open }}</span>
+                        <span></span>
+                      </sc-if>
+                      <span class="m4-meta"><span class="m4-pill">{{ r.pill }}</span></span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ g.foot }}" hint-placeholder-val="{{ false }}"><div class="m4-foot"><span>{{ g.foot }}</span><span class="lg-sp"></span><span class="m4-more">Collapse<span class="lg-kbd">A</span></span></div></sc-if>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showProjects }}" hint-placeholder-val="{{ true }}">
+            <div data-screen-label="Projects">
+              <div class="m4-sh"><span class="m4-st2">Projects</span><span class="m4-sc">{{ projCount }}</span><span class="m4-sl">Most recently active first</span></div>
+              <div class="m4-pt">
+                <div class="{{ pthCls }}"><span>Key</span><span>Name</span><span class="lg-right">Open</span><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="lg-right">Doing</span><span class="lg-right">Review</span><span>Current cycle</span><span>Next milestone</span></sc-if><span class="lg-right">Active</span></div>
+                <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+                  <sc-for list="{{ skelRows }}" as="k" hint-placeholder-count="3"><div class="m4-pr m4-pc"><span class="lg-skel" style="width:30px"></span><span class="lg-skel" style="width:{{ k }}%"></span><span class="lg-skel" style="width:20px;justify-self:end"></span><span class="lg-skel" style="width:20px;justify-self:end"></span><span class="lg-skel" style="width:20px;justify-self:end"></span><span class="lg-skel" style="width:160px"></span><span class="lg-skel" style="width:180px"></span><span class="lg-skel" style="width:30px;justify-self:end"></span></div></sc-for>
+                </sc-if>
+                <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+                  <div class="{{ prCls }}">
+                    <span class="lg-key" style="color:var(--fg)">{{ p.pk }}</span>
+                    <span class="m4-cell"><span class="lg-trunc" style="font-weight:600">{{ p.name }}</span><sc-if value="{{ p.src }}" hint-placeholder-val="{{ false }}"><span class="m4-src"><span class="m4-srcsq"></span>Backlog.md</span></sc-if></span>
+                    <span class="m4-n">{{ p.open }}</span>
+                    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                      <span class="{{ p.progCls }}">{{ p.prog }}</span>
+                      <span class="{{ p.revCls }}">{{ p.rev }}</span>
+                      <sc-if value="{{ p.cy }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-plan"><span class="m2-cyon" style="--p:{{ p.cyPct }}%;color:var(--muted)"></span><span class="lg-trunc">{{ p.cy }}</span><span class="m2-prog"><span class="m2-progd" style="width:{{ p.cyPct }}%"></span></span><sc-if value="{{ p.cyWarn }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ p.cyWarn }}</span></sc-if><sc-if value="{{ p.cyLeft }}" hint-placeholder-val="{{ true }}"><span class="m2-num">{{ p.cyLeft }}</span></sc-if></span>
+                      </sc-if>
+                      <sc-if value="{{ p.noCy }}" hint-placeholder-val="{{ false }}"><span class="m4-unused">{{ p.noCy }}</span></sc-if>
+                      <sc-if value="{{ p.ms }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-plan"><span class="m2-ms" style="color:var(--muted)"></span><span class="lg-trunc">{{ p.ms }}</span><span class="m2-prog"><span class="m2-progd" style="width:{{ p.msPct }}%"></span></span><sc-if value="{{ p.msWarn }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ p.msWarn }}</span></sc-if><sc-if value="{{ p.msDate }}" hint-placeholder-val="{{ true }}"><span class="m2-num">{{ p.msDate }}</span></sc-if></span>
+                      </sc-if>
+                      <sc-if value="{{ p.noMs }}" hint-placeholder-val="{{ false }}"><span class="m4-unused">{{ p.noMs }}</span></sc-if>
+                    </sc-if>
+                    <span class="lg-upd">{{ p.act }}</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ projMore }}" hint-placeholder-val="{{ false }}"><div class="m4-foot" style="padding:0 8px"><span>{{ projMore }}</span></div></sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showAgents }}" hint-placeholder-val="{{ true }}">
+            <div data-screen-label="Agents">
+              <div class="m4-sh"><span class="m4-st2">Agents</span><span class="m4-sc">{{ agentCount }}</span><span class="m4-sl">{{ agentNote }}</span></div>
+              <div class="{{ agCls }}">
+                <sc-for list="{{ agents }}" as="a" hint-placeholder-count="4">
+                  <div class="m4-a">
+                    <div class="m4-ah"><span class="lg-ag">{{ a.av }}</span><b class="lg-trunc">{{ a.name }}</b><span class="lg-for lg-trunc">for {{ a.for }}</span></div>
+                    <sc-if value="{{ a.task }}" hint-placeholder-val="{{ true }}">
+                      <div class="m4-at2"><span class="lg-sq lg-s-prog" style="align-self:center"></span><span class="lg-key">{{ a.key }}</span><span class="lg-trunc">{{ a.task }}</span><sc-if value="{{ a.plus }}" hint-placeholder-val="{{ false }}"><span class="m2-num">{{ a.plus }}</span></sc-if></div>
+                    </sc-if>
+                    <sc-if value="{{ a.idle }}" hint-placeholder-val="{{ false }}"><div class="m4-idle">Idle · nothing in progress</div></sc-if>
+                    <div class="m4-af"><sc-if value="{{ a.pill }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ a.pill }}</span></sc-if><span>{{ a.last }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ scrollTop }}" hint-placeholder-val="{{ false }}"><span class="m4-scroll" style="top:{{ scrollTop }}px;height:{{ scrollH }}px"></span></sc-if>
+      </section>
+
+      <sc-if value="{{ isPanel }}" hint-placeholder-val="{{ false }}">
+        <aside class="d-panel" data-screen-label="Task panel from the dashboard">
+          <header class="lg-head"><span class="lg-mono">PAY-140</span><span class="lg-faint">in Payments</span><span class="lg-sp"></span><a class="lg-muted" href="#">Open as page</a><span class="lg-kbd">Esc</span></header>
+          <div class="d-pb">
+            <h2 class="lg-h2" style="font-size:19px">Retry failed webhook deliveries with exponential backoff</h2>
+            <div class="d-props">
+              <div class="d-cell"><span class="lg-cap">Status</span><span class="d-cv"><span class="lg-sq lg-s-review"></span>In review</span></div>
+              <div class="d-cell"><span class="lg-cap">Priority</span><span class="d-cv"><span class="lg-pri">■■■</span>High</span></div>
+              <div class="d-cell"><span class="lg-cap">Assignee</span><span class="d-cv"><span class="lg-ag">C</span>claude-dev</span><span class="lg-for">for Ana Ruiz</span></div>
+              <div class="d-cell"><span class="lg-cap">Milestone</span><span class="d-cv"><span class="m2-ms"></span>Webhooks v2</span></div>
+            </div>
+            <span class="lg-cap">Latest comment</span>
+            <div class="m2-cmt">
+              <div class="m2-cmth"><span class="lg-ag">C</span><b>claude-dev</b><span>for Ana Ruiz</span><span class="lg-sp"></span><span class="lg-upd">25m</span></div>
+              <div class="m2-cmtb"><p><span class="m2-at">@Ana Ruiz</span> the retry cap is 24 hours now. Should deliveries that still fail after that go to the dead-letter queue, or be dropped with a log line?</p></div>
+            </div>
+            <div class="m2-comp"><div class="m2-compbody lg-faint">Reply to claude-dev…</div><div class="m2-compfoot"><span>Markdown · @ to mention</span><span class="lg-sp"></span><span class="lg-kbd">M</span><span>to reply</span></div></div>
+          </div>
+        </aside>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 1100 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["mine", "everyone", "panel", "expanded", "partial", "clear", "new", "loading", "refresh", "error", "stale", "long", "longlow"], "default": "mine" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'mine';
+    const width = String(this.props.width ?? '1280');
+    const narrow = width === '1024';
+    const panel = state === 'panel';
+    const wide = !panel;
+    const all = state === 'everyone' || state === 'expanded' || state === 'long' || state === 'longlow';
+    const long = state === 'long' || state === 'longlow';
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const PJ = { PAY: 'Payments', WEB: 'Website', CLI: 'Command-line tool', INF: 'Infrastructure', DOC: 'Docs' };
+    const PEOPLE = { 'Ana Ruiz': ['AR', 25], 'Tomás Berg': ['TB', 140], 'Lina Okafor': ['LO', 200] };
+    const AGENTS = { 'claude-dev': 'C', 'claude-docs': 'D', 'codex-ci': 'X', 'gemini-triage': 'G' };
+    const rowGrid = panel ? (narrow ? 'm4-cn' : 'm4-cp') : 'm4-c';
+    const who = (name) => AGENTS[name] ? { agent: true, person: false, av: AGENTS[name] } : { agent: false, person: true, av: PEOPLE[name][0], h: PEOPLE[name][1] };
+    let n = 0;
+    const focusAt = state === 'mine' || state === 'refresh' ? 0 : -1;
+    const hoverAt = state === 'mine' ? 4 : -1;
+    const rowCls = (key, two) => {
+      const i = n++;
+      let base = 'm4-r';
+      if (panel && key === 'PAY-140' && i === 0) base = 'm4-rs';
+      else if (i === focusAt) base = 'm4-rf';
+      else if (i === hoverAt) base = 'm4-rh';
+      return base + ' ' + rowGrid + (two ? ' m4-two' : '');
+    };
+    const task = (sq, key, title, w, f, pri, meta, pill) => Object.assign({
+      isTask: true, isMention: false, isDeadline: false, sq: 'lg-sq ' + sq, key, title, pk: key.split('-')[0], proj: PJ[key.split('-')[0]],
+      who: w, for: f || '', pri: PRI[pri][0], priCls: PRI[pri][1], meta: meta || '', pill: pill || ''
+    }, who(w));
+    const mention = (key, title, w, f, to, at, t1, code, t2, pri, meta) => Object.assign({
+      isTask: false, isMention: true, isDeadline: false, key, title, pk: key.split('-')[0], proj: PJ[key.split('-')[0]],
+      who: w, for: f || '', to: to || '', at, t1, code: code || '', t2: t2 || '', kind: AGENTS[w] ? 'Agent asks' : 'Person asks',
+      pri: PRI[pri][0], priCls: PRI[pri][1], meta
+    }, who(w));
+    const deadline = (kind, pk, title, sub, pct, done, open, pill) => ({
+      isTask: false, isMention: false, isDeadline: true, ms: kind === 'ms', cy: kind === 'cy', pk, title, sub, pct, done, open, pill
+    });
+
+    let reviewRows = [
+      task('lg-s-review', 'PAY-140', 'Retry failed webhook deliveries with exponential backoff', 'claude-dev', 'Ana Ruiz', 3, 'in review 3h'),
+      task('lg-s-review', 'CLI-21', 'pm dashboard command with --json output', 'claude-dev', 'Ana Ruiz', 2, 'in review 40m'),
+      task('lg-s-review', 'WEB-91', 'Cookie banner blocks the checkout button on small laptops', 'Ana Ruiz', '', 3, 'in review 1d')
+    ];
+    let mentionRows = [
+      mention('PAY-140', 'Retry failed webhook deliveries with exponential backoff', 'claude-dev', 'Ana Ruiz', '', 'Ana Ruiz', 'the retry cap is 24 hours now. Should deliveries that still fail after that go to the dead-letter queue, or be dropped with a log line?', '', '', 3, '25m'),
+      mention('INF-31', 'Move Postgres backups to the new object store', 'Tomás Berg', '', '', 'Ana Ruiz', 'can you check the bucket policy before I switch the nightly backups over?', '', '', 2, '2h')
+    ];
+    let stalledRows = [
+      task('lg-s-prog', 'PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'claude-dev', 'Ana Ruiz', 2, '', 'no update 26h'),
+    ];
+    let deadlineRows = [
+      deadline('ms', 'PAY', 'PCI audit', 'milestone · target Oct 12', 64, '7/11', '4 open tasks', '11 days overdue'),
+      deadline('cy', 'WEB', 'Cycle 4', 'cycle · Oct 12 – Oct 24', 63, '12/19', '7 open tasks', 'ends tomorrow')
+    ];
+    let counts = { review: 3, mention: 2, stalled: 1, deadline: 2 };
+
+    if (all) {
+      reviewRows = reviewRows.concat([
+        task('lg-s-review', 'INF-27', 'Terraform the Hetzner firewall rules for the worker nodes', 'codex-ci', 'Tomás Berg', 2, 'in review 5h'),
+        task('lg-s-review', 'DOC-12', 'Rewrite the self-hosting guide for Postgres 18', 'Lina Okafor', '', 1, 'in review 2d')
+      ]);
+      mentionRows = [mentionRows[0], mentionRows[1],
+        mention('INF-27', 'Terraform the Hetzner firewall rules for the worker nodes', 'codex-ci', 'Tomás Berg', 'Tomás Berg', 'Tomás Berg', 'the plan removes two rules nobody references. Apply as is?', '', '', 2, '1h')
+      ];
+      mentionRows[0].to = 'Ana Ruiz';
+      mentionRows[1].to = 'Ana Ruiz';
+      stalledRows = stalledRows.concat([task('lg-s-prog', 'WEB-84', 'Move the docs search to the new index', 'Lina Okafor', '', 1, '', 'no update 6d'), task('lg-s-prog', 'INF-33', 'Rotate the registry token used by CI', 'codex-ci', 'Tomás Berg', 3, '', 'no update 31h')]);
+      deadlineRows = deadlineRows.concat([deadline('ms', 'DOC', 'Docs 1.0', 'milestone · target Oct 20', 80, '16/20', '4 open tasks', '3 days overdue')]);
+      counts = { review: 12, mention: 3, stalled: 3, deadline: 3 };
+    }
+    if (long) {
+      reviewRows[0] = task('lg-s-review', 'PAY-140', 'Retry failed webhook deliveries with exponential backoff, cap the total retry window at 24 hours, and move what still fails to the dead-letter queue with the last response body', 'claude-dev', 'Ana Ruiz', 3, 'in review 3h');
+      mentionRows[0] = mention('CLI-30', 'pm sync stops halfway through large workspaces', 'claude-dev', 'Ana Ruiz', 'Ana Ruiz', 'Ana Ruiz', 'pg-boss drops the job after', 'retryLimit: 5', 'and the sync never resumes. Raise the limit, or split the sync into one job per project so a failure only loses one?', 3, '8m');
+      counts = { review: 132, mention: 14, stalled: 9, deadline: 6 };
+    }
+    if (state === 'expanded') {
+      const titles = ['Validate webhook URLs before saving', 'Paginate pm tasks list by default', 'Footer links point to the old docs domain', 'Compress worker logs older than a week', 'Typed errors for the pm sync command', 'Explain API key scopes in the CLI help', 'Lazy-load the changelog images', 'Remove the unused payouts_v1 table', 'Status page for the public API'];
+      const keys = ['PAY-151', 'CLI-25', 'WEB-95', 'INF-35', 'CLI-27', 'CLI-28', 'WEB-96', 'PAY-155', 'INF-36'];
+      const whos = [['codex-ci', 'Tomás Berg'], ['claude-dev', 'Ana Ruiz'], ['Lina Okafor', ''], ['codex-ci', 'Tomás Berg'], ['claude-dev', 'Ana Ruiz'], ['claude-docs', 'Ana Ruiz'], ['Tomás Berg', ''], ['claude-dev', 'Ana Ruiz'], ['codex-ci', 'Tomás Berg']];
+      for (let i = 0; i < titles.length; i++) reviewRows.push(task('lg-s-review', keys[i], titles[i], whos[i][0], whos[i][1], i % 4, 'in review ' + (i + 2) + 'h'));
+      counts.review = 132;
+    }
+
+    const cap = (rows, c, expanded) => expanded ? rows : rows.slice(0, 5);
+    const mkGroup = (id, name, rows, count, k, expanded) => {
+      const shown = cap(rows, count, expanded);
+      return {
+        isReview: id === 'review', isMention: id === 'mention', isStalled: id === 'stalled', isDeadline: id === 'deadline',
+        name, count, k, rows: [], _rows: shown,
+        empty: count === 0, emptyText: { review: 'Nothing waiting for review', mention: 'No open questions', stalled: 'Nothing stalled', deadline: 'No deadlines in the next 2 days' }[id],
+        hCls: count === 0 ? 'm4-ghe' : 'm4-gh',
+        more: !expanded && count > 5 ? 'Show all ' + (count > 50 ? '50 of ' + count : count) : '',
+        foot: expanded ? 'Showing 50 of ' + count + '. The rest stay here until they clear.' : ''
+      };
+    };
+    let groups = [];
+    const showQueue = !['new', 'error'].includes(state);
+    if (['mine', 'everyone', 'panel', 'expanded', 'refresh', 'stale', 'long'].includes(state)) {
+      groups = [
+        mkGroup('review', 'In review', reviewRows, counts.review, '1', state === 'expanded'),
+        mkGroup('mention', 'Mentions', mentionRows, counts.mention, '2', false),
+        mkGroup('stalled', 'Stalled', stalledRows, counts.stalled, '3', false),
+        mkGroup('deadline', 'Deadlines', deadlineRows, counts.deadline, '4', false)
+      ];
+      if (state === 'expanded') groups = groups.slice(0, 2);
+      n = 0;
+      groups.forEach((g) => { g.rows = g._rows.map((r) => Object.assign({ cls: rowCls(r.key, r.isMention) }, r)); });
+    }
+    if (state === 'partial') {
+      counts = { review: 3, mention: 0, stalled: 0, deadline: 2 };
+      groups = [
+        mkGroup('review', 'In review', reviewRows, 3, '1', false),
+        mkGroup('mention', 'Mentions', [], 0, '2', false),
+        mkGroup('stalled', 'Stalled', [], 0, '3', false),
+        mkGroup('deadline', 'Deadlines', deadlineRows, 2, '4', false)
+      ];
+      n = 0;
+      groups.forEach((g) => { g.rows = g._rows.map((r) => Object.assign({ cls: rowCls(r.key, r.isMention) }, r)); });
+    }
+    const total = counts.review + counts.mention + counts.stalled + counts.deadline;
+
+    let projects = [
+      { pk: 'PAY', name: 'Payments', open: 18, prog: 4, rev: 3, cy: 'Cycle 9', cyPct: 58, cyLeft: '3d left', ms: 'PCI audit', msPct: 64, msWarn: '11d overdue', act: '5m' },
+      { pk: 'WEB', name: 'Website', open: 27, prog: 5, rev: 2, cy: 'Cycle 4', cyPct: 63, cyWarn: 'ends tomorrow', noMs: 'Milestones not used', act: '12m' },
+      { pk: 'CLI', name: 'Command-line tool', open: 9, prog: 2, rev: 1, noCy: 'Cycles not used', ms: 'CLI 1.0', msPct: 42, msDate: 'Nov 30 · +1', act: '40m' },
+      { pk: 'DOC', name: 'Docs', src: true, open: 6, prog: 1, rev: 1, noCy: 'Cycles not used', ms: 'Docs 1.0', msPct: 80, msWarn: '3d overdue', act: '2h' },
+      { pk: 'INF', name: 'Infrastructure', open: 5, prog: 1, rev: 0, noCy: 'Cycles not used', noMs: 'Milestones not used', act: '1d' }
+    ];
+    let projMore = '';
+    if (long) {
+      projects[0].name = 'Payments platform: card processing, payouts, invoicing and the merchant dashboard';
+      projects[1].cy = 'Cycle 4 · Checkout rewrite and the new pricing page';
+      const extra = ['Mobile app', 'Partner API', 'Billing migration', 'Status page', 'Design system', 'Data warehouse', 'Support tooling'];
+      const ek = ['MOB', 'PAPI', 'BILL', 'STAT', 'DS', 'DWH', 'SUP'];
+      for (let i = 0; i < extra.length; i++) projects.push({ pk: ek[i], name: extra[i], open: 3 + i * 2, prog: i % 3, rev: i % 2, noCy: i % 2 ? 'Cycles not used' : '', cy: i % 2 ? '' : 'Cycle ' + (i + 2), cyPct: 20 + i * 9, cyLeft: (i + 2) + 'd left', noMs: i % 3 ? 'Milestones not used' : '', ms: i % 3 ? '' : 'Launch', msPct: 30 + i * 5, msDate: 'Dec ' + (i + 4), act: (i + 2) + 'h' });
+      projMore = 'Showing 12 of 30 projects · Show all';
+    }
+    if (state === 'clear') {
+      projects[0].msWarn = ''; projects[0].msDate = 'Nov 14'; projects[0].ms = 'Webhooks v2'; projects[0].msPct = 53;
+      projects[1].cyWarn = ''; projects[1].cyLeft = '4d left';
+      projects[3].msWarn = ''; projects[3].msDate = 'Nov 20';
+    }
+    projects = projects.map((p) => Object.assign({ cyWarn: '', cyLeft: '', msWarn: '', msDate: '', src: false, noCy: '', noMs: '', cy: '', ms: '' }, p, {
+      progCls: p.prog ? 'm4-n' : 'm4-n0', revCls: p.rev ? 'm4-n' : 'm4-n0'
+    }));
+
+    let agents = [
+      { av: 'C', name: 'claude-dev', for: 'Ana Ruiz', key: 'PAY-139', task: 'Stream invoice PDFs instead of buffering them in memory', plus: '', pill: '', last: 'Last activity 40m ago' },
+      { av: 'D', name: 'claude-docs', for: 'Ana Ruiz', key: 'DOC-14', task: 'Write the CLI quickstart page', plus: '', pill: '', last: 'Last activity 4m ago' }
+    ];
+    if (state !== 'clear') agents[0].pill = 'Stalled 26h';
+    else agents[0].last = 'Last activity 10m ago';
+    if (all) {
+      agents = agents.concat([
+        { av: 'X', name: 'codex-ci', for: 'Tomás Berg', key: 'INF-33', task: 'Rotate the registry token used by CI', plus: '', pill: 'Stalled 31h', last: 'Last activity yesterday' },
+        { av: 'G', name: 'gemini-triage', for: 'Lina Okafor', idle: true, last: 'Last activity 3d ago' }
+      ]);
+    }
+    if (long) {
+      agents[0] = { av: 'C', name: 'claude-dev', for: 'Ana Ruiz', key: 'PAY-139', task: 'Stream invoice PDFs instead of buffering them in memory', plus: '+4', pill: 'Stalled 26h', last: 'Last activity 40m ago' };
+      const names = ['claude-review', 'codex-migrations', 'claude-support-triage-for-the-eu-region', 'gemini-docs', 'codex-tests', 'claude-infra', 'codex-mobile', 'claude-design-sync'];
+      const fors = ['Ana Ruiz', 'Tomás Berg', 'Lina Okafor', 'Lina Okafor', 'Tomás Berg', 'Tomás Berg', 'Ana Ruiz', 'Lina Okafor'];
+      for (let i = 0; i < names.length; i++) agents.push(i % 3 === 2 ? { av: names[i][0].toUpperCase(), name: names[i], for: fors[i], idle: true, last: 'Last activity ' + (i + 1) + 'd ago' } : { av: names[i][0].toUpperCase(), name: names[i], for: fors[i], key: 'WEB-' + (100 + i), task: ['Snapshot tests for the board', 'Backfill task keys on old rows', 'Translate the refund FAQ', 'Fix broken anchors in the API reference', 'Flaky e2e: quick create focus', 'Bump Node to 24.11 in the image'][i % 6], plus: '', pill: '', last: 'Last activity ' + (i + 5) + 'm ago' });
+    }
+    agents = agents.map((a) => Object.assign({ idle: false, task: '', key: '', plus: '', pill: '' }, a));
+
+    const showProjects = !['new', 'error', 'expanded'].includes(state);
+    const showAgents = showProjects && state !== 'loading';
+    const railKeys = state === 'new' ? [] : [{ k: 'PAY', n: 18 }, { k: 'WEB', n: 27 }, { k: 'CLI', n: 9 }, { k: 'DOC', n: 6 }, { k: 'INF', n: 5 }];
+    const subs = { partial: 'Reddevs · you and 2 agents', mine: 'Reddevs · you and 2 agents', everyone: 'Reddevs · 3 people, 4 agents', panel: 'Reddevs · you and 2 agents', expanded: 'Reddevs · 3 people, 4 agents', clear: 'Reddevs · you and 2 agents', new: 'Reddevs', loading: 'Reddevs', refresh: 'Reddevs · you and 2 agents', error: 'Reddevs', stale: 'Reddevs · you and 2 agents', long: 'Reddevs · 9 people, 12 agents', longlow: 'Reddevs · 9 people, 12 agents' };
+    const upds = { refresh: 'Refreshing', stale: "Couldn't refresh · showing 3m ago · Retry", loading: 'Loading' };
+    // The rail count is always the Mine count, whatever scope the page shows.
+    let badge = state === 'partial' ? '5' : '8';
+    if (state === 'clear' || state === 'new') badge = '';
+    if (state === 'loading' || state === 'error') badge = '';
+    if (long) badge = '99+';
+
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rootStyle: (narrow ? 'width:1024px;' : '') + 'height:' + (panel || state === 'new' || state === 'error' || state === 'clear' ? 800 : 1100) + 'px',
+      label: 'Dashboard · ' + state + (narrow ? ' · 1024' : ''),
+      gridCls: panel ? 'd-gridp' : 'd-grid', isPanel: panel, notPanel: !panel, wide,
+      sub: subs[state] || '',
+      showUpd: state !== 'new' && state !== 'error', updText: !(panel && narrow), upd: upds[state] || 'Updated just now', updDot: state === 'stale' || state === 'loading' ? 'm4-dotoff' : 'm4-dot',
+      showScope: state !== 'new',
+      segMine: all ? 'm2-segi' : 'm2-segon', segAll: all ? 'm2-segon' : 'm2-segi',
+      isError: state === 'error', isNew: state === 'new', isClear: state === 'clear', isLoading: state === 'loading',
+      showQueue: showQueue && state !== 'longlow',
+      qTitle: all ? 'Needs someone' : 'Needs you',
+      qCount: state === 'clear' || state === 'loading' ? '' : String(total),
+      qNote: panel ? '' : (all ? 'Everyone in Reddevs. Items leave when they are handled.' : 'Assigned to you, your agents, and mentions of you. Items leave when they are handled.'),
+      groups,
+      skelGroups: [70, 60, 56], skelRows: [64, 48],
+      showProjects: showProjects && state !== 'long', projects: state === 'loading' ? [] : projects, projCount: long ? '30' : String(projects.length), projMore,
+      pthCls: 'm4-pth ' + (panel ? 'm4-pcp' : 'm4-pc'), prCls: 'm4-pr ' + (panel ? 'm4-pcp' : 'm4-pc'),
+      showAgents: showAgents && state !== 'long', agents, agentCount: long ? '12' : String(agents.length), agentNote: all ? 'Everyone' : 'Yours · Everyone shows all 4',
+      agCls: panel ? 'm4-ag2' : 'm4-ag',
+      badge,
+      railKeys,
+      scrollTop: long ? (state === 'longlow' ? 520 : 70) : 0, scrollH: 160
+    };
+  }
+}
+</script>
+</body>
+</html>

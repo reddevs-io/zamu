@@ -1,0 +1,100 @@
+/* Ledger M4 additions: the dashboard. Load after ledger.css and ledger-m2.css.
+   No new colour tokens. The queue reuses --surface, --line, --warn and --warn-bg,
+   --mention and --mention-bg, --review, --accent and --on-accent. Only component styles live here. */
+
+/* Page */
+.m4-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+.m4-body { flex: 1; min-height: 0; overflow: hidden; padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 28px; box-sizing: border-box; }
+.m4-rel { position: relative; }
+.m4-upd { font-family: "Martian Mono", ui-monospace, monospace; font-size: 10px; color: var(--faint); display: inline-flex; align-items: center; gap: 6px; }
+.m4-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--accent); }
+.m4-dotoff { width: 6px; height: 6px; flex: none; border-radius: 50%; border: 1.5px solid var(--faint); box-sizing: border-box; }
+
+/* Rail: the Dashboard item grows to 46px and carries the queue count under its label,
+   like the open counts under project keys. No badge at 0. */
+.m4-rd { height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--rail-fg); font-size: 10.5px; font-weight: 500; }
+.m4-rdon { height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--rail); background: var(--rail-on); font-size: 10.5px; font-weight: 600; }
+.m4-badge { min-width: 18px; height: 14px; padding: 0 4px; box-sizing: border-box; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); font-family: "Martian Mono", ui-monospace, monospace; font-size: 9px; font-weight: 500; line-height: 1; }
+
+/* Scope switch reuses .m2-seg; the key hint sits outside it */
+.m4-scope { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Action queue: the one boxed surface on the page */
+.m4-q { border: 1px solid var(--line); border-top: 2px solid var(--fg); background: var(--surface); display: flex; flex-direction: column; flex: none; }
+.m4-qh { height: 48px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line); box-sizing: border-box; }
+.m4-qt { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.m4-qn { font-family: "Martian Mono", ui-monospace, monospace; font-size: 15px; font-weight: 500; color: var(--fg); }
+.m4-qnote { font-size: 11.5px; color: var(--faint); }
+.m4-gh { height: 30px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--band); border-bottom: 1px solid var(--line-2); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; box-sizing: border-box; }
+.m4-ghe { height: 30px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-bottom: 1px solid var(--line-2); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; color: var(--faint); box-sizing: border-box; }
+.m4-ghk { font-family: "Martian Mono", ui-monospace, monospace; font-size: 9.5px; color: var(--faint); letter-spacing: 0; font-weight: 500; }
+.m4-more { font-size: 11.5px; letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.m4-foot { height: 32px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line-2); font-size: 11.5px; color: var(--muted); }
+
+/* Group glyphs. Shape plus label, never colour alone. */
+.m4-at { width: 14px; flex: none; text-align: center; color: var(--mention); font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; font-weight: 500; }
+.m4-st { width: 8px; height: 8px; flex: none; box-sizing: border-box; border: 1.5px solid var(--warn); background: linear-gradient(var(--warn), var(--warn)) left / 50% 100% no-repeat; }
+.m4-dl { width: 8px; height: 8px; flex: none; background: var(--warn); transform: rotate(45deg); }
+
+/* Queue rows. All share one grid per layout so columns line up across groups. */
+.m4-r { min-height: 36px; display: grid; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line-2); box-sizing: border-box; }
+.m4-rh { min-height: 36px; display: grid; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line-2); box-sizing: border-box; background: var(--band); }
+.m4-rf { min-height: 36px; display: grid; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line-2); box-sizing: border-box; box-shadow: inset 0 0 0 2px var(--focus); }
+.m4-rs { min-height: 36px; display: grid; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line-2); box-sizing: border-box; background: var(--sel); box-shadow: inset 2px 0 0 var(--accent); }
+.m4-c { grid-template-columns: 14px 64px minmax(0, 1fr) 128px 200px 34px 140px; }
+.m4-cp { grid-template-columns: 14px 64px minmax(0, 1fr) 118px; }
+.m4-cn { grid-template-columns: 14px 64px minmax(0, 1fr) 96px; }
+.m4-two { padding-top: 7px; padding-bottom: 8px; align-items: start; }
+.m4-two > :first-child { margin-top: 3px; }
+.m4-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.m4-stack { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.m4-line { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.m4-line b { font-weight: 600; }
+.m4-ex { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.m4-ex code { font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; background: var(--band); padding: 0 3px; color: var(--fg); }
+.m4-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-family: "Martian Mono", ui-monospace, monospace; font-size: 10px; color: var(--faint); white-space: nowrap; }
+.m4-pill { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; background: var(--warn-bg); color: var(--warn); font-family: "Instrument Sans", ui-sans-serif, sans-serif; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.m4-to { color: var(--faint); }
+.m4-pk { font-family: "Martian Mono", ui-monospace, monospace; font-size: 9.5px; padding: 0 4px; border: 1px solid var(--line); color: var(--muted); line-height: 15px; flex: none; }
+
+/* Section headers below the queue */
+.m4-sh { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.m4-st2 { font-size: 13px; font-weight: 600; }
+.m4-sc { font-family: "Martian Mono", ui-monospace, monospace; font-size: 10px; color: var(--faint); }
+.m4-sl { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+
+/* Project rows */
+.m4-pt { border-top: 1px solid var(--line); }
+.m4-pth { height: 28px; display: grid; align-items: center; gap: 14px; padding: 0 8px; border-bottom: 1px solid var(--line); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 600; box-sizing: border-box; }
+.m4-pr { height: 44px; display: grid; align-items: center; gap: 14px; padding: 0 8px; border-bottom: 1px solid var(--line-2); box-sizing: border-box; }
+.m4-pc { grid-template-columns: 44px minmax(0, 1fr) 44px 56px 52px 236px 252px 52px; }
+.m4-pcp { grid-template-columns: 44px minmax(0, 1fr) 44px 52px; }
+.m4-n { font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.m4-n0 { font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; text-align: right; color: var(--faint); }
+.m4-plan { display: grid; grid-template-columns: 12px minmax(0, 1fr) 54px auto; align-items: center; gap: 7px; min-width: 0; font-size: 12px; }
+.m4-plan .m2-prog { min-width: 0; }
+.m4-unused { font-size: 11.5px; color: var(--faint); }
+.m4-src { display: inline-flex; align-items: center; gap: 4px; height: 16px; padding: 0 4px; border: 1px dashed var(--line); font-size: 9.5px; color: var(--muted); flex: none; }
+.m4-srcsq { width: 6px; height: 6px; background: var(--muted); flex: none; }
+
+/* Agents */
+.m4-ag { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.m4-ag2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.m4-a { padding: 10px 12px 11px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.m4-ah { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.m4-at2 { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 12.5px; }
+.m4-at2 .lg-trunc { min-width: 0; }
+.m4-at2 .lg-key { flex: none; white-space: nowrap; }
+.m4-idle { font-size: 12px; color: var(--faint); }
+.m4-af { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--faint); }
+
+/* All clear and new workspace */
+.m4-clear { display: flex; align-items: center; gap: 14px; padding: 18px 16px; }
+.m4-check { width: 22px; height: 22px; flex: none; border: 1.5px solid var(--done); box-sizing: border-box; position: relative; }
+.m4-check::after { content: ""; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px; border-right: 2px solid var(--done); border-bottom: 2px solid var(--done); transform: rotate(45deg); }
+.m4-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 300px)); gap: 12px; }
+.m4-step { border: 1px solid var(--line); background: var(--surface); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.m4-stepn { font-family: "Martian Mono", ui-monospace, monospace; font-size: 10px; color: var(--faint); }
+
+/* Scroll hint for long frames */
+.m4-scroll { position: absolute; right: 3px; width: 4px; background: var(--line); }

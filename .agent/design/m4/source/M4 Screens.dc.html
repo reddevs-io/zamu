@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif;color:#1a1a1a}
+a{color:#1a1a1a}
+a:hover{color:#2a78d6}
+.dv-turn{padding:36px 44px 28px;border-bottom:1px solid rgba(0,0,0,0.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 15px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-desc{margin:0 0 18px;max-width:960px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.65);text-wrap:pretty}
+.dv-opts{display:flex;flex-wrap:wrap;gap:24px 24px;align-items:flex-start;max-width:2650px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:8px;scroll-margin-top:16px}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 12px/1.3 system-ui,sans-serif;color:rgba(0,0,0,0.6)}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,0.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden}
+.dv-intro{display:grid;grid-template-columns:repeat(3,minmax(0,440px));gap:32px;font:12.5px/1.6 system-ui,sans-serif;color:rgba(0,0,0,0.72)}
+.dv-intro h3{margin:0 0 6px;font:600 12.5px/1.3 system-ui,sans-serif;color:#1a1a1a}
+.dv-intro ul,.dv-intro ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.dv-h{font:700 22px/1.2 system-ui,sans-serif;margin:0 0 6px}
+.dv-lead{font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.6);margin:0 0 24px;max-width:960px}
+code{font:11.5px ui-monospace,Menlo,monospace;background:rgba(0,0,0,0.06);padding:0 4px;border-radius:3px}
+</style>
+</helmet>
+<section class="dv-turn" id="intro" data-screen-label="M4 screens · overview">
+  <h1 class="dv-h">M4 screens · cross-project dashboard</h1>
+  <p class="dv-lead">The dashboard is the first rail item and the page you land on. It has an action queue on top (In review, Mentions, Stalled, Deadlines), one row per project, and the agents. The design follows the Ledger direction and adds no new colour tokens; component styles are in ledger-m4.css. Every frame is shown in light and dark, 1280 wide unless marked 1024.</p>
+  <div class="dv-intro">
+    <div>
+      <h3>Layout rules</h3>
+      <ul>
+        <li>The queue is the only boxed surface on the page, with a 2px top rule in the text colour. Projects and agents sit on the page ground, so the queue reads first without an accent colour.</li>
+        <li>All queue rows share one grid: glyph, key, title, project, who, priority, and a right-aligned reason. Columns line up across groups.</li>
+        <li>Shape tells the groups apart: square, @, half-filled square, diamond. Overdue and stalled always carry words in a pill ("no update 26h", "11 days overdue"), never colour alone.</li>
+        <li>Mentions take two lines: who, the task, then the excerpt with the @ chip.</li>
+        <li>With the panel open, rows drop to key, title and reason. Project rows drop to key, name, open and active.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Calls I made on the brief</h3>
+      <ol>
+        <li>The rail count sits under the "Dashboard" label, like the counts under project keys, not as a corner badge. The Ledger rail has one width, so there is no collapsed form to draw.</li>
+        <li>The rail count is always the Mine count, even while the page shows Everyone.</li>
+        <li>An empty group stays as one quiet line ("Stalled 0 · Nothing stalled") instead of disappearing. The layout doesn't jump on refresh, and keys 1 to 4 always land on the same group. When all four are empty, the queue becomes a single all-clear line.</li>
+        <li>Deadlines under Mine are milestones and cycles where you or your agents hold an open task.</li>
+        <li>A background refresh never moves rows under keyboard focus. A row whose condition cleared stays until focus leaves it.</li>
+        <li>The panel opened from the queue scrolls to the newest comment. M focuses the reply box, so a mention can be answered without leaving the page.</li>
+        <li>The scope is kept in the URL (<code>?scope=everyone</code>).</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Open questions</h3>
+      <ol>
+        <li>Project rows: I capped them at 12 with "Show all 30" (frame 9b). The agreed scope says every project. Keep the cap, or list them all?</li>
+        <li>Mentions show "Agent asks" or "Person asks" in the who column. Is that useful, or should the column stay empty?</li>
+        <li>New on the dashboard opens quick create with no project chosen, so the project picker gets focus first. OK?</li>
+        <li>The Backlog.md tag on project rows is a placeholder until M3 settles its marker.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+<section class="dv-turn" id="s0" data-screen-label="Tokens, components, rail and keys">
+  <div class="dv-thd"><a class="dv-tid" href="#s0">0</a><span class="dv-tname">Tokens, components, rail and keys</span></div>
+  <p class="dv-desc">No new colour tokens. The rail count, the queue pieces, project and agent rows, the scope switch, the refresh line and the keyboard list.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="0a"><div class="dv-olabel"><a class="dv-oid" href="#0a">0a</a>Light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Kit" theme="light" hint-size="1280px,1480px"></dc-import></div></div>
+      <div class="dv-opt" id="0b"><div class="dv-olabel"><a class="dv-oid" href="#0b">0b</a>Dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Kit" theme="dark" hint-size="1280px,1480px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s1" data-screen-label="Dashboard · Mine">
+  <div class="dv-thd"><a class="dv-tid" href="#s1">1</a><span class="dv-tname">Dashboard · Mine</span></div>
+  <p class="dv-desc">A typical day for Ana Ruiz: two reviews from claude-dev, a question from the agent and one from Tomás, one stalled agent task, an overdue milestone and a cycle ending tomorrow. The first row has keyboard focus; the second mention shows hover.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Mine · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="mine" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Mine · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="mine" hint-size="1280px,1100px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s2" data-screen-label="Dashboard · Everyone">
+  <div class="dv-thd"><a class="dv-tid" href="#s2">2</a><span class="dv-tname">Dashboard · Everyone</span></div>
+  <p class="dv-desc">The whole workspace. Mentions add who was asked (→ Tomás Berg); the agents strip shows every agent. Groups over 5 offer Show all.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Everyone · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="everyone" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Everyone · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="everyone" hint-size="1280px,1100px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s3" data-screen-label="Side panel open">
+  <div class="dv-thd"><a class="dv-tid" href="#s3">3</a><span class="dv-tname">Side panel open</span></div>
+  <p class="dv-desc">Enter on PAY-140 opens the existing task panel at 440px. The queue keeps its place, the selected row gets the accent edge, and the panel scrolls to the newest comment with the reply box ready.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>1280 · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="panel" width="1280" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt" id="3b"><div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>1280 · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="panel" width="1280" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt" id="3c"><div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>1024 · light</div><div class="dv-card" style="width:1024px"><dc-import name="M4Dashboard" theme="light" state="panel" width="1024" hint-size="1024px,800px"></dc-import></div></div>
+      <div class="dv-opt" id="3d"><div class="dv-olabel"><a class="dv-oid" href="#3d">3d</a>1024 · dark</div><div class="dv-card" style="width:1024px"><dc-import name="M4Dashboard" theme="dark" state="panel" width="1024" hint-size="1024px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s4" data-screen-label="Show all">
+  <div class="dv-thd"><a class="dv-tid" href="#s4">4</a><span class="dv-tname">Show all</span></div>
+  <p class="dv-desc">A expands the focused group in place, up to 50 rows. Past 50, the footer says how many there are. A again collapses.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="4a"><div class="dv-olabel"><a class="dv-oid" href="#4a">4a</a>In review, 50 of 132 · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="expanded" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="4b"><div class="dv-olabel"><a class="dv-oid" href="#4b">4b</a>In review, 50 of 132 · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="expanded" hint-size="1280px,1100px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s5" data-screen-label="Quieter day: empty groups">
+  <div class="dv-thd"><a class="dv-tid" href="#s5">5</a><span class="dv-tname">Quieter day: empty groups</span></div>
+  <p class="dv-desc">Mentions and Stalled are empty and stay as one line each. Keys 1 to 4 still land on the same groups.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="5a"><div class="dv-olabel"><a class="dv-oid" href="#5a">5a</a>Two groups empty · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="partial" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="5b"><div class="dv-olabel"><a class="dv-oid" href="#5b">5b</a>Two groups empty · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="partial" hint-size="1280px,1100px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s6" data-screen-label="All clear">
+  <div class="dv-thd"><a class="dv-tid" href="#s6">6</a><span class="dv-tname">All clear</span></div>
+  <p class="dv-desc">Nothing needs you. One calm line replaces the groups; projects and agents stay. The rail shows no count.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="6a"><div class="dv-olabel"><a class="dv-oid" href="#6a">6a</a>All clear · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="clear" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt" id="6b"><div class="dv-olabel"><a class="dv-oid" href="#6b">6b</a>All clear · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="clear" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s7" data-screen-label="New workspace">
+  <div class="dv-thd"><a class="dv-tid" href="#s7">7</a><span class="dv-tname">New workspace</span></div>
+  <p class="dv-desc">No projects yet. Two steps: create a project, add an agent. The scope switch and refresh line are hidden until there is something to show.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="7a"><div class="dv-olabel"><a class="dv-oid" href="#7a">7a</a>New workspace · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="new" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt" id="7b"><div class="dv-olabel"><a class="dv-oid" href="#7b">7b</a>New workspace · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="new" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s8" data-screen-label="Loading, refreshing and errors">
+  <div class="dv-thd"><a class="dv-tid" href="#s8">8</a><span class="dv-tname">Loading, refreshing and errors</span></div>
+  <p class="dv-desc">First load shows skeleton rows in the queue and the project table. A background refresh only changes the line in the header. A failed refresh keeps the last data and says how old it is. A failed first load shows the banner with Retry.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="8a"><div class="dv-olabel"><a class="dv-oid" href="#8a">8a</a>First load · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="loading" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="8b"><div class="dv-olabel"><a class="dv-oid" href="#8b">8b</a>First load · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="loading" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="8c"><div class="dv-olabel"><a class="dv-oid" href="#8c">8c</a>Refreshing in the background · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="refresh" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="8d"><div class="dv-olabel"><a class="dv-oid" href="#8d">8d</a>Couldn't refresh, showing 3m old data · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="stale" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="8e"><div class="dv-olabel"><a class="dv-oid" href="#8e">8e</a>Request failed · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="error" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt" id="8f"><div class="dv-olabel"><a class="dv-oid" href="#8f">8f</a>Request failed · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="error" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s9" data-screen-label="Long content">
+  <div class="dv-thd"><a class="dv-tid" href="#s9">9</a><span class="dv-tname">Long content</span></div>
+  <p class="dv-desc">Nine people, twelve agents, thirty projects. Long titles clamp to one line, the mention excerpt keeps inline code, the rail count caps at 99+, an agent with five tasks shows +4, and long names truncate.</p>
+  <div class="dv-opts">
+      <div class="dv-opt" id="9a"><div class="dv-olabel"><a class="dv-oid" href="#9a">9a</a>Queue · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="long" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="9b"><div class="dv-olabel"><a class="dv-oid" href="#9b">9b</a>Projects and agents, scrolled · light</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="light" state="longlow" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="9c"><div class="dv-olabel"><a class="dv-oid" href="#9c">9c</a>Queue · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="long" hint-size="1280px,1100px"></dc-import></div></div>
+      <div class="dv-opt" id="9d"><div class="dv-olabel"><a class="dv-oid" href="#9d">9d</a>Projects and agents, scrolled · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M4Dashboard" theme="dark" state="longlow" hint-size="1280px,1100px"></dc-import></div></div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

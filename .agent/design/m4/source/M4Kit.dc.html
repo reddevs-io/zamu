@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m4.css" />
+<style>
+a{color:inherit}
+a:hover{color:var(--accent)}
+.k-wrap{padding:28px 32px;display:flex;flex-direction:column;gap:30px;height:100%;box-sizing:border-box;overflow:hidden}
+.k-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px}
+.k-three{display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,1fr);gap:32px}
+.k-col{display:flex;flex-direction:column;gap:22px;min-width:0}
+.k-h{font-size:13px;font-weight:600;margin:0 0 8px}
+.k-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin:0;text-wrap:pretty}
+.k-lab{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:6px 0 4px}
+.k-box{border:1px solid var(--line);background:var(--surface)}
+.k-rails{display:flex;gap:14px;align-items:flex-start}
+.k-rail{width:64px;background:var(--rail);display:flex;flex-direction:column;padding:10px 0;gap:2px}
+.k-rcap{font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;width:64px}
+.k-agents{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.k-tok{display:grid;grid-template-columns:200px minmax(0,1fr);gap:4px 12px;font-size:11.5px;line-height:1.45}
+.k-tok code{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px}
+.k-keys{display:flex;flex-direction:column;border-top:1px solid var(--line-2)}
+.k-key{display:grid;grid-template-columns:88px minmax(0,1fr);gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-2);font-size:12px}
+.k-kk{display:flex;gap:4px}
+.k-ind{display:flex;flex-direction:column;gap:8px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="height:1480px" data-screen-label="M4 tokens, components and keys">
+  <div class="k-wrap">
+    <div class="k-two">
+      <div>
+        <h2 class="k-h">Queue group header</h2>
+        <div class="k-box">
+          <div class="m4-gh"><span class="lg-sq lg-s-review"></span><span>In review</span><span class="lg-gc">12</span><span class="lg-sp"></span><span class="m4-more">Show all 12<span class="lg-kbd">A</span></span><span class="lg-kbd">1</span></div>
+          <div class="m4-gh"><span class="m4-at">@</span><span>Mentions</span><span class="lg-gc">2</span><span class="lg-sp"></span><span class="lg-kbd">2</span></div>
+          <div class="m4-ghe"><span class="m4-st"></span><span>Stalled</span><span class="lg-gc">0</span><span class="m4-more" style="color:var(--faint)">Nothing stalled</span><span class="lg-sp"></span><span class="lg-kbd">3</span></div>
+          <div class="m4-gh"><span class="m4-dl"></span><span>Deadlines</span><span class="lg-gc">2</span><span class="lg-sp"></span><span class="lg-kbd">4</span></div>
+        </div>
+        <p class="k-note" style="margin-top:6px">An empty group keeps its place as one quiet line, so the layout doesn't jump when an item clears during a refresh, and 1 to 4 always jump to the same group. Shape tells the groups apart: square, @, half-filled square, diamond.</p>
+      </div>
+      <div>
+        <h2 class="k-h">Rail: Dashboard item</h2>
+        <div class="k-rails">
+          <sc-for list="{{ rails }}" as="r" hint-placeholder-count="4">
+            <div>
+              <div class="k-rail"><div class="lg-ws" style="margin-bottom:6px">R</div><a class="{{ r.cls }}" href="#"><span>Dashboard</span><sc-if value="{{ r.n }}" hint-placeholder-val="{{ true }}"><span class="m4-badge">{{ r.n }}</span></sc-if></a><a class="lg-rnav" href="#">My tasks</a></div>
+              <div class="k-rcap">{{ r.cap }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <p class="k-note" style="margin-top:8px">The count sits under the label, like the open counts under project keys. It is the same number as the queue header in Mine. No count at 0; 99+ above 99. The Ledger rail has one width, so there is no collapsed form.</p>
+      </div>
+    </div>
+    <div>
+        <h2 class="k-h">Queue rows</h2>
+        <div class="k-box">
+          <div class="k-lab" style="padding-left:16px">Task row: default, hover, keyboard focus, selected (panel open)</div>
+          <sc-for list="{{ rowStates }}" as="r" hint-placeholder-count="4">
+            <div class="{{ r.cls }}"><span class="lg-sq lg-s-review"></span><span class="lg-key">PAY-140</span><span class="lg-trunc">Retry failed webhook deliveries with exponential backoff</span><span class="m4-cell"><span class="m4-pk">PAY</span><span class="lg-muted" style="font-size:12px">Payments</span></span><span class="lg-who"><span class="lg-ag">C</span><span style="color:var(--fg)">claude-dev</span><span class="lg-for">for Ana Ruiz</span></span><span class="lg-pri">■■■</span><span class="m4-meta">{{ r.meta }}</span></div>
+          </sc-for>
+          <div class="k-lab" style="padding-left:16px">Mention row: two lines, excerpt clamps to one</div>
+          <div class="m4-r m4-c m4-two"><span class="lg-ag">C</span><span class="lg-key">PAY-140</span><span class="m4-stack"><span class="m4-line"><b>claude-dev</b><span class="lg-for">for Ana Ruiz</span><span class="lg-faint">on</span><span class="lg-trunc lg-muted">Retry failed webhook deliveries with exponential backoff</span></span><span class="m4-ex"><span class="m2-at">@Ana Ruiz</span> the retry cap is 24 hours now. Should deliveries that still fail after that go to the dead-letter queue?</span></span><span class="m4-cell"><span class="m4-pk">PAY</span><span class="lg-muted" style="font-size:12px">Payments</span></span><span class="lg-faint" style="font-size:12px">Agent asks</span><span class="lg-pri">■■■</span><span class="m4-meta">25m</span></div>
+          <div class="k-lab" style="padding-left:16px">Stalled row: the pill names the silence</div>
+          <div class="m4-r m4-c"><span class="lg-sq lg-s-prog"></span><span class="lg-key">PAY-139</span><span class="lg-trunc">Stream invoice PDFs instead of buffering them in memory</span><span class="m4-cell"><span class="m4-pk">PAY</span><span class="lg-muted" style="font-size:12px">Payments</span></span><span class="lg-who"><span class="lg-ag">C</span><span style="color:var(--fg)">claude-dev</span><span class="lg-for">for Ana Ruiz</span></span><span class="lg-pri">■■</span><span class="m4-meta"><span class="m4-pill">no update 26h</span></span></div>
+          <div class="k-lab" style="padding-left:16px">Deadline rows: milestone and cycle</div>
+          <div class="m4-r m4-c"><span class="m2-msf" style="color:var(--warn);margin-left:3px"></span><span class="lg-key">PAY</span><span class="m4-line"><b>PCI audit</b><span class="lg-faint" style="font-size:12px">milestone · target Oct 12</span></span><span class="m4-cell"><span class="m2-prog"><span class="m2-progd" style="width:64%"></span></span><span class="m2-num">7/11</span></span><span class="lg-muted" style="font-size:12px">4 open tasks</span><span></span><span class="m4-meta"><span class="m4-pill">11 days overdue</span></span></div>
+          <div class="m4-r m4-c" style="border-bottom:0"><span class="m2-cyon" style="--p:63%;color:var(--warn);margin-left:2px"></span><span class="lg-key">WEB</span><span class="m4-line"><b>Cycle 4</b><span class="lg-faint" style="font-size:12px">cycle · Oct 12 – Oct 24</span></span><span class="m4-cell"><span class="m2-prog"><span class="m2-progd" style="width:63%"></span></span><span class="m2-num">12/19</span></span><span class="lg-muted" style="font-size:12px">7 open tasks</span><span></span><span class="m4-meta"><span class="m4-pill">ends tomorrow</span></span></div>
+        </div>
+      </div>
+    <div>
+        <h2 class="k-h">Project row</h2>
+        <div class="m4-pt">
+          <div class="m4-pr m4-pc"><span class="lg-key" style="color:var(--fg)">PAY</span><span class="m4-cell"><span class="lg-trunc" style="font-weight:600">Payments</span></span><span class="m4-n">18</span><span class="m4-n">4</span><span class="m4-n">3</span><span class="m4-plan"><span class="m2-cyon" style="--p:58%;color:var(--muted)"></span><span class="lg-trunc">Cycle 9</span><span class="m2-prog"><span class="m2-progd" style="width:58%"></span></span><span class="m2-num">3d left</span></span><span class="m4-plan"><span class="m2-ms" style="color:var(--muted)"></span><span class="lg-trunc">PCI audit</span><span class="m2-prog"><span class="m2-progd" style="width:64%"></span></span><span class="m4-pill">11d overdue</span></span><span class="lg-upd">5m</span></div>
+          <div class="m4-pr m4-pc"><span class="lg-key" style="color:var(--fg)">DOC</span><span class="m4-cell"><span class="lg-trunc" style="font-weight:600">Docs</span><span class="m4-src"><span class="m4-srcsq"></span>Backlog.md</span></span><span class="m4-n">6</span><span class="m4-n">1</span><span class="m4-n">1</span><span class="m4-unused">Cycles not used</span><span class="m4-plan"><span class="m2-ms" style="color:var(--muted)"></span><span class="lg-trunc">Docs 1.0</span><span class="m2-prog"><span class="m2-progd" style="width:80%"></span></span><span class="m2-num">Nov 20</span></span><span class="lg-upd">2h</span></div>
+          <div class="m4-pr m4-pc"><span class="lg-key" style="color:var(--fg)">INF</span><span class="m4-cell"><span class="lg-trunc" style="font-weight:600">Infrastructure</span></span><span class="m4-n">5</span><span class="m4-n">1</span><span class="m4-n0">0</span><span class="m4-unused">Cycles not used</span><span class="m4-unused">Milestones not used</span><span class="lg-upd">1d</span></div>
+        </div>
+        <p class="k-note" style="margin-top:6px">The dashed Backlog.md tag is a placeholder for the marker M3 designs for mirrored projects. Zero counts go faint.</p>
+      </div>
+    <div class="k-three">
+      <div>
+        <h2 class="k-h">Agent card</h2>
+        <div class="k-agents" style="grid-template-columns:minmax(0,1fr)">
+          <div class="m4-a"><div class="m4-ah"><span class="lg-ag">C</span><b>claude-dev</b><span class="lg-for">for Ana Ruiz</span></div><div class="m4-at2"><span class="lg-sq lg-s-prog" style="align-self:center"></span><span class="lg-key">PAY-139</span><span class="lg-trunc">Stream invoice PDFs instead of buffering</span><span class="m2-num">+4</span></div><div class="m4-af"><span class="m4-pill">Stalled 26h</span><span>Last activity 40m ago</span></div></div>
+          <div class="m4-a"><div class="m4-ah"><span class="lg-ag">D</span><b>claude-docs</b><span class="lg-for">for Ana Ruiz</span></div><div class="m4-at2"><span class="lg-sq lg-s-prog" style="align-self:center"></span><span class="lg-key">DOC-14</span><span class="lg-trunc">Write the CLI quickstart page</span></div><div class="m4-af"><span>Last activity 4m ago</span></div></div>
+          <div class="m4-a"><div class="m4-ah"><span class="lg-ag">G</span><b>gemini-triage</b><span class="lg-for">for Lina Okafor</span></div><div class="m4-idle">Idle · nothing in progress</div><div class="m4-af"><span>Last activity 3d ago</span></div></div>
+        </div>
+        <p class="k-note" style="margin-top:6px">Working, stalled, idle. The current task is the oldest one in progress; +4 counts the others. The task opens in the side panel.</p>
+      </div>
+      <div class="k-col"><div>
+        <h2 class="k-h">Scope and refresh</h2>
+        <div class="k-ind">
+          <div style="display:flex;gap:10px;align-items:center"><span class="m4-scope"><span class="m2-seg"><span class="m2-segon">Mine</span><span class="m2-segi">Everyone</span></span><span class="lg-kbd">E</span></span><span class="m4-scope"><span class="m2-seg"><span class="m2-segi">Mine</span><span class="m2-segon">Everyone</span></span></span></div>
+          <span class="m4-upd"><span class="m4-dot"></span>Updated just now</span>
+          <span class="m4-upd"><span class="m4-dot"></span>Refreshing</span>
+          <span class="m4-upd"><span class="m4-dotoff"></span>Couldn't refresh · showing 3m ago · Retry</span>
+        </div>
+        <p class="k-note" style="margin-top:8px">The scope is kept in the URL (?scope=everyone), so a link opens the same view. Background refreshes only change the line above. Rows update in place, focus and the open panel stay put, and a row whose condition cleared stays until focus moves off it.</p>
+      </div><div>
+        <h2 class="k-h">Tokens</h2>
+        <div class="k-tok">
+          <code>no new tokens</code><span class="lg-muted">ledger-m4.css holds component styles only.</span>
+          <code>--fg</code><span class="lg-muted">2px top rule that marks the queue as the page's one boxed surface.</span>
+          <code>--warn, --warn-bg</code><span class="lg-muted">Stalled and overdue pills, deadline glyphs.</span>
+          <code>--mention, --mention-bg</code><span class="lg-muted">@ glyph and the mention chip in excerpts.</span>
+          <code>--accent, --on-accent</code><span class="lg-muted">Rail count, refresh dot, selected row edge.</span>
+        </div>
+      </div></div>
+      <div class="k-col"><div>
+        <h2 class="k-h">Keyboard</h2>
+        <div class="k-keys">
+          <sc-for list="{{ keys }}" as="k" hint-placeholder-count="8">
+            <div class="k-key"><span class="k-kk"><sc-for list="{{ k.keys }}" as="x" hint-placeholder-count="1"><span class="lg-kbd">{{ x }}</span></sc-for></span><span>{{ k.what }}</span></div>
+          </sc-for>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 1480 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rowStates: [
+        { cls: 'm4-r m4-c', meta: 'in review 3h' },
+        { cls: 'm4-rh m4-c', meta: 'in review 3h' },
+        { cls: 'm4-rf m4-c', meta: 'in review 3h' },
+        { cls: 'm4-rs m4-c', meta: 'in review 3h' }
+      ],
+      rails: [
+        { cls: 'm4-rdon', n: '8', cap: 'On, 8' },
+        { cls: 'm4-rd', n: '7', cap: 'Off, 7' },
+        { cls: 'm4-rd', n: '', cap: 'Off, 0' },
+        { cls: 'm4-rdon', n: '99+', cap: 'On, 99+' }
+      ],
+      keys: [
+        { keys: ['G', 'D'], what: 'Go to the dashboard' },
+        { keys: ['J', 'K'], what: 'Next or previous row, across groups' },
+        { keys: ['1', '4'], what: 'Jump to a group (1 to 4)' },
+        { keys: ['↵'], what: 'Open: task in the panel, milestone or cycle page' },
+        { keys: ['A'], what: 'Show all or collapse the focused group' },
+        { keys: ['E'], what: 'Switch Mine and Everyone' },
+        { keys: ['M'], what: 'Panel open: reply in the comment box' },
+        { keys: ['I'], what: 'Assign the focused task to me' },
+        { keys: ['Esc'], what: 'Close the panel; focus returns to the row' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
