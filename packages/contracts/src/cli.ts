@@ -6,6 +6,7 @@ import {
   Cycle,
   CycleDetail,
   CycleList,
+  Dashboard,
   Me,
   MilestoneList,
   MilestoneWithProgress,
@@ -112,6 +113,8 @@ export const cliDataSchemas = {
     project: ProjectKey.nullable(),
     block: z.string(),
   }),
+  /** pm dashboard [--everyone] */
+  dashboard: Dashboard,
   /** Any command that fails while --json is set (printed to stdout, exit code still non-zero). */
   error: Problem,
 } as const;

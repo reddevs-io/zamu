@@ -2,18 +2,22 @@ import { useEffect, useRef } from 'react';
 import { isEditableTarget, useHotkeys } from '~/ui';
 import { useNewProject } from './new-project';
 import { useFocusPageSearch } from './page-search';
-import { useQuickCreate } from './quick-create';
+import { type QuickCreateOptions, useQuickCreate } from './quick-create';
 
 /**
  * Shortcuts the shell owns on every signed-in page: C quick create (in the current project, if any),
  * P new project, / page search. Plain keys are ignored while typing and inside dialogs and menus.
+ * `quickCreateOptions` apply to C, for example `pickProject` on the dashboard.
  */
-export function useShellHotkeys(currentProjectKey: string | undefined): void {
+export function useShellHotkeys(
+  currentProjectKey: string | undefined,
+  quickCreateOptions?: QuickCreateOptions,
+): void {
   const quickCreate = useQuickCreate();
   const newProject = useNewProject();
   const focusSearch = useFocusPageSearch();
   useHotkeys({
-    c: () => quickCreate.open(currentProjectKey),
+    c: () => quickCreate.open(currentProjectKey, quickCreateOptions),
     p: () => newProject.open(),
     '/': () => focusSearch(),
   });

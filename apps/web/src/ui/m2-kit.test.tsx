@@ -357,6 +357,17 @@ describe('Composer', () => {
     expect(onSubmit).toHaveBeenCalledWith('Looks good');
   });
 
+  it('leaves the box on Escape and keeps the text', async () => {
+    const user = userEvent.setup();
+    render(<ComposerExample />);
+    const box = screen.getByRole('textbox', { name: 'Comment' });
+    await user.type(box, 'Half a thought');
+    expect(box).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(box).not.toHaveFocus();
+    expect(box).toHaveValue('Half a thought');
+  });
+
   it('switches to Preview and renders Markdown', async () => {
     const user = userEvent.setup();
     render(<ComposerExample />);

@@ -7,11 +7,13 @@ import { QuickCreateDialog } from '~/features/tasks/QuickCreateDialog';
 import { ThemeErrorToast, useThemeChoice } from '~/features/theme/ThemeChoice';
 import { useSignOut } from '~/lib/auth-client';
 import { AppFrame, Rail, type UserMenuItem } from '~/ui';
+import { railCountLabel, useDashboardRailCount, useRefreshDashboardAfterEdits } from './dashboard-count';
 import { useGoToHotkeys, useShellHotkeys } from './hotkeys';
 import { NewProjectProvider } from './new-project';
 import { PageSearchProvider } from './page-search';
 import {
   APPEARANCE_HREF,
+  DASHBOARD_HREF,
   MY_TASKS_HREF,
   PROJECTS_HREF,
   projectHref,
@@ -29,7 +31,8 @@ export interface AppShellProps {
 
 /**
  * Signed-in shell: the rail with the account menu, the global shortcuts (C quick create, P new project,
- * / page search, G then M for My tasks) and the dialogs they open. Pages render inside the content area.
+ * / page search, G then D for the dashboard, G then M for My tasks) and the dialogs they open. Pages render
+ * inside the content area.
  */
 export function AppShell({ user, children }: AppShellProps) {
   return (
@@ -53,8 +56,15 @@ function ShellFrame({ user, children }: AppShellProps) {
   const projects = useQuery(projectsQuery());
   const signOut = useSignOut();
   const theme = useThemeChoice();
-  useShellHotkeys(currentKey);
-  useGoToHotkeys({ m: () => void navigate({ to: MY_TASKS_HREF }) });
+  const onDashboard = pathname === DASHBOARD_HREF;
+  // The dashboard spans every project: C there starts with the project picker instead of a guess.
+  useShellHotkeys(currentKey, onDashboard ? { pickProject: true } : undefined);
+  useGoToHotkeys({
+    d: () => void navigate({ to: DASHBOARD_HREF }),
+    m: () => void navigate({ to: MY_TASKS_HREF }),
+  });
+  const queueCount = useDashboardRailCount();
+  useRefreshDashboardAfterEdits();
 
   const workspaceName = me.data?.workspace.name ?? 'Workspace';
   const accountGroups: UserMenuItem[][] = [
@@ -75,6 +85,14 @@ function ShellFrame({ user, children }: AppShellProps) {
         <Rail
           workspace={{ name: workspaceName, href: PROJECTS_HREF }}
           nav={[
+            {
+              id: 'dashboard',
+              label: 'Dashboard',
+              href: DASHBOARD_HREF,
+              isCurrent: onDashboard,
+              count: queueCount,
+              countLabel: railCountLabel,
+            },
             { id: 'my-tasks', label: 'My tasks', href: MY_TASKS_HREF, isCurrent: pathname === MY_TASKS_HREF },
             { id: 'projects', label: 'Projects', href: PROJECTS_HREF, isCurrent: pathname === PROJECTS_HREF },
           ]}
