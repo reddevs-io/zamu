@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<style>
+.bd-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.bd-grid{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
+.bd-gridp{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-width:0;min-height:0}
+.bd-wrap{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.bd-lanes{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.bd-lhead{display:flex;flex:none;border-bottom:1px solid var(--line-2)}
+.bd-lhc{flex:1 1 0;min-width:0;height:34px;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;border-right:1px solid var(--line-2)}
+.bd-panel{border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.bd-pbody{padding:20px 24px;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+.bd-props{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line)}
+.bd-cell{padding:8px 10px 9px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.bd-cell:nth-child(2n){border-right:0}
+.bd-cell:nth-last-child(-n+2){border-bottom:0}
+.bd-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500}
+.bd-toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:9px 12px 9px 14px;background:var(--fg);color:var(--bg);font-size:12.5px;box-shadow:var(--shadow);z-index:7;white-space:nowrap}
+.bd-toast .lg-kbd{color:var(--bg);border-color:oklch(0.6 0 0 / 0.5)}
+.bd-scroll{position:absolute;right:2px;top:44px;width:4px;height:120px;background:var(--line)}
+.bd-empty{flex:1;padding:48px 24px;display:flex}
+.bd-skcol{flex:1 1 0;padding:8px;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--line-2)}
+.bd-skcard{height:64px;border:1px solid var(--line-2);padding:10px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
+.bd-keys{display:flex;align-items:center;gap:6px;color:var(--faint);font-size:11.5px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">{{ openCount }}</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <div class="{{ gridCls }}">
+      <section class="bd-wrap">
+        <header class="lg-head">
+          <div style="min-width:0"><h1 class="lg-h1">{{ projName }}</h1><div class="lg-sub"><span class="lg-mono">{{ projKey }}</span> · {{ projSub }}</div></div>
+          <div class="lg-headr">
+            <div class="lg-search" style="width:150px"><span>Search</span><span class="lg-kbd">/</span></div>
+            <button class="lg-btn">New<span class="lg-btnk">C</span></button>
+          </div>
+        </header>
+        <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+          <nav class="m2-tabs">
+            <a class="m2-tabon" href="#">Tasks<span class="m2-tabn">{{ openCount }}</span></a>
+            <sc-if value="{{ hasMs }}" hint-placeholder-val="{{ true }}"><a class="m2-tab" href="#"><span class="m2-ms"></span>Milestones<span class="m2-tabn">3</span></a></sc-if>
+            <sc-if value="{{ hasCy }}" hint-placeholder-val="{{ true }}"><a class="m2-tab" href="#"><span class="m2-cyon" style="--p:60%"></span>Cycles<span class="m2-tabn">C12 · 3d left</span></a></sc-if>
+          </nav>
+        </sc-if>
+        <div class="lg-bar">
+          <span>Status <span class="lg-bv">Any</span></span>
+          <span>Priority <span class="lg-bv">Any</span></span>
+          <span>Assignee <span class="lg-bv">{{ fAssignee }}</span></span>
+          <sc-if value="{{ hasMs }}" hint-placeholder-val="{{ true }}"><span>Milestone <span class="lg-bv">Any</span></span></sc-if>
+          <sc-if value="{{ hasCy }}" hint-placeholder-val="{{ true }}"><span>Cycle <span class="lg-bv">{{ fCycle }}</span></span></sc-if>
+          <span>Lanes <span class="lg-bv">{{ fLanes }}</span></span>
+          <span class="lg-sp"></span>
+          <span class="m2-seg"><span class="m2-segi">List</span><span class="m2-segon">Board</span></span>
+          <span class="lg-kbd">V</span>
+        </div>
+
+        <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px 24px;border-bottom:1px solid var(--line)">
+            <div class="lg-banner"><span class="lg-bannerx"></span><span style="flex:1">Couldn't move PAY-131 to In review. It went back to In progress.</span><button class="lg-btn2" style="height:28px">Try again</button></div>
+            <p class="lg-hint" style="margin:8px 0 0">Someone else changed the task while you dragged it. The board shows the latest version.</p>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+          <div class="bd-empty">
+            <div class="lg-empty">
+              <h2 class="lg-h2">No tasks match these filters</h2>
+              <p class="lg-muted" style="margin:0;line-height:1.55">Cycle 12 has no tasks assigned to agents. Clear the filters, or add tasks to the cycle from the list.</p>
+              <div style="display:flex;gap:8px"><button class="lg-btn2">Clear filters</button><button class="lg-btn">New task<span class="lg-btnk">C</span></button></div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showBoard }}" hint-placeholder-val="{{ true }}">
+          <div class="m2-board">
+            <sc-for list="{{ cols }}" as="c" hint-placeholder-count="4">
+              <sc-if value="{{ c.open }}" hint-placeholder-val="{{ true }}">
+                <div class="{{ c.cls }}" style="position:relative">
+                  <div class="m2-colh"><span class="{{ c.sq }}"></span><span>{{ c.name }}</span><span class="lg-gc">{{ c.count }}</span><span class="lg-sp"></span><span class="lg-faint" style="letter-spacing:0">+</span></div>
+                  <div class="m2-colb">
+                    <sc-for list="{{ c.cards }}" as="t" hint-placeholder-count="3">
+                      <sc-if value="{{ t.isLine }}" hint-placeholder-val="{{ false }}"><div class="m2-dropline"></div></sc-if>
+                      <sc-if value="{{ t.isGhost }}" hint-placeholder-val="{{ false }}"><div class="m2-cardghost"></div></sc-if>
+                      <sc-if value="{{ t.isCard }}" hint-placeholder-val="{{ true }}">
+                        <div class="{{ t.cls }}">
+                          <div class="m2-cardl"><span class="lg-key">{{ t.key }}</span><span class="lg-sp"></span><span class="{{ t.priCls }}">{{ t.pri }}</span></div>
+                          <div class="m2-cardt">{{ t.title }}</div>
+                          <div class="m2-cardf">
+                            <sc-if value="{{ t.ms }}" hint-placeholder-val="{{ true }}"><span class="m2-chip"><span class="m2-ms"></span><span class="m2-chipt">{{ t.ms }}</span></span></sc-if>
+                            <sc-if value="{{ t.cy }}" hint-placeholder-val="{{ true }}"><span class="m2-chip"><span class="m2-cy"></span>{{ t.cy }}</span></sc-if>
+                            <span class="lg-sp"></span>
+                            <sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}" title="{{ t.who }}">{{ t.ini }}</span></sc-if>
+                          </div>
+                        </div>
+                      </sc-if>
+                    </sc-for>
+                    <sc-if value="{{ c.more }}" hint-placeholder-val="{{ false }}"><div class="m2-more">{{ c.more }}</div></sc-if>
+                  </div>
+                  <sc-if value="{{ c.scroll }}" hint-placeholder-val="{{ false }}"><span class="bd-scroll"></span></sc-if>
+                </div>
+              </sc-if>
+              <sc-if value="{{ c.folded }}" hint-placeholder-val="{{ false }}">
+                <div class="m2-colfold" title="Expand {{ c.name }}"><span class="{{ c.sq }}"></span><span class="m2-colfoldt"><span>{{ c.name }}</span><span class="lg-gc">{{ c.count }}</span></span></div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isLanes }}" hint-placeholder-val="{{ false }}">
+          <div class="bd-lanes">
+            <div class="bd-lhead">
+              <sc-for list="{{ laneCols }}" as="c" hint-placeholder-count="4"><div class="bd-lhc"><span class="{{ c.sq }}"></span>{{ c.name }}<span class="lg-gc">{{ c.count }}</span></div></sc-for>
+              <div class="m2-colfold" style="padding-top:0;justify-content:center;height:34px;writing-mode:horizontal-tb"><span class="lg-gc">+2</span></div>
+            </div>
+            <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="3">
+              <div class="m2-lane"><span class="lg-faint" style="width:10px">{{ l.chev }}</span><sc-if value="{{ l.has }}" hint-placeholder-val="{{ true }}"><span class="{{ l.avCls }}" style="--h:{{ l.hue }}">{{ l.ini }}</span></sc-if><span>{{ l.name }}</span><span class="lg-for" style="font-weight:400">{{ l.forTxt }}</span><span class="lg-gc">{{ l.count }}</span></div>
+              <sc-if value="{{ l.open }}" hint-placeholder-val="{{ true }}">
+                <div class="m2-lanerow">
+                  <sc-for list="{{ l.cells }}" as="cell" hint-placeholder-count="4">
+                    <div class="m2-lanecell">
+                      <sc-for list="{{ cell }}" as="t" hint-placeholder-count="1">
+                        <div class="{{ t.cls }}">
+                          <div class="m2-cardl"><span class="lg-key">{{ t.key }}</span><span class="lg-sp"></span><span class="{{ t.priCls }}">{{ t.pri }}</span></div>
+                          <div class="m2-cardt">{{ t.title }}</div>
+                          <div class="m2-cardf"><sc-if value="{{ t.ms }}" hint-placeholder-val="{{ true }}"><span class="m2-chip"><span class="m2-ms"></span><span class="m2-chipt">{{ t.ms }}</span></span></sc-if><sc-if value="{{ t.cy }}" hint-placeholder-val="{{ true }}"><span class="m2-chip"><span class="m2-cy"></span>{{ t.cy }}</span></sc-if></div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                  <div style="width:40px;flex:none;background:var(--band)"></div>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-board">
+            <sc-for list="{{ skCols }}" as="k" hint-placeholder-count="4">
+              <div class="bd-skcol"><span class="lg-skel" style="width:90px;margin:6px 4px 8px"></span><sc-for list="{{ k.cards }}" as="w" hint-placeholder-count="3"><div class="bd-skcard"><span class="lg-skel" style="width:46px"></span><span class="lg-skel" style="width:{{ w }}%"></span></div></sc-for></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDrag }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-carddrag" style="left:690px;top:300px;width:262px">
+            <div class="m2-cardl"><span class="lg-key">PAY-131</span><span class="lg-sp"></span><span class="lg-priurg">■■■</span></div>
+            <div class="m2-cardt">Add idempotency keys to the refund endpoint</div>
+            <div class="m2-cardf"><span class="m2-chip"><span class="m2-ms"></span><span class="m2-chipt">Webhooks v2</span></span><span class="m2-chip"><span class="m2-cy"></span>C12</span><span class="lg-sp"></span><span class="lg-ag">X</span></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+          <div class="bd-toast"><span>{{ toast }}</span><span style="opacity:0.7">Undo</span><span class="lg-kbd">⌘Z</span></div>
+        </sc-if>
+      </section>
+
+      <sc-if value="{{ isPanel }}" hint-placeholder-val="{{ false }}">
+        <aside class="bd-panel" data-screen-label="Task panel over board">
+          <header class="lg-head"><span class="lg-mono">PAY-142</span><span class="lg-sp"></span><a class="lg-muted" href="#">Open as page</a><span class="lg-kbd">Esc</span></header>
+          <div class="bd-pbody">
+            <h2 class="lg-h2" style="font-size:19px">Retry failed webhook deliveries with exponential backoff</h2>
+            <div class="bd-props">
+              <div class="bd-cell"><span class="lg-cap">Status</span><span class="bd-cv"><span class="lg-sq lg-s-prog"></span>In progress</span></div>
+              <div class="bd-cell"><span class="lg-cap">Priority</span><span class="bd-cv"><span class="lg-pri">■■■</span>High</span></div>
+              <div class="bd-cell"><span class="lg-cap">Assignee</span><span class="bd-cv"><span class="lg-ag">C</span>claude-dev</span><span class="lg-for">for Ana Ruiz</span></div>
+              <div class="bd-cell"><span class="lg-cap">Created</span><span class="bd-cv">Ana Ruiz</span><span class="lg-for">Oct 20</span></div>
+              <div class="bd-cell"><span class="lg-cap">Milestone</span><span class="bd-cv"><span class="m2-ms"></span>Webhooks v2</span><span class="lg-for">Nov 14 · 64%</span></div>
+              <div class="bd-cell"><span class="lg-cap">Cycle</span><span class="bd-cv"><span class="m2-cyon" style="--p:60%"></span>Cycle 12</span><span class="lg-for">Oct 12 – Oct 25</span></div>
+            </div>
+            <p style="margin:0;line-height:1.55;font-size:13px;text-wrap:pretty">Deliveries that fail with a 5xx or time out are dropped today. Retry them with exponential backoff, capped at 6 attempts over about 24 hours.</p>
+            <div class="lg-cap" style="padding-top:12px;border-top:1px solid var(--line)">Activity and comments · 7</div>
+            <div class="m2-cmt"><div class="m2-cmth"><span class="lg-ag">C</span><b>claude-dev</b><span>for Ana Ruiz</span><span class="lg-sp"></span><span class="lg-upd">3m</span></div><div class="m2-cmtb"><p>Retries are scheduled as pg-boss jobs. 4xx stops retrying, except 408 and 429. Opening a merge request next.</p></div></div>
+          </div>
+        </aside>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["board", "panel", "drag", "lanes", "long", "empty", "loading", "error"], "default": "board" },
+  "features": { "editor": "enum", "options": ["both", "milestones", "cycles", "none"], "default": "both" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'board';
+    const features = this.props.features ?? 'both';
+    const hasMs = features === 'both' || features === 'milestones';
+    const hasCy = features === 'both' || features === 'cycles';
+    const people = {
+      ana: { who: 'Ana Ruiz', ini: 'AR', hue: 25, agent: false },
+      tomas: { who: 'Tomás Berg', ini: 'TB', hue: 220, agent: false },
+      claude: { who: 'claude-dev', ini: 'C', hue: 0, agent: true },
+      codex: { who: 'codex-ci', ini: 'X', hue: 0, agent: true }
+    };
+    const SQ = { prog: 'lg-sq lg-s-prog', review: 'lg-sq lg-s-review', todo: 'lg-sq lg-s-todo', backlog: 'lg-sq lg-s-backlog', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel' };
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const card = (key, title, pri, who, ms, cy, cls) => {
+      const p = who ? people[who] : null;
+      return {
+        isCard: true, isLine: false, isGhost: false,
+        key, title, cls: cls || 'm2-card',
+        pri: PRI[pri][0], priCls: PRI[pri][1],
+        ms: hasMs ? (ms || '') : '', cy: hasCy ? (cy || '') : '',
+        has: !!p, who: p ? p.who : '', ini: p ? p.ini : '', hue: p ? p.hue : 0,
+        avCls: p && p.agent ? 'lg-ag' : 'lg-av'
+      };
+    };
+    const line = { isLine: true, isCard: false, isGhost: false };
+    const ghost = { isGhost: true, isCard: false, isLine: false };
+    const panel = state === 'panel';
+    const drag = state === 'drag';
+    const long = state === 'long';
+    const W = 'Webhooks v2', P = 'PCI audit', R = 'Refunds rework for multi-currency invoices and partial captures';
+
+    const backlog = [
+      card('PAY-151', 'Support SEPA Direct Debit mandates', 1, null, R),
+      card('PAY-149', 'Evaluate moving payout files to S3 lifecycle rules', 0, null),
+      card('PAY-147', 'Rate-limit the public checkout session endpoint', 2, 'tomas', P)
+    ];
+    let todo = [
+      card('PAY-144', 'Show a test-mode banner on the billing settings page', 1, null, null, 'C12'),
+      card('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 3, 'tomas', R, 'C12'),
+      card('PAY-137', 'Document the nightly payout reconciliation job', 0, 'claude', null, 'C12'),
+      card('PAY-129', 'Remove legacy v0 checkout routes', 2, null, P)
+    ];
+    let prog = [
+      card('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 3, 'claude', W, 'C12', panel ? 'm2-cardsel' : 'm2-card'),
+      card('PAY-131', 'Add idempotency keys to the refund endpoint', 4, 'codex', W, 'C12', state === 'board' ? 'm2-cardhov' : 'm2-card'),
+      card('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 2, 'ana', null, 'C12')
+    ];
+    let review = [
+      card('PAY-138', 'Webhook signature check accepts expired timestamps', 4, 'claude', W, 'C12', state === 'board' ? 'm2-cardfoc' : 'm2-card'),
+      card('PAY-135', 'Paginate the transactions CSV export', 2, 'tomas', null, 'C11')
+    ];
+    if (drag) {
+      prog = [prog[0], ghost, prog[2]];
+      review = [review[0], line, review[1]];
+    }
+    if (long) {
+      const extra = [
+        ['PAY-188', 'Translate decline codes into customer-facing messages', 1, 'ana'],
+        ['PAY-186', 'Move currency rounding into one helper with property tests', 2, 'claude'],
+        ['PAY-183', 'Audit log entries for manual payout holds', 2, null],
+        ['PAY-181', 'Expose payout schedule in the account API', 1, 'codex'],
+        ['PAY-177', 'Retry 3-D Secure challenge when the issuer times out', 3, 'tomas'],
+        ['PAY-176', 'Drop the unused merchant_category column', 0, null],
+        ['PAY-172', 'Webhook endpoint health page', 2, 'claude']
+      ].map((r) => card(r[0], r[1], r[2], r[3], null, 'C12'));
+      todo = todo.concat(extra);
+      review = [card('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs from the account currency', 3, 'tomas', R, 'C12', 'm2-cardfoc')].concat(review);
+      todo = todo.filter((t) => t.key !== 'PAY-140');
+    }
+    const col = (name, sq, cards, count, extra) => Object.assign({ name, sq, cards, count, open: true, folded: false, cls: 'm2-col', more: '', scroll: false }, extra || {});
+    const fold = (name, sq, count) => ({ name, sq, count, open: false, folded: true, cards: [] });
+    let cols = [
+      col('Backlog', SQ.backlog, backlog, 3),
+      col('Todo', SQ.todo, todo, long ? 60 : 4, long ? { more: '49 more · scroll or press J', scroll: true } : null),
+      col('In progress', SQ.prog, prog, 3),
+      col('In review', SQ.review, review, long ? 3 : 2, drag ? { cls: 'm2-coldrop' } : null),
+      fold('Done', SQ.done, 64),
+      fold('Canceled', SQ.cancel, 3)
+    ];
+    if (panel) cols[0] = fold('Backlog', SQ.backlog, 3);
+
+    const laneCols = [
+      { name: 'Backlog', sq: SQ.backlog, count: 3 }, { name: 'Todo', sq: SQ.todo, count: 4 },
+      { name: 'In progress', sq: SQ.prog, count: 3 }, { name: 'In review', sq: SQ.review, count: 2 }
+    ];
+    const lane = (pk, name, count, cells, open, forTxt) => {
+      const p = pk ? people[pk] : null;
+      return { name, count, cells, open, chev: open ? '▾' : '▸', has: !!p, ini: p ? p.ini : '', hue: p ? p.hue : 0, avCls: p && p.agent ? 'lg-ag' : 'lg-av', forTxt: forTxt || '' };
+    };
+    const lanes = [
+      lane('claude', 'claude-dev', 3, [[], [todo[2]], [prog[0]], [review[0]]], true, 'for Ana Ruiz'),
+      lane('codex', 'codex-ci', 1, [[], [], [prog[1]], []], true, 'for Tomás Berg'),
+      lane('tomas', 'Tomás Berg', 3, [], false),
+      lane('ana', 'Ana Ruiz', 1, [], false),
+      lane(null, 'No assignee', 4, [[backlog[0], backlog[1]], [todo[0], todo[3]], [], []], true)
+    ];
+
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Board · ' + state,
+      gridCls: panel ? 'bd-gridp' : 'bd-grid',
+      projName: 'Payments', projKey: 'PAY',
+      projSub: state === 'empty' ? 'filtered: Cycle 12, assigned to agents' : (long ? '72 open · board' : '12 open · board'),
+      openCount: long ? 72 : 12,
+      showTabs: hasMs || hasCy, hasMs, hasCy,
+      fAssignee: state === 'empty' ? 'Agents' : 'Any',
+      fCycle: state === 'empty' ? 'Cycle 12' : 'Any',
+      fLanes: state === 'lanes' ? 'Assignee' : 'None',
+      showBoard: ['board', 'panel', 'drag', 'long', 'error'].includes(state),
+      isLanes: state === 'lanes',
+      isLoading: state === 'loading', isError: state === 'error', isEmpty: state === 'empty',
+      isDrag: drag, isPanel: panel,
+      toast: long ? 'PAY-140 moved to In review' : '',
+      cols, laneCols, lanes,
+      skCols: [0, 1, 2, 3].map((i) => ({ cards: [[70, 50], [80, 60, 40], [55], [75, 65]][i] }))
+    };
+  }
+}
+</script>
+</body>
+</html>

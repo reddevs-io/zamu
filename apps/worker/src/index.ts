@@ -1,4 +1,5 @@
 // Worker entry point: `node --import tsx src/index.ts`. Runs until SIGTERM or SIGINT, then exits 0.
+import { isValidTimeZone } from '@pm/core';
 import { createLogger, isLogLevel } from './logger';
 import { startWorker, type Worker } from './worker';
 
@@ -23,8 +24,14 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
+const timeZone = process.env.APP_TIME_ZONE?.trim() || 'UTC';
+if (!isValidTimeZone(timeZone)) {
+  logger.fatal('APP_TIME_ZONE is not a valid IANA time zone', { timeZone });
+  process.exit(1);
+}
+
 // In Docker the worker may start while Postgres is still coming up: retry for about a minute.
-const starting: Promise<Worker> = startWorker({ databaseUrl, logger, startAttempts: 6 });
+const starting: Promise<Worker> = startWorker({ databaseUrl, logger, startAttempts: 6, timeZone });
 
 let shuttingDown = false;
 const shutdown = (signal: NodeJS.Signals) => {

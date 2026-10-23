@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif;color:#1a1a1a}
+a{color:#1a1a1a}
+a:hover{color:#2a78d6}
+.dv-turn{padding:36px 44px 28px;border-bottom:1px solid rgba(0,0,0,0.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 15px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-desc{margin:0 0 18px;max-width:900px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.65);text-wrap:pretty}
+.dv-opts{display:flex;flex-wrap:wrap;gap:24px 24px;align-items:flex-start;max-width:2600px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:8px}
+.dv-olabel{font:500 12px/1.3 system-ui,sans-serif;color:rgba(0,0,0,0.6)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden}
+.dv-intro{display:grid;grid-template-columns:repeat(3,minmax(0,420px));gap:32px;font:12.5px/1.6 system-ui,sans-serif;color:rgba(0,0,0,0.72)}
+.dv-intro h3{margin:0 0 6px;font:600 12.5px/1.3 system-ui,sans-serif;color:#1a1a1a}
+.dv-intro p{margin:0 0 8px;text-wrap:pretty}
+.dv-intro ul{margin:0;padding-left:16px}
+.dv-h{font:700 22px/1.2 system-ui,sans-serif;margin:0 0 6px}
+.dv-lead{font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.6);margin:0 0 24px;max-width:900px}
+</style>
+</helmet>
+<section class="dv-turn" id="intro" data-screen-label="M2 screens · overview">
+  <h1 class="dv-h">M2 screens · work views</h1>
+  <p class="dv-lead">Board, milestones, cycles, comments, My tasks and the theme choice, in the Ledger direction from M1. Every screen in light and dark, with empty, loading, error and long-content states. The M1 screens live in M1 Screens.</p>
+  <div class="dv-intro">
+    <div>
+      <h3>Layout rules kept from M1</h3>
+      <ul>
+        <li>Rail, page header, filter bar, group rows and task rows are unchanged.</li>
+        <li>The task panel is a pane beside the content, never over it. On the board it takes 440px and the board folds Backlog to make room.</li>
+        <li>Square corners. Round avatars for people, outlined squares for agents.</li>
+        <li>Milestones are diamonds, cycles are circles. Neither gets a colour, so status colours stay the only colour coding.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Calls I made on the brief</h3>
+      <ul>
+        <li>Milestone status: Planned until a task in it starts, then Active. Completed is set by hand.</li>
+        <li>Cycles end on their own at midnight on the end date, and unfinished tasks move to the next cycle. End cycle is for ending early.</li>
+        <li>The theme is saved to the account, not the browser.</li>
+        <li>The full task page gets milestone and cycle as two more rows in its M1 property column. Not redrawn here.</li>
+        <li>Board drag and drop has a keyboard path for every move, plus undo.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Open questions</h3>
+      <ul>
+        <li>When a cycle ends and no next cycle exists: create one with the same length, or move the tasks out of any cycle?</li>
+        <li>Should a cycle's scope count tasks added after the start (shown with +), or only the tasks planned at the start?</li>
+        <li>Can a person edit or delete an agent's comment if they are its responsible human?</li>
+        <li>Is a Shift+T shortcut for the theme worth having?</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<section class="dv-turn" id="s0" data-screen-label="Tokens, components and keys">
+  <div class="dv-thd"><a class="dv-tid" href="#s0">0</a><span class="dv-tname">Tokens, components and keys</span></div>
+  <p class="dv-desc">Additions only. ledger.css is unchanged; ledger-m2.css loads after it.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Tokens" theme="light" hint-size="1280px,920px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Tokens" theme="dark" hint-size="1280px,920px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s1" data-screen-label="Project header">
+  <div class="dv-thd"><a class="dv-tid" href="#s1">1</a><span class="dv-tname">Project header</span></div>
+  <p class="dv-desc">Tabs appear only for what a project uses. The List / Board switch lives at the right of the filter bar in every case, with V as its shortcut.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Milestones and cycles · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="light" state="board" features="both" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Milestones only · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="dark" state="board" features="milestones" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Neither: no tab row · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="light" state="board" features="none" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s2" data-screen-label="Board">
+  <div class="dv-thd"><a class="dv-tid" href="#s2">2</a><span class="dv-tname">Board</span></div>
+  <p class="dv-desc">One column per status. Done and Canceled fold to 40px strips by default; Backlog folds too when the panel is open. Cards show key, priority, title (2 lines), milestone and cycle chips, assignee. The second card shows hover, the In review card shows keyboard focus.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Board · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="dark" state="board" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Task panel open · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="light" state="panel" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Dragging PAY-131 to In review · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="dark" state="drag" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Swimlanes by assignee · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="light" state="lanes" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">60-card column, keyboard move with undo · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="dark" state="long" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">No tasks match the filters · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="light" state="empty" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Loading · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="dark" state="loading" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Move rejected, card went back · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Board" theme="light" state="error" features="milestones" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s3" data-screen-label="Milestones">
+  <div class="dv-thd"><a class="dv-tid" href="#s3">3</a><span class="dv-tname">Milestones</span></div>
+  <p class="dv-desc">A list with status, target date and progress, a milestone page that reuses the task rows, and the create dialog. Overdue dates use --warn, nothing louder.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">List · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="light" state="list" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">List · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="dark" state="list" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">New milestone · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="dark" state="dialog" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Milestone page · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="light" state="page" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Milestone page · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="dark" state="page" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">No milestones yet · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="light" state="empty" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Loading · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="dark" state="loading" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Request failed · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Milestones" theme="light" state="error" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s4" data-screen-label="Cycles">
+  <div class="dv-thd"><a class="dv-tid" href="#s4">4</a><span class="dv-tname">Cycles</span></div>
+  <p class="dv-desc">The current cycle sits on top with time elapsed against work done. Upcoming and completed cycles follow. Ending a cycle lists what will move; a completed cycle keeps the record of what moved and where it is now.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Cycles · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="light" state="list" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Cycles · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="dark" state="list" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Current cycle page · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="light" state="page" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">End cycle early · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="dark" state="end" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Completed cycle · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="light" state="done" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Completed cycle · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="dark" state="done" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">New cycle · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="light" state="dialog" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">No cycles yet · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="dark" state="empty" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Loading · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="light" state="loading" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Request failed · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Cycles" theme="dark" state="error" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s5" data-screen-label="Task detail and quick create">
+  <div class="dv-thd"><a class="dv-tid" href="#s5">5</a><span class="dv-tname">Task detail and quick create</span></div>
+  <p class="dv-desc">Milestone and cycle join the property grid, which grows to three columns. Shift+M and Shift+C open the pickers. Quick create gets the same two chips, prefilled from the page it was opened on.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">Milestone picker · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="light" state="milestone" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Quick create with cycle picker · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="dark" state="create" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s6" data-screen-label="Comments">
+  <div class="dv-thd"><a class="dv-tid" href="#s6">6</a><span class="dv-tname">Comments</span></div>
+  <p class="dv-desc">Activity lines stay one-line and quiet; comments are boxed with the author avatar outside the box. Agents read 'claude-dev for Ana Ruiz', as in activity. A Comments only toggle hides the activity lines. Mentions are links; there are no notifications.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">History with comments · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="light" state="thread" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">History with comments · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="dark" state="thread" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Long agent comment: code and list · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="light" state="long" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Mention picker · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="dark" state="mention" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Preview while sending · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="light" state="preview" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Editing own comment · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="light" state="edit" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Send failed, text kept; delete confirmation · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="dark" state="failed" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Loading history · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2Task" theme="dark" state="loading" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s7" data-screen-label="My tasks">
+  <div class="dv-thd"><a class="dv-tid" href="#s7">7</a><span class="dv-tname">My tasks</span></div>
+  <p class="dv-desc">Tasks assigned to you in every project of the current workspace, grouped by status, with project and milestone columns. With the panel open the list drops to key, title, priority and time.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">My tasks · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="light" state="list" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Panel open · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="dark" state="panel" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">214 tasks · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="light" state="long" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Nothing assigned · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="dark" state="empty" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Loading · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="light" state="loading" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Request failed · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="dark" state="error" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+<section class="dv-turn" id="s8" data-screen-label="Theme">
+  <div class="dv-thd"><a class="dv-tid" href="#s8">8</a><span class="dv-tname">Theme</span></div>
+  <p class="dv-desc">A three-way switch in the user menu, and an Appearance page under You in settings. Shift+T cycles the three.</p>
+  <div class="dv-opts">
+      <div class="dv-opt"><div class="dv-olabel">User menu · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="dark" state="menu" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Appearance · light</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="light" state="appearance" hint-size="1280px,800px"></dc-import></div></div>
+      <div class="dv-opt"><div class="dv-olabel">Appearance · dark</div><div class="dv-card" style="width:1280px"><dc-import name="M2MyTasks" theme="dark" state="appearance" hint-size="1280px,800px"></dc-import></div></div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

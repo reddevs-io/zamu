@@ -1,5 +1,6 @@
 // Settings area: the 220px settings nav and the current settings page beside it. Sits in the content
-// area right of the app rail. M1 shows Members, API keys (admins) and Your API keys.
+// area right of the app rail: Members and API keys (admins) for the workspace; Your API keys and
+// Appearance for you.
 import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
@@ -11,6 +12,7 @@ export const SETTINGS_PATHS = {
   members: '/settings/members',
   apiKeys: '/settings/api-keys',
   myKeys: '/settings/my-keys',
+  appearance: '/settings/appearance',
 } as const;
 
 export function settingsSections(pathname: string, isAdmin: boolean): SettingsNavSection[] {
@@ -28,7 +30,13 @@ export function settingsSections(pathname: string, isAdmin: boolean): SettingsNa
         ...(isAdmin ? [item('api-keys', 'API keys', SETTINGS_PATHS.apiKeys)] : []),
       ],
     },
-    { label: 'You', items: [item('my-keys', 'Your API keys', SETTINGS_PATHS.myKeys)] },
+    {
+      label: 'You',
+      items: [
+        item('my-keys', 'Your API keys', SETTINGS_PATHS.myKeys),
+        item('appearance', 'Appearance', SETTINGS_PATHS.appearance),
+      ],
+    },
   ];
 }
 

@@ -12,12 +12,22 @@ import { z } from 'zod';
 /** Marks expired pending invitations. Payload: `{}` (`now` overrides the clock in tests). */
 export const INVITATIONS_EXPIRE = 'invitations.expire';
 
+/**
+ * Ends every cycle whose end date is before today in APP_TIME_ZONE, moving unfinished tasks on.
+ * Payload: `{}` (`now` overrides the clock in tests).
+ */
+export const CYCLES_END_DUE = 'cycles.end-due';
+
+/** Payload of jobs that only take an optional clock override. */
+const ClockPayload = z.object({
+  /** ISO timestamp to treat as "now". Omitted in production: the worker uses the current time. */
+  now: z.iso.datetime({ offset: true }).optional(),
+});
+
 /** Payload schema per job name. Parse with parseJobPayload in the worker before running a job. */
 export const jobPayloadSchemas = {
-  [INVITATIONS_EXPIRE]: z.object({
-    /** ISO timestamp to treat as "now". Omitted in production: the worker uses the current time. */
-    now: z.iso.datetime({ offset: true }).optional(),
-  }),
+  [INVITATIONS_EXPIRE]: ClockPayload,
+  [CYCLES_END_DUE]: ClockPayload,
 } as const;
 
 export type JobName = keyof typeof jobPayloadSchemas;
@@ -42,6 +52,9 @@ export interface JobSchedule {
 export const JOB_SCHEDULES: Partial<Record<JobName, JobSchedule>> = {
   // Daily at 03:00 UTC.
   [INVITATIONS_EXPIRE]: { cron: '0 3 * * *', tz: 'UTC', data: {} },
+  // Hourly, on the hour. "Today" comes from APP_TIME_ZONE in the handler's context, so a cycle ends
+  // within the hour after midnight there (zones with a half-hour offset: within 30 minutes later).
+  [CYCLES_END_DUE]: { cron: '0 * * * *', tz: 'UTC', data: {} },
 };
 
 export function isJobName(name: string): name is JobName {

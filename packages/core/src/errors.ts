@@ -1,12 +1,13 @@
 // Typed errors thrown by core services. Adapters map them to Problem responses by `code`
-// (NotFound 404, Forbidden 403, Conflict 409, Invalid 422); see PROBLEM_STATUS in @pm/contracts.
-import type { ProblemCode, ProblemIssue } from '@pm/contracts';
+// (NotFound 404, Forbidden 403, Conflict 409, TaskChanged 409, Invalid 422); see PROBLEM_STATUS in
+// @pm/contracts.
+import type { ProblemCode, ProblemIssue, Task } from '@pm/contracts';
 import { toProblemIssues } from '@pm/contracts';
 import { ZodError } from 'zod';
 
 export type CoreErrorCode = Extract<
   ProblemCode,
-  'NOT_FOUND' | 'FORBIDDEN' | 'CONFLICT' | 'UNPROCESSABLE_CONTENT'
+  'NOT_FOUND' | 'FORBIDDEN' | 'CONFLICT' | 'TASK_CHANGED' | 'UNPROCESSABLE_CONTENT'
 >;
 
 export abstract class CoreError extends Error {
@@ -34,6 +35,20 @@ export class Forbidden extends CoreError {
 /** The change conflicts with the current state (duplicate key, renaming a project with tasks). */
 export class Conflict extends CoreError {
   readonly code = 'CONFLICT' as const;
+}
+
+/**
+ * A task write sent an ifUpdatedAt older than the stored task: someone else changed it meanwhile.
+ * Adapters put `task` (the current version) into the problem data.
+ */
+export class TaskChanged extends CoreError {
+  readonly code = 'TASK_CHANGED' as const;
+  readonly task: Task;
+
+  constructor(task: Task, message = `${task.key} changed since you loaded it`) {
+    super(message);
+    this.task = task;
+  }
 }
 
 /** The input is well-formed but not acceptable (unknown assignee, project outside the workspace). */

@@ -76,6 +76,7 @@ const PROBLEM_CODE_SET = new Set<string>([
   'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
+  'TASK_CHANGED',
   'UNPROCESSABLE_CONTENT',
   'INTERNAL_SERVER_ERROR',
 ] satisfies ProblemCode[]);
@@ -108,13 +109,16 @@ export function toCliError(error: unknown, url?: string): CliError {
       : status >= 500
         ? 'INTERNAL_SERVER_ERROR'
         : 'BAD_REQUEST';
-    const data = error.data as { requestId?: unknown; issues?: unknown } | undefined;
+    const data = error.data as { requestId?: unknown; issues?: unknown; task?: unknown } | undefined;
     const requestId = typeof data?.requestId === 'string' ? data.requestId : undefined;
     const issues = Array.isArray(data?.issues) ? (data.issues as ProblemIssue[]) : undefined;
+    // TASK_CHANGED carries the task as it is now. decodeProblem already validated it.
+    const task = code === 'TASK_CHANGED' && data?.task ? (data.task as Problem['task']) : undefined;
     const body: Problem = {
       ...problem(code, error.message || undefined, {
         ...(requestId ? { requestId } : {}),
         ...(issues?.length ? { issues } : {}),
+        ...(task ? { task } : {}),
       }),
       status: status >= 400 && status <= 599 ? status : 500,
     };

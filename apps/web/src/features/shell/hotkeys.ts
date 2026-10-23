@@ -1,4 +1,5 @@
-import { useHotkeys } from '~/ui';
+import { useEffect, useRef } from 'react';
+import { isEditableTarget, useHotkeys } from '~/ui';
 import { useNewProject } from './new-project';
 import { useFocusPageSearch } from './page-search';
 import { useQuickCreate } from './quick-create';
@@ -16,4 +17,47 @@ export function useShellHotkeys(currentProjectKey: string | undefined): void {
     p: () => newProject.open(),
     '/': () => focusSearch(),
   });
+}
+
+/** How long after G the second key still counts. */
+export const GO_TO_WINDOW_MS = 1_000;
+
+const OVERLAY_SELECTOR =
+  '[role="dialog"], [role="alertdialog"], [aria-modal="true"], [role="menu"], [role="listbox"]';
+
+/**
+ * Two-key "go to" shortcuts: G then a letter, for example G then M for My tasks. The second key is
+ * taken in the capture phase, so page shortcuts on the same letter (M focuses the comment composer)
+ * do not also fire. Ignored while typing, inside dialogs and menus, and with modifier keys.
+ */
+export function useGoToHotkeys(targets: Readonly<Record<string, () => void>>): void {
+  const targetsRef = useRef(targets);
+  targetsRef.current = targets;
+  useEffect(() => {
+    let armedAt = 0;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) {
+        armedAt = 0;
+        return;
+      }
+      const target = event.target;
+      if (isEditableTarget(target) || (target instanceof Element && target.closest(OVERLAY_SELECTOR))) {
+        armedAt = 0;
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (armedAt && Date.now() - armedAt <= GO_TO_WINDOW_MS) {
+        armedAt = 0;
+        const go = event.shiftKey ? undefined : targetsRef.current[key];
+        if (!go) return;
+        event.preventDefault();
+        event.stopPropagation();
+        go();
+        return;
+      }
+      armedAt = key === 'g' && !event.shiftKey && !event.defaultPrevented ? Date.now() : 0;
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, []);
 }

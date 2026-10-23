@@ -15,6 +15,8 @@ export interface WorkerOptions {
   shutdownTimeoutMs?: number;
   /** How often each queue is polled for new jobs. Default 2 s (pg-boss's default). */
   pollingIntervalSeconds?: number;
+  /** APP_TIME_ZONE for core jobs (cycle ends). Default UTC. */
+  timeZone?: string;
 }
 
 export interface Worker {
@@ -34,6 +36,7 @@ export async function startWorker(options: WorkerOptions): Promise<Worker> {
     startAttempts = 1,
     shutdownTimeoutMs = 8_000,
     pollingIntervalSeconds,
+    timeZone,
   } = options;
 
   logger.info('worker starting', { jobs: JOB_NAMES });
@@ -76,7 +79,7 @@ export async function startWorker(options: WorkerOptions): Promise<Worker> {
     for (const name of JOB_NAMES) {
       // pg-boss fetches one job at a time (batchSize 1); the returned value becomes the job's output.
       await boss.work<unknown>(name, workOptions, async ([job]) =>
-        job ? runJob(name, job, { db, logger }) : undefined,
+        job ? runJob(name, job, timeZone ? { db, logger, timeZone } : { db, logger }) : undefined,
       );
     }
 

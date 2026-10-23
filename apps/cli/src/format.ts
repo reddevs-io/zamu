@@ -3,11 +3,17 @@ import {
   type Activity,
   type ActivityChange,
   type AssigneeRef,
+  type Comment,
+  CYCLE_STATE_LABELS,
+  type CycleState,
   type Me,
+  MILESTONE_STATUS_LABELS,
+  type MilestoneStatus,
   PRIORITY_LABELS,
   type Priority,
   TASK_STATUS_LABELS,
   type TaskStatus,
+  type TimelineItem,
   type UserRef,
 } from '@pm/contracts';
 
@@ -150,14 +156,28 @@ export function changeSentence(change: ActivityChange): string {
     case 'description':
       if (change.to === null) return 'cleared the description';
       return change.from === null ? 'added a description' : 'edited the description';
+    case 'milestone':
+      return change.to ? `set milestone ${change.to.name}` : 'cleared the milestone';
+    case 'cycle':
+      if (change.to) return `moved it to Cycle ${change.to.number}`;
+      return change.from ? `removed it from Cycle ${change.from.number}` : 'removed it from the cycle';
   }
 }
 
 /** "claude-dev for Ana Ruiz moved it from Todo to In progress". */
 export function activitySentence(activity: Activity): string {
-  const who = activity.onBehalfOf
-    ? `${activity.actor.name} for ${activity.onBehalfOf.name}`
-    : activity.actor.name;
+  // A null actor is the system: the hourly job that ends cycles.
+  const actor = activity.actor?.name ?? 'System';
+  const who = activity.onBehalfOf ? `${actor} for ${activity.onBehalfOf.name}` : actor;
+  if (activity.type === 'cycle.ended') {
+    // "Cycle 12 ended. Moved to Cycle 13." The hourly job has no actor; a person who ended it early does.
+    const change = activity.changes.find((c) => c.field === 'cycle');
+    const ended = change?.from ? `Cycle ${change.from.number}` : 'the cycle';
+    const moved = change?.to ? `Moved to Cycle ${change.to.number}.` : 'Removed from the cycle.';
+    return activity.actor
+      ? `${who} ended ${ended}. ${moved}`
+      : `${ended.charAt(0).toUpperCase()}${ended.slice(1)} ended. ${moved}`;
+  }
   if (activity.type === 'task.created') {
     // The title and description are on screen already; the rest are values that differ from defaults.
     const extras = activity.changes
@@ -173,4 +193,72 @@ export function activitySentence(activity: Activity): string {
 export function scopeLabel(scope: NonNullable<Me['auth']['scope']>): string {
   const projects = scope.projects === 'all' ? 'all projects' : scope.projects.map((p) => p.key).join(', ');
   return `${projects}, ${scope.access}`;
+}
+
+export const milestoneStatusLabel = (status: MilestoneStatus) => MILESTONE_STATUS_LABELS[status];
+export const cycleStateLabel = (state: CycleState) => CYCLE_STATE_LABELS[state];
+
+/** "Cycle 12" or "Cycle 12 · Checkout rewrite". */
+export function cycleLabel(cycle: { number: number; name: string | null }): string {
+  return cycle.name ? `Cycle ${cycle.number} · ${cycle.name}` : `Cycle ${cycle.number}`;
+}
+
+/** "2026-10-12 to 2026-10-25" (both days included). */
+export function cycleDates(cycle: { startsOn: string; endsOn: string }): string {
+  return `${cycle.startsOn} to ${cycle.endsOn}`;
+}
+
+/** Done share of the non-canceled tasks: "3/5 · 60%". */
+export function progressLabel(progress: { total: number; done: number; canceled: number }): string {
+  const counted = progress.total - progress.canceled;
+  const percent = counted > 0 ? Math.round((progress.done / counted) * 100) : 0;
+  return `${progress.done}/${counted} · ${percent}%`;
+}
+
+/** Mention links ([@Ana Ruiz](mention:<id>)) read as plain @Ana Ruiz in a terminal. */
+export function plainMentions(body: string): string {
+  return body.replace(/\[@([^\]]+)\]\(mention:[^)\s]+\)/g, '@$1');
+}
+
+/** "claude-dev for Ana Ruiz" for an agent's comment, the author's name otherwise. */
+export function commentAuthor(comment: Pick<Comment, 'author' | 'onBehalfOf'>): string {
+  return comment.onBehalfOf ? `${comment.author.name} for ${comment.onBehalfOf.name}` : comment.author.name;
+}
+
+const COMMENT_INDENT = '    ';
+
+/**
+ * A comment as a block: a heading line with time, author and id, then the body indented. Deleted
+ * comments keep their place as one line.
+ */
+export function commentBlock(comment: Comment, style: Style): string {
+  const time = style.dim(formatTime(comment.createdAt));
+  if (comment.body === null) {
+    return `${time}  ${style.dim(`Comment deleted by ${commentAuthor(comment)}`)}`;
+  }
+  const edited = comment.editedAt ? ' (edited)' : '';
+  const head = `${time}  ${style.bold(commentAuthor(comment))} commented${edited}  ${style.dim(comment.id)}`;
+  const body = plainMentions(comment.body)
+    .replace(/\s+$/, '')
+    .split('\n')
+    .map((line) => (line.trim() ? `${COMMENT_INDENT}${line}` : ''))
+    .join('\n');
+  return `${head}\n${body}`;
+}
+
+/** Activity as one line each, comments as indented blocks set off by blank lines, oldest first. */
+export function timelineText(items: TimelineItem[], style: Style): string {
+  const lines: string[] = [];
+  let afterBlock = false;
+  for (const item of items) {
+    const isBlock = item.kind === 'comment' && item.body !== null;
+    if (lines.length && (isBlock || afterBlock)) lines.push('');
+    lines.push(
+      item.kind === 'comment'
+        ? commentBlock(item, style)
+        : `${style.dim(formatTime(item.createdAt))}  ${activitySentence(item)}`,
+    );
+    afterBlock = isBlock;
+  }
+  return lines.length ? `${lines.join('\n')}\n` : '';
 }

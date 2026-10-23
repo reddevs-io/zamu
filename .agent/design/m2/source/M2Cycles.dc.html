@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<style>
+.cy-main{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.cy-body{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.cy-cur{margin:20px 24px 8px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column}
+.cy-curh{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line-2)}
+.cy-curs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.cy-curs .m2-stat{border-right:1px solid var(--line-2)}
+.cy-curs .m2-stat:last-child{border-right:0}
+.cy-bars{display:grid;grid-template-columns:48px minmax(0,1fr) 44px;gap:6px 12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line-2);font-size:11.5px;color:var(--muted)}
+.cy-bar{display:flex;height:6px;background:var(--track)}
+.cy-time{background:var(--muted);height:100%}
+.cy-cols{grid-template-columns:minmax(0,1fr) 190px 120px 220px 24px}
+.cy-crumbs{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.cy-top{padding:18px 24px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid var(--line)}
+.cy-tline{display:flex;align-items:center;gap:12px}
+.cy-trow{height:34px;display:grid;grid-template-columns:72px minmax(0,1fr) 96px 34px 150px 34px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.cy-added{font-size:10.5px;color:var(--faint);font-family:"Martian Mono",ui-monospace,monospace}
+.cy-rrow{height:38px;display:grid;grid-template-columns:72px minmax(0,1fr) 200px 120px;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2)}
+.cy-move{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.cy-empty{padding:48px 24px;display:flex}
+.cy-dl{display:flex;flex-direction:column;max-height:250px;overflow:hidden;border:1px solid var(--line)}
+.cy-dli{height:32px;display:grid;grid-template-columns:14px 64px minmax(0,1fr) 20px;gap:10px;align-items:center;padding:0 10px;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.cy-dli:last-child{border-bottom:0}
+.cy-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">12</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="cy-main">
+      <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+        <header class="lg-head">
+          <div style="min-width:0"><h1 class="lg-h1">Payments</h1><div class="lg-sub"><span class="lg-mono">PAY</span> · {{ sub }}</div></div>
+          <div class="lg-headr"><div class="lg-search" style="width:150px"><span>Search</span><span class="lg-kbd">/</span></div><button class="lg-btn">New cycle</button></div>
+        </header>
+        <nav class="m2-tabs">
+          <a class="m2-tab" href="#">Tasks<span class="m2-tabn">12</span></a>
+          <a class="m2-tab" href="#"><span class="m2-ms"></span>Milestones<span class="m2-tabn">4</span></a>
+          <a class="m2-tabon" href="#"><span class="m2-cyon" style="--p:79%"></span>Cycles<span class="m2-tabn">{{ tabSub }}</span></a>
+        </nav>
+        <div class="cy-body">
+          <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+            <div class="cy-cur" data-screen-label="Current cycle">
+              <div class="cy-curh">
+                <span class="m2-cyon" style="--p:79%;width:12px;height:12px;color:var(--accent)"></span>
+                <span style="font-weight:600;font-size:15px">Cycle 12</span><span class="lg-muted">· Checkout rewrite</span>
+                <span class="lg-taga">Current</span>
+                <span class="lg-sp"></span>
+                <span class="lg-muted">Oct 12 – Oct 25</span><span class="m2-warnpill">3 days left</span>
+                <button class="lg-btn2" style="height:28px">Open</button>
+              </div>
+              <div class="cy-curs">
+                <div class="m2-stat"><span class="lg-cap">Scope</span><span class="m2-statv">18</span><span class="lg-for">3 added after start</span></div>
+                <div class="m2-stat"><span class="lg-cap">Done</span><span class="m2-statv">9</span><span class="lg-for">50%</span></div>
+                <div class="m2-stat"><span class="lg-cap">In progress</span><span class="m2-statv">5</span><span class="lg-for">1 in review</span></div>
+                <div class="m2-stat"><span class="lg-cap">Todo</span><span class="m2-statv">4</span><span class="lg-for">2 unassigned</span></div>
+                <div class="m2-stat"><span class="lg-cap">Agents</span><span class="m2-statv">6</span><span class="lg-for">of 18 tasks</span></div>
+              </div>
+              <div class="cy-bars">
+                <span>Time</span><span class="cy-bar"><span class="cy-time" style="width:79%"></span></span><span class="m2-num">11/14d</span>
+                <span>Done</span><span class="cy-bar"><span class="m2-progd" style="width:50%"></span><span class="m2-progp" style="width:28%"></span></span><span class="m2-num">9/18</span>
+              </div>
+            </div>
+            <div class="lg-g" style="margin-top:12px;border-top:1px solid var(--line-2)"><span>Upcoming</span><span class="lg-gc">2</span></div>
+            <div class="lg-th cy-cols" style="display:grid"><span>Cycle</span><span>Dates</span><span>Tasks</span><span>Result</span><span></span></div>
+            <sc-for list="{{ upcoming }}" as="c" hint-placeholder-count="2">
+              <div class="m2-row cy-cols" style="min-height:44px"><span class="m2-name" style="display:flex;align-items:center;gap:8px"><span class="m2-cy"></span>{{ c.name }}</span><span class="lg-muted">{{ c.dates }}</span><span class="m2-num">{{ c.tasks }}</span><span class="lg-faint">{{ c.result }}</span><span class="lg-faint lg-right">›</span></div>
+            </sc-for>
+            <div class="lg-g"><span>Completed</span><span class="lg-gc">11</span></div>
+            <sc-for list="{{ completed }}" as="c" hint-placeholder-count="3">
+              <div class="m2-row cy-cols" style="min-height:44px"><span class="m2-name lg-trunc" style="display:flex;align-items:center;gap:8px"><span class="m2-cyon" style="--p:100%;color:var(--done)"></span><span class="lg-trunc">{{ c.name }}</span></span><span class="lg-muted">{{ c.dates }}</span><span class="m2-num">{{ c.tasks }}</span><span class="cy-move"><span class="lg-sq lg-s-done"></span>{{ c.done }} done<sc-if value="{{ c.rolled }}" hint-placeholder-val="{{ true }}"><span class="m2-warn">· {{ c.rolled }} rolled over</span></sc-if></span><span class="lg-faint lg-right">›</span></div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+            <div class="cy-cur"><div class="cy-curh"><span class="lg-skel" style="width:180px;height:12px"></span></div><div style="height:72px;padding:16px;display:flex;gap:40px"><span class="lg-skel" style="width:60px;height:24px"></span><span class="lg-skel" style="width:60px;height:24px"></span><span class="lg-skel" style="width:60px;height:24px"></span></div><div style="padding:12px 16px"><span class="lg-skel" style="display:block;height:6px"></span></div></div>
+          </sc-if>
+          <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:16px 24px"><div class="lg-banner"><span class="lg-bannerx"></span><span style="flex:1">Couldn't load cycles. The server returned an error.</span><button class="lg-btn2" style="height:28px">Retry</button></div></div>
+          </sc-if>
+          <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+            <div class="cy-empty">
+              <div class="lg-empty" style="max-width:500px">
+                <h2 class="lg-h2">Work in fixed-length cycles</h2>
+                <p class="lg-muted" style="margin:0;line-height:1.55">A cycle is a sprint with a start and an end date. Put the tasks you mean to finish in it. When it ends, anything unfinished moves to the next cycle and the finished cycle keeps a record of what moved.</p>
+                <button class="lg-btn">Start Cycle 1</button>
+                <p class="lg-hint" style="margin:0">Two weeks from Monday, Oct 26. You can change the length.</p>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isPage }}" hint-placeholder-val="{{ false }}">
+        <header class="lg-head">
+          <div class="cy-crumbs"><a href="#">Payments</a><span>/</span><a href="#">Cycles</a><span>/</span><span style="color:var(--fg)">{{ pageName }}</span></div>
+          <div class="lg-headr">
+            <sc-if value="{{ isCurrent }}" hint-placeholder-val="{{ true }}"><button class="lg-btn2">End cycle</button><button class="lg-btn">Add tasks</button></sc-if>
+            <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}"><button class="lg-btn2">Copy summary</button></sc-if>
+          </div>
+        </header>
+        <sc-if value="{{ isCurrent }}" hint-placeholder-val="{{ true }}">
+          <div class="cy-top">
+            <div class="cy-tline"><span class="m2-cyon" style="--p:79%;width:14px;height:14px;color:var(--accent)"></span><h2 class="lg-h2" style="font-size:24px">Cycle 12</h2><span class="lg-muted" style="font-size:16px">Checkout rewrite</span><span class="lg-taga">Current</span><span class="lg-sp"></span><span class="lg-muted">Oct 12 – Oct 25</span><span class="m2-warnpill">3 days left</span></div>
+            <div class="cy-bars" style="padding:0;border:0;grid-template-columns:48px 420px 44px minmax(0,1fr)">
+              <span>Time</span><span class="cy-bar"><span class="cy-time" style="width:79%"></span></span><span class="m2-num">11/14d</span><span></span>
+              <span>Done</span><span class="cy-bar"><span class="m2-progd" style="width:50%"></span><span class="m2-progp" style="width:28%"></span></span><span class="m2-num">9/18</span><span class="lg-for">3 tasks added after the start are marked +</span>
+            </div>
+          </div>
+          <div class="lg-bar"><span>Status <span class="lg-bv">Any</span></span><span>Assignee <span class="lg-bv">Any</span></span><span>Milestone <span class="lg-bv">Any</span></span><span class="lg-sp"></span><span class="m2-seg"><span class="m2-segon">List</span><span class="m2-segi">Board</span></span></div>
+          <div class="cy-body">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+              <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+              <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="2">
+                <div class="cy-trow"><span class="lg-key">{{ t.key }}</span><span class="lg-trunc">{{ t.title }}</span><span class="cy-added">{{ t.added }}</span><span class="{{ t.priCls }}">{{ t.pri }}</span><span class="lg-who"><sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span><span class="lg-trunc">{{ t.who }}</span></sc-if></span><span class="lg-upd">{{ t.upd }}</span></div>
+              </sc-for>
+            </sc-for>
+            <div class="lg-g"><span class="lg-sq lg-s-done"></span><span>Done</span><span class="lg-gc">9</span></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+          <div class="cy-top">
+            <div class="cy-tline"><span class="m2-cyon" style="--p:100%;width:14px;height:14px;color:var(--done)"></span><h2 class="lg-h2" style="font-size:24px">Cycle 11</h2><span class="lg-muted" style="font-size:16px">Webhook retries and the delivery log for merchants who asked for it</span><span class="lg-tag">Completed</span><span class="lg-sp"></span><span class="lg-muted">Sep 28 – Oct 11</span></div>
+            <div class="m2-stats" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+              <div class="m2-stat"><span class="lg-cap">Scope</span><span class="m2-statv">20</span><span class="lg-for">2 added after start</span></div>
+              <div class="m2-stat"><span class="lg-cap">Completed</span><span class="m2-statv" style="color:var(--done)">16</span><span class="lg-for">80%</span></div>
+              <div class="m2-stat"><span class="lg-cap">Rolled over</span><span class="m2-statv m2-warn">3</span><span class="lg-for">to Cycle 12</span></div>
+              <div class="m2-stat"><span class="lg-cap">Canceled</span><span class="m2-statv lg-muted">1</span><span class="lg-for">PAY-118</span></div>
+            </div>
+          </div>
+          <div class="cy-body">
+            <div class="lg-g"><span>Rolled over</span><span class="lg-gc">3</span></div>
+            <div class="lg-th" style="display:grid;grid-template-columns:72px minmax(0,1fr) 200px 120px"><span>Key</span><span>Title</span><span>Status when it ended → now</span><span>Moved to</span></div>
+            <sc-for list="{{ rolled }}" as="r" hint-placeholder-count="3">
+              <div class="cy-rrow"><span class="lg-key">{{ r.key }}</span><span class="lg-trunc">{{ r.title }}</span><span class="cy-move"><span class="{{ r.sqA }}"></span>{{ r.a }}<span class="lg-faint">→</span><span class="{{ r.sqB }}"></span>{{ r.b }}</span><span class="cy-move"><span class="m2-cy"></span>Cycle 12</span></div>
+            </sc-for>
+            <div class="lg-g"><span class="lg-faint">▸</span><span class="lg-sq lg-s-done"></span><span>Completed</span><span class="lg-gc">16</span></div>
+            <div class="lg-g"><span class="lg-faint">▸</span><span class="lg-sq lg-s-cancel"></span><span>Canceled</span><span class="lg-gc">1</span></div>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isEnd }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-scrim"></div>
+        <div class="lg-dialog" style="top:70px;width:560px" data-screen-label="End cycle">
+          <div class="lg-dh"><span style="font-weight:600">End Cycle 12 now?</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+          <div class="lg-db" style="gap:14px">
+            <p style="margin:0;line-height:1.55">9 of 18 tasks are done. The other 9 move to the next cycle. Cycle 12 keeps a record of what moved. It would end on its own on Oct 25 at midnight.</p>
+            <div class="lg-field"><span class="lg-label">Move unfinished tasks to</span>
+              <div class="cy-two">
+                <div class="lg-opton"><span class="lg-radioon"></span><div class="m2-stack"><span style="font-weight:600">Cycle 13</span><span class="lg-for">Oct 26 – Nov 8 · 2 tasks</span></div></div>
+                <div class="lg-opt"><span class="lg-radio"></span><div class="m2-stack"><span style="font-weight:600">No cycle</span><span class="lg-for">Back to the project list</span></div></div>
+              </div>
+            </div>
+            <div class="lg-field"><span class="lg-label">Unfinished · 9</span>
+              <div class="cy-dl"><sc-for list="{{ unfinished }}" as="t" hint-placeholder-count="5"><div class="cy-dli"><span class="{{ t.sq }}"></span><span class="lg-key">{{ t.key }}</span><span class="lg-trunc">{{ t.title }}</span><span class="{{ t.avCls }}" style="--h:{{ t.hue }}">{{ t.ini }}</span></div></sc-for></div>
+            </div>
+          </div>
+          <div class="lg-df"><span class="lg-hint">Done and canceled tasks stay in Cycle 12.</span><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">End and move 9</button></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isDialog }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-scrim"></div>
+        <div class="lg-dialog" style="top:110px;width:520px" data-screen-label="New cycle">
+          <div class="lg-dh"><span class="lg-mono lg-muted" style="font-size:10.5px">PAY</span><span style="font-weight:600">New cycle</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+          <div class="lg-db">
+            <div class="lg-field"><span class="lg-label">Name <span class="lg-faint" style="font-weight:400">optional</span></span><div class="lg-inputf"><span class="lg-mono lg-muted" style="font-size:11px">Cycle 15 ·</span><span class="lg-ph">What is this cycle about?</span></div></div>
+            <div class="cy-two">
+              <div class="lg-field"><span class="lg-label">Starts</span><div class="lg-input" style="justify-content:space-between"><span>Mon, Nov 23</span><span class="lg-faint">▾</span></div></div>
+              <div class="lg-field"><span class="lg-label">Ends</span><div class="lg-input" style="justify-content:space-between"><span>Sun, Dec 6</span><span class="lg-faint">▾</span></div></div>
+            </div>
+            <p class="lg-hint" style="margin:0">2 weeks, the same length as Cycle 14. It starts the day after Cycle 14 ends.</p>
+          </div>
+          <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">Create<span class="lg-btnk">⌘↵</span></button></div>
+        </div>
+      </sc-if>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["list", "dialog", "page", "end", "done", "empty", "loading", "error"], "default": "list" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'list';
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const people = { ana: ['Ana Ruiz', 'AR', 25, false], tomas: ['Tomás Berg', 'TB', 220, false], claude: ['claude-dev', 'C', 0, true], codex: ['codex-ci', 'X', 0, true] };
+    const SQ = { prog: 'lg-sq lg-s-prog', review: 'lg-sq lg-s-review', todo: 'lg-sq lg-s-todo', backlog: 'lg-sq lg-s-backlog', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel' };
+    const t = (key, title, pri, who, upd, added, sq) => { const p = who ? people[who] : null; return { key, title, added: added || '', sq: sq || '', pri: PRI[pri][0], priCls: PRI[pri][1], has: !!p, who: p ? p[0] : '', ini: p ? p[1] : '', hue: p ? p[2] : 0, avCls: p ? (p[3] ? 'lg-ag' : 'lg-av') : 'm2-none', upd }; };
+    const groups = [
+      { name: 'In progress', sq: SQ.prog, tasks: [
+        t('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 3, 'claude', '3m', '', SQ.prog),
+        t('PAY-131', 'Add idempotency keys to the refund endpoint', 4, 'codex', '12m', '', SQ.prog),
+        t('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 2, 'ana', '1h', '', SQ.prog),
+        t('PAY-153', 'Sign payloads with a rotating secret per endpoint', 3, 'tomas', '5h', '+ Oct 17', SQ.prog)
+      ]},
+      { name: 'In review', sq: SQ.review, tasks: [
+        t('PAY-138', 'Webhook signature check accepts expired timestamps', 4, 'claude', '25m', '+ Oct 15', SQ.review)
+      ]},
+      { name: 'Todo', sq: SQ.todo, tasks: [
+        t('PAY-144', 'Show a test-mode banner on the billing settings page', 1, null, '2h', '', SQ.todo),
+        t('PAY-140', 'Partial refunds across more than three line items round to the wrong cent when the invoice currency differs', 3, 'tomas', '5h', '', SQ.todo),
+        t('PAY-137', 'Document the nightly payout reconciliation job', 0, 'claude', '1d', '+ Oct 20', SQ.todo),
+        t('PAY-152', 'Delivery log page for merchants with filter by event type', 2, null, '2h', '', SQ.todo)
+      ]}
+    ].map((g) => Object.assign(g, { count: g.tasks.length }));
+    const unfinished = groups.reduce((a, g) => a.concat(g.tasks), []);
+    const rolled = [
+      { key: 'PAY-131', title: 'Add idempotency keys to the refund endpoint', a: 'In progress', sqA: SQ.prog, b: 'In progress', sqB: SQ.prog },
+      { key: 'PAY-138', title: 'Webhook signature check accepts expired timestamps', a: 'Todo', sqA: SQ.todo, b: 'In review', sqB: SQ.review },
+      { key: 'PAY-133', title: 'Reject refunds larger than the captured amount', a: 'In review', sqA: SQ.review, b: 'Done', sqB: SQ.done }
+    ];
+    const isPage = state === 'page' || state === 'end' || state === 'done';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Cycles · ' + state,
+      isList: !isPage, isPage, isCurrent: state === 'page' || state === 'end', isDone: state === 'done',
+      isEnd: state === 'end', isDialog: state === 'dialog',
+      hasRows: state === 'list' || state === 'dialog',
+      isLoading: state === 'loading', isError: state === 'error', isEmpty: state === 'empty',
+      sub: state === 'empty' ? 'no cycles yet' : 'Cycle 12 ends Sunday',
+      tabSub: state === 'empty' ? 'none' : 'C12 · 3d left',
+      pageName: state === 'done' ? 'Cycle 11' : 'Cycle 12',
+      upcoming: [
+        { name: 'Cycle 13', dates: 'Oct 26 – Nov 8', tasks: '2', result: 'Starts Monday' },
+        { name: 'Cycle 14', dates: 'Nov 9 – Nov 22', tasks: '0', result: 'Starts in 17 days' }
+      ],
+      completed: [
+        { name: 'Cycle 11 · Webhook retries and the delivery log for merchants who asked for it', dates: 'Sep 28 – Oct 11', tasks: '20', done: 16, rolled: 3 },
+        { name: 'Cycle 10', dates: 'Sep 14 – Sep 27', tasks: '19', done: 19, rolled: 0 },
+        { name: 'Cycle 9 · Payout reconciliation', dates: 'Aug 31 – Sep 13', tasks: '17', done: 12, rolled: 5 }
+      ],
+      groups, unfinished, rolled
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { Avatar } from '../Avatar';
 import { cn } from '../cn';
 import { Menu, MenuItem } from '../Menu';
 import { Tooltip, TooltipTrigger } from '../Tooltip';
+import { UserMenu, type UserMenuProps } from './UserMenu';
 
 export interface RailNavItem {
   id: string;
@@ -35,8 +36,10 @@ export interface RailProps {
   projects?: readonly RailProject[];
   settings?: { href: string; isCurrent?: boolean; label?: string };
   user: { name: string; hue?: number; initials?: string };
-  /** Items of the avatar menu, for example Sign out. */
+  /** Items of the simple avatar menu, for example Sign out. Ignored when `userMenu` is set. */
   userActions?: readonly RailUserAction[];
+  /** Full account menu (name, theme switch, groups). Replaces `userActions`. */
+  userMenu?: Omit<UserMenuProps, 'user' | 'className'>;
   className?: string;
 }
 
@@ -54,6 +57,7 @@ export function Rail({
   settings,
   user,
   userActions = [],
+  userMenu,
   className,
 }: RailProps) {
   const initial = workspace.initial ?? workspace.name.charAt(0).toUpperCase();
@@ -120,7 +124,11 @@ export function Rail({
           {settings.label ?? 'Settings'}
         </Link>
       ) : null}
-      <UserButton user={user} actions={userActions} />
+      {userMenu ? (
+        <UserMenu user={user} {...userMenu} className="mx-auto mt-1.5" />
+      ) : (
+        <UserButton user={user} actions={userActions} />
+      )}
     </nav>
   );
 }

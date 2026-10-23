@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<style>
+.tk-sheet{height:auto;min-height:800px;padding:32px 40px;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:36px;align-content:start}
+.tk-col{display:flex;flex-direction:column;gap:22px;min-width:0}
+.tk-sw{display:grid;grid-template-columns:32px 130px minmax(0,1fr);gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-2);font-size:12px}
+.tk-swc{width:32px;height:22px;border:1px solid var(--line)}
+.tk-note{color:var(--muted);font-size:11.5px}
+.tk-demo{border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--bg)}
+.tk-drow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tk-kb{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 12px;font-size:12px;align-items:center}
+.tk-kb .k{display:flex;gap:4px}
+.tk-sec{display:flex;flex-direction:column;gap:10px}
+.tk-inv{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px 12px;font-size:12px;line-height:1.45}
+.tk-inv b{font-weight:600}
+.tk-inv span{color:var(--muted)}
+</style>
+</helmet>
+<div class="{{ rootCls }} tk-sheet" style="width:1280px;height:auto" data-screen-label="M2 tokens and components">
+  <div class="tk-col">
+    <div class="tk-sec">
+      <h2 class="lg-h1">New tokens</h2>
+      <p class="tk-note" style="margin:0">Added in ledger-m2.css, loaded after ledger.css. No M1 token changed. Milestones and cycles get no colour of their own: a diamond and a circle tell them apart, so status keeps its colours.</p>
+      <div>
+        <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="8">
+          <div class="tk-sw"><span class="tk-swc" style="background:var({{ t.name }})"></span><span class="lg-mono" style="font-size:10.5px">{{ t.name }}</span><span class="tk-note">{{ t.note }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+    <div class="tk-sec">
+      <h2 class="lg-h1">Components</h2>
+      <div class="tk-demo">
+        <div class="tk-drow"><span class="m2-chip"><span class="m2-ms"></span>Planned milestone</span><span class="m2-chip"><span class="m2-msf"></span>Active</span><span class="m2-chip"><span class="m2-cy"></span>C13</span><span class="m2-chip"><span class="m2-cyon" style="--p:79%"></span>C12 current</span><span class="m2-warnpill">3 days left</span><span class="m2-at">@Ana Ruiz</span><span class="m2-none"></span></div>
+        <div class="tk-drow"><span class="m2-prog" style="max-width:200px"><span class="m2-progd" style="width:64%"></span><span class="m2-progp" style="width:23%"></span></span><span class="m2-num">14/22</span><span class="tk-note">done, then in progress at half strength</span></div>
+        <div class="tk-drow"><span class="m2-seg"><span class="m2-segi">List</span><span class="m2-segon">Board</span></span><span class="m2-seg"><span class="m2-segi">Light</span><span class="m2-segon">Dark</span><span class="m2-segi">System</span></span></div>
+        <div class="tk-drow" style="align-items:flex-start">
+          <div class="m2-card" style="width:190px"><div class="m2-cardl"><span class="lg-key">PAY-142</span><span class="lg-sp"></span><span class="lg-pri">■■■</span></div><div class="m2-cardt">Default card</div><div class="m2-cardf"><span class="m2-chip"><span class="m2-cy"></span>C12</span><span class="lg-sp"></span><span class="lg-ag">C</span></div></div>
+          <div class="m2-cardfoc" style="width:190px"><div class="m2-cardl"><span class="lg-key">PAY-138</span></div><div class="m2-cardt">Keyboard focus</div></div>
+          <div class="m2-cardsel" style="width:190px"><div class="m2-cardl"><span class="lg-key">PAY-131</span></div><div class="m2-cardt">Selected, panel open</div></div>
+        </div>
+        <div class="tk-drow" style="align-items:flex-start"><div class="m2-cardghost" style="width:190px;height:52px"></div><div style="width:190px;display:flex;flex-direction:column;gap:6px;padding-top:10px"><span class="tk-note">Drop line</span><div class="m2-dropline" style="margin:0"></div></div><div style="width:190px;height:52px;background:var(--drop);outline:1.5px dashed var(--drop-line);outline-offset:-2px;display:grid;place-items:center" class="tk-note">Drop column</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="tk-col">
+    <div class="tk-sec">
+      <h2 class="lg-h1">Keyboard</h2>
+      <div class="tk-kb">
+        <sc-for list="{{ keys }}" as="k" hint-placeholder-count="10">
+          <span class="k"><sc-for list="{{ k.keys }}" as="x" hint-placeholder-count="1"><span class="lg-kbd">{{ x }}</span></sc-for></span><span>{{ k.what }}</span>
+        </sc-for>
+      </div>
+      <p class="tk-note" style="margin:0">M1 keys stay: C new task, / search, J/K move, Esc close, I assign to me. Drag and drop always has the keyboard path above; screen readers hear "PAY-140 moved to In review, position 1 of 3".</p>
+    </div>
+    <div class="tk-sec">
+      <h2 class="lg-h1">Inventory</h2>
+      <div class="tk-inv">
+        <sc-for list="{{ inv }}" as="i" hint-placeholder-count="8"><b>{{ i.name }}</b><span>{{ i.states }}</span></sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 1000 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      tokens: [
+        { name: '--warn', note: 'Overdue target dates, rolled-over counts. Text-safe on --bg.' },
+        { name: '--warn-bg', note: 'Ground for the days-left pill when 3 days or fewer remain.' },
+        { name: '--drop', note: 'Column under a dragged card.' },
+        { name: '--drop-line', note: 'Insertion line and drop column outline.' },
+        { name: '--mention', note: '@mention text. AA on --mention-bg.' },
+        { name: '--mention-bg', note: '@mention chip ground.' },
+        { name: '--comment-bg', note: 'Comment body, so comments stand apart from activity lines.' },
+        { name: '--track', note: 'Empty part of progress bars.' }
+      ],
+      keys: [
+        { keys: ['V'], what: 'Switch List and Board in a project' },
+        { keys: ['H', 'L'], what: 'Board: previous or next column' },
+        { keys: ['J', 'K'], what: 'Board: next or previous card in the column' },
+        { keys: ['⇧H', '⇧L'], what: 'Board: move the card to the previous or next status' },
+        { keys: ['⇧J', '⇧K'], what: 'Board: move the card down or up in its column' },
+        { keys: ['↵'], what: 'Open the focused card or row in the panel' },
+        { keys: ['⇧M'], what: 'Set milestone on the selected task' },
+        { keys: ['⇧C'], what: 'Set cycle on the selected task' },
+        { keys: ['M'], what: 'Focus the comment box' },
+        { keys: ['⌘↵'], what: 'Send the comment, save an edit, create in dialogs' },
+        { keys: ['⇧P'], what: 'Composer: toggle Write and Preview' },
+        { keys: ['@'], what: 'Composer: mention a person or an agent' },
+        { keys: ['G', 'M'], what: 'Go to My tasks' },
+        { keys: ['⇧T'], what: 'Cycle Light, Dark and System' },
+        { keys: ['⌘Z'], what: 'Undo the last move on the board' }
+      ],
+      inv: [
+        { name: 'View tabs', states: 'Tasks, Milestones, Cycles. Hidden tabs when a project uses neither. Count or current-cycle note beside each.' },
+        { name: 'Segmented switch', states: 'List and Board; Light, Dark and System. Default, selected, focus.' },
+        { name: 'Board column', states: 'Open, folded to 40px, drop target, long with scroll and "N more", empty.' },
+        { name: 'Card', states: 'Default, hover, focus, selected, dragging, ghost slot. Title clamps at 2 lines.' },
+        { name: 'Swimlane', states: 'Open, collapsed, "No assignee" / "No milestone" lane.' },
+        { name: 'Milestone row', states: 'Planned, active, completed; overdue date; no date; long name.' },
+        { name: 'Progress bar', states: 'Done plus in progress; time-elapsed bar for cycles.' },
+        { name: 'Cycle header', states: 'Current with days left, upcoming, completed summary.' },
+        { name: 'Comment', states: 'Person, agent with "for", edited, own (Edit, Delete), editing, deleted line.' },
+        { name: 'Composer', states: 'Idle, focused, mention picker, preview, sending, failed (text kept).' },
+        { name: 'Pickers', states: 'Milestone and cycle menus with search, none option, check on current.' },
+        { name: 'User menu', states: 'Name, workspace, theme switch, Profile, Appearance, sign out.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

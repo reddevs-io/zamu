@@ -14,6 +14,9 @@ export const UserId = AuthId;
 export const WorkspaceId = AuthId;
 export const ProjectId = RowId;
 export const TaskId = RowId;
+export const MilestoneId = RowId;
+export const CycleId = RowId;
+export const CommentId = RowId;
 
 /**
  * Timestamps travel as ISO 8601 UTC strings. Servers may hand in a Date (what Drizzle returns);
@@ -23,6 +26,13 @@ export const Timestamp = z
   .union([z.date(), z.iso.datetime({ offset: true })])
   .transform((value) => (value instanceof Date ? value : new Date(value)).toISOString())
   .pipe(z.iso.datetime());
+
+/**
+ * A calendar day without time or zone, `2026-11-14`. Milestone targets and cycle dates use it;
+ * "today" is the day in the instance's APP_TIME_ZONE.
+ */
+export const CalendarDate = z.iso.date();
+export type CalendarDate = z.infer<typeof CalendarDate>;
 
 // ---------------------------------------------------------------------------
 // Status
@@ -188,3 +198,86 @@ export function safeParseTaskKey(value: string): TaskKeyParts | null {
 export function formatTaskKey(projectKey: string, number: number): string {
   return `${projectKey}-${number}`;
 }
+
+// ---------------------------------------------------------------------------
+// Milestones
+// ---------------------------------------------------------------------------
+
+/** Planned until a task in it starts, Active then, Completed only by hand. */
+export const MILESTONE_STATUSES = ['planned', 'active', 'completed'] as const;
+export const MilestoneStatus = z.enum(MILESTONE_STATUSES);
+export type MilestoneStatus = z.infer<typeof MilestoneStatus>;
+
+export const MILESTONE_STATUS_LABELS: Record<MilestoneStatus, string> = {
+  planned: 'Planned',
+  active: 'Active',
+  completed: 'Completed',
+};
+
+// ---------------------------------------------------------------------------
+// Cycles
+// ---------------------------------------------------------------------------
+
+/** Derived: Completed once ended, Current while today is within its dates, otherwise Upcoming. */
+export const CYCLE_STATES = ['upcoming', 'current', 'completed'] as const;
+export const CycleState = z.enum(CYCLE_STATES);
+export type CycleState = z.infer<typeof CycleState>;
+
+export const CYCLE_STATE_LABELS: Record<CycleState, string> = {
+  upcoming: 'Upcoming',
+  current: 'Current',
+  completed: 'Completed',
+};
+
+/** Shortest and longest cycle in days, both ends included. */
+export const MIN_CYCLE_DAYS = 1;
+export const MAX_CYCLE_DAYS = 56;
+/** Length of the first cycle of a project; later cycles default to the previous one's length. */
+export const DEFAULT_CYCLE_DAYS = 14;
+
+/** Largest cycle number: Postgres integer range. */
+export const MAX_CYCLE_NUMBER = 2_147_483_647;
+
+/** A cycle number. Query strings and path parameters carry it as text, so digits are accepted too. */
+export const CycleNumber = z.union([
+  z.number().int().min(1).max(MAX_CYCLE_NUMBER),
+  z
+    .string()
+    .trim()
+    .regex(/^[1-9][0-9]{0,9}$/, 'Use a cycle number like 12')
+    .transform(Number)
+    .pipe(z.number().max(MAX_CYCLE_NUMBER, 'Cycle number is out of range')),
+]);
+export type CycleNumber = z.output<typeof CycleNumber>;
+
+export const CYCLE_CURRENT = 'current';
+export const CYCLE_NEXT = 'next';
+
+/**
+ * Addresses a cycle of a project without its id: a number, the current cycle, or the next upcoming
+ * one. Agents use it so they never need ids.
+ */
+export const CycleSelector = z.union([z.literal(CYCLE_CURRENT), z.literal(CYCLE_NEXT), CycleNumber], {
+  error: 'Use a cycle number, current or next',
+});
+export type CycleSelector = z.output<typeof CycleSelector>;
+
+/** Number of days from `start` to `end`, both included. Both are CalendarDate strings. */
+export function cycleLengthDays(start: string, end: string): number {
+  return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
+}
+
+// ---------------------------------------------------------------------------
+// Theme
+// ---------------------------------------------------------------------------
+
+/** A person's theme choice. System follows prefers-color-scheme. */
+export const THEMES = ['system', 'light', 'dark'] as const;
+export const Theme = z.enum(THEMES);
+export type Theme = z.infer<typeof Theme>;
+
+export const THEME_LABELS: Record<Theme, string> = {
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
+};

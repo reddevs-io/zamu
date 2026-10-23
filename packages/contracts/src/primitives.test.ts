@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CalendarDate,
+  CYCLE_STATE_LABELS,
+  CYCLE_STATES,
+  CycleNumber,
+  CycleSelector,
+  cycleLengthDays,
   formatTaskKey,
   isOpenStatus,
+  MILESTONE_STATUS_LABELS,
+  MILESTONE_STATUSES,
   OPEN_TASK_STATUSES,
   PRIORITIES,
   PRIORITY_LABELS,
@@ -18,6 +26,9 @@ import {
   TaskKey,
   TaskKeyInput,
   TaskStatus,
+  THEME_LABELS,
+  THEMES,
+  Theme,
   Timestamp,
 } from './primitives';
 
@@ -174,5 +185,65 @@ describe('Timestamp', () => {
 
   it.each([['not a date'], ['2026-10-22'], [new Date('invalid')], [1729621146997]])('rejects %s', (value) => {
     expect(Timestamp.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('CalendarDate', () => {
+  it.each(['2026-11-14', '2028-02-29'])('accepts %s', (value) => {
+    expect(CalendarDate.parse(value)).toBe(value);
+  });
+
+  it.each(['2026-02-29', '2026-13-01', '2026-11-14T00:00:00Z', '14.11.2026', ''])('rejects %j', (value) => {
+    expect(CalendarDate.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('CycleNumber and CycleSelector', () => {
+  it.each([
+    [12, 12],
+    ['12', 12],
+    [' 7 ', 7],
+    [2_147_483_647, 2_147_483_647],
+  ])('reads cycle number %j', (value, parsed) => {
+    expect(CycleNumber.parse(value)).toBe(parsed);
+  });
+
+  it.each([0, -1, 1.5, '0', '012', '1e3', 'twelve', '2147483648', 2_147_483_648])(
+    'rejects cycle number %j',
+    (value) => {
+      expect(CycleNumber.safeParse(value).success).toBe(false);
+    },
+  );
+
+  it.each([
+    ['current', 'current'],
+    ['next', 'next'],
+    ['3', 3],
+  ])('selects %j', (value, parsed) => {
+    expect(CycleSelector.parse(value)).toBe(parsed);
+  });
+
+  it.each(['Current', 'none', 'previous', null])('rejects selector %j with one message', (value) => {
+    const result = CycleSelector.safeParse(value);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
+      'Use a cycle number, current or next',
+    ]);
+  });
+
+  it('counts cycle days with both ends included, across a DST change', () => {
+    expect(cycleLengthDays('2026-10-26', '2026-10-26')).toBe(1);
+    expect(cycleLengthDays('2026-10-12', '2026-10-25')).toBe(14);
+    expect(cycleLengthDays('2026-03-23', '2026-04-05')).toBe(14);
+    expect(cycleLengthDays('2026-10-26', '2026-10-25')).toBe(0);
+  });
+});
+
+describe('labels', () => {
+  it('has a label for every milestone status, cycle state and theme', () => {
+    expect(Object.keys(MILESTONE_STATUS_LABELS)).toEqual([...MILESTONE_STATUSES]);
+    expect(Object.keys(CYCLE_STATE_LABELS)).toEqual([...CYCLE_STATES]);
+    expect(Object.keys(THEME_LABELS)).toEqual([...THEMES]);
+    expect(Theme.safeParse('auto').success).toBe(false);
   });
 });

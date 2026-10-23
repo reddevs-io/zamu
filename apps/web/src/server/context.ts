@@ -26,7 +26,7 @@ export function createServerContext(env: ServerEnv = process.env): ServerContext
   pool.on('error', (error) => console.error('server: idle database connection failed:', error.message));
   const auth = createAuth({ db, secret: config.secret, baseUrl: config.baseUrl, config: config.auth });
   // PUBLIC_URL builds invitation links; it matches BETTER_AUTH_URL unless a proxy says otherwise.
-  return { db, auth, pool, publicUrl: config.publicUrl };
+  return { db, auth, pool, publicUrl: config.publicUrl, timeZone: config.timeZone };
 }
 
 const globalKey = Symbol.for('pm.web.serverContext');

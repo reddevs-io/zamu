@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Task } from './entities';
 
 /**
  * Error codes shared by core, the API, the web app and the CLI. They match oRPC's common error
@@ -10,6 +11,8 @@ export const PROBLEM_CODES = [
   'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
+  /** A task write with an ifUpdatedAt older than the stored task. The body carries the current task. */
+  'TASK_CHANGED',
   'UNPROCESSABLE_CONTENT',
   'INTERNAL_SERVER_ERROR',
 ] as const;
@@ -22,6 +25,7 @@ export const PROBLEM_STATUS: Record<ProblemCode, number> = {
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  TASK_CHANGED: 409,
   UNPROCESSABLE_CONTENT: 422,
   INTERNAL_SERVER_ERROR: 500,
 };
@@ -32,6 +36,7 @@ export const PROBLEM_TITLES: Record<ProblemCode, string> = {
   FORBIDDEN: 'Not allowed',
   NOT_FOUND: 'Not found',
   CONFLICT: 'Conflict',
+  TASK_CHANGED: 'Task changed',
   UNPROCESSABLE_CONTENT: 'Invalid input',
   INTERNAL_SERVER_ERROR: 'Server error',
 };
@@ -47,12 +52,15 @@ export type ProblemIssue = z.infer<typeof ProblemIssue>;
 export const ProblemData = z.object({
   requestId: z.string().optional(),
   issues: z.array(ProblemIssue).optional(),
+  /** TASK_CHANGED only: the task as it is now. */
+  task: Task.optional(),
 });
 export type ProblemData = z.infer<typeof ProblemData>;
 
 /**
  * Error body of every /api/v1 response with a 4xx or 5xx status, after RFC 9457 (problem details)
- * with three extensions: `code`, `requestId` and `issues`. The CLI prints it under `pm.v1.error`.
+ * with four extensions: `code`, `requestId`, `issues`, and `task` for TASK_CHANGED. The CLI prints
+ * it under `pm.v1.error`.
  */
 export const Problem = z.object({
   type: z.string().default('about:blank'),
@@ -63,6 +71,8 @@ export const Problem = z.object({
   instance: z.string().optional(),
   requestId: z.string().optional(),
   issues: z.array(ProblemIssue).optional(),
+  /** TASK_CHANGED only: the task as it is now, so the client can roll back to it. */
+  task: Task.optional(),
 });
 export type Problem = z.output<typeof Problem>;
 
@@ -70,7 +80,7 @@ export type Problem = z.output<typeof Problem>;
 export function problem(
   code: ProblemCode,
   detail?: string,
-  extra: { requestId?: string; issues?: ProblemIssue[]; instance?: string } = {},
+  extra: { requestId?: string; issues?: ProblemIssue[]; instance?: string; task?: Problem['task'] } = {},
 ): Problem {
   return {
     type: 'about:blank',

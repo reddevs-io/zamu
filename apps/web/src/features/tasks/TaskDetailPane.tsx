@@ -1,21 +1,21 @@
 import type { Activity, AssigneeRef, Task, TaskListItem } from '@pm/contracts';
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
-import {
-  type ActivityEntry,
-  ActivityTimeline,
-  Banner,
-  Button,
-  Kbd,
-  PageHeader,
-  PropertyGrid,
-  Skeleton,
-} from '~/ui';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
+import { CommentComposer } from '~/features/comments/CommentComposer';
+import { TaskTimeline } from '~/features/comments/TaskTimeline';
+import { type ActivityEntry, Banner, Button, cn, Kbd, PageHeader, Skeleton, useHotkeys } from '~/ui';
 import { useNow } from './clock';
 import { describeError } from './errors';
-import { atTime, describeActivity, formatDay, formatPaneTime } from './format';
-import { activityQuery, membersQuery, type TaskPatch, taskQuery, useUpdateTask } from './queries';
+import { atTime, describeActivity, findCheckboxes, formatDay } from './format';
+import {
+  CyclePicker,
+  CycleValue,
+  MilestonePicker,
+  MilestoneValue,
+  useProjectPlanning,
+} from './PlanningFields';
+import { membersQuery, projectsQuery, type TaskPatch, taskQuery, useUpdateTask } from './queries';
 import {
   AssigneePicker,
   EditableDescription,
@@ -24,15 +24,22 @@ import {
   StatusPicker,
 } from './TaskFields';
 
-// Right-hand pane of the task list: the selected task, editable in place.
+// Right-hand pane of the task list, the board and My tasks: the selected task, editable in place, with its
+// history (activity and comments) and the comment box pinned at the bottom.
 
 export interface TaskDetailPaneProps {
+  /** The task's project. */
   projectKey: string;
   taskKey: string;
   /** The list row, shown at once while the full task loads, so J/K never waits on the network. */
   preview?: TaskListItem;
   /** Clears the selection (Esc). */
   onClose: () => void;
+  /**
+   * Shows "in <project name>" after the key, for screens that mix projects (My tasks). Optional; off by
+   * default.
+   */
+  showProject?: boolean;
 }
 
 const SETTLE_MS = 120;
@@ -47,21 +54,38 @@ function useSettled(ms: number): boolean {
   return settled;
 }
 
-export function TaskDetailPane({ projectKey, taskKey, preview, onClose }: TaskDetailPaneProps) {
+type OpenPicker = 'milestone' | 'cycle' | null;
+
+export function TaskDetailPane({ projectKey, taskKey, preview, onClose, showProject }: TaskDetailPaneProps) {
   // While J/K races through rows the pane shows the list row; the full task loads once the selection rests.
   const settled = useSettled(SETTLE_MS);
   const taskResult = useQuery({ ...taskQuery(taskKey), enabled: settled });
-  const activityResult = useQuery({ ...activityQuery(taskKey), enabled: settled });
   const members = useQuery(membersQuery()).data?.items ?? [];
+  const projectName = useQuery({
+    ...projectsQuery(),
+    select: (data) => data.items.find((item) => item.key === projectKey)?.name,
+    enabled: showProject === true,
+  }).data;
+  const planning = useProjectPlanning(projectKey);
   const update = useUpdateTask();
   const now = useNow();
+  const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
+  const [revealId, setRevealId] = useState<string | null>(null);
+  const milestoneCell = useRef<HTMLDivElement>(null);
+  const cycleCell = useRef<HTMLDivElement>(null);
 
   const task = taskResult.data;
   const shown = task ?? preview;
 
+  useHotkeys({
+    'Shift+M': shown && planning.usesMilestones ? () => setOpenPicker('milestone') : null,
+    'Shift+C': shown && planning.usesCycles ? () => setOpenPicker('cycle') : null,
+  });
+
   const header = (
     <PageHeader>
       <span className="font-mono text-[13px] text-fg">{taskKey}</span>
+      {showProject && projectName ? <span className="truncate text-muted">in {projectName}</span> : null}
       <span className="flex-1" />
       <Link
         to="/p/$projectKey/$taskKey"
@@ -107,11 +131,94 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose }: TaskDe
   }
 
   const save = (patch: TaskPatch) => update.mutate({ key: taskKey, patch });
+  const pickerOpenChange = (picker: Exclude<OpenPicker, null>) => (isOpen: boolean) =>
+    setOpenPicker((current) => (isOpen ? picker : current === picker ? null : current));
+
+  const cells: PropertyCellProps[] = [
+    {
+      id: 'status',
+      label: 'Status',
+      children: <StatusPicker value={shown.status} onChange={(status) => save({ status })} />,
+    },
+    {
+      id: 'priority',
+      label: 'Priority',
+      children: <PriorityPicker value={shown.priority} onChange={(priority) => save({ priority })} />,
+    },
+    {
+      id: 'assignee',
+      label: 'Assignee',
+      children: (
+        <AssigneePicker
+          value={shown.assignee}
+          members={members}
+          onChange={(assignee) => save({ assignee })}
+        />
+      ),
+      sub: forLine(shown.assignee),
+    },
+  ];
+  if (planning.usesMilestones) {
+    cells.push({
+      id: 'milestone',
+      label: 'Milestone',
+      kbd: '⇧M',
+      cellRef: milestoneCell,
+      isActive: openPicker === 'milestone',
+      children: (
+        <MilestonePicker
+          value={shown.milestone}
+          milestones={planning.milestones}
+          onChange={(milestone) => save({ milestone })}
+          isOpen={openPicker === 'milestone'}
+          onOpenChange={pickerOpenChange('milestone')}
+          triggerRef={milestoneCell}
+        >
+          <MilestoneValue value={shown.milestone} milestones={planning.milestones} />
+        </MilestonePicker>
+      ),
+    });
+  }
+  if (planning.usesCycles) {
+    cells.push({
+      id: 'cycle',
+      label: 'Cycle',
+      kbd: '⇧C',
+      cellRef: cycleCell,
+      isActive: openPicker === 'cycle',
+      children: (
+        <CyclePicker
+          value={shown.cycle}
+          cycles={planning.cycles}
+          onChange={(cycle) => save({ cycle })}
+          isOpen={openPicker === 'cycle'}
+          onOpenChange={pickerOpenChange('cycle')}
+          triggerRef={cycleCell}
+        >
+          <CycleValue value={shown.cycle} cycles={planning.cycles} />
+        </CyclePicker>
+      ),
+    });
+  }
+  cells.push(
+    task
+      ? {
+          id: 'created',
+          label: 'Created',
+          children: <span className="truncate">{task.createdBy.name}</span>,
+          sub: createdSub(task, atTime(formatDay, now)),
+        }
+      : {
+          id: 'created',
+          label: 'Created',
+          children: <Skeleton width={70} />,
+        },
+  );
 
   return (
     <>
       {header}
-      <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-7 pt-[22px] pb-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-7 pt-[22px] pb-5">
         <EditableTitle key={`${taskKey}:title`} value={shown.title} onSave={(title) => save({ title })} />
         {update.isError ? (
           <Banner
@@ -124,47 +231,9 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose }: TaskDe
             Couldn't save your change, so it was undone. {describeError(update.error).message}
           </Banner>
         ) : null}
-        <PropertyGrid
-          items={[
-            {
-              id: 'status',
-              label: 'Status',
-              value: <StatusPicker value={shown.status} onChange={(status) => save({ status })} />,
-            },
-            {
-              id: 'priority',
-              label: 'Priority',
-              value: <PriorityPicker value={shown.priority} onChange={(priority) => save({ priority })} />,
-            },
-            {
-              id: 'assignee',
-              label: 'Assignee',
-              value: (
-                <AssigneePicker
-                  value={shown.assignee}
-                  members={members}
-                  onChange={(assignee) => save({ assignee })}
-                />
-              ),
-              sub: forLine(shown.assignee),
-            },
-            task
-              ? {
-                  id: 'created',
-                  label: 'Created',
-                  value: <span className="truncate">{task.createdBy.name}</span>,
-                  sub: createdSub(task, atTime(formatDay, now)),
-                }
-              : {
-                  id: 'created',
-                  label: 'Created',
-                  value: <Skeleton width={70} />,
-                  sub: <Skeleton width={40} />,
-                },
-          ]}
-        />
+        <PropertyCells cells={cells} />
         {task ? (
-          <EditableDescription
+          <DescriptionSection
             key={`${taskKey}:description`}
             value={task.description}
             onSave={(description) => save({ description })}
@@ -176,53 +245,135 @@ export function TaskDetailPane({ projectKey, taskKey, preview, onClose }: TaskDe
             <Skeleton width="70%" />
           </div>
         )}
-        <div className="caps border-t border-line pt-3.5">Activity</div>
-        <ActivityList result={activityResult} now={now} />
+        <TaskTimeline taskKey={taskKey} members={members} enabled={settled} revealId={revealId} />
       </div>
-      <div className="mx-7 mt-3 mb-[18px] flex h-[38px] shrink-0 items-center border border-dashed border-line px-3 text-faint">
-        Comments arrive in a later release.
+      <div className="shrink-0 border-t border-line bg-bg px-7 pt-3 pb-4">
+        <CommentComposer taskKey={taskKey} members={members} onSent={setRevealId} />
       </div>
     </>
   );
 }
 
-function ActivityList({
-  result,
-  now,
-}: {
-  result: UseQueryResult<{ items: Activity[] }>;
-  now: number | null;
-}) {
-  if (result.data) {
-    const time = atTime(formatPaneTime, now);
-    return <ActivityTimeline items={result.data.items.map((item) => toEntry(item, time))} />;
-  }
-  if (result.isError) {
-    return (
-      <p className="m-0 text-[12.5px] text-muted">
-        Couldn't load the activity.{' '}
-        <button
-          type="button"
-          onClick={() => result.refetch()}
-          className="cursor-pointer text-fg underline outline-none focus-visible:focus-ring"
-        >
-          Retry
-        </button>
-      </p>
-    );
-  }
+// ---------------------------------------------------------------------------
+// Property cells
+// ---------------------------------------------------------------------------
+
+interface PropertyCellProps {
+  id: string;
+  label: string;
+  /** Shortcut drawn after the caption: "⇧M". */
+  kbd?: string;
+  children: ReactNode;
+  /** Muted text after the value; wraps under it when the cell is narrow. */
+  sub?: ReactNode;
+  /** The picker of this cell is open: focus outline and selection ground. */
+  isActive?: boolean;
+  cellRef?: RefObject<HTMLDivElement | null>;
+}
+
+/**
+ * The bordered property grid: three columns when the pane is wide enough, two otherwise. Cells draw their
+ * right and bottom borders; the frame clips the ones on the outer edge.
+ */
+function PropertyCells({ cells }: { cells: readonly PropertyCellProps[] }) {
   return (
-    <div className="flex flex-col gap-3" aria-busy="true">
-      <Skeleton width="60%" />
-      <Skeleton width="72%" />
+    <div className="@container shrink-0 overflow-hidden border border-line">
+      <dl className="-mr-px -mb-px grid grid-cols-2 @min-[520px]:grid-cols-3">
+        {cells.map((cell) => (
+          <div
+            key={cell.id}
+            ref={cell.cellRef}
+            data-cell={cell.id}
+            className={cn(
+              'flex min-w-0 flex-col gap-[3px] border-r border-b border-line px-2.5 pt-[7px] pb-2',
+              cell.isActive && 'bg-sel outline-2 -outline-offset-2 outline-focus',
+            )}
+          >
+            <dt className="caps flex items-center gap-1.5">
+              {cell.label}
+              {cell.kbd ? (
+                <Kbd aria-hidden className="tracking-normal">
+                  {cell.kbd}
+                </Kbd>
+              ) : null}
+            </dt>
+            <dd className="m-0 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium">
+              <span className="flex max-w-full min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
+                {cell.children}
+              </span>
+              {cell.sub ? (
+                <span className="min-w-0 truncate text-[11.5px] font-normal text-muted">{cell.sub}</span>
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Description
+// ---------------------------------------------------------------------------
+
+/** Folding the description stays as set while moving between tasks. */
+let descriptionOpenChoice = true;
+
+/** "6 lines, 4 checklist items". */
+export function describeDescription(source: string): string {
+  const lines = source.split('\n').filter((line) => line.trim()).length;
+  const checks = findCheckboxes(source).length;
+  const parts = [`${lines} ${lines === 1 ? 'line' : 'lines'}`];
+  if (checks) parts.push(`${checks} checklist ${checks === 1 ? 'item' : 'items'}`);
+  return parts.join(', ');
+}
+
+function DescriptionSection({
+  value,
+  onSave,
+}: {
+  value: string | null;
+  onSave: (description: string | null) => void;
+}) {
+  const [open, setOpenState] = useState(descriptionOpenChoice);
+  const setOpen = (next: boolean) => {
+    descriptionOpenChoice = next;
+    setOpenState(next);
+  };
+  if (!value?.trim()) return <EditableDescription value={value} onSave={onSave} />;
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex cursor-pointer items-center gap-2 self-start text-[12.5px] text-muted outline-none hover:text-fg focus-visible:focus-ring"
+      >
+        <span aria-hidden className="w-2 text-faint">
+          {open ? '▾' : '▸'}
+        </span>
+        <span>Description</span>
+        <span className="text-faint">· {describeDescription(value)}</span>
+      </button>
+      {open ? <EditableDescription value={value} onSave={onSave} /> : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers (also used by the task page and other screens)
+// ---------------------------------------------------------------------------
+
+/** Shown where an entry has no actor: the hourly job that ends cycles. */
+export const SYSTEM_ACTOR = 'System';
+
 export function toEntry(activity: Activity, format: (value: string) => string): ActivityEntry {
   return {
     id: activity.id,
-    actor: { name: activity.actor.name, kind: activity.actor.kind },
+    // A null actor is the system (the hourly job that ends cycles).
+    actor: activity.actor
+      ? { name: activity.actor.name, kind: activity.actor.kind }
+      : { name: SYSTEM_ACTOR, kind: 'person' },
     onBehalfOf: activity.onBehalfOf?.name,
     action: describeActivity(activity),
     time: format(activity.createdAt),

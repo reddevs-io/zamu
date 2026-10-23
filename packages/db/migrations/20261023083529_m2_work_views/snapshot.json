@@ -1,0 +1,2153 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d966838d-6272-4588-b1fa-0c530e89ab6c",
+  "prevIds": ["7b79ca25-7b5f-4db1-9b6e-4f1c5f5c4b08"],
+  "footprints": [
+    {
+      "statementType": "create_enum",
+      "statementTarget": ["enum", "public", "milestone_status"],
+      "writes": [
+        "s|enum|public.milestone_status",
+        "n|enum|public.milestone_status",
+        "e|enum|public.milestone_status",
+        "n|type|public.milestone_status"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "comment"],
+      "writes": [
+        "s|tbl|public.comment",
+        "n|tbl|public.comment",
+        "e|tbl|public.comment",
+        "n|rel|public.comment",
+        "n|type|public.comment",
+        "n|rel|public.comment_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "comment_mention"],
+      "writes": [
+        "s|tbl|public.comment_mention",
+        "n|tbl|public.comment_mention",
+        "e|tbl|public.comment_mention",
+        "n|rel|public.comment_mention",
+        "n|type|public.comment_mention",
+        "n|rel|public.comment_mention_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "cycle"],
+      "writes": [
+        "s|tbl|public.cycle",
+        "n|tbl|public.cycle",
+        "e|tbl|public.cycle",
+        "n|rel|public.cycle",
+        "n|type|public.cycle",
+        "n|rel|public.cycle_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "cycle_rollover"],
+      "writes": [
+        "s|tbl|public.cycle_rollover",
+        "n|tbl|public.cycle_rollover",
+        "e|tbl|public.cycle_rollover",
+        "n|rel|public.cycle_rollover",
+        "n|type|public.cycle_rollover",
+        "n|rel|public.cycle_rollover_pkey"
+      ],
+      "reads": ["n|sch|public", "n|enum|public.task_status"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "milestone"],
+      "writes": [
+        "s|tbl|public.milestone",
+        "n|tbl|public.milestone",
+        "e|tbl|public.milestone",
+        "n|rel|public.milestone",
+        "n|type|public.milestone",
+        "n|rel|public.milestone_pkey"
+      ],
+      "reads": ["n|sch|public", "n|enum|public.milestone_status"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "project", "uses_milestones"],
+      "writes": [
+        "s|col|public.project.uses_milestones",
+        "n|col|public.project.uses_milestones",
+        "e|col|public.project.uses_milestones"
+      ],
+      "reads": ["n|tbl|public.project", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "project", "uses_cycles"],
+      "writes": [
+        "s|col|public.project.uses_cycles",
+        "n|col|public.project.uses_cycles",
+        "e|col|public.project.uses_cycles"
+      ],
+      "reads": ["n|tbl|public.project", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "project", "next_cycle_number"],
+      "writes": [
+        "s|col|public.project.next_cycle_number",
+        "n|col|public.project.next_cycle_number",
+        "e|col|public.project.next_cycle_number"
+      ],
+      "reads": ["n|tbl|public.project", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "milestone_id"],
+      "writes": [
+        "s|col|public.task.milestone_id",
+        "n|col|public.task.milestone_id",
+        "e|col|public.task.milestone_id"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "cycle_id"],
+      "writes": ["s|col|public.task.cycle_id", "n|col|public.task.cycle_id", "e|col|public.task.cycle_id"],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "cycle_added_at"],
+      "writes": [
+        "s|col|public.task.cycle_added_at",
+        "n|col|public.task.cycle_added_at",
+        "e|col|public.task.cycle_added_at"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "rank"],
+      "writes": ["s|col|public.task.rank", "n|col|public.task.rank", "e|col|public.task.rank"],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "user", "theme"],
+      "writes": ["s|col|public.user.theme", "n|col|public.user.theme", "e|col|public.user.theme"],
+      "reads": ["n|tbl|public.user", "n|sch|public"]
+    },
+    {
+      "statementType": "alter_column",
+      "statementTarget": ["column", "public", "activity", "actor_id"],
+      "writes": ["s|colprop|public.activity.actor_id.notNull"],
+      "reads": ["n|tbl|public.activity", "n|sch|public", "n|col|public.activity.actor_id"],
+      "sqlHash": "d68a346016c99b02"
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "comment", "comment_taskId_createdAt_idx"],
+      "writes": [
+        "s|idx|public.comment_taskId_createdAt_idx",
+        "n|idx|public.comment_taskId_createdAt_idx",
+        "e|idx|public.comment_taskId_createdAt_idx",
+        "n|rel|public.comment_taskId_createdAt_idx"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|col|public.comment.task_id",
+        "n|col|public.comment.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "comment_mention", "comment_mention_userId_idx"],
+      "writes": [
+        "s|idx|public.comment_mention_userId_idx",
+        "n|idx|public.comment_mention_userId_idx",
+        "e|idx|public.comment_mention_userId_idx",
+        "n|rel|public.comment_mention_userId_idx"
+      ],
+      "reads": ["n|tbl|public.comment_mention", "n|sch|public", "n|col|public.comment_mention.user_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "cycle", "cycle_projectId_number_unique"],
+      "writes": [
+        "s|idx|public.cycle_projectId_number_unique",
+        "n|idx|public.cycle_projectId_number_unique",
+        "e|idx|public.cycle_projectId_number_unique",
+        "n|rel|public.cycle_projectId_number_unique"
+      ],
+      "reads": [
+        "n|tbl|public.cycle",
+        "n|sch|public",
+        "n|col|public.cycle.project_id",
+        "n|col|public.cycle.number"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "cycle_rollover", "cycle_rollover_taskId_idx"],
+      "writes": [
+        "s|idx|public.cycle_rollover_taskId_idx",
+        "n|idx|public.cycle_rollover_taskId_idx",
+        "e|idx|public.cycle_rollover_taskId_idx",
+        "n|rel|public.cycle_rollover_taskId_idx"
+      ],
+      "reads": ["n|tbl|public.cycle_rollover", "n|sch|public", "n|col|public.cycle_rollover.task_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "milestone", "milestone_projectId_name_unique"],
+      "writes": [
+        "s|idx|public.milestone_projectId_name_unique",
+        "n|idx|public.milestone_projectId_name_unique",
+        "e|idx|public.milestone_projectId_name_unique",
+        "n|rel|public.milestone_projectId_name_unique"
+      ],
+      "reads": ["n|tbl|public.milestone", "n|sch|public", "n|col|public.milestone.project_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task", "task_projectId_status_rank_idx"],
+      "writes": [
+        "s|idx|public.task_projectId_status_rank_idx",
+        "n|idx|public.task_projectId_status_rank_idx",
+        "e|idx|public.task_projectId_status_rank_idx",
+        "n|rel|public.task_projectId_status_rank_idx"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task.project_id",
+        "n|col|public.task.status",
+        "n|col|public.task.rank"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task", "task_milestoneId_idx"],
+      "writes": [
+        "s|idx|public.task_milestoneId_idx",
+        "n|idx|public.task_milestoneId_idx",
+        "e|idx|public.task_milestoneId_idx",
+        "n|rel|public.task_milestoneId_idx"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public", "n|col|public.task.milestone_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task", "task_cycleId_idx"],
+      "writes": [
+        "s|idx|public.task_cycleId_idx",
+        "n|idx|public.task_cycleId_idx",
+        "e|idx|public.task_cycleId_idx",
+        "n|rel|public.task_cycleId_idx"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public", "n|col|public.task.cycle_id"]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "comment"],
+      "writes": [
+        "s|fk|public.comment.comment_workspace_id_organization_id_fkey",
+        "n|fk|public.comment.comment_workspace_id_organization_id_fkey",
+        "e|fk|public.comment.comment_workspace_id_organization_id_fkey",
+        "n|con|public.comment.comment_workspace_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.comment.workspace_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "comment"],
+      "writes": [
+        "s|fk|public.comment.comment_project_id_project_id_fkey",
+        "n|fk|public.comment.comment_project_id_project_id_fkey",
+        "e|fk|public.comment.comment_project_id_project_id_fkey",
+        "n|con|public.comment.comment_project_id_project_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|tbl|public.project",
+        "n|sch|public",
+        "n|col|public.comment.project_id",
+        "n|col|public.project.id",
+        "e|uniqueness|public.project.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "comment"],
+      "writes": [
+        "s|fk|public.comment.comment_task_id_task_id_fkey",
+        "n|fk|public.comment.comment_task_id_task_id_fkey",
+        "e|fk|public.comment.comment_task_id_task_id_fkey",
+        "n|con|public.comment.comment_task_id_task_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.comment.task_id",
+        "n|col|public.task.id",
+        "e|uniqueness|public.task.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "comment"],
+      "writes": [
+        "s|fk|public.comment.comment_author_id_user_id_fkey",
+        "n|fk|public.comment.comment_author_id_user_id_fkey",
+        "e|fk|public.comment.comment_author_id_user_id_fkey",
+        "n|con|public.comment.comment_author_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.comment.author_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "comment"],
+      "writes": [
+        "s|fk|public.comment.comment_on_behalf_of_id_user_id_fkey",
+        "n|fk|public.comment.comment_on_behalf_of_id_user_id_fkey",
+        "e|fk|public.comment.comment_on_behalf_of_id_user_id_fkey",
+        "n|con|public.comment.comment_on_behalf_of_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.comment.on_behalf_of_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "comment_mention"],
+      "writes": [
+        "s|fk|public.comment_mention.comment_mention_comment_id_comment_id_fkey",
+        "n|fk|public.comment_mention.comment_mention_comment_id_comment_id_fkey",
+        "e|fk|public.comment_mention.comment_mention_comment_id_comment_id_fkey",
+        "n|con|public.comment_mention.comment_mention_comment_id_comment_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.comment_mention",
+        "n|sch|public",
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|col|public.comment_mention.comment_id",
+        "n|col|public.comment.id",
+        "e|uniqueness|public.comment.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "comment_mention"],
+      "writes": [
+        "s|fk|public.comment_mention.comment_mention_user_id_user_id_fkey",
+        "n|fk|public.comment_mention.comment_mention_user_id_user_id_fkey",
+        "e|fk|public.comment_mention.comment_mention_user_id_user_id_fkey",
+        "n|con|public.comment_mention.comment_mention_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.comment_mention",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.comment_mention.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "cycle"],
+      "writes": [
+        "s|fk|public.cycle.cycle_workspace_id_organization_id_fkey",
+        "n|fk|public.cycle.cycle_workspace_id_organization_id_fkey",
+        "e|fk|public.cycle.cycle_workspace_id_organization_id_fkey",
+        "n|con|public.cycle.cycle_workspace_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cycle",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.cycle.workspace_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "cycle"],
+      "writes": [
+        "s|fk|public.cycle.cycle_project_id_project_id_fkey",
+        "n|fk|public.cycle.cycle_project_id_project_id_fkey",
+        "e|fk|public.cycle.cycle_project_id_project_id_fkey",
+        "n|con|public.cycle.cycle_project_id_project_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cycle",
+        "n|sch|public",
+        "n|tbl|public.project",
+        "n|sch|public",
+        "n|col|public.cycle.project_id",
+        "n|col|public.project.id",
+        "e|uniqueness|public.project.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "cycle"],
+      "writes": [
+        "s|fk|public.cycle.cycle_ended_by_id_user_id_fkey",
+        "n|fk|public.cycle.cycle_ended_by_id_user_id_fkey",
+        "e|fk|public.cycle.cycle_ended_by_id_user_id_fkey",
+        "n|con|public.cycle.cycle_ended_by_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cycle",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.cycle.ended_by_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "cycle_rollover"],
+      "writes": [
+        "s|fk|public.cycle_rollover.cycle_rollover_cycle_id_cycle_id_fkey",
+        "n|fk|public.cycle_rollover.cycle_rollover_cycle_id_cycle_id_fkey",
+        "e|fk|public.cycle_rollover.cycle_rollover_cycle_id_cycle_id_fkey",
+        "n|con|public.cycle_rollover.cycle_rollover_cycle_id_cycle_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cycle_rollover",
+        "n|sch|public",
+        "n|tbl|public.cycle",
+        "n|sch|public",
+        "n|col|public.cycle_rollover.cycle_id",
+        "n|col|public.cycle.id",
+        "e|uniqueness|public.cycle.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "cycle_rollover"],
+      "writes": [
+        "s|fk|public.cycle_rollover.cycle_rollover_task_id_task_id_fkey",
+        "n|fk|public.cycle_rollover.cycle_rollover_task_id_task_id_fkey",
+        "e|fk|public.cycle_rollover.cycle_rollover_task_id_task_id_fkey",
+        "n|con|public.cycle_rollover.cycle_rollover_task_id_task_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cycle_rollover",
+        "n|sch|public",
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.cycle_rollover.task_id",
+        "n|col|public.task.id",
+        "e|uniqueness|public.task.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "cycle_rollover"],
+      "writes": [
+        "s|fk|public.cycle_rollover.cycle_rollover_to_cycle_id_cycle_id_fkey",
+        "n|fk|public.cycle_rollover.cycle_rollover_to_cycle_id_cycle_id_fkey",
+        "e|fk|public.cycle_rollover.cycle_rollover_to_cycle_id_cycle_id_fkey",
+        "n|con|public.cycle_rollover.cycle_rollover_to_cycle_id_cycle_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cycle_rollover",
+        "n|sch|public",
+        "n|tbl|public.cycle",
+        "n|sch|public",
+        "n|col|public.cycle_rollover.to_cycle_id",
+        "n|col|public.cycle.id",
+        "e|uniqueness|public.cycle.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "milestone"],
+      "writes": [
+        "s|fk|public.milestone.milestone_workspace_id_organization_id_fkey",
+        "n|fk|public.milestone.milestone_workspace_id_organization_id_fkey",
+        "e|fk|public.milestone.milestone_workspace_id_organization_id_fkey",
+        "n|con|public.milestone.milestone_workspace_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.milestone",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.milestone.workspace_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "milestone"],
+      "writes": [
+        "s|fk|public.milestone.milestone_project_id_project_id_fkey",
+        "n|fk|public.milestone.milestone_project_id_project_id_fkey",
+        "e|fk|public.milestone.milestone_project_id_project_id_fkey",
+        "n|con|public.milestone.milestone_project_id_project_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.milestone",
+        "n|sch|public",
+        "n|tbl|public.project",
+        "n|sch|public",
+        "n|col|public.milestone.project_id",
+        "n|col|public.project.id",
+        "e|uniqueness|public.project.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "milestone"],
+      "writes": [
+        "s|fk|public.milestone.milestone_created_by_id_user_id_fkey",
+        "n|fk|public.milestone.milestone_created_by_id_user_id_fkey",
+        "e|fk|public.milestone.milestone_created_by_id_user_id_fkey",
+        "n|con|public.milestone.milestone_created_by_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.milestone",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.milestone.created_by_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "task"],
+      "writes": [
+        "s|fk|public.task.task_milestone_id_milestone_id_fkey",
+        "n|fk|public.task.task_milestone_id_milestone_id_fkey",
+        "e|fk|public.task.task_milestone_id_milestone_id_fkey",
+        "n|con|public.task.task_milestone_id_milestone_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|tbl|public.milestone",
+        "n|sch|public",
+        "n|col|public.task.milestone_id",
+        "n|col|public.milestone.id",
+        "e|uniqueness|public.milestone.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "task"],
+      "writes": [
+        "s|fk|public.task.task_cycle_id_cycle_id_fkey",
+        "n|fk|public.task.task_cycle_id_cycle_id_fkey",
+        "e|fk|public.task.task_cycle_id_cycle_id_fkey",
+        "n|con|public.task.task_cycle_id_cycle_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|tbl|public.cycle",
+        "n|sch|public",
+        "n|col|public.task.cycle_id",
+        "n|col|public.cycle.id",
+        "e|uniqueness|public.cycle.id"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "project"],
+      "writes": [
+        "s|ck|public.project.project_next_cycle_number_check",
+        "n|ck|public.project.project_next_cycle_number_check",
+        "e|ck|public.project.project_next_cycle_number_check",
+        "n|con|public.project.project_next_cycle_number_check"
+      ],
+      "reads": ["n|tbl|public.project", "n|sch|public", "n|col|public.project.next_cycle_number"]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "user"],
+      "writes": [
+        "s|ck|public.user.user_theme_check",
+        "n|ck|public.user.user_theme_check",
+        "e|ck|public.user.user_theme_check",
+        "n|con|public.user.user_theme_check"
+      ],
+      "reads": ["n|tbl|public.user", "n|sch|public", "n|col|public.user.theme"]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "comment",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "comment_mention",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "cycle",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "cycle_rollover",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "milestone",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "milestone_status",
+        "values": ["planned", "active", "completed"],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "uuidv7()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "workspace_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "project_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "task_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "author_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "on_behalf_of_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "body",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "edited_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "deleted_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment_mention",
+        "name": "comment_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment_mention",
+        "name": "user_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "uuidv7()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "workspace_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "project_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "number",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "starts_on",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "ends_on",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "completed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "ended_by_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "scope_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "completed_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "rolled_over_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "canceled_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "added_after_start_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "cycle_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "task_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "to_cycle_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "status_at_end",
+        "type": "task_status",
+        "typeSchema": "public",
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "uuidv7()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "workspace_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "project_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "description",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "target_date",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "status",
+        "type": "milestone_status",
+        "typeSchema": "public",
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'planned'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "completed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "created_by_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "uses_milestones",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "uses_cycles",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "next_cycle_number",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "1",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "milestone_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "cycle_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "cycle_added_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "rank",
+        "type": "double precision",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user",
+        "name": "theme",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'system'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_taskId_createdAt_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "task_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment_mention",
+        "name": "comment_mention_userId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "cycle_projectId_number_unique",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "number",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "cycle_rollover_taskId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "task_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_projectId_name_unique",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "lower(\"name\")",
+            "isExpression": true,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_projectId_status_rank_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "status",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "rank",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_milestoneId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "milestone_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_cycleId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "cycle_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_workspace_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": ["workspace_id"],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_project_id_project_id_fkey",
+        "nameExplicit": false,
+        "columns": ["project_id"],
+        "schemaTo": "public",
+        "tableTo": "project",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_task_id_task_id_fkey",
+        "nameExplicit": false,
+        "columns": ["task_id"],
+        "schemaTo": "public",
+        "tableTo": "task",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_author_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["author_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "RESTRICT",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_on_behalf_of_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["on_behalf_of_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "RESTRICT",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment_mention",
+        "name": "comment_mention_comment_id_comment_id_fkey",
+        "nameExplicit": false,
+        "columns": ["comment_id"],
+        "schemaTo": "public",
+        "tableTo": "comment",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment_mention",
+        "name": "comment_mention_user_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["user_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "cycle_workspace_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": ["workspace_id"],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "cycle_project_id_project_id_fkey",
+        "nameExplicit": false,
+        "columns": ["project_id"],
+        "schemaTo": "public",
+        "tableTo": "project",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "cycle_ended_by_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["ended_by_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "RESTRICT",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "cycle_rollover_cycle_id_cycle_id_fkey",
+        "nameExplicit": false,
+        "columns": ["cycle_id"],
+        "schemaTo": "public",
+        "tableTo": "cycle",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "cycle_rollover_task_id_task_id_fkey",
+        "nameExplicit": false,
+        "columns": ["task_id"],
+        "schemaTo": "public",
+        "tableTo": "task",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "cycle_rollover_to_cycle_id_cycle_id_fkey",
+        "nameExplicit": false,
+        "columns": ["to_cycle_id"],
+        "schemaTo": "public",
+        "tableTo": "cycle",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_workspace_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": ["workspace_id"],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_project_id_project_id_fkey",
+        "nameExplicit": false,
+        "columns": ["project_id"],
+        "schemaTo": "public",
+        "tableTo": "project",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_created_by_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": ["created_by_id"],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "RESTRICT",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_milestone_id_milestone_id_fkey",
+        "nameExplicit": false,
+        "columns": ["milestone_id"],
+        "schemaTo": "public",
+        "tableTo": "milestone",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_cycle_id_cycle_id_fkey",
+        "nameExplicit": false,
+        "columns": ["cycle_id"],
+        "schemaTo": "public",
+        "tableTo": "cycle",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment_mention",
+        "name": "comment_mention_pkey",
+        "columns": ["comment_id", "user_id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle_rollover",
+        "name": "cycle_rollover_pkey",
+        "columns": ["cycle_id", "task_id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_pkey",
+        "columns": ["id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "cycle_pkey",
+        "columns": ["id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_pkey",
+        "columns": ["id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_body_check",
+        "value": "(\"body\" is null) = (\"deleted_at\" is not null)",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "cycle_number_check",
+        "value": "\"number\" >= 1",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cycle",
+        "name": "cycle_dates_check",
+        "value": "\"ends_on\" >= \"starts_on\" and \"ends_on\" - \"starts_on\" < 56",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_name_check",
+        "value": "char_length(\"name\") between 1 and 100",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "project",
+        "name": "project_next_cycle_number_check",
+        "value": "\"next_cycle_number\" >= 1",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user",
+        "name": "user_theme_check",
+        "value": "\"theme\" in ('system', 'light', 'dark')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"activity\",\"actor_id\"]",
+      "set": {
+        "notNull": false
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 // refuses to start with one message listing every problem.
 // Framework-free: the startup plugin, getServerContext and tests import it.
 import { type AuthConfig, AuthConfigError, readAuthConfig } from '@pm/auth';
+import { isValidTimeZone } from '@pm/core';
 
 /** Better Auth signs sessions with BETTER_AUTH_SECRET; shorter secrets are refused. */
 export const MIN_SECRET_LENGTH = 32;
@@ -22,6 +23,7 @@ export interface ServerEnv {
   OIDC_TRUST_EMAIL?: string | undefined;
   PASSWORD_LOGIN?: string | undefined;
   TRUSTED_IP_HEADERS?: string | undefined;
+  APP_TIME_ZONE?: string | undefined;
 }
 
 export interface ServerConfig {
@@ -32,6 +34,8 @@ export interface ServerConfig {
   /** PUBLIC_URL, defaulting to BETTER_AUTH_URL. */
   publicUrl: string;
   auth: AuthConfig;
+  /** APP_TIME_ZONE, an IANA zone name. Default UTC. */
+  timeZone: string;
 }
 
 export class ServerConfigError extends Error {
@@ -84,6 +88,11 @@ export function readServerConfig(env: ServerEnv = process.env): ServerConfig {
     problems.push(...error.problems);
   }
 
+  const timeZone = env.APP_TIME_ZONE?.trim() || 'UTC';
+  if (!isValidTimeZone(timeZone)) {
+    problems.push(`APP_TIME_ZONE must be an IANA time zone such as Europe/Paris (got "${timeZone}").`);
+  }
+
   if (problems.length > 0) throw new ServerConfigError(problems);
-  return { databaseUrl, secret, baseUrl, publicUrl, auth };
+  return { databaseUrl, secret, baseUrl, publicUrl, auth, timeZone };
 }

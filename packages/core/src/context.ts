@@ -6,6 +6,10 @@ import type { JobQueue } from './jobs';
 
 export interface DbContext {
   db: Db;
+  /** IANA time zone that decides "today" for cycles and milestones (APP_TIME_ZONE). Default UTC. */
+  timeZone?: string;
+  /** Clock override for tests. Default: the current time. */
+  now?: () => Date;
 }
 
 /** Services that create API keys go through Better Auth's API-key plugin. */

@@ -1,6 +1,6 @@
 import type { Priority, TaskStatus } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { useQuickCreate } from '~/features/shell/quick-create';
 import {
@@ -20,12 +20,24 @@ import {
   useHotkeys,
 } from '~/ui';
 import { describeError } from './errors';
+import {
+  CyclePicker,
+  CycleStateGlyph,
+  cycleLabel,
+  MilestonePicker,
+  toCycleRef,
+  toMilestoneRef,
+  useProjectPlanning,
+} from './PlanningFields';
 import { membersQuery, meQuery, projectsQuery, useCreateTask } from './queries';
+import { planningDefaultsFrom, resolveCycleDefault, resolveMilestoneDefault } from './quick-create-defaults';
 import { assigneeOptions, ModKey, NO_ASSIGNEE, PRIORITY_OPTIONS, STATUS_OPTIONS } from './TaskFields';
 
-// Quick create (frame 06). The shell renders it once and opens it with C (useQuickCreate().open). Title is
-// focused; Mod+Enter creates; I assigns to me; with "Create more" on, the dialog stays open for the next
-// task. Every new task is selected in its project's list.
+// Quick create (frames 06 and 33). The shell renders it once and opens it with C (useQuickCreate().open).
+// Title is focused; Mod+Enter creates; I assigns to me; Shift+M and Shift+C open the milestone and cycle
+// chips (shown when the project uses them, prefilled from the page the dialog opened on); with "Create
+// more" on, the dialog stays open for the next task. Every new task is selected in its project's list.
+// open(projectKey, { status }) preselects the status for that opening (the board column's "+").
 
 const DEFAULT_STATUS: TaskStatus = 'todo';
 const DEFAULT_PRIORITY: Priority = 'none';
@@ -47,8 +59,13 @@ export function QuickCreateDialog() {
 }
 
 function QuickCreateForm({ onClose }: { onClose: () => void }) {
-  const { projectKey: requestedProject } = useQuickCreate();
+  const { projectKey: requestedProject, status: requestedStatus } = useQuickCreate();
   const navigate = useNavigate();
+  // Read once: the page the dialog opened on decides the milestone and cycle defaults.
+  const location = useRouterState({ select: (state) => state.location });
+  const [pageDefaults] = useState(() =>
+    planningDefaultsFrom(location.pathname, (location.search ?? {}) as Record<string, unknown>),
+  );
   const projects = useQuery(projectsQuery()).data?.items;
   const members = useQuery(membersQuery()).data?.items ?? [];
   const me = useQuery(meQuery()).data;
@@ -59,13 +76,36 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
   const projectKey = project ?? projects?.[0]?.key;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<TaskStatus>(DEFAULT_STATUS);
+  const [status, setStatus] = useState<TaskStatus>(requestedStatus ?? DEFAULT_STATUS);
   const [priority, setPriority] = useState<Priority>(DEFAULT_PRIORITY);
   const [assignee, setAssignee] = useState<string>(NO_ASSIGNEE);
   const [createMore, setCreateMore] = useState(false);
   const [created, setCreated] = useState<string | null>(null);
   const [titleError, setTitleError] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+
+  // Milestone and cycle: undefined follows the page default, null is "none", a string is the picked id.
+  const planning = useProjectPlanning(projectKey);
+  const [milestoneId, setMilestoneId] = useState<string | null | undefined>(undefined);
+  const [cycleId, setCycleId] = useState<string | null | undefined>(undefined);
+  const [openPicker, setOpenPicker] = useState<'milestone' | 'cycle' | null>(null);
+  const onPageProject = projectKey != null && projectKey === pageDefaults.projectKey;
+  const milestone =
+    milestoneId === undefined
+      ? onPageProject
+        ? resolveMilestoneDefault(planning.milestones, pageDefaults.milestoneId)
+        : undefined
+      : planning.milestones?.find((item) => item.id === milestoneId);
+  const cycle =
+    cycleId === undefined
+      ? onPageProject
+        ? resolveCycleDefault(planning.cycles, pageDefaults.cycle)
+        : undefined
+      : planning.cycles?.find((item) => item.id === cycleId);
+  const chosenMilestone = planning.usesMilestones ? milestone : undefined;
+  const chosenCycle = planning.usesCycles ? cycle : undefined;
+  const pickerOpenChange = (picker: 'milestone' | 'cycle') => (isOpen: boolean) =>
+    setOpenPicker((current) => (isOpen ? picker : current === picker ? null : current));
 
   useEffect(() => {
     // The Modal's focus scope runs after mount; focus the title once it settles.
@@ -94,6 +134,8 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
         status,
         priority,
         assignee: assignee === NO_ASSIGNEE ? null : assignee,
+        ...(chosenMilestone ? { milestone: chosenMilestone.id } : {}),
+        ...(chosenCycle ? { cycle: chosenCycle.number } : {}),
       })
       .catch(() => null);
     if (!task) return;
@@ -118,6 +160,8 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
     {
       'Mod+Enter': () => void submit(),
       i: assignToMe,
+      'Shift+M': planning.usesMilestones ? () => setOpenPicker('milestone') : null,
+      'Shift+C': planning.usesCycles ? () => setOpenPicker('cycle') : null,
     },
     { allowInOverlays: true },
   );
@@ -137,7 +181,13 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
           variant="chip"
           items={projectItems}
           value={projectKey ?? null}
-          onChange={(key) => key != null && setProject(String(key))}
+          onChange={(key) => {
+            if (key == null || String(key) === projectKey) return;
+            setProject(String(key));
+            // Milestones and cycles belong to one project: start over in the new one.
+            setMilestoneId(undefined);
+            setCycleId(undefined);
+          }}
           placeholder="Project"
           renderValue={(selected) => {
             const [item] = selected;
@@ -203,6 +253,35 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
               value={assignee}
               onChange={(key) => key != null && setAssignee(String(key))}
             />
+            {planning.usesMilestones ? (
+              <MilestonePicker
+                look="chip"
+                value={chosenMilestone ? toMilestoneRef(chosenMilestone) : null}
+                milestones={planning.milestones}
+                onChange={(picked) => setMilestoneId(picked?.id ?? null)}
+                isOpen={openPicker === 'milestone'}
+                onOpenChange={pickerOpenChange('milestone')}
+              />
+            ) : null}
+            {planning.usesCycles ? (
+              <CyclePicker
+                look="chip"
+                value={chosenCycle ? toCycleRef(chosenCycle) : null}
+                cycles={planning.cycles}
+                onChange={(picked) => setCycleId(picked?.id ?? null)}
+                isOpen={openPicker === 'cycle'}
+                onOpenChange={pickerOpenChange('cycle')}
+              >
+                {chosenCycle ? (
+                  <>
+                    <CycleStateGlyph cycle={chosenCycle} />
+                    {cycleLabel(chosenCycle)}
+                  </>
+                ) : (
+                  <span className="text-faint">Cycle</span>
+                )}
+              </CyclePicker>
+            ) : null}
             <Button
               variant="secondary"
               size="sm"
@@ -229,9 +308,16 @@ function QuickCreateForm({ onClose }: { onClose: () => void }) {
         </DialogBody>
         <DialogFooter
           start={
-            <Switch isSelected={createMore} onChange={setCreateMore}>
-              Create more
-            </Switch>
+            <>
+              <Switch isSelected={createMore} onChange={setCreateMore} className="shrink-0 whitespace-nowrap">
+                Create more
+              </Switch>
+              {planning.usesMilestones || planning.usesCycles ? (
+                <span className="min-w-0 truncate text-[11.5px] text-faint">
+                  Milestone and cycle default to the page you opened this from.
+                </span>
+              ) : null}
+            </>
           }
         >
           <Button variant="secondary" onPress={onClose}>

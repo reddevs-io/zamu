@@ -1,20 +1,21 @@
-import type { Activity } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
-import { Avatar, Banner, Button, PageHeader, Skeleton, useCopy, useHotkeys } from '~/ui';
+import { type ReactNode, type RefObject, useRef, useState } from 'react';
+import { CommentComposer } from '~/features/comments/CommentComposer';
+import { TaskTimeline } from '~/features/comments/TaskTimeline';
+import { Banner, Button, cn, Kbd, PageHeader, Skeleton, useCopy, useHotkeys } from '~/ui';
 import { useNow } from './clock';
 import { describeError } from './errors';
-import { atTime, describeActivity, formatDayTime, formatPageTime } from './format';
+import { atTime, formatDayTime, formatPageTime } from './format';
 import { listSearchFor } from './list-memory';
 import {
-  activityQuery,
-  membersQuery,
-  projectsQuery,
-  type TaskPatch,
-  taskQuery,
-  useUpdateTask,
-} from './queries';
+  CyclePicker,
+  CycleValue,
+  MilestonePicker,
+  MilestoneValue,
+  useProjectPlanning,
+} from './PlanningFields';
+import { membersQuery, projectsQuery, type TaskPatch, taskQuery, useUpdateTask } from './queries';
 import { createdSub, forLine, RequestHint } from './TaskDetailPane';
 import {
   AssigneePicker,
@@ -25,7 +26,8 @@ import {
 } from './TaskFields';
 
 // /p/$projectKey/$taskKey: one task on the whole page (frame 05). Esc goes back to the list with the
-// task selected.
+// task selected. The history (activity and comments) follows the description, with the comment box
+// pinned under it; the right column holds the properties, milestone and cycle included.
 
 export interface TaskPageProps {
   projectKey: string;
@@ -35,16 +37,20 @@ export interface TaskPageProps {
 export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
   const navigate = useNavigate();
   const taskResult = useQuery(taskQuery(taskKey));
-  const activity = useQuery(activityQuery(taskKey));
   const members = useQuery(membersQuery()).data?.items ?? [];
   const projectName = useQuery({
     ...projectsQuery(),
     select: (data) => data.items.find((item) => item.key === projectKey)?.name,
   }).data;
   const update = useUpdateTask();
+  const planning = useProjectPlanning(projectKey);
   const { copied, copy } = useCopy();
   const now = useNow();
   const pageTime = atTime(formatPageTime, now);
+  const [openPicker, setOpenPicker] = useState<'milestone' | 'cycle' | null>(null);
+  const [revealId, setRevealId] = useState<string | null>(null);
+  const milestoneRow = useRef<HTMLDivElement>(null);
+  const cycleRow = useRef<HTMLDivElement>(null);
 
   const backToList = () =>
     navigate({
@@ -52,10 +58,16 @@ export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
       params: { projectKey },
       search: listSearchFor(projectKey, taskKey) as never,
     });
-  useHotkeys({ Escape: backToList });
-
   const task = taskResult.data;
+  useHotkeys({
+    Escape: backToList,
+    'Shift+M': task && planning.usesMilestones ? () => setOpenPicker('milestone') : null,
+    'Shift+C': task && planning.usesCycles ? () => setOpenPicker('cycle') : null,
+  });
+
   const save = (patch: TaskPatch) => update.mutate({ key: taskKey, patch });
+  const pickerOpenChange = (picker: 'milestone' | 'cycle') => (isOpen: boolean) =>
+    setOpenPicker((current) => (isOpen ? picker : current === picker ? null : current));
 
   return (
     <div className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
@@ -115,9 +127,21 @@ export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
                 value={task.description}
                 onSave={(description) => save({ description })}
               />
+              <TaskTimeline
+                taskKey={taskKey}
+                members={members}
+                size="page"
+                revealId={revealId}
+                className="mt-2 max-w-[720px]"
+              />
             </article>
-            <div className="mx-12 mt-1 mb-5 flex h-10 max-w-[720px] shrink-0 items-center border border-dashed border-line px-3 text-faint">
-              Comments arrive in a later release.
+            <div className="shrink-0 border-t border-line px-12 pt-3 pb-4">
+              <CommentComposer
+                taskKey={taskKey}
+                members={members}
+                onSent={setRevealId}
+                className="max-w-[720px]"
+              />
             </div>
           </div>
           <aside
@@ -137,19 +161,45 @@ export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
                 onChange={(assignee) => save({ assignee })}
               />
             </PropertyRow>
+            {planning.usesMilestones ? (
+              <PropertyRow
+                label="Milestone"
+                kbd="⇧M"
+                rowRef={milestoneRow}
+                isActive={openPicker === 'milestone'}
+              >
+                <MilestonePicker
+                  value={task.milestone}
+                  milestones={planning.milestones}
+                  onChange={(milestone) => save({ milestone })}
+                  isOpen={openPicker === 'milestone'}
+                  onOpenChange={pickerOpenChange('milestone')}
+                  triggerRef={milestoneRow}
+                >
+                  <MilestoneValue value={task.milestone} milestones={planning.milestones} />
+                </MilestonePicker>
+              </PropertyRow>
+            ) : null}
+            {planning.usesCycles ? (
+              <PropertyRow label="Cycle" kbd="⇧C" rowRef={cycleRow} isActive={openPicker === 'cycle'}>
+                <CyclePicker
+                  value={task.cycle}
+                  cycles={planning.cycles}
+                  onChange={(cycle) => save({ cycle })}
+                  isOpen={openPicker === 'cycle'}
+                  onOpenChange={pickerOpenChange('cycle')}
+                  triggerRef={cycleRow}
+                >
+                  <CycleValue value={task.cycle} cycles={planning.cycles} />
+                </CyclePicker>
+              </PropertyRow>
+            ) : null}
             <PropertyRow label="Created" sub={createdSub(task, atTime(formatDayTime, now))}>
               <span className="truncate">{task.createdBy.name}</span>
             </PropertyRow>
             <PropertyRow label="Updated">
               <time dateTime={task.updatedAt}>{pageTime(task.updatedAt)}</time>
             </PropertyRow>
-            <div className="caps px-5 pt-[18px]">Activity</div>
-            <PageActivity
-              items={activity.data?.items}
-              isError={activity.isError}
-              onRetry={() => activity.refetch()}
-              time={pageTime}
-            />
           </aside>
         </div>
       ) : taskResult.isError ? (
@@ -161,66 +211,45 @@ export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
   );
 }
 
-function PropertyRow({ label, sub, children }: { label: string; sub?: string; children: ReactNode }) {
+function PropertyRow({
+  label,
+  sub,
+  kbd,
+  rowRef,
+  isActive,
+  children,
+}: {
+  label: string;
+  sub?: string;
+  /** Shortcut after the caption: "⇧M". */
+  kbd?: string;
+  /** Anchor for a picker popover. */
+  rowRef?: RefObject<HTMLDivElement | null>;
+  /** The row's picker is open. */
+  isActive?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div className="grid min-h-11 shrink-0 grid-cols-[96px_minmax(0,1fr)] items-center gap-2.5 border-b border-line-2 px-5 py-1.5">
-      <span className="caps">{label}</span>
+    <div
+      ref={rowRef}
+      className={cn(
+        'grid min-h-11 shrink-0 grid-cols-[96px_minmax(0,1fr)] items-center gap-2.5 border-b border-line-2 px-5 py-1.5',
+        isActive && 'bg-sel outline-2 -outline-offset-2 outline-focus',
+      )}
+    >
+      <span className="caps flex items-center gap-1.5">
+        {label}
+        {kbd ? (
+          <Kbd aria-hidden className="tracking-normal">
+            {kbd}
+          </Kbd>
+        ) : null}
+      </span>
       <div className="flex min-w-0 flex-col gap-0.5 font-medium">
         <div className="flex min-w-0 items-center gap-[7px]">{children}</div>
         {sub ? <span className="truncate text-[11.5px] font-normal text-muted">{sub}</span> : null}
       </div>
     </div>
-  );
-}
-
-function PageActivity({
-  items,
-  isError,
-  onRetry,
-  time,
-}: {
-  items: Activity[] | undefined;
-  isError: boolean;
-  onRetry: () => void;
-  time: (value: string) => string;
-}) {
-  if (!items) {
-    return (
-      <div className="flex flex-col gap-3 px-5 py-4" aria-busy={!isError}>
-        {isError ? (
-          <p className="m-0 text-[12.5px] text-muted">
-            Couldn't load the activity.{' '}
-            <button type="button" onClick={onRetry} className="cursor-pointer text-fg underline">
-              Retry
-            </button>
-          </p>
-        ) : (
-          <>
-            <Skeleton width="70%" />
-            <Skeleton width="55%" />
-          </>
-        )}
-      </div>
-    );
-  }
-  return (
-    <ol className="m-0 flex list-none flex-col gap-3 px-5 py-4">
-      {items.map((item) => (
-        <li
-          key={item.id}
-          className="grid grid-cols-[18px_minmax(0,1fr)] gap-2.5 text-[12.5px] leading-[1.45] text-muted"
-        >
-          <Avatar name={item.actor.name} kind={item.actor.kind} decorative />
-          <span>
-            <b className="font-semibold text-fg">{item.actor.name}</b>
-            {item.onBehalfOf ? ` for ${item.onBehalfOf.name}` : null} {describeActivity(item)}
-            <time dateTime={item.createdAt} className="mt-px block font-mono text-[10px] text-faint">
-              {time(item.createdAt)}
-            </time>
-          </span>
-        </li>
-      ))}
-    </ol>
   );
 }
 

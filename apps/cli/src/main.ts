@@ -3,14 +3,19 @@
 import { Command, CommanderError } from 'commander';
 import pkg from '../package.json' with { type: 'json' };
 import { login, logout, whoami } from './commands/auth';
+import { addComment, deleteComment, editComment, listComments } from './commands/comments';
+import { createCycle, currentCycle, endCycle, listCycles } from './commands/cycles';
+import { createMilestone, listMilestones, updateMilestone } from './commands/milestones';
 import { listProjects } from './commands/projects';
-import { collectList, createTask, listTasks, showTask, updateTask } from './commands/tasks';
+import { collectKeys, collectList } from './commands/shared';
+import { createTask, listTasks, showTask, updateTask } from './commands/tasks';
 import { type CommandContext, createContext, reportError } from './context';
 import { EXIT, toCliError, usageError } from './errors';
 import type { CliIo } from './io';
 
 const STATUS_HELP = 'backlog, todo, in_progress, in_review, done, canceled';
 const PRIORITY_HELP = 'none, low, medium, high, urgent';
+const MILESTONE_STATUS_HELP = 'planned, active, completed';
 
 /** True when --json appears before a `--` separator. */
 function wantsJson(argv: readonly string[]): boolean {
@@ -74,20 +79,30 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
   leaf(
     tasks
       .command('list')
-      .description('list tasks of a project')
-      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .description('list tasks of one or more projects, or of every project you can read')
+      .option(
+        '--project <KEY>',
+        'project key, e.g. PAY; repeatable or comma-separated (default: every project)',
+        collectKeys,
+      )
+      .option('--mine', 'only tasks assigned to you (same as --assignee me)')
       .option(
         '--status <status>',
         `filter by status, repeatable or comma-separated: ${STATUS_HELP}`,
         collectList,
       )
       .option('--assignee <who>', 'me, agents, or a member name, email or id')
+      .option('--milestone <name>', 'milestone name (needs one --project) or id; none for tasks without one')
+      .option('--cycle <cycle>', 'cycle number, current, next, or none for tasks without one')
       .option('--limit <n>', 'tasks per page, 1 to 200 (default 50)')
       .option('--cursor <cursor>', 'next page, from the previous result'),
   ).action((options) => listTasks(context, options));
 
   leaf(
-    tasks.command('show').description('show a task with its activity').argument('<TASK-KEY>', 'e.g. PAY-142'),
+    tasks
+      .command('show')
+      .description('show a task with its history: activity and comments, oldest first')
+      .argument('<TASK-KEY>', 'e.g. PAY-142'),
   ).action((key: string) => showTask(context, key));
 
   leaf(
@@ -99,7 +114,9 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       .option('--description <text>', 'Markdown description; "-" reads it from stdin')
       .option('--priority <priority>', PRIORITY_HELP)
       .option('--assignee <who>', 'me, or a member name, email or id')
-      .option('--status <status>', `${STATUS_HELP} (default todo)`),
+      .option('--status <status>', `${STATUS_HELP} (default todo)`)
+      .option('--milestone <name>', 'milestone of the project, by name or id')
+      .option('--cycle <cycle>', 'cycle number, current or next'),
   ).action((title: string[], options) => createTask(context, title, options));
 
   leaf(
@@ -112,8 +129,108 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       .option('--assignee <who>', 'me, or a member name, email or id')
       .option('--unassign', 'remove the assignee')
       .option('--title <title>', 'new title')
-      .option('--description <text>', 'new Markdown description; "-" reads it from stdin'),
+      .option('--description <text>', 'new Markdown description; "-" reads it from stdin')
+      .option('--milestone <name>', "milestone of the task's project, by name or id; none clears it")
+      .option('--cycle <cycle>', 'cycle number, current or next; none clears it'),
   ).action((key: string, options) => updateTask(context, key, options));
+
+  const comments = program.command('comments').description('list, add, edit and delete task comments');
+  leaf(
+    comments
+      .command('list')
+      .description('list the comments of a task, oldest first')
+      .argument('<TASK-KEY>', 'e.g. PAY-142'),
+  ).action((key: string) => listComments(context, key));
+
+  leaf(
+    comments
+      .command('add')
+      .description('comment on a task; @agent-name and @email mention members')
+      .argument('<TASK-KEY>', 'e.g. PAY-142')
+      .argument('<body>', 'Markdown body (quote it); "-" reads it from stdin'),
+  ).action((key: string, body: string) => addComment(context, key, body));
+
+  leaf(
+    comments
+      .command('edit')
+      .description('replace the body of your own comment')
+      .argument('<comment-id>', 'id from pm comments list or pm tasks show')
+      .argument('<body>', 'new Markdown body (quote it); "-" reads it from stdin'),
+  ).action((id: string, body: string) => editComment(context, id, body));
+
+  leaf(
+    comments
+      .command('delete')
+      .description('delete your own comment (the timeline keeps a placeholder)')
+      .argument('<comment-id>', 'id from pm comments list or pm tasks show'),
+  ).action((id: string) => deleteComment(context, id));
+
+  const milestones = program.command('milestones').description('list, create and update milestones');
+  leaf(
+    milestones
+      .command('list')
+      .description('list the milestones of a project with progress')
+      .requiredOption('--project <KEY>', 'project key, e.g. PAY'),
+  ).action((options) => listMilestones(context, options));
+
+  leaf(
+    milestones
+      .command('create')
+      .description('create a milestone (starts Planned)')
+      .argument('<name...>', 'milestone name (quote it, or pass the words)')
+      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .option('--target <date>', 'target date, YYYY-MM-DD')
+      .option('--description <text>', 'Markdown description; "-" reads it from stdin'),
+  ).action((name: string[], options) => createMilestone(context, name, options));
+
+  leaf(
+    milestones
+      .command('update')
+      .description('change a milestone; send only what changes')
+      .argument('<id-or-name>', 'milestone id, or its name (case-insensitive) with --project')
+      .option('--project <KEY>', 'project key, needed to find the milestone by name')
+      .option('--name <name>', 'new name')
+      .option('--target <date>', 'target date, YYYY-MM-DD; none clears it')
+      .option('--status <status>', `${MILESTONE_STATUS_HELP}; leaving completed reopens it as active`)
+      .option('--description <text>', 'Markdown description; "-" reads it from stdin, "" clears it'),
+  ).action((idOrName: string, options) => updateMilestone(context, idOrName, options));
+
+  const cycles = program.command('cycles').description('list, create, show and end cycles');
+  leaf(
+    cycles
+      .command('list')
+      .description('list the cycles of a project, oldest first')
+      .requiredOption('--project <KEY>', 'project key, e.g. PAY'),
+  ).action((options) => listCycles(context, options));
+
+  leaf(
+    cycles
+      .command('create')
+      .description('create a cycle; dates default to the day after the last cycle, same length')
+      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .option('--starts <date>', 'first day, YYYY-MM-DD')
+      .option('--ends <date>', 'last day, YYYY-MM-DD (1 to 56 days in all)')
+      .option('--name <name>', 'optional name'),
+  ).action((options) => createCycle(context, options));
+
+  leaf(
+    cycles
+      .command('current')
+      .description("show the project's current cycle (null with --json when there is none)")
+      .requiredOption('--project <KEY>', 'project key, e.g. PAY'),
+  ).action((options) => currentCycle(context, options));
+
+  leaf(
+    cycles
+      .command('end')
+      .description('end a cycle now; unfinished tasks move to the next cycle')
+      .argument('[number]', 'cycle number (default: the current cycle)')
+      .requiredOption('--project <KEY>', 'project key, e.g. PAY')
+      .option(
+        '--move-to <cycle>',
+        'cycle number for unfinished tasks, or none (default: next upcoming cycle, else a new one)',
+      ),
+  ).action((number: string | undefined, options) => endCycle(context, number, options));
 
   return program;
 }

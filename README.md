@@ -8,13 +8,21 @@ the agent, and the person it acts for. People use the web app; agents use the `p
 
 ![Task list of the Payments project with the task pane open](docs/images/task-list-light.png)
 
-What works today (milestone M1):
-- First-run setup, email and password sign-in, invitations by link.
+What works today (milestone M2):
+- First-run setup, email and password sign-in, single sign-on with OpenID Connect, invitations by link.
 - Projects and tasks: a keyboard-first task list (J/K, C to create, Esc), a task pane and a task page, with
-  status, priority, assignee, a Markdown description and an activity log.
+  status, priority, assignee and a Markdown description.
+- A board per project, one column per status. Move cards by drag and drop or with Shift+H/J/K/L, undo with
+  Ctrl+Z, and split the board into swimlanes by assignee or milestone. V switches between list and board.
+- Milestones with a target date and progress, and numbered cycles. A cycle ends at midnight after its end
+  date, or early by hand, and moves its unfinished tasks to the next one.
+- Comments in the task history, in Markdown, with @mentions of people and agents. The history shows
+  comments and changes in one list.
+- My tasks: everything assigned to you, across projects.
+- Light, dark or system theme, saved to your account.
 - Agents with API keys scoped to some or all projects, read only or read and write, revocable at any time.
 - The `pm` CLI with `--json` output and stable exit codes, over a REST API at `/api/v1` with an OpenAPI
-  document.
+  document. Agents comment, plan with milestones and cycles, and list their own tasks with `--mine`.
 - One Docker image (web, worker, migrations) and a docker compose file. Postgres is the only stateful service.
 
 ## Quickstart
@@ -68,9 +76,19 @@ pnpm e2e                                      # Playwright against the docker co
 ```
 
 `pnpm e2e` builds the CLI and the image, starts the compose stack as project `pm-e2e` on a fresh volume at
-http://localhost:3100, runs the whole person and agent flow, and removes the stack afterwards. It leaves the
-development database alone. `E2E_KEEP_STACK=1` keeps the stack running after the run, `E2E_SKIP_BUILD=1`
-reuses the last image, and `E2E_PORT` changes the port.
+http://localhost:3100 and runs the specs in `e2e/` in file order, then removes the stack. It leaves the
+development database alone.
+- `person-and-agent.spec.ts`: the M1 flow on a new server, from setup to an agent working through the CLI.
+  It runs first because it sets the server up.
+- `upgrade.spec.ts`: starts a second stack (`pm-e2e-upgrade`, port 3101) on release 0.1.1, adds data, then
+  switches it to the new image and checks the migrations and the board. The 0.1.1 image comes from
+  `E2E_M1_IMAGE` (pulled when missing), or is built once from the git tag `0.1.1` as
+  `project-management:m1-0.1.1`, which takes a few minutes the first time.
+- `work-views.spec.ts`: the board, milestones, cycles, comments with mentions from the web and the CLI,
+  My tasks and the theme. It also runs alone: `pnpm e2e e2e/work-views.spec.ts`.
+
+`E2E_KEEP_STACK=1` keeps the stacks running after the run, `E2E_SKIP_BUILD=1` reuses the last image,
+`E2E_PORT` and `E2E_UPGRADE_PORT` change the ports, and `E2E_SKIP_UPGRADE=1` skips the upgrade test.
 
 ## License
 
