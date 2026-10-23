@@ -9,11 +9,13 @@ import {
   CreateMilestoneInput,
   CreateProjectInput,
   CreateTaskInput,
+  DEFAULT_DASHBOARD_SCOPE,
   DEFAULT_TASK_LIST_LIMIT,
   DeleteCommentInput,
   DeleteMilestoneInput,
   EndCycleInput,
   GetCycleInput,
+  GetDashboardInput,
   GetMilestoneInput,
   GetTaskInput,
   ListCommentsInput,
@@ -107,6 +109,22 @@ describe('UpdateProjectInput', () => {
     });
     expect(UpdateProjectInput.parse({ project: 'PAY', usesMilestones: true }).usesMilestones).toBe(true);
     expect(UpdateProjectInput.safeParse({ project: 'PAY', usesCycles: 'no' }).success).toBe(false);
+  });
+});
+
+describe('GetDashboardInput', () => {
+  it('defaults to mine, also when the query string is empty or missing', () => {
+    expect(DEFAULT_DASHBOARD_SCOPE).toBe('mine');
+    expect(GetDashboardInput.parse({})).toEqual({ scope: 'mine' });
+    expect(GetDashboardInput.parse(undefined)).toEqual({ scope: 'mine' });
+  });
+
+  it.each(['mine', 'everyone'] as const)('accepts scope %s', (scope) => {
+    expect(GetDashboardInput.parse({ scope })).toEqual({ scope });
+  });
+
+  it.each(['team', 'Mine', '', 'all', ['mine']])('rejects scope %j', (scope) => {
+    expect(GetDashboardInput.safeParse({ scope }).success).toBe(false);
   });
 });
 

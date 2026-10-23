@@ -535,6 +535,202 @@ export const Me = z.object({
 export type Me = z.output<typeof Me>;
 
 // ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+export const DASHBOARD_SCOPES = ['mine', 'everyone'] as const;
+/**
+ * mine: tasks assigned to the caller or to the agents they are responsible for, and mentions of
+ * the caller. everyone: every task and mention in the projects the caller can read.
+ */
+export const DashboardScope = z.enum(DASHBOARD_SCOPES);
+export type DashboardScope = z.infer<typeof DashboardScope>;
+
+/** Most items a queue group returns. `total` still counts every item. */
+export const DASHBOARD_GROUP_ITEM_LIMIT = 50;
+
+const count = z.number().int().nonnegative();
+
+/** A project as named inside dashboard rows. */
+export const DashboardProjectRef = ProjectRef.pick({ key: true, name: true });
+export type DashboardProjectRef = z.output<typeof DashboardProjectRef>;
+
+/** A task as shown in a dashboard row. */
+export const DashboardTask = Task.pick({ key: true, title: true, status: true, priority: true }).extend({
+  project: DashboardProjectRef,
+});
+export type DashboardTask = z.output<typeof DashboardTask>;
+
+/** Done over total, as the source screen shows it. */
+export const DashboardProgress = z.object({
+  done: count,
+  total: count,
+});
+export type DashboardProgress = z.output<typeof DashboardProgress>;
+
+/** A task in review, waiting for someone to look at it. */
+export const ReviewItem = z.object({
+  task: DashboardTask,
+  assignee: AssigneeRef.nullable(),
+  /** When the task last entered In review; its updatedAt when no activity records it. */
+  since: Timestamp,
+});
+export type ReviewItem = z.output<typeof ReviewItem>;
+
+/** The newest unanswered comment that mentions a member on an open task. */
+export const MentionItem = z.object({
+  task: DashboardTask,
+  comment: z.object({
+    id: CommentId,
+    /** Plain text, at most 200 characters plus an ellipsis. Inline code keeps its backticks. */
+    excerpt: z.string(),
+    createdAt: Timestamp,
+  }),
+  author: UserRef,
+  /** The agent's responsible human when an agent wrote the comment; null for people. */
+  onBehalfOf: UserRef.nullable(),
+  /** Who has to answer. */
+  mentioned: AssigneeRef,
+});
+export type MentionItem = z.output<typeof MentionItem>;
+
+/** An in-progress task without an update or comment for longer than its threshold. */
+export const StalledItem = z.object({
+  task: DashboardTask,
+  assignee: AssigneeRef.nullable(),
+  /** Later of the task's updatedAt and its newest comment. */
+  lastTouchedAt: Timestamp,
+  /** 24 when an agent holds the task, 120 otherwise. */
+  thresholdHours: z.number().int().positive(),
+});
+export type StalledItem = z.output<typeof StalledItem>;
+
+/**
+ * A milestone past its target date, or a current cycle ending within 2 days, that still has open
+ * tasks. Milestone progress leaves canceled tasks out of total, like the milestones screen; cycle
+ * progress counts every task in the cycle, like the cycles screen.
+ */
+export const DeadlineItem = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('milestone'),
+    project: DashboardProjectRef,
+    milestone: MilestoneRef.pick({ id: true, name: true }).extend({ targetDate: CalendarDate }),
+    /** Days since the target date in APP_TIME_ZONE: 1 the day after it. */
+    daysOverdue: z.number().int().positive(),
+    openTasks: count,
+    progress: DashboardProgress,
+  }),
+  z.object({
+    kind: z.literal('cycle'),
+    project: DashboardProjectRef,
+    cycle: CycleRef.pick({ number: true, name: true, startsOn: true, endsOn: true }),
+    /** Days left including today: 1 on the last day. */
+    daysLeft: z.number().int().positive(),
+    openTasks: count,
+    progress: DashboardProgress,
+  }),
+]);
+export type DeadlineItem = z.output<typeof DeadlineItem>;
+
+/** One queue group: the uncapped count and the first DASHBOARD_GROUP_ITEM_LIMIT items. */
+export function dashboardGroup<T extends z.ZodType>(item: T) {
+  return z
+    .object({
+      total: count,
+      items: z.array(item).max(DASHBOARD_GROUP_ITEM_LIMIT),
+    })
+    .refine((group) => group.total >= group.items.length, {
+      message: 'total counts every item, so it cannot be below the number of items',
+      path: ['total'],
+    });
+}
+export type DashboardGroup<T> = { total: number; items: T[] };
+
+export const ReviewGroup = dashboardGroup(ReviewItem);
+export const MentionGroup = dashboardGroup(MentionItem);
+export const StalledGroup = dashboardGroup(StalledItem);
+export const DeadlineGroup = dashboardGroup(DeadlineItem);
+
+/** One row of the dashboard's project list. It ignores the scope switch. */
+export const DashboardProject = z.object({
+  key: ProjectKey,
+  name: z.string(),
+  openCounts: OpenStatusCounts,
+  /** Sum of openCounts. */
+  openCount: count,
+  usesMilestones: z.boolean(),
+  usesCycles: z.boolean(),
+  /** Same rule as on the projects screen. Sorts the rows, newest first. */
+  lastActivityAt: Timestamp,
+  /** Null when the project has no current cycle or does not use cycles. total counts every task in the cycle. */
+  currentCycle: CurrentCycle.pick({ number: true, name: true, endsOn: true, daysLeft: true })
+    .extend({ done: count, total: count })
+    .nullable(),
+  /**
+   * The milestone that is not Completed with the earliest target date (undated ones last). Null
+   * when there is none or the project does not use milestones. total leaves canceled tasks out.
+   */
+  nextMilestone: MilestoneRef.pick({ id: true, name: true, targetDate: true })
+    .extend({
+      /** Target date before today. */
+      overdue: z.boolean(),
+      done: count,
+      total: count,
+      /** Other milestones that are not Completed. */
+      others: count,
+    })
+    .nullable(),
+});
+export type DashboardProject = z.output<typeof DashboardProject>;
+
+/** One agent in the agents strip. */
+export const DashboardAgent = z.object({
+  agent: AssigneeRef,
+  /** Its in-progress task with the oldest last touch; null when idle. */
+  currentTask: DashboardTask.nullable(),
+  /** In-progress tasks, currentTask included. */
+  inProgressCount: count,
+  /** currentTask has had no update or comment for 24 hours. */
+  stalled: z.boolean(),
+  /** Newest activity row or comment by the agent in projects in scope; null when none. */
+  lastActivityAt: Timestamp.nullable(),
+});
+export type DashboardAgent = z.output<typeof DashboardAgent>;
+
+/** GET /dashboard: the action queue, the project rows and the agents for one scope. */
+export const Dashboard = z.object({
+  scope: DashboardScope,
+  generatedAt: Timestamp,
+  groups: z.object({
+    review: ReviewGroup,
+    mentions: MentionGroup,
+    stalled: StalledGroup,
+    deadlines: DeadlineGroup,
+  }),
+  /** Every project in scope, most recently active first. */
+  projects: z.array(DashboardProject),
+  /** Stalled first, then by name. */
+  agents: z.array(DashboardAgent),
+});
+export type Dashboard = z.output<typeof Dashboard>;
+
+/** GET /dashboard/counts: the Mine queue totals, for the rail. */
+export const DashboardCounts = z
+  .object({
+    review: count,
+    mentions: count,
+    stalled: count,
+    deadlines: count,
+    /** Sum of the four groups. */
+    total: count,
+  })
+  .refine((c) => c.total === c.review + c.mentions + c.stalled + c.deadlines, {
+    message: 'total is the sum of the four groups',
+    path: ['total'],
+  });
+export type DashboardCounts = z.output<typeof DashboardCounts>;
+
+// ---------------------------------------------------------------------------
 // List wrappers
 // ---------------------------------------------------------------------------
 
