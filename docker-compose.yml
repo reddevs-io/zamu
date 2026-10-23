@@ -20,6 +20,16 @@ x-app: &app
     BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env (openssl rand -base64 32)}
     BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
     PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+    # Single sign-on (OIDC); empty values mean unset. See docs/self-hosting.md.
+    OIDC_ISSUER: ${OIDC_ISSUER:-}
+    OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+    OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+    OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-}
+    OIDC_SCOPES: ${OIDC_SCOPES:-}
+    OIDC_SIGNUP: ${OIDC_SIGNUP:-}
+    OIDC_ADMIN_GROUPS: ${OIDC_ADMIN_GROUPS:-}
+    OIDC_GROUPS_CLAIM: ${OIDC_GROUPS_CLAIM:-}
+    PASSWORD_LOGIN: ${PASSWORD_LOGIN:-}
 
 services:
   db:

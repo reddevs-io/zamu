@@ -5,6 +5,9 @@
 import { type Auth, createAuth } from '@pm/auth';
 import type { CoreContext } from '@pm/core';
 import { createDb, type Db, type DbHandle } from '@pm/db';
+import { readServerConfig, type ServerEnv } from './config';
+
+export type { ServerEnv } from './config';
 
 export interface ServerContext extends CoreContext {
   db: Db;
@@ -12,28 +15,18 @@ export interface ServerContext extends CoreContext {
   pool: DbHandle['pool'];
 }
 
-export interface ServerEnv {
-  DATABASE_URL?: string;
-  BETTER_AUTH_SECRET?: string;
-  BETTER_AUTH_URL?: string;
-  PUBLIC_URL?: string;
-}
-
-function required(env: ServerEnv, name: keyof ServerEnv): string {
-  const value = env[name];
-  if (!value) throw new Error(`${name} is not set`);
-  return value;
-}
-
-/** Builds the services from environment variables. Call once per process; see getServerContext. */
+/**
+ * Builds the services from environment variables. Call once per process; see getServerContext.
+ * Throws ServerConfigError when the configuration is invalid (see config.ts).
+ */
 export function createServerContext(env: ServerEnv = process.env): ServerContext {
-  const { db, pool } = createDb(required(env, 'DATABASE_URL'));
+  const config = readServerConfig(env);
+  const { db, pool } = createDb(config.databaseUrl);
   // Without a listener, an idle connection that breaks (Postgres restart) crashes the server.
   pool.on('error', (error) => console.error('server: idle database connection failed:', error.message));
-  const baseUrl = required(env, 'BETTER_AUTH_URL');
-  const auth = createAuth({ db, secret: required(env, 'BETTER_AUTH_SECRET'), baseUrl });
+  const auth = createAuth({ db, secret: config.secret, baseUrl: config.baseUrl, config: config.auth });
   // PUBLIC_URL builds invitation links; it matches BETTER_AUTH_URL unless a proxy says otherwise.
-  return { db, auth, pool, publicUrl: env.PUBLIC_URL || baseUrl };
+  return { db, auth, pool, publicUrl: config.publicUrl };
 }
 
 const globalKey = Symbol.for('pm.web.serverContext');

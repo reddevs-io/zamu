@@ -2,9 +2,12 @@ import {
   AcceptInvitationError,
   type Auth,
   acceptInvitationWithSignUp,
+  authConfigOf,
   BootstrapError,
   bootstrapAdmin,
-  isFirstRun,
+  bootstrapWorkspace,
+  type SetupState,
+  setupState,
 } from '@pm/auth';
 import type { Db } from '@pm/db';
 import { redirect } from '@tanstack/react-router';
@@ -12,7 +15,8 @@ import { createServerFn, createServerOnlyFn } from '@tanstack/react-start';
 import { appendResponseHeader, getRequestHeaders } from '@tanstack/react-start/server';
 import { type AuthPage, type AuthState, authRedirect } from '../routes/(auth)/-auth/guards';
 import { loadInstanceName, loadInvitation } from '../routes/(auth)/-auth/queries';
-import { AcceptInvitationInput, SetupInput } from '../routes/(auth)/-auth/validation';
+import type { SignInOptions } from '../routes/(auth)/-auth/sso';
+import { AcceptInvitationInput, SetupInput, WorkspaceFields } from '../routes/(auth)/-auth/validation';
 import { getServerContext } from '../server/context';
 
 // Session helpers for route `beforeLoad` and the signed-out screens.
@@ -57,19 +61,41 @@ async function readSession(): Promise<SessionInfo | null> {
 /** The current session, or null when signed out. */
 export const getSession = createServerFn({ method: 'GET' }).handler(() => readSession());
 
-/** First-run flag and session in one round trip, for the guards. */
+/**
+ * Setup state and session in one round trip, for the guards. `firstRun` stays true until the workspace
+ * exists: after setup via SSO, the admin is signed in but still has to name the workspace.
+ */
 const getAuthState = createServerFn({ method: 'GET' }).handler(async () => {
   const { db } = getAuthContext();
-  const firstRun = await isFirstRun(db);
-  return { firstRun, session: firstRun ? null : await readSession() };
+  const setup = await setupState(db);
+  return { firstRun: setup !== 'done', session: setup === 'account' ? null : await readSession() };
 });
 
-const checkFirstRun = createServerFn({ method: 'GET' }).handler(async () => {
-  const { db } = getAuthContext();
-  return isFirstRun(db);
-});
+const checkFirstRun = createServerFn({ method: 'GET' }).handler(
+  async () => (await setupState(getAuthContext().db)) !== 'done',
+);
 
-// Once an instance has a user it never goes back to first run, so the browser stops asking.
+function signInOptions(auth: Auth): SignInOptions {
+  const { sso, passwordLogin } = authConfigOf(auth);
+  return { sso: sso ? { providerName: sso.providerName } : null, passwordLogin };
+}
+
+/** Whether "Continue with {provider}" and the password form are shown. Safe to send to the browser. */
+export const getSignInOptions = createServerFn({ method: 'GET' }).handler(() =>
+  signInOptions(getAuthContext().auth),
+);
+
+/** What /setup shows: step 1 (account) or, after setup via SSO, step 2 (workspace). */
+export const getSetupScreen = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<{ state: SetupState; signedIn: boolean; options: SignInOptions }> => {
+    const { auth, db } = getAuthContext();
+    const state = await setupState(db);
+    const signedIn = state === 'workspace' && (await readSession()) !== null;
+    return { state, signedIn, options: signInOptions(auth) };
+  },
+);
+
+// Once an instance has a workspace it never goes back to first run, so the browser stops asking.
 let setUpSeen = false;
 
 interface GuardLocation {
@@ -113,7 +139,7 @@ export async function requireSession({ location }: { location: GuardLocation }):
 }
 
 /**
- * For the root route's `beforeLoad`: sends every page to /setup while the instance has no user.
+ * For the root route's `beforeLoad`: sends every page to /setup until the instance has a workspace.
  * After the first check that finds a user, browser navigations skip the server call.
  */
 export async function requireSetUp({ location }: { location: GuardLocation }): Promise<void> {
@@ -138,7 +164,11 @@ export const getInvitation = createServerFn({ method: 'GET' })
 
 export type SetupResult =
   | { ok: true }
-  | { ok: false; code: 'ALREADY_SET_UP' | 'INVALID_INPUT'; message: string };
+  | {
+      ok: false;
+      code: 'ALREADY_SET_UP' | 'INVALID_INPUT' | 'PASSWORD_LOGIN_DISABLED' | 'NOT_SETUP_ADMIN';
+      message: string;
+    };
 
 /**
  * First-run setup: creates the admin, the workspace and the owner membership (bootstrapAdmin).
@@ -156,14 +186,45 @@ export const setupInstance = createServerFn({ method: 'POST' })
     }
   });
 
+/**
+ * Setup step 2 after SSO: the signed-in admin names the workspace and becomes its owner
+ * (bootstrapWorkspace). Refused once a workspace exists, or for anyone but the first person.
+ */
+export const completeSetup = createServerFn({ method: 'POST' })
+  .validator(WorkspaceFields)
+  .handler(async ({ data }): Promise<SetupResult> => {
+    const session = await readSession();
+    if (!session) {
+      return {
+        ok: false,
+        code: 'NOT_SETUP_ADMIN',
+        message: 'Your session has ended. Continue with SSO again.',
+      };
+    }
+    try {
+      await bootstrapWorkspace(getAuthContext(), {
+        userId: session.user.id,
+        workspaceName: data.workspaceName,
+      });
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof BootstrapError) return { ok: false, code: error.code, message: error.message };
+      throw error;
+    }
+  });
+
 export type AcceptInvitationResult =
   | { ok: true }
-  | { ok: false; code: 'INVITATION_NOT_USABLE' | 'ACCOUNT_EXISTS' | 'INVALID_INPUT'; message: string };
+  | {
+      ok: false;
+      code: 'INVITATION_NOT_USABLE' | 'ACCOUNT_EXISTS' | 'INVALID_INPUT' | 'PASSWORD_LOGIN_DISABLED';
+      message: string;
+    };
 
 /**
  * Invitation accept: creates the account for the invitation's email (never one sent by the browser),
  * signs the person in through the session cookie on this response, and joins the workspace.
- * Public HTTP sign-up is closed; this is the only way in besides first-run setup.
+ * Public HTTP sign-up is closed; besides this, people join through first-run setup and SSO (see @pm/auth sso.ts).
  */
 export const acceptInvitation = createServerFn({ method: 'POST' })
   .validator(AcceptInvitationInput)

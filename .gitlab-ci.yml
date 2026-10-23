@@ -1,14 +1,17 @@
-# GitLab CI for project-management. Runs on merge requests and on the default branch.
+# GitLab CI for project-management. Runs on merge requests, on the default branch and on release tags.
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
 
 stages:
   - install
   - check
   - test
   - build
+  - release
+  - deploy
 
 # Node jobs share a pnpm store cached per lockfile. The install job fills it; the others only read it and
 # install offline-first, which takes seconds once the store is warm.
@@ -142,3 +145,70 @@ e2e:
       - test-results/
     reports:
       junit: test-results/junit.xml
+
+# Releases: an X.Y.Z tag (no pre-release suffix) builds the image, pushes it to this project's registry and
+# bumps the image tag for pm.example.com in gitops (apps/project-management/cluster-production.yaml);
+# ArgoCD (ApplicationSet apps-cluster-production) rolls it out. Same flow as conference-search.
+.production:
+  environment:
+    name: production
+    url: https://pm.example.com
+    deployment_tier: production
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+$/'
+
+release-image:
+  extends: .production
+  stage: release
+  needs: [lint, typecheck, test, e2e]
+  image: docker:29-cli
+  services:
+    # Plain-TCP dind with the "docker" alias, as for docker-build (Kubernetes runner).
+    - name: docker:29-dind
+      alias: docker
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    - |
+      for attempt in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
+      docker info >/dev/null
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - docker build --tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" --tag "$CI_REGISTRY_IMAGE:latest" .
+    - docker push --all-tags "$CI_REGISTRY_IMAGE"
+
+# GITOPS_TOKEN (masked) is a reddevsdotio group variable: a gitops token allowed to push
+# to main. The worker and the migrate initJob inherit .image, so one tag covers all three roles.
+deploy-production:
+  extends: .production
+  stage: deploy
+  needs: [release-image]
+  image: alpine/k8s:1.35.0 # ships git and yq
+  variables:
+    GIT_STRATEGY: none # only touches the gitops repo
+    GITOPS_REPO: gitlab.com/example/gitops.git
+    VALUES_FILE: apps/project-management/cluster-production.yaml
+  script:
+    - export IMAGE_TAG="$CI_COMMIT_TAG"
+    - git config --global user.name "project-management-ci"
+    - git config --global user.email "ci@reddevs.io"
+    - git clone "https://oauth2:${GITOPS_TOKEN}@${GITOPS_REPO}" gitops
+    - cd gitops
+    - yq -i '.image.tag = strenv(IMAGE_TAG)' "$VALUES_FILE"
+    - |
+      if git diff --quiet; then
+        echo "image tag ${IMAGE_TAG} already deployed, nothing to do"
+        exit 0
+      fi
+    - 'git commit -am "project-management: ${IMAGE_TAG}"'
+    - |
+      # Push to main, rebasing over concurrent deploy commits.
+      for i in 1 2 3; do
+        git push origin HEAD:main && exit 0
+        git pull --rebase origin main || exit 1
+      done
+      echo "could not push after 3 attempts"
+      exit 1
