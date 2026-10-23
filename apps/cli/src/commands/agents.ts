@@ -42,8 +42,13 @@ export function agentsBlock(project: string | null): string {
     `- Add a follow-up: \`pm tasks create "Title"${projectFlag} --description -\``,
     `- Milestones and cycles: \`pm milestones list${projectFlag}\`, \`pm cycles current${projectFlag}\``,
     '',
+    'In a project mirrored from Backlog.md, Backlog.md ids work as task keys, and the task files own title,',
+    'description, status, priority, assignee and milestone: change those in the files (or with `backlog task edit`)',
+    `and push, then \`pm backlog refresh${projectFlag} --wait\`. Comments and cycles still change through pm.`,
+    '',
     'Add `--json` to any command for versioned output (`pm.v1.*`). Exit codes: 0 ok, 1 usage or',
-    'rejected input, 2 not logged in or key refused, 3 not found, 4 outside the key scope or read-only, 5 server.',
+    'rejected input, 2 not logged in or key refused, 3 not found, 4 outside the key scope or read-only, 5 server,',
+    '6 the change belongs in Backlog.md, or the mirror is paused or detached.',
     AGENTS_BLOCK_END,
   ].join('\n');
 }

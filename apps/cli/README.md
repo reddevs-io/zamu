@@ -65,7 +65,7 @@ it, pm uses the first of:
 3. The project linked to this clone's git remote (`origin`, or the only remote). A project links to
    one repository; HTTPS and SSH URLs of the same repository match.
 
-Link once from a clone, or set Repository in the project's Edit project dialog on the web:
+Link once from a clone, or set Repository in the project's settings (General) on the web:
 
 ```sh
 pm link --project PAY          # link PAY to this clone's remote
@@ -131,9 +131,15 @@ pm cycles create --project PAY                  # the day after the last cycle, 
 pm cycles current --project PAY
 pm cycles end --project PAY                     # the current cycle
 pm cycles end 12 --project PAY --move-to none
+
+pm backlog status --project PAY                 # where the mirror reads from, last read, counts
+pm backlog status --problems                    # every file skipped or read with a warning, unmapped values
+pm backlog refresh                              # queue a read of the default branch now
+pm backlog refresh --wait                       # wait for it (up to 5 minutes) and report how it went
 ```
 
-- Project and task keys are case-insensitive (`pay-142` works).
+- Project and task keys are case-insensitive (`pay-142` works). Subtasks mirrored from Backlog.md have
+  suffixed keys (`PAY-786.1`, `PAY-786.1.2`).
 - Statuses: `backlog`, `todo`, `in_progress`, `in_review`, `done`, `canceled`. `in-progress` and
   `"In progress"` are accepted too.
 - Priorities: `none`, `low`, `medium`, `high`, `urgent`.
@@ -169,6 +175,37 @@ pm cycles end 12 --project PAY --move-to none
   as "Comment deleted by ...".
 - `pm tasks show` prints the task's history: activity as one line each, comments as indented blocks
   with their author, "for" the agent's human, the time and the comment id.
+
+### Backlog.md mirrors
+
+A project can mirror a Backlog.md folder from its repository (set up in the project's settings on the
+web). Its tasks keep their Backlog.md numbers: `BACK-786.1` becomes `PAY-786.1`.
+- Every command that takes a task key also takes the Backlog.md id: `pm tasks show BACK-786.1`. An app
+  key wins over an id with the same text. Ids like `TASK-12` can repeat across projects: pm looks the
+  id up in `--project`, `PM_PROJECT` or `.pm.json` when one is set, and in the project linked to the
+  clone's remote when the id alone is not enough.
+- Backlog.md owns title, description, status, priority, assignee and milestone of a mirrored task, and
+  every milestone of the project. Changing one fails with exit code 6 and says where to change it:
+
+  ```
+  $ pm tasks update PAY-786 --status done
+  error: PAY-786 is mirrored from Backlog.md, so its status can't change here (task_mirrored).
+    file:  backlog/tasks/back-786 - Retry-failed-webhook-deliveries-with-exponential-backoff.md (main)
+    edit the file and push, or run: backlog task edit 786 -s Done
+    still allowed here: comments (pm comments add PAY-786) and cycles (pm tasks update PAY-786 --cycle 4)
+  ```
+
+  New tasks and milestones of a mirrored project are added in Backlog.md too (`project_mirrored`,
+  `milestone_mirrored`). With `--json` the error is the problem as the server sent it, with `field`,
+  `file`, `backlogId` and `hint`.
+- `pm tasks show` adds the Backlog.md id and file, the locked fields, and "Hidden" for a task whose file
+  is gone from the default branch. Changes a refresh made show as "Backlog.md" with the commit.
+- `pm backlog refresh` needs an owner, an admin, or an agent whose key can write the project. It fails
+  with exit code 6 when the mirror is paused (`BACKLOG_PAUSED`: the connection is missing, rejected or
+  unreachable) or detached (`BACKLOG_DETACHED`). `--wait` checks the status every 2 seconds until the
+  read ends, up to 5 minutes; it exits 0 whatever the read found, so check `state` in the JSON
+  (`healthy`, `warnings`, `failed`, `paused`). `outcome` is `queued` without `--wait`, `finished`, or
+  `timeout` when no read ended in time (is the worker running?).
 
 Human output is a compact table with task keys first. Agents show as "claude-dev for Ana Ruiz": the agent
 and the person responsible for it. Colour is used only when stdout is a terminal.
@@ -207,6 +244,8 @@ Every command takes `--json` and prints one versioned result:
 | `pm cycles end`        | `pm.v1.cycles.end`        |
 | `pm link`              | `pm.v1.link`              |
 | `pm agents`            | `pm.v1.agents`            |
+| `pm backlog status`    | `pm.v1.backlog.status`    |
+| `pm backlog refresh`   | `pm.v1.backlog.refresh`   |
 | any failure            | `pm.v1.error`             |
 
 The data schemas live in `@pm/contracts` (`cliDataSchemas`, `parseCliOutput`). Within `v1`, fields are
@@ -214,7 +253,11 @@ only ever added; removing or changing a field needs `pm.v2`. JSON is printed on 
 indented at a terminal.
 
 With `--json`, failures print `pm.v1.error` on stdout: an RFC 9457 problem with `code`, `status`,
-`detail`, and `requestId` and `issues` when the server sent them. The exit code is still non-zero.
+`detail`, and `requestId` and `issues` when the server sent them (`field`, `file`, `backlogId` and `hint`
+for the Backlog.md mirror errors). The exit code is still non-zero.
+
+`pm.v1.backlog.status` holds the first 50 problems unless you pass `--problems`, which reads them all.
+`pm.v1.backlog.refresh` is the refresh request plus `outcome` and, with `--wait`, the final `status`.
 
 `pm.v1.tasks.show` keeps `activity` for v1 readers and adds `timeline`: activity and comments in one
 list, oldest first, told apart by `kind` (`activity` or `comment`).
@@ -229,6 +272,7 @@ list, oldest first, told apart by `kind` (`activity` or `comment`).
 | 3    | Not found (404)                                                                             |
 | 4    | Forbidden: the key's scope or access does not allow it (403)                                |
 | 5    | Server: unreachable, 5xx, or a response this version does not understand                    |
+| 6    | Backlog.md: the change belongs in Backlog.md, or the mirror is paused or detached (409)     |
 
 ## Development
 

@@ -1201,7 +1201,9 @@ describe('output conventions', () => {
   it('prints help and version with exit 0, unknown commands with exit 1', async () => {
     const help = await pm(['--help']);
     expect(help.code).toBe(0);
-    expect(help.stdout).toContain('Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.');
+    expect(help.stdout).toContain(
+      'Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog.md conflict.',
+    );
     const version = await pm(['--version']);
     expect(version.code).toBe(0);
     expect(version.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);

@@ -84,8 +84,10 @@ export async function createMilestone(
   nameWords: string[],
   options: CreateMilestoneOptions,
 ): Promise<void> {
+  const project = await requireProject(context, options.project);
+  context.target = { ...context.target, project };
   const input = parseInput(CreateMilestoneInput, {
-    project: await requireProject(context, options.project),
+    project,
     name: nameWords.join(' '),
     ...(options.target !== undefined ? { targetDate: isNone(options.target) ? null : options.target } : {}),
     ...(options.description !== undefined
@@ -131,6 +133,7 @@ export async function updateMilestone(
   const project = MilestoneId.safeParse(idOrName.trim()).success
     ? options.project
     : (await resolveProject(context, options.project))?.key;
+  if (project) context.target = { ...context.target, project };
   const id = await resolveMilestone(client, project, idOrName, 'Milestone');
   const input = parseInput(UpdateMilestoneInput, { id, ...changes });
   const milestone = await client.milestones.update(input);

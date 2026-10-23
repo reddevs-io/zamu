@@ -86,7 +86,9 @@ async function linkRemote(context: CommandContext, options: LinkOptions): Promis
     throw usageError(
       inRepo ? 'This clone has no git remote to link.' : 'This folder is not inside a git repository.',
       undefined,
-      ['Run pm link in a clone with an origin remote, or set the repository in Edit project on the web.'],
+      [
+        "Run pm link in a clone with an origin remote, or set the repository in the project's settings on the web.",
+      ],
     );
   }
   const repository = parseRepositoryUrl(remote.url);

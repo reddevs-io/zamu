@@ -1,9 +1,18 @@
 // Every failure the CLI reports becomes a CliError: a Problem (printed as pm.v1.error with --json)
 // plus the process exit code. Scripts and agents branch on the exit code, so it is part of the
 // stable interface:
-//   0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.
+//   0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog.md conflict.
 import { ORPCError } from '@orpc/client';
-import { type Problem, type ProblemCode, type ProblemIssue, problem, toProblemIssues } from '@pm/contracts';
+import {
+  isMirroredProblemCode,
+  type MirroredProblemExtensions,
+  PROBLEM_CODES,
+  type Problem,
+  type ProblemCode,
+  type ProblemIssue,
+  problem,
+  toProblemIssues,
+} from '@pm/contracts';
 import { ZodError } from 'zod';
 
 export const EXIT = {
@@ -13,6 +22,12 @@ export const EXIT = {
   notFound: 3,
   forbidden: 4,
   server: 5,
+  /**
+   * M3: the write conflicts with a Backlog.md mirror (TASK_MIRRORED, MILESTONE_MIRRORED,
+   * PROJECT_MIRRORED, PROJECT_NOT_EMPTY) or the mirror cannot refresh (BACKLOG_PAUSED,
+   * BACKLOG_DETACHED). Other 409s (CONFLICT, TASK_CHANGED) keep exit code 1, as in v1.
+   */
+  conflict: 6,
 } as const;
 
 export type ExitCode = (typeof EXIT)[keyof typeof EXIT];
@@ -22,6 +37,11 @@ export class CliError extends Error {
   readonly exitCode: ExitCode;
   /** Extra lines printed under the message in human output (hints, issue lists). */
   readonly hints: string[];
+  /**
+   * The whole human rendering, when the error has its own layout (the Backlog.md mirror errors).
+   * Replaces `pm: <message>` and the hints.
+   */
+  lines?: string[];
 
   constructor(problemBody: Problem, exitCode: ExitCode, hints: string[] = [], message?: string) {
     super(message ?? problemBody.detail ?? problemBody.title);
@@ -70,16 +90,70 @@ export function inputError(error: ZodError, detail = 'Invalid arguments'): CliEr
   );
 }
 
-const PROBLEM_CODE_SET = new Set<string>([
-  'BAD_REQUEST',
-  'UNAUTHORIZED',
-  'FORBIDDEN',
-  'NOT_FOUND',
-  'CONFLICT',
-  'TASK_CHANGED',
-  'UNPROCESSABLE_CONTENT',
-  'INTERNAL_SERVER_ERROR',
+const PROBLEM_CODE_SET = new Set<string>(PROBLEM_CODES);
+
+/** Problem codes that exit with EXIT.conflict. */
+const BACKLOG_CONFLICT_CODES = new Set<string>([
+  'TASK_MIRRORED',
+  'MILESTONE_MIRRORED',
+  'PROJECT_MIRRORED',
+  'PROJECT_NOT_EMPTY',
+  'BACKLOG_PAUSED',
+  'BACKLOG_DETACHED',
 ] satisfies ProblemCode[]);
+
+/** The mirrored-problem extensions in error data that are strings. */
+function mirroredExtensions(data: Record<string, unknown> | undefined): MirroredProblemExtensions {
+  const out: MirroredProblemExtensions = {};
+  for (const name of ['field', 'file', 'backlogId', 'hint'] as const) {
+    const value = data?.[name];
+    if (typeof value === 'string') out[name] = value;
+  }
+  return out;
+}
+
+export interface MirroredContext {
+  /** The task's app key (PAY-786), for the "still allowed here" commands. */
+  taskKey?: string;
+  /** The default branch the file lives on. */
+  branch?: string | null;
+  /** Whether the project uses cycles (default true) and the cycle to suggest. */
+  usesCycles?: boolean;
+  cycle?: number | null;
+}
+
+/**
+ * Human text of a *_MIRRORED problem, built from its fields:
+ *
+ *   error: PAY-786 is mirrored from Backlog.md, so its status can't change here (task_mirrored).
+ *     file:  backlog/tasks/back-786 - Retry-failed-webhook-deliveries.md (main)
+ *     edit the file and push, or run: backlog task edit 786 -s Done
+ *     still allowed here: comments (pm comments add PAY-786) and cycles (pm tasks update PAY-786 --cycle 4)
+ *
+ * The file line needs `file`; the hint line reads "edit the file and push, or run:" when the hint
+ * is a Backlog.md command and there is a file, "run:" without a file, and the hint as written when
+ * it is a sentence. The last line is for TASK_MIRRORED with a known task key.
+ */
+export function mirroredLines(body: Problem, context: MirroredContext = {}): string[] {
+  const detail = (body.detail ?? body.title).trim().replace(/\.$/, '');
+  const lines = [`error: ${detail} (${body.code.toLowerCase()}).`];
+  if (body.file) lines.push(`  file:  ${body.file}${context.branch ? ` (${context.branch})` : ''}`);
+  if (body.hint) {
+    const command = /^backlog\s/.test(body.hint);
+    if (!command) lines.push(`  ${body.hint}`);
+    else if (body.file) lines.push(`  edit the file and push, or run: ${body.hint}`);
+    else lines.push(`  run: ${body.hint}`);
+  }
+  if (body.code === 'TASK_MIRRORED' && context.taskKey) {
+    const key = context.taskKey;
+    const allowed = [`comments (pm comments add ${key})`];
+    if (context.usesCycles !== false) {
+      allowed.push(`cycles (pm tasks update ${key} --cycle ${context.cycle ?? '<number>'})`);
+    }
+    lines.push(`  still allowed here: ${allowed.join(' and ')}`);
+  }
+  return lines;
+}
 
 function errorChain(error: unknown): string {
   const parts: string[] = [];
@@ -109,7 +183,9 @@ export function toCliError(error: unknown, url?: string): CliError {
       : status >= 500
         ? 'INTERNAL_SERVER_ERROR'
         : 'BAD_REQUEST';
-    const data = error.data as { requestId?: unknown; issues?: unknown; task?: unknown } | undefined;
+    const data = error.data as
+      | ({ requestId?: unknown; issues?: unknown; task?: unknown } & Record<string, unknown>)
+      | undefined;
     const requestId = typeof data?.requestId === 'string' ? data.requestId : undefined;
     const issues = Array.isArray(data?.issues) ? (data.issues as ProblemIssue[]) : undefined;
     // TASK_CHANGED carries the task as it is now. decodeProblem already validated it.
@@ -119,9 +195,15 @@ export function toCliError(error: unknown, url?: string): CliError {
         ...(requestId ? { requestId } : {}),
         ...(issues?.length ? { issues } : {}),
         ...(task ? { task } : {}),
+        ...mirroredExtensions(data),
       }),
       status: status >= 400 && status <= 599 ? status : 500,
     };
+    if (BACKLOG_CONFLICT_CODES.has(code)) {
+      const failure = new CliError(body, EXIT.conflict, requestId ? [`Request id: ${requestId}`] : []);
+      if (isMirroredProblemCode(code)) failure.lines = mirroredLines(body);
+      return failure;
+    }
     // An issue that only repeats the message (a conflict on one field) adds nothing to it.
     const hints = (issues ?? [])
       .filter((issue) => issue.message !== error.message)

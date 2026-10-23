@@ -4,6 +4,7 @@ import { Command, CommanderError } from 'commander';
 import pkg from '../package.json' with { type: 'json' };
 import { agents } from './commands/agents';
 import { login, logout, whoami } from './commands/auth';
+import { backlogRefresh, backlogStatus } from './commands/backlog';
 import { addComment, deleteComment, editComment, listComments } from './commands/comments';
 import { createCycle, currentCycle, endCycle, listCycles } from './commands/cycles';
 import { link } from './commands/link';
@@ -14,11 +15,15 @@ import { createTask, listTasks, showTask, updateTask } from './commands/tasks';
 import { type CommandContext, createContext, reportError } from './context';
 import { EXIT, toCliError, usageError } from './errors';
 import type { CliIo } from './io';
+import { describeFailure } from './mirrored';
 
 const STATUS_HELP = 'backlog, todo, in_progress, in_review, done, canceled';
 const PRIORITY_HELP = 'none, low, medium, high, urgent';
 const MILESTONE_STATUS_HELP = 'planned, active, completed';
 const PROJECT_HELP = "project key, e.g. PAY (default: PM_PROJECT, .pm.json or this clone's linked project)";
+const TASK_KEY_HELP = 'e.g. PAY-142, a subtask key like PAY-786.1, or a Backlog.md id like BACK-786.1';
+const TASK_PROJECT_HELP =
+  "project to look a Backlog.md id up in (default: PM_PROJECT, .pm.json or this clone's linked project)";
 
 /** True when --json appears before a `--` separator. */
 function wantsJson(argv: readonly string[]): boolean {
@@ -57,7 +62,10 @@ Credentials: pm login stores the server URL and key in $XDG_CONFIG_HOME/pm/confi
 Project: commands that need one take --project, then PM_PROJECT, then the nearest .pm.json, then
 the project linked to this clone's git remote (pm link). pm whoami shows which one applies here.
 
-Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
+Tasks: a task key is PAY-142, or PAY-786.1 for a subtask. In a project mirrored from Backlog.md, its
+Backlog.md id (BACK-786.1) works too, and the fields Backlog.md owns change in the files, not here.
+
+Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog.md conflict.`,
     );
 
   const leaf = (command: Command) => command.option('--json', 'print the versioned JSON result (pm.v1.*)');
@@ -131,8 +139,9 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
     tasks
       .command('show')
       .description('show a task with its history: activity and comments, oldest first')
-      .argument('<TASK-KEY>', 'e.g. PAY-142'),
-  ).action((key: string) => showTask(context, key));
+      .argument('<TASK-KEY>', TASK_KEY_HELP)
+      .option('--project <KEY>', TASK_PROJECT_HELP),
+  ).action((key: string, options) => showTask(context, key, options));
 
   leaf(
     tasks
@@ -151,8 +160,11 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
   leaf(
     tasks
       .command('update')
-      .description('change a task; send only what changes')
-      .argument('<TASK-KEY>', 'e.g. PAY-142')
+      .description(
+        'change a task; send only what changes (mirrored tasks: only --cycle, the rest changes in Backlog.md)',
+      )
+      .argument('<TASK-KEY>', TASK_KEY_HELP)
+      .option('--project <KEY>', TASK_PROJECT_HELP)
       .option('--status <status>', STATUS_HELP)
       .option('--priority <priority>', PRIORITY_HELP)
       .option('--assignee <who>', 'me, or a member name, email or id')
@@ -168,16 +180,18 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
     comments
       .command('list')
       .description('list the comments of a task, oldest first')
-      .argument('<TASK-KEY>', 'e.g. PAY-142'),
-  ).action((key: string) => listComments(context, key));
+      .argument('<TASK-KEY>', TASK_KEY_HELP)
+      .option('--project <KEY>', TASK_PROJECT_HELP),
+  ).action((key: string, options) => listComments(context, key, options));
 
   leaf(
     comments
       .command('add')
       .description('comment on a task; @agent-name and @email mention members')
-      .argument('<TASK-KEY>', 'e.g. PAY-142')
-      .argument('<body>', 'Markdown body (quote it); "-" reads it from stdin'),
-  ).action((key: string, body: string) => addComment(context, key, body));
+      .argument('<TASK-KEY>', TASK_KEY_HELP)
+      .argument('<body>', 'Markdown body (quote it); "-" reads it from stdin')
+      .option('--project <KEY>', TASK_PROJECT_HELP),
+  ).action((key: string, body: string, options) => addComment(context, key, body, options));
 
   leaf(
     comments
@@ -261,6 +275,25 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server.`,
       ),
   ).action((number: string | undefined, options) => endCycle(context, number, options));
 
+  const backlog = program
+    .command('backlog')
+    .description('status and refresh of a project mirrored from Backlog.md');
+  leaf(
+    backlog
+      .command('status')
+      .description('show where the mirror reads from, the last read, counts and problems')
+      .option('--project <KEY>', PROJECT_HELP)
+      .option('--problems', 'list every problem (files skipped or read with a warning, unmapped values)'),
+  ).action((options) => backlogStatus(context, options));
+
+  leaf(
+    backlog
+      .command('refresh')
+      .description('queue a read of the default branch now (owners, admins and agents with write access)')
+      .option('--project <KEY>', PROJECT_HELP)
+      .option('--wait', 'wait until the read ends (up to 5 minutes) and report how it went'),
+  ).action((options) => backlogRefresh(context, options));
+
   return program;
 }
 
@@ -280,6 +313,7 @@ export async function main(argv: readonly string[], io: CliIo): Promise<number> 
       return EXIT.usage;
     }
     const failure = toCliError(error, context.url);
+    await describeFailure(context, failure);
     reportError(context, failure);
     return failure.exitCode;
   }

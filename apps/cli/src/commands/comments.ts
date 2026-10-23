@@ -8,7 +8,7 @@ import {
 } from '@pm/contracts';
 import { type CommandContext, emit } from '../context';
 import { commentAuthor, commentBlock } from '../format';
-import { parseInput, readText } from './shared';
+import { parseInput, readText, taskRef, withTaskRef } from './shared';
 
 /** "Added comment <id> on PAY-142" plus the body as it was stored (mentions resolved). */
 function commentSummary(context: CommandContext, verb: string, comment: Comment): string {
@@ -18,20 +18,36 @@ function commentSummary(context: CommandContext, verb: string, comment: Comment)
   return `${head}\n\n${commentBlock(comment, style)}\n`;
 }
 
-export async function listComments(context: CommandContext, key: string): Promise<void> {
-  const input = parseInput(ListCommentsInput, { key });
+export async function listComments(
+  context: CommandContext,
+  key: string,
+  options: { project?: string } = {},
+): Promise<void> {
+  const ref = await taskRef(context, key, options.project);
+  const input = parseInput(ListCommentsInput, ref);
   const client = await context.client();
-  const comments = await client.comments.list(input);
+  const comments = await withTaskRef(context, ref, (r) =>
+    client.comments.list(parseInput(ListCommentsInput, r)),
+  );
   emit(context, 'comments.list', comments, (data) => {
     if (data.items.length === 0) return `No comments on ${input.key}.\n`;
     return `${data.items.map((comment) => commentBlock(comment, context.style)).join('\n\n')}\n`;
   });
 }
 
-export async function addComment(context: CommandContext, key: string, body: string): Promise<void> {
-  const input = parseInput(CreateCommentInput, { key, body: await readText(context, body) });
+export async function addComment(
+  context: CommandContext,
+  key: string,
+  body: string,
+  options: { project?: string } = {},
+): Promise<void> {
+  const ref = await taskRef(context, key, options.project);
+  const text = await readText(context, body);
+  parseInput(CreateCommentInput, { ...ref, body: text });
   const client = await context.client();
-  const comment = await client.comments.create(input);
+  const comment = await withTaskRef(context, ref, (r) =>
+    client.comments.create(parseInput(CreateCommentInput, { ...r, body: text })),
+  );
   emit(context, 'comments.add', comment, (data) => commentSummary(context, 'Added', data));
 }
 
