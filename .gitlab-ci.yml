@@ -71,6 +71,11 @@ test:
     BETTER_AUTH_SECRET: ci-only-secret-not-used-outside-tests-0123456789
     BETTER_AUTH_URL: http://localhost:3000
     PUBLIC_URL: http://localhost:3000
+  before_script:
+    # The CLI tests create git clones to check how pm finds the project from the remote.
+    - apt-get update -qq
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends git >/dev/null
+    - !reference [.node, before_script]
   script:
     - pnpm test
 
