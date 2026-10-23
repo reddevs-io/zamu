@@ -14,6 +14,13 @@ describe('authRedirect', () => {
     it('lets the setup form through', () => {
       expect(authRedirect('setup', firstRun)).toBeNull();
     });
+
+    it('keeps an admin who signed up through SSO on setup until the workspace exists', () => {
+      const ssoAdmin = { firstRun: true, signedIn: true };
+      expect(authRedirect('setup', ssoAdmin)).toBeNull();
+      expect(authRedirect('app', ssoAdmin, '/projects')).toEqual({ to: '/setup' });
+      expect(authRedirect('guest', ssoAdmin)).toEqual({ to: '/setup' });
+    });
   });
 
   describe('signed out', () => {

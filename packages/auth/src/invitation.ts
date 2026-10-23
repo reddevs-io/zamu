@@ -2,6 +2,7 @@ import { type Db, schema } from '@pm/db';
 import { eq, sql } from 'drizzle-orm';
 import type { Auth } from './auth';
 import { MIN_PASSWORD_LENGTH } from './options';
+import { authConfigOf } from './settings';
 
 /** Better Auth's default maximum password length. */
 const MAX_PASSWORD_LENGTH = 128;
@@ -13,7 +14,9 @@ export type AcceptInvitationErrorCode =
   | 'INVITATION_NOT_USABLE'
   /** A user with the invited email already exists. */
   | 'ACCOUNT_EXISTS'
-  | 'INVALID_INPUT';
+  | 'INVALID_INPUT'
+  /** PASSWORD_LOGIN=disabled: invited people join through SSO instead. */
+  | 'PASSWORD_LOGIN_DISABLED';
 
 export class AcceptInvitationError extends Error {
   constructor(
@@ -83,6 +86,12 @@ export async function acceptInvitationWithSignUp(
   input: AcceptInvitationInput,
   options: { headers?: Headers; now?: Date } = {},
 ): Promise<AcceptInvitationResult> {
+  if (!authConfigOf(auth).passwordLogin) {
+    throw new AcceptInvitationError(
+      'PASSWORD_LOGIN_DISABLED',
+      'Password sign-in is turned off on this server. Join with single sign-on.',
+    );
+  }
   const name = input.name.trim();
   if (!name || name.length > MAX_NAME_LENGTH) {
     throw new AcceptInvitationError('INVALID_INPUT', `Name needs 1 to ${MAX_NAME_LENGTH} characters.`);

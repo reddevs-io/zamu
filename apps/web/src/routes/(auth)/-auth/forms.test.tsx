@@ -1,7 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { InviteForm, SetupForm, SignInForm, WRONG_CREDENTIALS } from './forms';
+import { InviteForm, SetupForm, SignInForm, WorkspaceForm, WRONG_CREDENTIALS } from './forms';
+
+function sso(result: string | null = null) {
+  return { label: 'Continue with Authentik', onPress: vi.fn().mockResolvedValue(result) };
+}
 
 describe('SignInForm', () => {
   it('shows field errors and does not submit when empty', async () => {
@@ -34,9 +38,34 @@ describe('SignInForm', () => {
 
   it('hides the SSO button unless an OIDC sign-in is provided', () => {
     const { rerender } = render(<SignInForm onSubmit={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: /SSO/ })).not.toBeInTheDocument();
-    rerender(<SignInForm onSubmit={vi.fn()} onSso={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /Continue with/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('or with email')).not.toBeInTheDocument();
+    rerender(<SignInForm onSubmit={vi.fn()} sso={{ label: 'Continue with SSO', onPress: vi.fn() }} />);
     expect(screen.getByRole('button', { name: 'Continue with SSO' })).toBeInTheDocument();
+    expect(screen.getByText('or with email')).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+  });
+
+  it('starts SSO and shows a banner when the redirect cannot start', async () => {
+    const action = sso('Single sign-on is not available right now. Try again in a moment.');
+    render(<SignInForm onSubmit={vi.fn()} sso={action} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with Authentik' }));
+    expect(action.onPress).toHaveBeenCalledOnce();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Single sign-on is not available right now.');
+  });
+
+  it('shows only the SSO button when password sign-in is off', () => {
+    render(<SignInForm onSubmit={vi.fn()} sso={sso()} passwordLogin={false} />);
+    expect(screen.getByRole('button', { name: 'Continue with Authentik' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    expect(screen.queryByText('or with email')).not.toBeInTheDocument();
+  });
+
+  it('shows the error an SSO redirect came back with', () => {
+    render(<SignInForm onSubmit={vi.fn()} sso={sso()} initialError="Sign-in was cancelled." />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Sign-in was cancelled.');
   });
 });
 
@@ -91,7 +120,56 @@ describe('SetupForm', () => {
   });
 });
 
+describe('SetupForm with SSO', () => {
+  it('offers SSO above the account form', async () => {
+    const action = sso();
+    render(<SetupForm onSubmit={vi.fn()} sso={action} />);
+    expect(screen.getByLabelText('Your name')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with Authentik' }));
+    expect(action.onPress).toHaveBeenCalledOnce();
+  });
+
+  it('shows only the SSO button when password sign-in is off', () => {
+    render(<SetupForm onSubmit={vi.fn()} sso={sso()} passwordLogin={false} />);
+    expect(screen.getByRole('heading', { name: 'Set up this server' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue with Authentik' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+  });
+});
+
+describe('WorkspaceForm', () => {
+  it('validates and submits the workspace name', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(null);
+    render(<WorkspaceForm onSubmit={onSubmit} />);
+    expect(screen.getByRole('heading', { name: 'Name your workspace' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(screen.getByText('Enter a workspace name.')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByLabelText('Workspace name'), ' Reddevs {Enter}');
+    expect(onSubmit).toHaveBeenCalledWith('Reddevs');
+  });
+});
+
 describe('InviteForm', () => {
+  it('shows the invited email and only the SSO button when password sign-in is off', async () => {
+    const action = sso();
+    render(
+      <InviteForm
+        email="tomas@reddevs.io"
+        onSubmit={vi.fn()}
+        sso={action}
+        passwordLogin={false}
+        initialError={{ message: 'This invitation is for tomas@reddevs.io.' }}
+      />,
+    );
+    expect(screen.getByLabelText('Email')).toHaveValue('tomas@reddevs.io');
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('This invitation is for tomas@reddevs.io.');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with Authentik' }));
+    expect(action.onPress).toHaveBeenCalledOnce();
+  });
+
   it('shows the email read-only and validates name and password', async () => {
     const onSubmit = vi.fn().mockResolvedValue(null);
     render(<InviteForm email="tomas@reddevs.io" onSubmit={onSubmit} />);

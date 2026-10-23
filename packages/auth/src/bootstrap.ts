@@ -1,16 +1,20 @@
 import { type Db, type DbOrTx, schema } from '@pm/db';
-import { sql } from 'drizzle-orm';
+import { asc, sql } from 'drizzle-orm';
 import type { Auth } from './auth';
 import { MIN_PASSWORD_LENGTH } from './options';
+import { authConfigOf } from './settings';
 
 /** Better Auth's default maximum password length. */
 const MAX_PASSWORD_LENGTH = 128;
 
-/** Advisory lock key that serialises concurrent bootstrapAdmin calls. */
-const BOOTSTRAP_LOCK_KEY = 7_331_001;
+/** Advisory lock key that serialises first-run setup (bootstrapAdmin, SSO setup, bootstrapWorkspace). */
+export const BOOTSTRAP_LOCK_KEY = 7_331_001;
 
 /** Databases known to have users. A deleted last user is not a supported state, so this never resets. */
 const setUp = new WeakSet<object>();
+
+/** Databases known to have a workspace. Like `setUp`, this never resets. */
+const hasWorkspace = new WeakSet<object>();
 
 /** True when no user exists yet, so the instance still needs its first admin. */
 export async function isFirstRun(db: DbOrTx): Promise<boolean> {
@@ -23,7 +27,13 @@ export async function isFirstRun(db: DbOrTx): Promise<boolean> {
   return true;
 }
 
-export type BootstrapErrorCode = 'ALREADY_SET_UP' | 'INVALID_INPUT';
+export type BootstrapErrorCode =
+  | 'ALREADY_SET_UP'
+  | 'INVALID_INPUT'
+  /** PASSWORD_LOGIN=disabled: the admin is created through SSO instead. */
+  | 'PASSWORD_LOGIN_DISABLED'
+  /** bootstrapWorkspace: the caller is not the person who started setup. */
+  | 'NOT_SETUP_ADMIN';
 
 export class BootstrapError extends Error {
   constructor(
@@ -85,6 +95,9 @@ export async function bootstrapAdmin(
   { auth, db }: { auth: Auth; db: Db },
   input: BootstrapAdminInput,
 ): Promise<BootstrapAdminResult> {
+  if (!authConfigOf(auth).passwordLogin) {
+    throw new BootstrapError('PASSWORD_LOGIN_DISABLED', 'Password sign-in is turned off on this server.');
+  }
   const { name, email, password, workspaceName } = validate(input);
   const context = await auth.$context;
   const passwordHash = await context.password.hash(password);
@@ -112,5 +125,69 @@ export async function bootstrapAdmin(
   });
 
   setUp.add(db);
+  hasWorkspace.add(db);
+  return result;
+}
+
+/**
+ * Where first-run setup stands:
+ * - `account`: nobody exists yet; the first person to finish step 1 (password or SSO) becomes the admin.
+ * - `workspace`: the admin signed up through SSO but has not named the workspace yet.
+ * - `done`: a workspace exists.
+ */
+export type SetupState = 'account' | 'workspace' | 'done';
+
+export async function setupState(db: DbOrTx): Promise<SetupState> {
+  if (hasWorkspace.has(db)) return 'done';
+  const [workspace] = await db.select({ id: schema.organization.id }).from(schema.organization).limit(1);
+  if (workspace) {
+    hasWorkspace.add(db);
+    return 'done';
+  }
+  return (await isFirstRun(db)) ? 'account' : 'workspace';
+}
+
+export interface BootstrapWorkspaceInput {
+  /** The signed-in person who completed setup step 1 through SSO. */
+  userId: string;
+  workspaceName: string;
+}
+
+/**
+ * Setup step 2 after SSO: creates the workspace with `userId` as its owner. Only the first person may
+ * do this, and only while no workspace exists (same advisory lock as bootstrapAdmin).
+ */
+export async function bootstrapWorkspace(
+  { db }: { db: Db },
+  input: BootstrapWorkspaceInput,
+): Promise<BootstrapAdminResult> {
+  const workspaceName = input.workspaceName.trim();
+  if (!workspaceName) throw new BootstrapError('INVALID_INPUT', 'Workspace name is required.');
+
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${BOOTSTRAP_LOCK_KEY})`);
+    const [existing] = await tx.select({ id: schema.organization.id }).from(schema.organization).limit(1);
+    if (existing) throw new BootstrapError('ALREADY_SET_UP', 'This server already has a workspace.');
+    const [first] = await tx
+      .select({ id: schema.user.id, kind: schema.user.kind })
+      .from(schema.user)
+      .orderBy(asc(schema.user.createdAt), asc(schema.user.id))
+      .limit(1);
+    if (first?.id !== input.userId || first.kind !== 'person') {
+      throw new BootstrapError(
+        'NOT_SETUP_ADMIN',
+        'Only the person who started setup can name the workspace.',
+      );
+    }
+    const [workspace] = await tx
+      .insert(schema.organization)
+      .values({ name: workspaceName, slug: slugify(workspaceName) })
+      .returning();
+    if (!workspace) throw new Error('bootstrapWorkspace: organization insert returned no row');
+    await tx.insert(schema.member).values({ organizationId: workspace.id, userId: first.id, role: 'owner' });
+    return { userId: first.id, workspaceId: workspace.id };
+  });
+
+  hasWorkspace.add(db);
   return result;
 }

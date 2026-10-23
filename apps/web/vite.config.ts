@@ -29,6 +29,8 @@ export default defineConfig({
       compatibilityDate: '2026-10-22',
       // React's "use client" directives are irrelevant in the server bundle; silence the warnings.
       rolldownConfig: { checks: { moduleLevelDirective: false } },
+      // Refuse to start on an invalid auth or server config (Nitro v3 lists plugins explicitly).
+      plugins: ['./src/server/plugins/config-check.ts'],
     }),
     viteReact(),
   ],

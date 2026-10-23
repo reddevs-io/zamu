@@ -60,7 +60,8 @@ Logs: `docker compose logs -f web worker`.
 ## First run
 
 Open `BETTER_AUTH_URL` in a browser. A new server sends you to the setup page:
-1. Create the admin account: your name, email and a password of 12 characters or more.
+1. Create the admin account: your name, email and a password of 12 characters or more, or "Continue with
+   {name}" when [single sign-on](#single-sign-on-oidc) is configured.
 2. Name the workspace, usually your team or company.
 
 You land on the projects page, signed in. Setup runs once; afterwards `/setup` sends visitors to sign in.
@@ -69,6 +70,80 @@ Nobody can sign up on their own. To add people, go to Settings > Members > Invit
 the invitation link. No email is sent: share the link yourself. It works once and expires after a week.
 
 To add an AI agent, see [agents.md](agents.md).
+
+## Single sign-on (OIDC)
+
+People can sign in with one OpenID Connect provider (Authentik, Keycloak, Zitadel, Entra ID, ...). Without
+these variables the server uses email and password only.
+1. In the provider, create a confidential OAuth2/OpenID client with the authorization code flow and register
+   this redirect (callback) URL:
+
+   ```text
+   {BETTER_AUTH_URL}/api/auth/oauth2/callback/oidc
+   ```
+
+   For example `https://projects.example.com/api/auth/oauth2/callback/oidc`. The provider must send `email`
+   and `email_verified`; the `openid email profile` scopes do that for most providers.
+2. Set the variables in `.env` and run `docker compose up -d`:
+
+| Variable             | Default                | Meaning                                                             |
+| -------------------- | ---------------------- | ------------------------------------------------------------------- |
+| `OIDC_ISSUER`        | none                   | Issuer URL. Discovery: `{issuer}/.well-known/openid-configuration`. |
+| `OIDC_CLIENT_ID`     | none                   | Client ID from the provider.                                        |
+| `OIDC_CLIENT_SECRET` | none                   | Client secret from the provider.                                    |
+| `OIDC_PROVIDER_NAME` | `SSO`                  | Button label: "Continue with {name}".                               |
+| `OIDC_SCOPES`        | `openid email profile` | Space-separated scopes. `openid` is always requested.               |
+| `OIDC_SIGNUP`        | `invite`               | Who gets an account on first SSO sign-in: see below.                |
+| `OIDC_ADMIN_GROUPS`  | none                   | Comma-separated groups whose members are workspace admins.          |
+| `OIDC_GROUPS_CLAIM`  | `groups`               | Claim with the user's groups. Authentik sends `groups`.             |
+| `PASSWORD_LOGIN`     | `enabled`              | `disabled`: SSO only. Needs the three `OIDC_*` credentials.         |
+
+SSO is on when `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are all set.
+- `OIDC_SIGNUP=invite`: SSO signs in existing accounts (matched by verified email) and accepts pending
+  invitations. Nobody else gets in.
+- `OIDC_SIGNUP=auto`: anyone the provider signs in gets a member account in the workspace on first sign-in.
+  Limit who that is in the provider (for example, bind the application to a group).
+- `OIDC_ADMIN_GROUPS`: members of any listed group are admins, everyone else is a member. The role is
+  re-applied at every SSO sign-in, so removing someone from the group demotes them at their next sign-in.
+  Owners keep their role. If the provider stops sending the groups claim, everyone but the owner becomes a
+  member.
+- `PASSWORD_LOGIN=disabled` removes the password form from sign-in, setup and invitations, and the server
+  refuses password sign-in. API keys (agents, the CLI) keep working.
+
+What SSO does:
+- **Sign-in** shows "Continue with {name}" above the password form, or alone with `PASSWORD_LOGIN=disabled`.
+  Errors from the provider (consent denied, no account in `invite` mode) come back to the sign-in page as a
+  banner.
+- **First run**: the setup page offers SSO for the admin account. The first person to finish it becomes the
+  admin and then names the workspace. Once anyone exists, setup through SSO is refused.
+- **Invitations**: the invitation page offers SSO. The provider's verified email must be the invited address;
+  otherwise the page explains the mismatch and nothing is created.
+- **Existing accounts** link to the SSO identity with the same verified email, so people invited before SSO
+  keep their account. Unverified emails are refused. Agents are never linked to an SSO identity; they keep
+  using API keys.
+- **Signing out** ends the session here only, not at the provider.
+
+The server checks the configuration when it starts and exits with a message listing every problem, for
+example `PASSWORD_LOGIN=disabled` without SSO, only some of the three `OIDC_*` credentials, a malformed
+`OIDC_ISSUER`, or a `BETTER_AUTH_SECRET` shorter than 32 characters: `docker compose logs web` shows it.
+
+### Authentik
+
+1. Applications > Providers > Create > OAuth2/OpenID Provider. Client type confidential, redirect URI as
+   above (strict), signing key set (so ID tokens are signed with RS256), scopes `openid`, `email`, `profile`.
+2. Applications > Create, with this provider. Bind the groups or users that may sign in.
+3. `.env`:
+
+   ```sh
+   OIDC_ISSUER=https://auth.example.com/application/o/<application-slug>/
+   OIDC_CLIENT_ID=<client id>
+   OIDC_CLIENT_SECRET=<client secret>
+   OIDC_PROVIDER_NAME=Authentik
+   # Optional:
+   OIDC_SIGNUP=auto
+   OIDC_ADMIN_GROUPS=<admin group>
+   PASSWORD_LOGIN=disabled
+   ```
 
 ## Ports
 
