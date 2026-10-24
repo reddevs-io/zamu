@@ -8,6 +8,8 @@ import { errorMessage, SettingsError, unwrap } from '~/features/settings/result'
 import { projectHref } from '~/features/shell/paths';
 import { orpc } from '~/lib/orpc';
 import { Banner, Button, EmptyState, type SetupStep, Skeleton, useHotkeys } from '~/ui';
+import { type AgentSuggestion, assignAgent } from './agent-suggestions';
+import { CreateAgentHost } from './CreateAgentHost';
 import { pickConnection } from './connections';
 import { MappingsEditor } from './MappingsStep';
 import { ModeStep } from './ModeStep';
@@ -142,6 +144,7 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
     saveMappings(projectKey, toMappings(view));
   };
   const members = useQuery({ ...membersQuery(), enabled: step === 'mappings' });
+  const [agentDraft, setAgentDraft] = useState<AgentSuggestion | null>(null);
 
   const preview = useQuery({
     ...previewQuery({
@@ -312,7 +315,12 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
     body = detection.error ? (
       <Banner>{errorMessage(detection.error)}</Banner>
     ) : mappings ? (
-      <MappingsEditor view={mappings} onChange={onMappingsChange} members={members.data?.items ?? []} />
+      <MappingsEditor
+        view={mappings}
+        onChange={onMappingsChange}
+        members={members.data?.items ?? []}
+        onCreateAgent={setAgentDraft}
+      />
     ) : (
       <Skeleton height={240} />
     );
@@ -387,8 +395,8 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
   useContinueShortcut(() => {
     const next = footer.next;
     if (next && !next.isDisabled && !next.isPending) next.onPress();
-  }, !newFromOpen);
-  useHotkeys({ Escape: { handler: cancel, enabled: !newFromOpen } });
+  }, !newFromOpen && !agentDraft);
+  useHotkeys({ Escape: { handler: cancel, enabled: !newFromOpen && !agentDraft } });
 
   const verb = (source?.mode ?? mode) === 'import' ? 'Import' : 'Mirror';
   return (
@@ -405,6 +413,14 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
         {body}
       </SetupFrame>
       <NewFromBacklogDialogHost isOpen={newFromOpen} onClose={() => setNewFromOpen(false)} />
+      <CreateAgentHost
+        draft={agentDraft}
+        projectId={project.id}
+        onClose={() => setAgentDraft(null)}
+        onCreated={(draft, agent) => {
+          if (mappings) onMappingsChange(assignAgent(mappings, draft.from, agent.id));
+        }}
+      />
     </>
   );
 }
@@ -423,6 +439,7 @@ function EditMappings({ project }: { project: ProjectWithCounts }) {
   const status = useQuery(sourceStatusQuery(projectKey));
   const members = useQuery(membersQuery());
   const [edited, setEdited] = useState<BacklogMappingsView | null>(null);
+  const [agentDraft, setAgentDraft] = useState<AgentSuggestion | null>(null);
   const view = edited ?? status.data?.mappings ?? null;
   const noSource = status.error instanceof SettingsError && status.error.code === 'NOT_FOUND';
   const detached = status.data?.state === 'detached';
@@ -442,8 +459,8 @@ function EditMappings({ project }: { project: ProjectWithCounts }) {
   const onSave = () => {
     if (view && canSave && !save.isPending) save.mutate(view);
   };
-  useContinueShortcut(onSave);
-  useHotkeys({ Escape: cancel });
+  useContinueShortcut(onSave, !agentDraft);
+  useHotkeys({ Escape: { handler: cancel, enabled: !agentDraft } });
 
   let body: ReactNode;
   if (status.isPending) body = <Skeleton height={240} />;
@@ -483,34 +500,45 @@ function EditMappings({ project }: { project: ProjectWithCounts }) {
           isDisabled={save.isPending}
           title="Match Backlog.md values to this app"
           aside="The next refresh applies them to every task."
+          onCreateAgent={setAgentDraft}
         />
       </>
     );
   }
 
   return (
-    <SetupFrame
-      title={`Edit Backlog.md mappings for ${project.name}`}
-      projectKey={projectKey}
-      subtitle={<>{project.name} · nothing changes until you save</>}
-      onCancel={cancel}
-      steps={null}
-      navHint="Mappings turn the values in the files into statuses, priorities and assignees here. Saving reapplies them to every task on the next refresh."
-      footer={{
-        hint: 'Unmapped values use the fallback and show a warning.',
-        next:
-          noSource || detached
-            ? null
-            : {
-                label: 'Save mappings',
-                kbd: submitHint,
-                onPress: onSave,
-                isDisabled: !canSave,
-                isPending: save.isPending,
-              },
-      }}
-    >
-      {body}
-    </SetupFrame>
+    <>
+      <SetupFrame
+        title={`Edit Backlog.md mappings for ${project.name}`}
+        projectKey={projectKey}
+        subtitle={<>{project.name} · nothing changes until you save</>}
+        onCancel={cancel}
+        steps={null}
+        navHint="Mappings turn the values in the files into statuses, priorities and assignees here. Saving reapplies them to every task on the next refresh."
+        footer={{
+          hint: 'Unmapped values use the fallback and show a warning.',
+          next:
+            noSource || detached
+              ? null
+              : {
+                  label: 'Save mappings',
+                  kbd: submitHint,
+                  onPress: onSave,
+                  isDisabled: !canSave,
+                  isPending: save.isPending,
+                },
+        }}
+      >
+        {body}
+      </SetupFrame>
+      <CreateAgentHost
+        draft={agentDraft}
+        projectId={project.id}
+        onClose={() => setAgentDraft(null)}
+        onCreated={(draft, agent) => {
+          if (view) setEdited(assignAgent(view, draft.from, agent.id));
+        }}
+      />
+    </>
   );
 }

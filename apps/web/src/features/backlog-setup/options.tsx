@@ -8,7 +8,7 @@ import {
   StatusSquare,
   TASK_STATUSES,
 } from '~/ui';
-import { NO_ONE } from './mappings';
+import { CREATE_AGENT, NO_ONE } from './mappings';
 
 // Select options of the mapping tables: app statuses, priorities and members.
 
@@ -38,4 +38,20 @@ export function assigneeOptions(members: readonly Pick<Member, 'id' | 'name' | '
       avatar: { name: member.name, kind: member.kind },
     })),
   ];
+}
+
+/** "Create agent claude…" at the top of an unmatched assignee row's select. */
+export function createAgentOption(name: string): OptionItem {
+  return {
+    id: CREATE_AGENT,
+    label: `Create agent ${name}…`,
+    prefix: (
+      <span
+        aria-hidden
+        className="grid size-[18px] place-items-center border-[1.5px] border-dashed border-muted text-[12px] leading-none text-muted"
+      >
+        +
+      </span>
+    ),
+  };
 }

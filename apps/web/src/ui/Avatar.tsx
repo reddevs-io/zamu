@@ -16,6 +16,8 @@ export interface AvatarProps {
   hue?: number;
   /** Visible label next to the avatar is present, so hide the avatar from assistive tech. */
   decorative?: boolean;
+  /** An agent that doesn't exist yet (a suggestion): dashed outline. */
+  pending?: boolean;
   className?: string;
 }
 
@@ -26,6 +28,7 @@ export function Avatar({
   initials,
   hue,
   decorative = false,
+  pending = false,
   className,
 }: AvatarProps) {
   const text = initials ?? initialsFor(name, kind);
@@ -35,8 +38,10 @@ export function Avatar({
       <span
         {...a11y}
         data-kind="agent"
+        data-pending={pending || undefined}
         className={cn(
           'grid shrink-0 place-items-center border-[1.5px] border-accent font-mono font-medium text-accent',
+          pending && 'border-dashed',
           size === 'sm' ? 'size-[18px] text-[9px]' : 'size-7 text-[11px]',
           className,
         )}

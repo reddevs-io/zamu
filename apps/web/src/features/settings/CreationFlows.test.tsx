@@ -159,6 +159,51 @@ describe('AgentCreation', () => {
     },
     FLOW_TIMEOUT,
   );
+
+  it(
+    'opens prefilled from a Backlog.md assignee and reports the new agent',
+    async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn(async (values: CreateAgentValues) => agentResult(values));
+      const onCreated = vi.fn();
+      render(
+        <AgentCreation
+          isOpen
+          onOpenChange={vi.fn()}
+          people={[ana, tomas]}
+          defaultResponsibleId={ana.id}
+          projects={projects}
+          onSubmit={onSubmit}
+          onCreated={onCreated}
+          defaultName="claude"
+          defaultScope={{ access: 'selected', projectIds: [projects[0]?.id ?? ''], permission: 'write' }}
+          nameDescription="From @claude in the files. Lowercase, numbers and dashes."
+        />,
+      );
+
+      expect(screen.getByLabelText('Name')).toHaveValue('claude');
+      expect(
+        screen.getByText('From @claude in the files. Lowercase, numbers and dashes.'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Selected projects' })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: /PAY/ })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: /WEB/ })).not.toBeChecked();
+
+      await user.click(screen.getByRole('button', { name: 'Create agent' }));
+      expect(onSubmit).toHaveBeenCalledWith({
+        name: 'claude',
+        responsibleUserId: ana.id,
+        scope: { projects: [projects[0]?.id], access: 'write' },
+      });
+      await waitFor(() =>
+        expect(onCreated).toHaveBeenCalledWith(
+          expect.objectContaining({ agent: expect.objectContaining({ name: 'claude' }) }),
+        ),
+      );
+      expect(await screen.findByRole('alertdialog')).toHaveTextContent('Key created for claude');
+    },
+    FLOW_TIMEOUT,
+  );
 });
 
 const CLAUDE = { id: '00000000-0000-4000-8000-000000000003', name: 'claude-dev' };

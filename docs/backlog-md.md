@@ -91,6 +91,12 @@ Each Backlog.md value maps to one value here. The setup fills them in by name, a
   the `@`. A task gets the first of its assignees that maps to a member; the others stay listed in its
   Backlog.md section.
 
+An assignee that matches no member and names a coding agent (claude, codex, copilot, cursor, gemini and
+others, alone or in names like `claude-code`) gets a **Create agent** suggestion under the table. It opens
+Add agent with the name filled in, you as the responsible human and a key for this project only. Once the
+agent exists, its key is shown once and the row maps to it. Any other unmatched assignee offers
+**Create agent…** at the top of its select. Both work in the setup and in Edit mappings.
+
 A value with no mapping, including one that appears in a later push, gets the fallback (Todo, no priority,
 no assignee) and a warning. To change the mappings later, open Settings > Backlog.md > Edit mappings. The
 next refresh applies them to every task.

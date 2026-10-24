@@ -29,6 +29,12 @@ export interface AddAgentDialogProps {
   onSubmit: (values: CreateAgentValues) => Promise<AgentCreatedResult>;
   /** Called after the agent exists; the dialog has closed by then. */
   onCreated: (result: AgentCreatedResult) => void;
+  /** Prefilled name, for example from a Backlog.md assignee. */
+  defaultName?: string;
+  /** Prefilled access and permission. Defaults to the whole workspace, read and write. */
+  defaultScope?: ScopeValue;
+  /** Replaces the hint under the name field. */
+  nameDescription?: string;
 }
 
 export function AddAgentDialog({ isOpen, onOpenChange, ...props }: AddAgentDialogProps) {
@@ -53,14 +59,17 @@ function AddAgentForm({
   onSubmit,
   onCreated,
   onCancel,
+  defaultName = '',
+  defaultScope = DEFAULT_SCOPE,
+  nameDescription = 'Lowercase, numbers and dashes. Shows in activity next to every change it makes.',
 }: Omit<AddAgentDialogProps, 'isOpen' | 'onOpenChange'> & { onCancel: () => void }) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(defaultName);
   const [responsibleId, setResponsibleId] = useState(
     people.some((person) => person.id === defaultResponsibleId)
       ? defaultResponsibleId
       : (people[0]?.id ?? ''),
   );
-  const [scope, setScope] = useState<ScopeValue>(DEFAULT_SCOPE);
+  const [scope, setScope] = useState<ScopeValue>(defaultScope);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
 
@@ -125,7 +134,7 @@ function AddAgentForm({
             }}
             isInvalid={Boolean(errors.name)}
             errorMessage={errors.name}
-            description="Lowercase, numbers and dashes. Shows in activity next to every change it makes."
+            description={nameDescription}
             autoComplete="off"
             spellCheck="false"
           />

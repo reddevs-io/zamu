@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+body{margin:0;background:#f0eee9}
+a{color:inherit}
+a:hover{color:#2a78d6}
+</style>
+</helmet>
+<div style="width:1280px;height:800px;overflow:hidden" data-screen-label="Agent suggestion single frame">
+  <dc-import name="AgentSuggest" theme="{{ theme }}" v="{{ v }}" hint-size="1280px,800px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "v": { "editor": "text", "default": "note" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    let q = {};
+    try { q = Object.fromEntries(new URLSearchParams(window.location.search)); } catch (e) { q = {}; }
+    return { theme: q.theme || this.props.theme || 'light', v: q.v || this.props.v || 'note' };
+  }
+}
+</script>
+</body>
+</html>
