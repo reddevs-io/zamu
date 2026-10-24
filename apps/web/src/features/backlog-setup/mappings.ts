@@ -9,6 +9,9 @@ export type MappingKind = keyof BacklogMappings;
 /** The "No one" option of the assignee select. */
 export const NO_ONE = 'none';
 
+/** The "Create agent…" option of an unmatched assignee select. Picking it opens Add agent. */
+export const CREATE_AGENT = 'create-agent';
+
 /** Drops counts and resolved users: the input shape of preview, start and updateMappings. */
 export function toMappings(view: BacklogMappingsView): BacklogMappings {
   return {

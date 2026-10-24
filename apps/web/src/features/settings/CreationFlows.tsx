@@ -6,18 +6,23 @@ import { AddAgentDialog, type AddAgentDialogProps } from './AddAgentDialog';
 import { KeyRevealDialog, type RevealedKey } from './KeyRevealDialog';
 import { NewKeyDialog, type NewKeyDialogProps } from './NewKeyDialog';
 
-export type AgentCreationProps = Omit<AddAgentDialogProps, 'onCreated'> & { serverUrl?: string };
+export type AgentCreationProps = Omit<AddAgentDialogProps, 'onCreated'> & {
+  serverUrl?: string;
+  /** Called once the agent exists, before its key is shown. */
+  onCreated?: AddAgentDialogProps['onCreated'];
+};
 
-export function AgentCreation({ serverUrl, onOpenChange, ...props }: AgentCreationProps) {
+export function AgentCreation({ serverUrl, onOpenChange, onCreated, ...props }: AgentCreationProps) {
   const [revealed, setRevealed] = useState<RevealedKey | null>(null);
   return (
     <>
       <AddAgentDialog
         {...props}
         onOpenChange={onOpenChange}
-        onCreated={({ agent, key }) => {
+        onCreated={(result) => {
           onOpenChange(false);
-          setRevealed({ key, actsFor: agent.responsible?.name ?? null });
+          setRevealed({ key: result.key, actsFor: result.agent.responsible?.name ?? null });
+          onCreated?.(result);
         }}
       />
       <KeyRevealDialog revealed={revealed} onDone={() => setRevealed(null)} serverUrl={serverUrl} />

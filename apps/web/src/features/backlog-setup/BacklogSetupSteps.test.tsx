@@ -232,6 +232,64 @@ describe('MappingsEditor', () => {
     );
     expect(within(status).queryByText('fallback')).not.toBeInTheDocument();
   });
+
+  const UNMATCHED: BacklogMappingsView = {
+    ...MAPPINGS,
+    assignee: [
+      { from: '@claude', userId: null, how: 'fallback', count: 219, user: null },
+      { from: '@ana', userId: USER.id, how: 'name', count: 64, user: USER },
+      { from: '@francis', userId: null, how: 'fallback', count: 5, user: null },
+    ],
+  };
+
+  it('suggests creating an agent for an unmatched agent name', async () => {
+    const onCreateAgent = vi.fn();
+    render(
+      <MappingsEditor
+        view={UNMATCHED}
+        onChange={vi.fn()}
+        members={[USER, AGENT]}
+        onCreateAgent={onCreateAgent}
+      />,
+    );
+    const note = screen.getByRole('region', { name: 'Agent suggestions' });
+    expect(note).toHaveTextContent('This looks like a coding agent. No member matches it yet.');
+    expect(note).toHaveTextContent('@claude');
+    expect(note).not.toHaveTextContent('@francis');
+
+    await userEvent.setup().click(within(note).getByRole('button', { name: 'Create agent claude' }));
+    expect(onCreateAgent).toHaveBeenCalledWith({ name: 'claude', from: ['@claude'], count: 219 });
+  });
+
+  it('offers Create agent in the menu of every unmatched row', async () => {
+    const onChange = vi.fn();
+    const onCreateAgent = vi.fn();
+    render(
+      <MappingsEditor view={UNMATCHED} onChange={onChange} members={[USER]} onCreateAgent={onCreateAgent} />,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /@ana maps to/ }));
+    expect(screen.queryByRole('option', { name: /Create agent/ })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: /@francis maps to/ }));
+    await user.click(screen.getByRole('option', { name: 'Create agent francis…' }));
+    expect(onCreateAgent).toHaveBeenCalledWith({ name: 'francis', from: ['@francis'], count: 0 });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('suggests nothing without a way to create agents, or when the agent exists', () => {
+    const { unmount } = render(<MappingsEditor view={UNMATCHED} onChange={vi.fn()} members={[USER]} />);
+    expect(screen.queryByRole('region', { name: 'Agent suggestions' })).not.toBeInTheDocument();
+    unmount();
+
+    const claude = { id: '01a169ed-a7a5-712d-a08b-1e796a1ac80a', name: 'claude', kind: 'agent' as const };
+    render(
+      <MappingsEditor view={UNMATCHED} onChange={vi.fn()} members={[USER, claude]} onCreateAgent={vi.fn()} />,
+    );
+    expect(screen.queryByRole('region', { name: 'Agent suggestions' })).not.toBeInTheDocument();
+  });
 });
 
 const PREVIEW: BacklogPreview = {
