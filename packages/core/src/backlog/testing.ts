@@ -6,6 +6,7 @@ import { readFixtureTree } from '@pm/backlog-md/testing/fixtures';
 import type { BacklogMappings } from '@pm/contracts';
 import { type Db, schema } from '@pm/db';
 import {
+  type BlobRef,
   GitNotFound,
   type GitProvider,
   type ProviderKind,
@@ -210,6 +211,11 @@ export class FakeProvider implements GitProvider {
     return this.#repo(path).blob(sha);
   }
 
+  /** Blob text without counting a call, for subclasses. */
+  protected blobText(path: string, sha: string): string {
+    return this.#repo(path).blob(sha);
+  }
+
   async readFile(path: string, ref: string, filePath: string) {
     this.#call('readFile');
     const repo = this.#repo(path);
@@ -228,6 +234,22 @@ export class FakeProvider implements GitProvider {
     secret: string,
   ) {
     return verifyWebhook(this.provider, headers, rawBody, secret);
+  }
+}
+
+/** A FakeProvider with a batch read, like GitLab's. Records each batch it was asked for. */
+export class BatchingFakeProvider extends FakeProvider {
+  readonly batches: BlobRef[][] = [];
+  /** Blob hashes the batch leaves out, as GitLab does for binary or oversized files. */
+  readonly omit = new Set<string>();
+
+  async readBlobs(path: string, _commit: string, files: readonly BlobRef[]): Promise<Map<string, string>> {
+    this.batches.push([...files]);
+    const contents = new Map<string, string>();
+    for (const file of files) {
+      if (!this.omit.has(file.blobSha)) contents.set(file.blobSha, this.blobText(path, file.blobSha));
+    }
+    return contents;
   }
 }
 

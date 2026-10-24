@@ -29,6 +29,7 @@ export {
   normalizeHost,
 } from './hosts';
 export {
+  type BlobRef,
   type CreateProviderOptions,
   type FetchFn,
   type FileContent,

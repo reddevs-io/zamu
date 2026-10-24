@@ -22,6 +22,7 @@ import {
   GitHostRefused,
   GitNotFound,
   type GitProvider,
+  GitRateLimited,
   GitUnauthorized,
   GitUnreachable,
   hostnameOf,
@@ -152,7 +153,23 @@ async function readRepository(
   input: { connectionId: string; folderOverride?: string | undefined },
 ): Promise<RepositoryRead> {
   const { provider } = await connectionFor(ctx, workspaceId, input.connectionId, repository);
+  try {
+    return await readWith(provider, repository, input.folderOverride ?? null);
+  } catch (error) {
+    if (error instanceof GitRateLimited) {
+      throw new Conflict(
+        `${provider.host} asked to slow down. Try again in ${Math.max(1, error.retryAfterSeconds)} seconds.`,
+      );
+    }
+    throw error;
+  }
+}
 
+async function readWith(
+  provider: GitProvider,
+  repository: RepositoryRef,
+  folderOverride: string | null,
+): Promise<RepositoryRead> {
   let defaultBranch: string;
   let head: string;
   try {
@@ -163,7 +180,7 @@ async function readRepository(
     if (!access) throw error;
     return { repository, access, defaultBranch: null, head: null, location: null, read: null };
   }
-  const location = await locateFolder(provider, repository.path, head, input.folderOverride ?? null);
+  const location = await locateFolder(provider, repository.path, head, folderOverride);
   const read = location.folder
     ? await readFolder(provider, repository.path, { ...location, folder: location.folder }, null)
     : null;

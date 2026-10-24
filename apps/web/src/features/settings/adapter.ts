@@ -20,6 +20,8 @@ export async function runAs<T>(
     if (isCoreError(error)) {
       return { ok: false, error: { code: error.code, message: error.message, issues: error.issues ?? [] } };
     }
+    // The browser only sees a generic failure, so the server log is the one place the cause shows.
+    console.error('settings: unhandled error:', error);
     throw error;
   }
 }

@@ -1,9 +1,9 @@
 // Setup: detection order and output, preview, start, and New project from Backlog.md.
 import { schema } from '@pm/db';
-import { GitUnauthorized } from '@pm/git-providers';
+import { GitRateLimited, GitUnauthorized } from '@pm/git-providers';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Forbidden, Invalid, ProjectNotEmpty } from '../errors';
+import { Conflict, Forbidden, Invalid, ProjectNotEmpty } from '../errors';
 import { BACKLOG_REFRESH } from '../jobs';
 import { decryptSecret, EncryptionKeyMissing } from '../secrets';
 import {
@@ -173,6 +173,14 @@ describe('Backlog.md setup', () => {
       });
       expect(detection.configError).toContain('config.yml');
       expect(detection.config).toBeNull();
+    });
+
+    it('says when the provider asks to slow down instead of failing with a server error', async () => {
+      const { key, connection } = await linked(backlogFiles('backlog'));
+      provider.failWith = new GitRateLimited('slow down', 25, { status: 429 });
+      const attempt = detectBacklog(ctx, world.ownerActor, { projectKey: key, connectionId: connection.id });
+      await expect(attempt).rejects.toBeInstanceOf(Conflict);
+      await expect(attempt).rejects.toThrow('gitlab.com asked to slow down. Try again in 25 seconds.');
     });
 
     it('is for admins, on empty projects with a repository on the connection host', async () => {

@@ -132,11 +132,44 @@ export class HttpClient {
     if (!check.ok) throw new GitHostRefused(check.message, { code: check.reason });
   }
 
-  private async send(url: URL, accept: string): Promise<Response> {
+  /** URL for a path on the provider's origin, outside the API base path (GitLab's /api/graphql). */
+  originUrl(path: string): URL {
+    return new URL(path, this.origin);
+  }
+
+  /** POST a JSON body with auth and read a JSON answer. Redirects are refused: a POST is not replayed. */
+  async postJson<T = unknown>(target: URL, body: unknown): Promise<{ data: T; response: Response }> {
+    if (target.origin !== this.origin) {
+      throw new GitUnexpected(`Refusing to post to another host (${target.host}).`);
+    }
+    await this.checkHost(target);
+    const response = await this.send(target, 'application/json', JSON.stringify(body));
+    if (response.status >= 300 && response.status < 400) {
+      throw new GitUnexpected(`The provider answered ${response.status} to a POST.`);
+    }
+    if (!response.ok) throw await this.toError(response);
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (error) {
+      throw networkError(target, error);
+    }
+    try {
+      return { data: JSON.parse(text) as T, response };
+    } catch {
+      throw new GitUnexpected('The provider sent a response that is not JSON.');
+    }
+  }
+
+  private async send(url: URL, accept: string, body?: string): Promise<Response> {
     try {
       return await this.fetchFn(url.toString(), {
-        method: 'GET',
-        headers: { ...this.headers, accept },
+        method: body === undefined ? 'GET' : 'POST',
+        headers:
+          body === undefined
+            ? { ...this.headers, accept }
+            : { ...this.headers, accept, 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body }),
         redirect: 'manual',
         signal: AbortSignal.timeout(this.timeoutMs),
       });
