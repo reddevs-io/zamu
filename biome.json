@@ -14,7 +14,8 @@
       "!**/*.svg",
       "!memory-bank",
       "!.agent",
-      "!packages/backlog-md/test/fixtures"
+      "!packages/backlog-md/test/fixtures",
+      "!backlog"
     ]
   },
   "formatter": {
