@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<style>
+.su-wrap{display:flex;flex-direction:column;min-width:0;min-height:0}
+.su-grid{flex:1;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr)}
+.su-nav{border-right:1px solid var(--line);padding:18px 10px;display:flex;flex-direction:column;gap:14px;background:var(--band)}
+.su-col{display:flex;flex-direction:column;min-height:0;min-width:0}
+.su-main{flex:1;min-height:0;overflow:hidden}
+.su-body{padding:22px 32px 28px;display:flex;flex-direction:column;gap:16px;max-width:880px}
+.su-foot{height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 32px;border-top:1px solid var(--line);background:var(--band)}
+.su-q{font-size:16px;font-weight:600;letter-spacing:-0.01em}
+.su-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.su-sec{display:flex;flex-direction:column;gap:8px}
+.su-sech{display:flex;align-items:baseline;gap:10px}
+.as-agd{width:18px;height:18px;flex:none;box-sizing:border-box;border:1.5px dashed var(--accent);color:var(--accent);display:grid;place-items:center;font-family:"Martian Mono",ui-monospace,monospace;font-size:9px;font-weight:500}
+.as-plus{width:18px;height:18px;flex:none;box-sizing:border-box;border:1.5px dashed var(--muted);color:var(--muted);display:grid;place-items:center;font-size:12px;line-height:1}
+.as-note{display:flex;flex-direction:column;border:1px solid var(--line);background:var(--surface)}
+.as-noteh{padding:8px 12px 6px;font-size:12px;color:var(--muted)}
+.as-noter{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-top:1px solid var(--line-2);font-size:12px;color:var(--muted)}
+.as-nb{height:28px;font-size:12px;padding:0 10px;flex:none}
+.as-fromc{display:flex;flex-direction:column;gap:3px;min-width:0;padding:6px 0}
+.as-inl{font-size:11.5px;color:var(--accent);font-weight:600;white-space:nowrap}
+.as-inlm{font-size:11px;color:var(--faint);font-weight:400}
+.as-selsug{height:28px;display:flex;align-items:center;gap:7px;padding:0 8px;border:1.5px dashed var(--accent);background:var(--sel);font-size:12.5px;box-sizing:border-box;min-width:0;white-space:nowrap;overflow:hidden;color:var(--fg);font-weight:500}
+.as-selwrap{position:relative;min-width:0;display:flex;flex-direction:column}
+.as-menu{position:absolute;right:0;bottom:34px;width:240px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:6;padding:4px 0}
+.as-mi{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;font-size:12.5px}
+.as-mion{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;font-size:12.5px;background:var(--sel)}
+.as-mih{padding:6px 10px 4px;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.as-new{font-size:10px;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;color:var(--accent);border:1px solid var(--accent);padding:0 4px;line-height:15px}
+.as-callout{display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);background:var(--src-bg);line-height:1.5}
+.as-callt{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:12.5px}
+.as-callt b{font-weight:600}
+.dl-sec{display:flex;flex-direction:column;gap:8px}
+.dl-opts{display:flex;flex-direction:column;gap:6px}
+.dl-sub{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:4px 0 0 24px}
+.dl-pick{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.dl-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.dl-desc{font-size:11.5px;color:var(--muted);margin-top:1px}
+.rv-key{display:flex;align-items:center;gap:8px}
+.rv-box{flex:1;font-family:"Martian Mono",ui-monospace,monospace;font-size:12px;height:40px;display:flex;align-items:center;padding:0 12px;border:1px solid var(--accent);background:var(--sel);color:var(--fg);box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.rv-warn{display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+.rv-dot{width:8px;height:8px;background:var(--accent);margin-top:5px;flex:none}
+</style>
+</helmet>
+<div class="{{ rootCls }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">0</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="su-wrap">
+      <header class="lg-head">
+        <div style="min-width:0"><h1 class="lg-h1">Mirror Backlog.md into Payments</h1><div class="lg-sub"><span class="lg-mono">PAY</span> · Payments · nothing is written until you start</div></div>
+        <div class="lg-headr"><a class="lg-muted" href="#">Cancel</a><span class="lg-kbd">Esc</span></div>
+      </header>
+      <div class="su-grid">
+        <aside class="su-nav">
+          <div class="m3-steps">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="5">
+              <div class="{{ s.cls }}"><span class="{{ s.ncls }}">{{ s.n }}</span><span>{{ s.name }}</span><span class="lg-sp"></span><span class="lg-faint" style="font-size:11px;font-weight:400">{{ s.note }}</span></div>
+            </sc-for>
+          </div>
+          <div class="lg-hint" style="padding:0 12px;line-height:1.5">Step 3 of 5 · Mappings</div>
+        </aside>
+        <div class="su-col">
+          <div class="su-main">
+            <div class="su-body" style="transform:translateY(-{{ scrollY }}px)">
+              <div class="su-sech"><div class="su-q">Match Backlog.md values to this app</div><span class="lg-sp"></span><span class="lg-hint">Prefilled by name. You can change them later.</span></div>
+
+              <sc-if value="{{ isTop }}" hint-placeholder-val="{{ false }}">
+                <div class="as-callout" data-screen-label="Suggestion above the tables">
+                  <span class="as-agd">C</span>
+                  <div class="as-callt"><b>No member matches @claude on 219 tasks.</b><span class="lg-muted">It looks like a coding agent. Add it as an agent so those tasks get an assignee and its changes show under its own name.</span></div>
+                  <span class="lg-sp"></span>
+                  <button class="lg-btn2 as-nb">Create agent claude</button>
+                </div>
+              </sc-if>
+
+              <div class="su-sec">
+                <div class="su-sech"><span class="lg-cap">Status</span><span class="lg-gc">6</span><span class="lg-hint">Drafts always come in as Backlog.</span></div>
+                <div class="m3-map">
+                  <div class="m3-maph"><span>In the files</span><span></span><span>Here</span><span style="text-align:right">Tasks</span></div>
+                  <sc-for list="{{ statusMaps }}" as="m" hint-placeholder-count="6">
+                    <div class="m3-maprow"><span class="m3-from">{{ m.from }}</span><span class="m3-arrow">→</span><span class="{{ m.selCls }}"><span class="{{ m.sq }}"></span>{{ m.to }}<span class="lg-sp"></span><span class="{{ m.howCls }}">{{ m.how }}</span><span class="lg-faint">▾</span></span><span class="m3-num" style="text-align:right">{{ m.n }}</span></div>
+                  </sc-for>
+                </div>
+              </div>
+              <div class="su-two" style="align-items:start">
+                <div class="su-sec">
+                  <div class="su-sech"><span class="lg-cap">Priority</span><span class="lg-gc">3</span></div>
+                  <div class="m3-map">
+                    <sc-for list="{{ priMaps }}" as="m" hint-placeholder-count="3">
+                      <div class="m3-maprow" style="grid-template-columns:minmax(0,1fr) 16px 150px 40px"><span class="m3-from">{{ m.from }}</span><span class="m3-arrow">→</span><span class="m3-sel"><span class="{{ m.pcls }}">{{ m.bars }}</span>{{ m.to }}<span class="lg-sp"></span><span class="lg-faint">▾</span></span><span class="m3-num" style="text-align:right">{{ m.n }}</span></div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div class="su-sec">
+                  <div class="su-sech"><span class="lg-cap">Assignees</span><span class="lg-gc">{{ whoN }}</span><span class="lg-hint">The first match on a task becomes its assignee.</span></div>
+                  <div class="m3-map">
+                    <sc-for list="{{ whoMaps }}" as="m" hint-placeholder-count="4">
+                      <div class="m3-maprow" style="grid-template-columns:minmax(0,1fr) 16px {{ selW }} 36px">
+                        <span class="as-fromc"><span class="m3-from">{{ m.from }}</span><sc-if value="{{ m.inline }}" hint-placeholder-val="{{ false }}"><a class="as-inl" href="#">{{ m.inlineLabel }}</a><span class="as-inlm">Looks like a coding agent</span></sc-if></span>
+                        <span class="m3-arrow">→</span>
+                        <span class="as-selwrap">
+                          <span class="{{ m.selCls }}"><sc-if value="{{ m.hasAv }}" hint-placeholder-val="{{ true }}"><span class="{{ m.avCls }}" style="--h:{{ m.hue }}">{{ m.ini }}</span></sc-if>{{ m.to }}<span class="lg-sp"></span><sc-if value="{{ m.isNew }}" hint-placeholder-val="{{ false }}"><span class="as-new">new</span></sc-if><span class="lg-faint">▾</span></span>
+                          <sc-if value="{{ m.menu }}" hint-placeholder-val="{{ false }}">
+                            <div class="as-menu" data-screen-label="Assignee menu">
+                              <div class="as-mion"><span class="as-plus">+</span><span>Create agent francis…</span></div>
+                              <div class="m2-popsep"></div>
+                              <div class="as-mi"><span class="m2-none"></span><span>No one</span><span class="lg-sp"></span><span class="lg-faint">✓</span></div>
+                              <div class="as-mih">People</div>
+                              <div class="as-mi"><span class="lg-av" style="--h:25">AR</span><span>Ana Ruiz</span></div>
+                              <div class="as-mi"><span class="lg-av" style="--h:220">TB</span><span>Tomás Berg</span></div>
+                              <div class="as-mih">Agents</div>
+                              <div class="as-mi"><span class="lg-ag">X</span><span>codex-ci</span></div>
+                            </div>
+                          </sc-if>
+                        </span>
+                        <span class="m3-num" style="text-align:right">{{ m.n }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ isNote }}" hint-placeholder-val="{{ true }}">
+                    <div class="as-note" data-screen-label="Suggestion under assignees">
+                      <div class="as-noteh">{{ noteHead }}</div>
+                      <sc-for list="{{ sugs }}" as="g" hint-placeholder-count="1">
+                        <div class="as-noter"><span class="as-agd">{{ g.ini }}</span><span class="m3-from">{{ g.from }}</span><span class="lg-sp"></span><button class="lg-btn2 as-nb">{{ g.label }}</button></div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ isAfter }}" hint-placeholder-val="{{ false }}">
+                    <div class="m3-strip"><span class="m3-dot m3-ok"></span><span>Added <b>claude</b>, acting for Ana Ruiz. Its key is in Settings → API keys.</span></div>
+                  </sc-if>
+                  <sc-if value="{{ isSelHint }}" hint-placeholder-val="{{ false }}">
+                    <span class="lg-hint">A dashed value is a suggestion. Nothing is created until you confirm it.</span>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="su-foot">
+            <button class="lg-btn2">Back</button>
+            <span class="lg-hint">Unmapped values use the fallback and show a warning.</span>
+            <span class="lg-sp"></span>
+            <button class="lg-btn">Preview<span class="lg-btnk">⌘↵</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <sc-if value="{{ isDialog }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:70px;width:560px" data-screen-label="Add agent dialog, prefilled">
+      <div class="lg-dh"><span style="font-weight:600">Add agent</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db">
+        <div class="lg-field"><span class="lg-label">Name</span><div class="lg-inputf"><span class="lg-mono" style="font-size:12px">claude</span><span class="lg-caret" style="margin-left:-4px"></span></div><span class="lg-hint">From <span class="lg-codei">@claude</span> in the files. Lowercase, numbers and dashes.</span></div>
+        <div class="lg-field"><span class="lg-label">Responsible human</span><div class="lg-input"><span class="lg-av" style="--h:25">AR</span><span>Ana Ruiz</span><span class="lg-sp"></span><span class="lg-faint">▾</span></div><span class="lg-hint">The agent acts for this person. Activity reads "claude for Ana Ruiz".</span></div>
+        <div class="dl-sec"><span class="lg-label">Access</span>
+          <div class="dl-opts">
+            <div class="lg-opt"><span class="lg-radio"></span><span>Whole workspace</span></div>
+            <div class="lg-opton"><span class="lg-radioon"></span><span>Selected projects</span></div>
+            <div class="dl-sub">
+              <span class="dl-pick"><span class="lg-checkon"></span><span class="lg-mono" style="font-size:10.5px">PAY</span>Payments</span>
+              <span class="dl-pick"><span class="lg-check"></span><span class="lg-mono" style="font-size:10.5px">WEB</span>Web app</span>
+              <span class="dl-pick"><span class="lg-check"></span><span class="lg-mono" style="font-size:10.5px">CLI</span>pm CLI</span>
+            </div>
+          </div>
+        </div>
+        <div class="dl-sec"><span class="lg-label">Permission</span>
+          <div class="dl-two">
+            <div class="lg-opton" style="align-items:flex-start"><span class="lg-radioon" style="margin-top:2px"></span><div><div>Read and write</div><div class="dl-desc">Create and update tasks</div></div></div>
+            <div class="lg-opt" style="align-items:flex-start"><span class="lg-radio" style="margin-top:2px"></span><div><div>Read only</div><div class="dl-desc">List and view tasks</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="lg-df"><span class="lg-hint">Creates the agent and its first API key.</span><span class="lg-sp"></span><button class="lg-btn2">Cancel</button><button class="lg-btn">Create agent</button></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isReveal }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:140px;width:580px" data-screen-label="Key created, reveal once">
+      <div class="lg-dh"><span style="font-weight:600">Key created for claude</span></div>
+      <div class="lg-db">
+        <div class="rv-warn"><span class="rv-dot"></span><span>Copy it now. You won't see it again. If it gets lost, revoke it and create a new one.</span></div>
+        <div class="rv-key"><div class="rv-box">pm_live_9Lw2cQ7nRf3VxT5kB8yMp1Ze4Gh6Ja0S</div><button class="lg-btna" style="height:40px">Copy</button></div>
+        <div class="lg-field"><span class="lg-cap">Use it from the CLI</span><div class="lg-code">pm login --key pm_live_9Lw2cQ7nRf3VxT5kB8yMp1Ze4Gh6Ja0S</div></div>
+        <div class="lg-hint">Scope: PAY, read and write. Acts for Ana Ruiz.</div>
+      </div>
+      <div class="lg-df"><span class="lg-sp"></span><button class="lg-btn">I copied the key</button></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "v": { "editor": "enum", "options": ["note", "inline", "select", "top", "menu", "dialog", "reveal", "after", "two"], "default": "note" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const v = this.props.v ?? 'note';
+    const names = ['Mode', 'Source', 'Mappings', 'Preview', 'Read'];
+    const notes = ['Mirror', 'backlog/', '', '', ''];
+    const steps = names.map((name, i) => {
+      const n = i + 1;
+      const done = n < 3;
+      return { n: done ? '✓' : n, name, note: done ? notes[i] : '', cls: n === 3 ? 'm3-stepon' : 'm3-step', ncls: done ? 'm3-stepndone' : (n === 3 ? 'm3-stepnon' : 'm3-stepn') };
+    });
+    const S = { todo: 'lg-sq lg-s-todo', prog: 'lg-sq lg-s-prog', rev: 'lg-sq lg-s-review', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel' };
+    const sm = (from, sq, to, how, n, warn) => ({ from, sq: S[sq], to, how, n, howCls: warn ? 'm3-howwn' : 'm3-how', selCls: warn ? 'm3-selwn' : 'm3-sel' });
+    const statusMaps = [
+      sm('To Do', 'todo', 'Todo', 'by name', 24), sm('In Progress', 'prog', 'In progress', 'by name', 9), sm('Review', 'rev', 'In review', 'by name', 3), sm('Done', 'done', 'Done', 'by name', 690), sm('Won’t do', 'cancel', 'Canceled', 'by name', 7), sm('Blocked', 'todo', 'Todo', 'fallback', 2, true)
+    ];
+    const pm = (from, bars, pcls, to, n) => ({ from, bars, pcls, to, n });
+    const priMaps = [pm('high', '■■■', 'lg-pri', 'High', 41), pm('medium', '■■', 'lg-pri', 'Medium', 133), pm('low', '■', 'lg-prilow', 'Low', 88)];
+    const row = (o) => Object.assign({ inline: false, inlineLabel: '', menu: false, isNew: false, hasAv: true, hue: 0 }, o);
+    const claude = (() => {
+      if (v === 'after') return row({ from: '@claude', to: 'claude', avCls: 'lg-ag', ini: 'C', n: 219, selCls: 'm3-sel', isNew: true });
+      if (v === 'select') return row({ from: '@claude', to: 'Create agent claude…', avCls: 'as-agd', ini: 'C', n: 219, selCls: 'as-selsug' });
+      return row({ from: '@claude', to: 'No one', avCls: '', ini: '', hasAv: false, n: 219, selCls: 'm3-selwn', inline: v === 'inline', inlineLabel: '+ Create agent claude' });
+    })();
+    const whoMaps = [
+      claude,
+      row({ from: '@ana', to: 'Ana Ruiz', avCls: 'lg-av', ini: 'AR', hue: 25, n: 64, selCls: 'm3-sel' }),
+      row({ from: '@codex-ci', to: 'codex-ci', avCls: 'lg-ag', ini: 'X', n: 31, selCls: 'm3-sel' })
+    ];
+    if (v === 'two') whoMaps.push(row({ from: '@copilot', to: 'No one', avCls: '', ini: '', hasAv: false, n: 12, selCls: 'm3-selwn' }));
+    whoMaps.push(row({ from: '@francis', to: 'No one', avCls: '', ini: '', hasAv: false, n: 5, selCls: v === 'menu' ? 'm3-selon' : 'm3-selwn', menu: v === 'menu' }));
+    const sug = (from, name) => ({ from, name, ini: name.charAt(0).toUpperCase(), label: 'Create agent ' + name });
+    const sugs = v === 'two' ? [sug('@claude', 'claude'), sug('@copilot', 'copilot')] : [sug('@claude', 'claude')];
+    const noteStates = ['note', 'menu', 'dialog', 'reveal', 'two'];
+    const labels = { note: 'note under assignees', inline: 'in the row', select: 'in the select', top: 'above the tables', menu: 'menu on an unmatched row', dialog: 'Add agent, prefilled', reveal: 'key reveal', after: 'after creating', two: 'two suggestions' };
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      label: 'Agent suggestion · ' + labels[v],
+      steps, statusMaps, priMaps, whoMaps, whoN: whoMaps.length,
+      selW: v === 'select' ? '200px' : '170px',
+      sugs,
+      noteHead: sugs.length > 1 ? 'These look like coding agents. No member matches them yet.' : 'This looks like a coding agent. No member matches it yet.',
+      scrollY: v === 'two' ? 110 : 0,
+      isNote: noteStates.includes(v),
+      isTop: v === 'top',
+      isAfter: v === 'after',
+      isSelHint: v === 'select',
+      isDialog: v === 'dialog',
+      isReveal: v === 'reveal'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+/* Ledger M3 additions: Backlog.md mirror and import. Load after ledger.css and ledger-m2.css. Every M1 and M2 token stays as is. */
+
+/* New tokens
+   --sys-bg / --sys-fg  the Backlog.md system actor glyph: a filled square, apart from round people and outlined agents
+   --hatch              diagonal hatch on fields and board columns that Backlog.md owns (read-only)
+   --src-bg             ground of the Backlog.md section and the source strip in the task panel */
+.lg-light {
+  --sys-bg: oklch(0.3 0.02 255);
+  --sys-fg: oklch(0.98 0.004 240);
+  --hatch: oklch(0.2 0.02 255 / 0.045);
+  --src-bg: oklch(0.972 0.006 240);
+}
+.lg-dark {
+  --sys-bg: oklch(0.86 0.01 250);
+  --sys-fg: oklch(0.18 0.012 255);
+  --hatch: oklch(1 0 0 / 0.045);
+  --src-bg: oklch(0.2 0.013 255);
+}
+
+/* System actor */
+.m3-sys { width: 18px; height: 18px; flex: none; background: var(--sys-bg); color: var(--sys-fg); display: grid; place-items: center; font-family: "Martian Mono", ui-monospace, monospace; font-size: 8.5px; font-weight: 500; }
+.m3-sysl { width: 28px; height: 28px; flex: none; background: var(--sys-bg); color: var(--sys-fg); display: grid; place-items: center; font-family: "Martian Mono", ui-monospace, monospace; font-size: 10.5px; font-weight: 500; }
+.m3-sysdot { width: 7px; height: 7px; background: var(--sys-bg); justify-self: center; }
+
+/* Status dots for mirrors and connections */
+.m3-dot { width: 8px; height: 8px; flex: none; box-sizing: border-box; }
+.m3-ok { background: var(--done); }
+.m3-wn { background: var(--warn); }
+.m3-er { background: var(--danger); }
+.m3-pz { border: 1.5px solid var(--faint); }
+.m3-run { border: 1.5px solid var(--accent); background: conic-gradient(var(--accent) 0 40%, transparent 0); border-radius: 50%; }
+
+/* Provider badge: letters, no logos */
+.m3-prov { width: 26px; height: 26px; flex: none; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; font-family: "Martian Mono", ui-monospace, monospace; font-size: 9.5px; font-weight: 500; color: var(--fg); box-sizing: border-box; }
+
+/* Tags with a state colour */
+.m3-tagok { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 6px; border: 1px solid var(--line); font-size: 11px; color: var(--fg); white-space: nowrap; }
+.m3-tagwn { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 6px; background: var(--warn-bg); font-size: 11px; color: var(--warn); font-weight: 600; white-space: nowrap; }
+.m3-tager { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 6px; background: var(--danger-bg); font-size: 11px; color: var(--danger); font-weight: 600; white-space: nowrap; }
+
+/* Header source line on a mirrored project */
+.m3-src { display: inline-flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.m3-srcbtn { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; color: var(--fg); white-space: nowrap; box-sizing: border-box; }
+.m3-srcbtnon { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--focus); background: var(--sel); font-size: 12px; color: var(--fg); white-space: nowrap; box-sizing: border-box; }
+
+/* Read-only fields owned by Backlog.md */
+.m3-lock { background-image: repeating-linear-gradient(135deg, var(--hatch) 0 5px, transparent 5px 10px); }
+.m3-strip { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); background: var(--src-bg); font-size: 12px; color: var(--muted); flex: none; min-width: 0; }
+.m3-strip b { color: var(--fg); font-weight: 600; }
+.m3-path { font-family: "Martian Mono", ui-monospace, monospace; font-size: 10.5px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; min-width: 0; }
+.m3-own { font-size: 9.5px; letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--faint); }
+
+/* Backlog.md section in the task panel */
+.m3-bmd { border: 1px solid var(--line); background: var(--src-bg); display: flex; flex-direction: column; flex: none; }
+.m3-bmdh { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--line-2); }
+.m3-kv { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 6px 10px; border-bottom: 1px solid var(--line-2); font-size: 12px; min-width: 0; }
+.m3-kv:last-child { border-bottom: 0; }
+.m3-k { font-size: 11px; color: var(--faint); }
+.m3-vals { display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0; }
+.m3-lbl { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border: 1px solid var(--line); background: var(--surface); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.m3-tlink { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; font-size: 12px; }
+.m3-tlink .lg-mono { flex: none; }
+.m3-tmiss { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); text-decoration: line-through; text-decoration-color: var(--line); }
+
+/* Description built from Backlog.md sections */
+.m3-doc { display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55; }
+.m3-doc h4 { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: var(--fg); letter-spacing: 0; }
+.m3-doc p { margin: 0; text-wrap: pretty; }
+.m3-doc ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.m3-ck { display: flex; align-items: flex-start; gap: 8px; }
+.m3-ckbox { width: 12px; height: 12px; flex: none; border: 1.5px solid var(--muted); box-sizing: border-box; margin-top: 4px; }
+.m3-ckon { width: 12px; height: 12px; flex: none; background: var(--done); margin-top: 4px; position: relative; }
+.m3-ckon::after { content: ""; position: absolute; left: 3.5px; top: 1px; width: 3px; height: 6.5px; border-right: 1.5px solid var(--bg); border-bottom: 1.5px solid var(--bg); transform: rotate(45deg); }
+
+/* Setup steps */
+.m3-steps { display: flex; flex-direction: column; gap: 2px; }
+.m3-step { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; color: var(--muted); }
+.m3-stepon { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; color: var(--fg); font-weight: 600; background: var(--surface); box-shadow: inset 2px 0 0 var(--accent); }
+.m3-stepn { width: 18px; height: 18px; flex: none; border: 1px solid var(--line); display: grid; place-items: center; font-family: "Martian Mono", ui-monospace, monospace; font-size: 9.5px; color: var(--muted); box-sizing: border-box; }
+.m3-stepnon { width: 18px; height: 18px; flex: none; background: var(--fg); color: var(--bg); display: grid; place-items: center; font-family: "Martian Mono", ui-monospace, monospace; font-size: 9.5px; }
+.m3-stepndone { width: 18px; height: 18px; flex: none; background: var(--done); color: var(--bg); display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+
+/* Mapping table */
+.m3-map { border: 1px solid var(--line); display: flex; flex-direction: column; background: var(--surface); }
+.m3-maph { display: grid; grid-template-columns: minmax(0, 1fr) 20px 210px 64px; gap: 12px; align-items: center; height: 28px; padding: 0 12px; border-bottom: 1px solid var(--line); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.m3-maprow { display: grid; grid-template-columns: minmax(0, 1fr) 20px 210px 64px; gap: 12px; align-items: center; min-height: 40px; padding: 0 12px; border-bottom: 1px solid var(--line-2); }
+.m3-maprow:last-child { border-bottom: 0; }
+.m3-from { font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m3-arrow { color: var(--faint); text-align: center; }
+.m3-sel { height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 8px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; box-sizing: border-box; min-width: 0; white-space: nowrap; overflow: hidden; }
+.m3-selwn { height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 8px; border: 1px solid var(--warn); background: var(--warn-bg); font-size: 12.5px; box-sizing: border-box; min-width: 0; white-space: nowrap; overflow: hidden; }
+.m3-selon { height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 8px; border: 1px solid var(--focus); box-shadow: 0 0 0 3px oklch(0.6 0.15 262 / 0.2); background: var(--surface); font-size: 12.5px; box-sizing: border-box; min-width: 0; white-space: nowrap; overflow: hidden; }
+.m3-how { font-size: 11px; color: var(--faint); white-space: nowrap; }
+.m3-howwn { font-size: 11px; color: var(--warn); font-weight: 600; white-space: nowrap; }
+
+/* Skipped files and warnings */
+.m3-issues { border: 1px solid var(--line); display: flex; flex-direction: column; background: var(--surface); }
+.m3-issue { display: grid; grid-template-columns: 10px minmax(0, 280px) minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--line-2); font-size: 12px; }
+.m3-issue:last-child { border-bottom: 0; }
+.m3-issue .m3-dot { align-self: center; }
+
+/* Copy field */
+.m3-copy { display: flex; align-items: stretch; min-width: 0; }
+.m3-copyv { flex: 1; min-width: 0; height: 34px; display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-right: 0; background: var(--band); font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+.m3-copyb { height: 34px; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 500; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Board: while a mirrored card is dragged, other columns refuse the drop */
+.m3-colno { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line-2); min-height: 0; background-image: repeating-linear-gradient(135deg, var(--hatch) 0 5px, transparent 5px 10px); }
+.m3-colno .m2-card { opacity: 0.5; }
+.m3-colnot { flex: none; margin: 8px 8px 0; padding: 6px 8px; border: 1px dashed var(--line); background: var(--surface); font-size: 11.5px; color: var(--muted); text-align: center; line-height: 1.4; }
+
+/* Settings section blocks */
+.m3-sec { border: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; }
+.m3-sech { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line-2); }
+.m3-secb { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.m3-facts { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px 16px; font-size: 12.5px; align-items: baseline; }
+.m3-fk { color: var(--muted); font-size: 12px; }
+.m3-num { font-family: "Martian Mono", ui-monospace, monospace; font-size: 10.5px; color: var(--muted); }

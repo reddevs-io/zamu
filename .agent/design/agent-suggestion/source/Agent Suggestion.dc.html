@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif;color:#1a1a1a}
+a{color:#1a1a1a}
+a:hover{color:#2a78d6}
+.dv-turn{padding:36px 44px 28px;border-bottom:1px solid rgba(0,0,0,0.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 15px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-desc{margin:0 0 18px;max-width:900px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.65);text-wrap:pretty}
+.dv-opts{display:flex;flex-wrap:wrap;gap:24px 24px;align-items:flex-start;max-width:2650px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:8px;scroll-margin-top:16px}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 12px/1.3 system-ui,sans-serif;color:rgba(0,0,0,0.6)}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,0.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-card{width:1280px;max-width:100%;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden}
+.dv-intro{display:grid;grid-template-columns:repeat(3,minmax(0,440px));gap:32px;font:12.5px/1.6 system-ui,sans-serif;color:rgba(0,0,0,0.72)}
+.dv-intro h3{margin:0 0 6px;font:600 12.5px/1.3 system-ui,sans-serif;color:#1a1a1a}
+.dv-intro ul,.dv-intro ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.dv-h{font:700 22px/1.2 system-ui,sans-serif;margin:0 0 6px}
+.dv-lead{font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,0.6);margin:0 0 24px;max-width:960px}
+.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,0.5)}
+code{font:11.5px ui-monospace,Menlo,monospace;background:rgba(0,0,0,0.06);padding:0 4px;border-radius:3px}
+</style>
+</helmet>
+<section class="dv-turn" id="intro" data-screen-label="Agent suggestion · overview">
+  <h1 class="dv-h">Suggest an agent from Backlog.md assignees</h1>
+  <p class="dv-lead">On the Mappings step (and Edit mappings), an assignee like <code>@claude</code> that matches no member and looks like a coding agent gets a suggestion to create the agent. Accepting opens Add agent prefilled, then the one-time key, then the row maps to the new agent. Ledger direction, no new tokens. Every frame is 1280×800.</p>
+  <div class="dv-intro">
+    <div>
+      <h3>What stays the same in every option</h3>
+      <ul>
+        <li>Every unmatched row, agent-looking or not, gets <b>Create agent …</b> at the top of its select menu (<a class="dv-oid" href="#1e">1e</a>).</li>
+        <li>A not-yet-created agent is a <b>dashed</b> agent square. Existing agents stay solid-outlined, people stay round.</li>
+        <li>The dialog is the existing Add agent, prefilled: name from the value, you as responsible human, access limited to this project.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Placements</h3>
+      <ol>
+        <li><a class="dv-oid" href="#1a">1a</a> Note under the Assignees table, one line per name. Recommended: next to the rows it fixes, scales to several names, and leaves the tables untouched.</li>
+        <li><a class="dv-oid" href="#1b">1b</a> Link inside the row, under the value. Closest to the data; makes rows taller and uneven.</li>
+        <li><a class="dv-oid" href="#1c">1c</a> The select shows the suggestion as a dashed value. Compact, but a value that is not yet real can be read as already mapped.</li>
+        <li><a class="dv-oid" href="#1d">1d</a> Callout above the tables. Most visible; pushes the tables down and is far from the row.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Open questions</h3>
+      <ul>
+        <li>Should the note offer “Not an agent” to hide a suggestion? Left out: ignoring it costs nothing.</li>
+        <li>When an agent with a similar name exists (claude-dev for @claude), suggest mapping to it instead of creating? Left out of this pass.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<section class="dv-turn" id="t1" data-screen-label="Placements and flow">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Where the suggestion sits</span></div>
+  <p class="dv-desc">Same data in each frame: @claude on 219 tasks has no match, @ana and @codex-ci match, @francis has no match and is not an agent name.</p>
+  <div class="dv-opts"><sc-for list="{{ placements }}" as="f" hint-placeholder-count="4"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="AgentSuggest" theme="{{ f.theme }}" v="{{ f.v }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+  <div class="dv-thd" style="margin-top:36px"><span class="dv-tname">Flow, drawn with <a class="dv-oid" href="#1a">1a</a></span></div>
+  <p class="dv-desc">The menu option on any unmatched row, the prefilled dialog, the key reveal, the row after creating, and two suggestions at once.</p>
+  <div class="dv-opts"><sc-for list="{{ flow }}" as="f" hint-placeholder-count="6"><div class="dv-opt" id="{{ f.id }}"><div class="dv-olabel"><a class="dv-oid" href="#{{ f.id }}">{{ f.id }}</a>{{ f.label }}</div><div class="dv-card"><dc-import name="AgentSuggest" theme="{{ f.theme }}" v="{{ f.v }}" hint-size="1280px,800px"></dc-import></div></div></sc-for></div>
+  <p class="dv-next">Try next: “go with <a class="dv-oid" href="#1a">1a</a>” · “<a class="dv-oid" href="#1a">1a</a> but with the link from <a class="dv-oid" href="#1b">1b</a>” · “add Not an agent”</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    const f = (id, label, v, theme) => ({ id, label, v, theme });
+    return {
+      placements: [
+        f('1a', 'Note under the Assignees table · recommended', 'note', 'light'),
+        f('1b', 'Link inside the row', 'inline', 'light'),
+        f('1c', 'Suggestion as the select value', 'select', 'light'),
+        f('1d', 'Callout above the tables', 'top', 'light')
+      ],
+      flow: [
+        f('1e', 'Menu on an unmatched row', 'menu', 'light'),
+        f('1f', 'Add agent, prefilled', 'dialog', 'light'),
+        f('1g', 'Key shown once', 'reveal', 'dark'),
+        f('1h', 'After creating', 'after', 'dark'),
+        f('1i', 'Two suggestions', 'two', 'dark'),
+        f('1j', 'Note, dark', 'note', 'dark')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
