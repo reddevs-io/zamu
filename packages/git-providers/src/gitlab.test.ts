@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FIXTURE_TOKEN, loadFixture, replay } from '../test/replay';
 import { createProvider } from './create';
 import { GitNotFound, GitRateLimited, GitUnauthorized, GitUnreachable } from './errors';
+import type { GitLabProvider } from './gitlab';
 import type { FetchFn } from './types';
 
 const HEAD = 'a6fd50cecb4bbe630dfb03a621cbe2cedfef4aef';
@@ -15,6 +16,16 @@ function gitlab(fixture: string) {
     fetch: server.fetch,
   });
   return { provider, server };
+}
+
+/** The GitLab adapter over `fetch`, typed so its batch read is not optional. */
+function gitlabOver(fetch: FetchFn): GitLabProvider {
+  return createProvider({
+    provider: 'gitlab',
+    host: 'gitlab.com',
+    token: FIXTURE_TOKEN,
+    fetch,
+  }) as GitLabProvider;
 }
 
 describe('GitLab adapter', () => {
@@ -101,6 +112,85 @@ describe('GitLab adapter', () => {
     const text = await provider.readBlob('gitlab-org/cli', '0eb453a67ec1f140ada18146d48c089cd72d17ec');
     expect(text.startsWith('#!/usr/bin/env bash\n')).toBe(true);
     expect(text.length).toBeGreaterThan(2000);
+  });
+
+  it('reads blobs in batches of 100 over GraphQL, keyed by blob hash', async () => {
+    const bodies: { project: string; ref: string; paths: string[]; after: string | null }[] = [];
+    const urls: string[] = [];
+    const fetch: FetchFn = async (input, init) => {
+      urls.push(String(input));
+      const { variables } = JSON.parse(String(init?.body));
+      bodies.push(variables);
+      const nodes = (variables.paths as string[]).map((path) => ({
+        path,
+        oid: `sha-${path}`,
+        // A binary file comes back without text; the BOM of a text file is dropped.
+        rawTextBlob: path === 'b/image.png' ? null : `\uFEFFtext of ${path}`,
+      }));
+      return Response.json({
+        data: {
+          project: { repository: { blobs: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } },
+        },
+      });
+    };
+    const provider = gitlabOver(fetch);
+    const files = Array.from({ length: 250 }, (_, index) => ({
+      path: `b/t-${index}.md`,
+      blobSha: `sha-b/t-${index}.md`,
+    }));
+    files.push({ path: 'b/image.png', blobSha: 'sha-b/image.png' });
+    // Changed since the listing: the hash no longer matches, so the caller reads it alone.
+    files.push({ path: 'b/stale.md', blobSha: 'old-sha' });
+    const contents = await provider.readBlobs('group/sub/repo', HEAD, files);
+    expect(urls).toEqual(Array(3).fill('https://gitlab.com/api/graphql'));
+    expect(bodies.map((body) => body.paths.length)).toEqual([100, 100, 52]);
+    expect(bodies[0]).toMatchObject({ project: 'group/sub/repo', ref: HEAD, after: null });
+    expect(contents.size).toBe(250);
+    expect(contents.get('sha-b/t-0.md')).toBe('text of b/t-0.md');
+    expect(contents.has('sha-b/image.png')).toBe(false);
+    expect(contents.has('old-sha')).toBe(false);
+  });
+
+  it('follows GraphQL pages within a batch', async () => {
+    let calls = 0;
+    const fetch: FetchFn = async (_input, init) => {
+      const { variables } = JSON.parse(String(init?.body));
+      calls += 1;
+      const first = variables.after === null;
+      return Response.json({
+        data: {
+          project: {
+            repository: {
+              blobs: {
+                pageInfo: { hasNextPage: first, endCursor: first ? 'cursor-1' : null },
+                nodes: [{ path: first ? 'a.md' : 'b.md', oid: first ? 'a' : 'b', rawTextBlob: 'x' }],
+              },
+            },
+          },
+        },
+      });
+    };
+    const provider = gitlabOver(fetch);
+    const contents = await provider.readBlobs('acme/repo', HEAD, [
+      { path: 'a.md', blobSha: 'a' },
+      { path: 'b.md', blobSha: 'b' },
+    ]);
+    expect(calls).toBe(2);
+    expect([...contents.keys()]).toEqual(['a', 'b']);
+  });
+
+  it('maps GraphQL failures to typed errors', async () => {
+    const answer =
+      (body: unknown, status = 200): FetchFn =>
+      async () =>
+        Response.json(body, { status });
+    const read = (fetch: FetchFn) =>
+      gitlabOver(fetch).readBlobs('acme/repo', HEAD, [{ path: 'a.md', blobSha: 'a' }]);
+    await expect(read(answer({ data: { project: null } }))).rejects.toBeInstanceOf(GitNotFound);
+    await expect(read(answer({ errors: [{ message: 'complexity' }] }))).rejects.toMatchObject({
+      kind: 'unexpected',
+    });
+    await expect(read(answer({ message: 'Retry later' }, 429))).rejects.toBeInstanceOf(GitRateLimited);
   });
 
   it('reads one file at a ref, and null for a missing one', async () => {

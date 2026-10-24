@@ -26,6 +26,12 @@ export interface TreeEntry {
   size: number | null;
 }
 
+/** A file to read in a batch: its path and the blob hash the tree listing reported. */
+export interface BlobRef {
+  path: string;
+  blobSha: string;
+}
+
 export interface FileContent {
   content: string;
   blobSha: string;
@@ -77,6 +83,13 @@ export interface GitProvider {
   listTree(path: string, commit: string, folder: string): Promise<TreeEntry[]>;
   /** Blob content decoded as UTF-8 (a byte-order mark is dropped). */
   readBlob(path: string, blobSha: string): Promise<string>;
+  /**
+   * Many files at `commit` in a few requests, keyed by blob hash, for providers whose per-file reads
+   * hit rate limits (GitLab.com allows 100 API requests a minute on the free plan). A file missing
+   * from the result (binary, too large, or changed) is read with readBlob. Absent on providers
+   * without a batch read.
+   */
+  readBlobs?(path: string, commit: string, files: readonly BlobRef[]): Promise<Map<string, string>>;
   /** One file at `ref` (commit or branch), or null when there is no file at that path. */
   readFile(path: string, ref: string, filePath: string): Promise<FileContent | null>;
   /** Link to a file on the branch in the provider's web UI, for "Open file". */

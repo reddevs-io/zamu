@@ -62,6 +62,8 @@ function trimFolder(folder: string): string {
 }
 
 export interface FolderLocation {
+  /** The commit the folder was located at. */
+  commit: string;
   /** Null when no Backlog.md folder was found. */
   folder: string | null;
   source: BacklogFolderSource | null;
@@ -97,11 +99,11 @@ export async function locateFolder(
   }
   for (const [folder, source] of candidates) {
     const tree = await provider.listTree(repoPath, commit, folder);
-    if (tree.length > 0) return { folder, source, tree, rootConfig };
+    if (tree.length > 0) return { commit, folder, source, tree, rootConfig };
     // An override or a configured folder is final: say it is empty rather than guess another one.
-    if (source !== 'default') return { folder: null, source, tree: [], rootConfig };
+    if (source !== 'default') return { commit, folder: null, source, tree: [], rootConfig };
   }
-  return { folder: null, source: null, tree: [], rootConfig };
+  return { commit, folder: null, source: null, tree: [], rootConfig };
 }
 
 /** File counts per subfolder of the Backlog.md folder; docs/, decisions/ and the like are marked ignored. */
@@ -186,9 +188,11 @@ export async function readFolder(
 ): Promise<FolderRead> {
   const { folder, tree } = location;
   let downloads = 0;
+  // Filled by the batch read below on providers that have one; anything missing is read alone.
+  let batched = new Map<string, string>();
   const download = async (blobSha: string) => {
     downloads += 1;
-    return provider.readBlob(repoPath, blobSha);
+    return batched.get(blobSha) ?? provider.readBlob(repoPath, blobSha);
   };
 
   // Config: the root file when it names the project, else <folder>/config.yml (or .yaml).
@@ -246,6 +250,12 @@ export async function readFolder(
     return task?.backlogId && readStoredBlock(task.backlogData) ? row : null;
   };
 
+  if (provider.readBlobs) {
+    const needed = content
+      .filter(({ entry, kind }) => !isUnchanged(entry, kind))
+      .map(({ entry }) => ({ path: entry.path, blobSha: entry.blobSha }));
+    if (needed.length > 0) batched = await provider.readBlobs(repoPath, location.commit, needed);
+  }
   const files = await mapLimit(content, DOWNLOAD_CONCURRENCY, async ({ entry, kind }): Promise<PlanFile> => {
     const unchanged = isUnchanged(entry, kind);
     if (unchanged) return { path: entry.path, blobSha: entry.blobSha, kind, unchanged };

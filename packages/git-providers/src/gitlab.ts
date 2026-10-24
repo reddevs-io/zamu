@@ -2,6 +2,9 @@
 // Docs: https://docs.gitlab.com/api/repositories/ (tree with keyset pagination, raw blobs),
 // /api/branches/, /api/projects/, /api/rest/ (URL-encoded namespaced paths, Link headers).
 //
+// Blob contents come in batches of BATCH_SIZE through GraphQL (repository.blobs): one REST call per
+// file would exceed gitlab.com's 100 requests a minute on the free plan for a few hundred tasks.
+//
 // The tree endpoint answers 404 "invalid revision or path" for a folder that does not exist, the
 // same status as for a missing project. To tell them apart, listTree first checks the folder in its
 // parent's listing; the recursive listing then only runs on a folder known to exist.
@@ -17,11 +20,23 @@ import {
   stringField,
 } from './http';
 import { isRegularFileMode, normalizeFolder, repoSegments, splitFilePath } from './paths';
-import type { FileContent, GitProvider, RepositoryInfo, TreeEntry, Whoami } from './types';
+import type { BlobRef, FileContent, GitProvider, RepositoryInfo, TreeEntry, Whoami } from './types';
 import { verifyWebhook } from './webhooks';
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10_000;
+const BATCH_SIZE = 100;
+
+const BLOBS_QUERY = `query($project: ID!, $ref: String!, $paths: [String!]!, $after: String) {
+  project(fullPath: $project) {
+    repository {
+      blobs(ref: $ref, paths: $paths, first: ${BATCH_SIZE}, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { path oid rawTextBlob }
+      }
+    }
+  }
+}`;
 
 interface GitLabEntry {
   id: string;
@@ -152,6 +167,49 @@ export class GitLabProvider implements GitProvider {
       '*/*',
     );
     return decodeUtf8(bytes);
+  }
+
+  async readBlobs(path: string, commit: string, files: readonly BlobRef[]): Promise<Map<string, string>> {
+    const project = repoSegments(path, true).join('/');
+    const wanted = new Set(files.map((file) => file.blobSha));
+    const contents = new Map<string, string>();
+    const paths = [...new Set(files.map((file) => file.path))];
+    for (let start = 0; start < paths.length; start += BATCH_SIZE) {
+      const batch = paths.slice(start, start + BATCH_SIZE);
+      let after: string | null = null;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const { data } = await this.http.postJson(this.http.originUrl('/api/graphql'), {
+          query: BLOBS_QUERY,
+          variables: { project, ref: commit, paths: batch, after },
+        });
+        const body = asRecord(data, 'GraphQL answer');
+        if (Array.isArray(body.errors) && body.errors.length > 0) {
+          throw new GitUnexpected('The provider refused the batch read of files.');
+        }
+        // GraphQL answers null for a project the token cannot see, where REST answers 404.
+        const found = asRecord(body.data, 'GraphQL data').project;
+        if (found === null) {
+          throw new GitNotFound(
+            'The provider has no such repository, branch or object, or the token cannot see it.',
+          );
+        }
+        const repository = asRecord(asRecord(found, 'project').repository, 'repository');
+        const blobs = asRecord(repository.blobs, 'blob list');
+        for (const node of asArray(blobs.nodes, 'blob list')) {
+          const record = asRecord(node, 'blob');
+          const oid = record.oid;
+          const text = record.rawTextBlob;
+          // Binary or oversized blobs come back without text; the caller reads them one by one.
+          if (typeof oid === 'string' && typeof text === 'string' && wanted.has(oid)) {
+            contents.set(oid, text.replace(/^\uFEFF/, ''));
+          }
+        }
+        const info = asRecord(blobs.pageInfo, 'page info');
+        if (info.hasNextPage !== true || typeof info.endCursor !== 'string') break;
+        after = info.endCursor;
+      }
+    }
+    return contents;
   }
 
   async readFile(path: string, ref: string, filePath: string): Promise<FileContent | null> {
