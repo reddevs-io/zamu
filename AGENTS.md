@@ -11,7 +11,7 @@ Self-hosted, MIT-licensed project management tool for agent-driven development. 
 
 ## Backlog
 
-- Out-of-scope work and follow-ups go in Backlog.md (`backlog/`, prefix `PM`), not in Memory Bank issues. That includes work in other repos such as gitops; label it `infra`.
+- Out-of-scope work and follow-ups go in Backlog.md (`backlog/`, prefix `PM`), not in Memory Bank issues. Work that lands in gitops goes in its own backlog (prefix `OPS`); label infra work that stays in this repo `infra`.
 - Labels in use: `bug`, `feature`, `perf`, `security`, `refactor`, plus an area (`web`, `worker`, `db`, `infra`).
 
 <!-- BACKLOG.MD GUIDELINES START -->
