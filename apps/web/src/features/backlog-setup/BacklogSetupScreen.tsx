@@ -9,8 +9,10 @@ import { projectHref } from '~/features/shell/paths';
 import { orpc } from '~/lib/orpc';
 import { Banner, Button, EmptyState, type SetupStep, Skeleton, useHotkeys } from '~/ui';
 import { type AgentSuggestion, assignAgent } from './agent-suggestions';
+import type { InviteDraft } from './assignee-hints';
 import { CreateAgentHost } from './CreateAgentHost';
 import { pickConnection } from './connections';
+import { InviteHost } from './InviteHost';
 import { MappingsEditor } from './MappingsStep';
 import { ModeStep } from './ModeStep';
 import { forgetMappings, loadSavedMappings, saveMappings } from './mapping-memory';
@@ -145,6 +147,9 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
   };
   const members = useQuery({ ...membersQuery(), enabled: step === 'mappings' });
   const [agentDraft, setAgentDraft] = useState<AgentSuggestion | null>(null);
+  const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
+  // Invitations made here (value to email). Screen state only: nothing maps on accept.
+  const [invited, setInvited] = useState<Record<string, string>>({});
 
   const preview = useQuery({
     ...previewQuery({
@@ -320,6 +325,8 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
         onChange={onMappingsChange}
         members={members.data?.items ?? []}
         onCreateAgent={setAgentDraft}
+        onInvite={setInviteDraft}
+        invited={invited}
       />
     ) : (
       <Skeleton height={240} />
@@ -392,11 +399,14 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
     body = null;
   }
 
-  useContinueShortcut(() => {
-    const next = footer.next;
-    if (next && !next.isDisabled && !next.isPending) next.onPress();
-  }, !newFromOpen && !agentDraft);
-  useHotkeys({ Escape: { handler: cancel, enabled: !newFromOpen && !agentDraft } });
+  useContinueShortcut(
+    () => {
+      const next = footer.next;
+      if (next && !next.isDisabled && !next.isPending) next.onPress();
+    },
+    !newFromOpen && !agentDraft && !inviteDraft,
+  );
+  useHotkeys({ Escape: { handler: cancel, enabled: !newFromOpen && !agentDraft && !inviteDraft } });
 
   const verb = (source?.mode ?? mode) === 'import' ? 'Import' : 'Mirror';
   return (
@@ -421,6 +431,11 @@ function SetupWizard({ project, search }: { project: ProjectWithCounts; search: 
           if (mappings) onMappingsChange(assignAgent(mappings, draft.from, agent.id));
         }}
       />
+      <InviteHost
+        draft={inviteDraft}
+        onClose={() => setInviteDraft(null)}
+        onCreated={(draft, invitation) => setInvited((all) => ({ ...all, [draft.from]: invitation.email }))}
+      />
     </>
   );
 }
@@ -440,6 +455,9 @@ function EditMappings({ project }: { project: ProjectWithCounts }) {
   const members = useQuery(membersQuery());
   const [edited, setEdited] = useState<BacklogMappingsView | null>(null);
   const [agentDraft, setAgentDraft] = useState<AgentSuggestion | null>(null);
+  const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
+  // Invitations made here (value to email). Screen state only: nothing maps on accept.
+  const [invited, setInvited] = useState<Record<string, string>>({});
   const view = edited ?? status.data?.mappings ?? null;
   const noSource = status.error instanceof SettingsError && status.error.code === 'NOT_FOUND';
   const detached = status.data?.state === 'detached';
@@ -459,8 +477,8 @@ function EditMappings({ project }: { project: ProjectWithCounts }) {
   const onSave = () => {
     if (view && canSave && !save.isPending) save.mutate(view);
   };
-  useContinueShortcut(onSave, !agentDraft);
-  useHotkeys({ Escape: { handler: cancel, enabled: !agentDraft } });
+  useContinueShortcut(onSave, !agentDraft && !inviteDraft);
+  useHotkeys({ Escape: { handler: cancel, enabled: !agentDraft && !inviteDraft } });
 
   let body: ReactNode;
   if (status.isPending) body = <Skeleton height={240} />;
@@ -501,6 +519,8 @@ function EditMappings({ project }: { project: ProjectWithCounts }) {
           title="Match Backlog.md values to this app"
           aside="The next refresh applies them to every task."
           onCreateAgent={setAgentDraft}
+          onInvite={setInviteDraft}
+          invited={invited}
         />
       </>
     );
@@ -538,6 +558,11 @@ function EditMappings({ project }: { project: ProjectWithCounts }) {
         onCreated={(draft, agent) => {
           if (view) setEdited(assignAgent(view, draft.from, agent.id));
         }}
+      />
+      <InviteHost
+        draft={inviteDraft}
+        onClose={() => setInviteDraft(null)}
+        onCreated={(draft, invitation) => setInvited((all) => ({ ...all, [draft.from]: invitation.email }))}
       />
     </>
   );
