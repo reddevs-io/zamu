@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<link rel="stylesheet" href="./ledger-m5.css" />
+<style>
+.my-list{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.my-cols{grid-template-columns:72px minmax(0,1fr) 120px 110px 150px 92px 34px 34px}
+.my-cols1024{grid-template-columns:72px minmax(0,1fr) 56px 120px 92px 34px}
+.my-row{height:36px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box}
+.my-rowf{height:36px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;box-shadow:inset 0 0 0 2px var(--focus)}
+.my-rowh{height:36px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;background:var(--band)}
+.my-proj{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;min-width:0;white-space:nowrap;overflow:hidden}
+.my-pk{font-family:"Martian Mono",ui-monospace,monospace;font-size:9.5px;padding:0 4px;border:1px solid var(--line);color:var(--muted);line-height:15px;flex:none;position:relative}
+.my-pkm{font-family:"Martian Mono",ui-monospace,monospace;font-size:9.5px;padding:0 4px 0 12px;border:1px dashed var(--line);color:var(--muted);line-height:15px;flex:none;position:relative}
+.my-pkm::before{content:"";position:absolute;left:4px;top:5px;width:5px;height:5px;background:var(--muted)}
+.my-body{flex:1;min-height:0;overflow:hidden;position:relative}
+.my-ro{display:inline-flex;align-items:center;height:18px;padding:0 5px;margin-left:-5px;background-image:repeating-linear-gradient(135deg,var(--hatch) 0 5px,transparent 5px 10px)}
+.my-th{display:grid}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="{{ rootStyle }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnavon" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rk" href="#"><span>PAY</span><span class="lg-rn">38</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>BACK</span><span class="lg-rn">41</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="my-list">
+      <header class="lg-head">
+        <div style="min-width:0"><h1 class="lg-h1">My tasks</h1><div class="lg-sub">11 open in 5 projects · 2 overdue · 2 blocked</div></div>
+        <div class="lg-headr"><div class="lg-search" style="width:150px"><span>Search</span><span class="lg-kbd">/</span></div><button class="lg-btn">New<span class="lg-btnk">C</span></button></div>
+      </header>
+      <div class="lg-bar" style="gap:12px">
+        <span>Project <span class="lg-bv">Any</span></span>
+        <span>Status <span class="lg-bv">Open</span></span>
+        <span>Priority <span class="lg-bv">Any</span></span>
+        <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span>Milestone <span class="lg-bv">Any</span></span></sc-if>
+        <span class="m5-fsep"></span>
+        <span class="m5-f">Label<span class="lg-faint">▾</span></span>
+        <span class="m5-f">Due<span class="lg-faint">▾</span></span>
+        <span class="lg-sp"></span>
+        <span class="m5-sort">Sort: <b>Due date</b><span class="lg-faint">↑ soonest first</span></span>
+      </div>
+      <div class="{{ thCls }}"><span>Key</span><span>Title</span><span>Project</span><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span>Milestone</span></sc-if><span>Labels</span><span>Due</span><span>Pri</span><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="lg-right">Upd</span></sc-if></div>
+      <div class="my-body">
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+          <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+          <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+            <div class="{{ r.cls }}">
+              <span class="lg-key">{{ r.key }}</span>
+              <span class="m5-tc">
+                <span class="lg-trunc">{{ r.title }}</span>
+                <sc-if value="{{ r.par }}" hint-placeholder-val="{{ false }}"><span class="m5-par">↳ {{ r.par }}</span></sc-if>
+                <sc-if value="{{ r.sub }}" hint-placeholder-val="{{ false }}"><span class="m5-sub"><span class="m5-subbar" style="--p:{{ r.subP }}"></span>{{ r.sub }}</span></sc-if>
+                <sc-if value="{{ r.blk }}" hint-placeholder-val="{{ false }}"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></sc-if>
+              </span>
+              <span class="my-proj"><span class="{{ r.pkCls }}">{{ r.pk }}</span><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="lg-trunc">{{ r.proj }}</span></sc-if></span>
+              <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span><sc-if value="{{ r.ms }}" hint-placeholder-val="{{ true }}"><span class="m2-chip"><span class="m2-ms"></span><span class="m2-chipt">{{ r.ms }}</span></span></sc-if></span></sc-if>
+              <span class="m5-labels"><sc-for list="{{ r.labels }}" as="l" hint-placeholder-count="2"><span class="{{ l.cls }}" style="{{ l.mw }}"><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span class="m5-lbt">{{ l.n }}</span></span></sc-for><sc-if value="{{ r.more }}" hint-placeholder-val="{{ false }}"><span class="m5-lbmore">{{ r.more }}</span></sc-if></span>
+              <span><sc-if value="{{ r.due }}" hint-placeholder-val="{{ true }}"><span class="{{ r.dueWrap }}" title="{{ r.dueTitle }}"><span class="{{ r.dueCls }}"><sc-if value="{{ r.dueGlyph }}" hint-placeholder-val="{{ true }}"><span class="m5-cal"></span></sc-if>{{ r.due }}</span></span></sc-if></span>
+              <span class="{{ r.priCls }}">{{ r.pri }}</span>
+              <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="lg-upd">{{ r.upd }}</span></sc-if>
+            </div>
+          </sc-for>
+        </sc-for>
+        <div style="padding:12px 24px;display:flex;gap:16px;align-items:center;font-size:11.5px;color:var(--faint)"><span class="my-ro" style="margin-left:0"><span class="m5-due"><span class="m5-cal"></span>Nov 4</span></span><span>Hatched values come from a Backlog.md file and change there.</span><span class="lg-sp"></span><span><span class="lg-kbd">⇧D</span> due date · <span class="lg-kbd">#</span> labels · <span class="lg-kbd">⇧B</span> blocker on the focused row</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["mine"], "default": "mine" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const width = String(this.props.width ?? '1280');
+    const wide = width !== '1024';
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const LB = { webhooks: 'teal', reliability: 'green', 'merchant-facing': 'orange', backend: 'slate', billing: 'blue', refunds: 'violet', api: 'slate', docs: 'pink', sepa: 'amber', security: 'red', checkout: 'red', frontend: 'blue', marketing: 'pink', cli: 'slate', infra: 'slate', sessions: 'slate', redis: 'slate', postgres: 'teal' };
+    const DUE = { over: ['m5-dueover', false], soon: ['m5-duesoon', true], fut: ['m5-due', true], done: ['m5-duedone', true] };
+    const PJ = { PAY: 'Payments', WEB: 'Website', CLI: 'Command-line tool', BACK: 'Backend', INF: 'Infrastructure' };
+    const avail = wide ? 150 : 120;
+    const row = (key, title, o) => {
+      const labels = o.labels || [];
+      const shown = [];
+      let used = 0;
+      for (let i = 0; i < labels.length; i++) {
+        const w = 25 + labels[i].length * 6 + (shown.length ? 4 : 0);
+        const reserve = i < labels.length - 1 ? 30 : 0;
+        if (used + w + reserve > avail && shown.length) break;
+        if (!wide && shown.length) break;
+        shown.push({ n: labels[i], c: LB[labels[i]] || 'slate', cls: o.ro ? 'm5-lbro' : 'm5-lb', mw: 'max-width:' + (avail - used - reserve - (shown.length ? 4 : 0)) + 'px' });
+        used += w;
+      }
+      const due = o.due ? DUE[o.due[0]] : null;
+      const pk = key.split('-')[0];
+      const pri = PRI[o.pri];
+      return {
+        key, title, cls: (o.cls || 'my-row') + ' ' + (wide ? 'my-cols' : 'my-cols1024'),
+        pk, proj: PJ[pk], pkCls: o.ro ? 'my-pkm' : 'my-pk', ms: o.ms || '',
+        labels: shown, more: labels.length > shown.length ? '+' + (labels.length - shown.length) : '',
+        due: o.due ? o.due[1] : '', dueCls: due ? due[0] : '', dueGlyph: due ? due[1] : false,
+        dueWrap: o.ro ? 'my-ro' : '', dueTitle: o.ro ? 'From backlog/tasks/back-12 - Move-session-storage-to-Redis.md' : '',
+        pri: pri[0], priCls: pri[1], upd: o.upd || '', par: o.par || '', sub: o.sub || '', subP: o.subP || '0%', blk: !!o.blk
+      };
+    };
+    const SQ = { prog: 'lg-sq lg-s-prog', review: 'lg-sq lg-s-review', todo: 'lg-sq lg-s-todo', backlog: 'lg-sq lg-s-backlog' };
+    const groups = [
+      { sq: SQ.prog, name: 'In progress', count: 3, rows: [
+        row('WEB-88', 'Cookie banner blocks the checkout button on small laptops', { pri: 4, labels: ['checkout', 'frontend'], due: ['over', '2d overdue'], ms: 'Checkout v3', upd: '1h', cls: 'my-rowf' }),
+        row('CLI-21', 'pm dashboard command with --json output', { pri: 2, labels: ['cli'], due: ['soon', 'Due today'], ms: 'CLI 1.2', upd: '3h' }),
+        row('BACK-12', 'Move session storage to Redis', { pri: 3, labels: ['sessions', 'redis', 'infra'], due: ['fut', 'Nov 4'], ro: true, sub: '1/2', subP: '50%', blk: true, ms: 'm-2 Sessions', upd: '5h' })
+      ] },
+      { sq: SQ.review, name: 'In review', count: 1, rows: [
+        row('PAY-160', 'Idempotency keys on refund requests', { pri: 4, labels: ['refunds', 'api'], due: ['soon', 'Tomorrow'], ms: 'Webhooks v2', upd: '3h', cls: 'my-rowh' })
+      ] },
+      { sq: SQ.todo, name: 'Todo', count: 5, rows: [
+        row('INF-33', 'Postgres 18 minor upgrade on the staging cluster', { pri: 3, labels: ['infra', 'postgres'], due: ['over', '1d overdue'], upd: '2d' }),
+        row('WEB-95', 'Pricing page: annual billing toggle', { pri: 1, labels: ['marketing'], due: ['soon', 'Thu'], upd: '1d' }),
+        row('INF-31', 'Move Postgres backups to the new object store', { pri: 2, labels: ['infra'], due: ['fut', 'Nov 12'], upd: '2d' }),
+        row('PAY-150', 'Merchant dashboard: failed deliveries', { pri: 2, labels: ['merchant-facing', 'webhooks'], due: ['fut', 'Nov 18'], blk: true, ms: 'Webhooks v2', upd: '3d' }),
+        row('BACK-12.2', 'Migrate existing sessions on deploy', { pri: 2, labels: ['sessions'], ro: true, par: 'BACK-12', ms: 'm-2 Sessions', upd: '5h' })
+      ] },
+      { sq: SQ.backlog, name: 'Backlog', count: 2, rows: [
+        row('WEB-70', 'Dark mode for the docs site', { pri: 1, labels: ['frontend', 'docs'], upd: '6d' }),
+        row('PAY-163', 'SEPA mandate PDF in German', { pri: 1, labels: ['sepa', 'docs', 'billing'], upd: '4d' })
+      ] }
+    ];
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rootStyle: 'width:' + width + 'px;height:800px',
+      label: 'My tasks · due dates and Blocked across projects' + (wide ? '' : ' · 1024'),
+      wide,
+      thCls: 'lg-th my-th ' + (wide ? 'my-cols' : 'my-cols1024'),
+      groups
+    };
+  }
+}
+</script>
+</body>
+</html>

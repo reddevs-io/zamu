@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<link rel="stylesheet" href="./ledger-m5.css" />
+<style>
+.b5-wrap{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.b5-top{display:flex;align-items:center;gap:6px;min-width:0}
+.b5-top .lg-key{flex:none}
+.b5-lbls{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
+.b5-lbls .m5-lb{flex:0 1 auto;min-width:0}
+.b5-lbls .m5-lbmore{flex:none}
+.b5-foot{display:flex;align-items:center;gap:8px;min-width:0}
+.b5-tip{position:absolute;z-index:6;background:var(--fg);color:var(--bg);font-size:11.5px;padding:5px 8px;white-space:nowrap;box-shadow:var(--shadow)}
+.b5-keys{display:flex;align-items:center;gap:6px;color:var(--faint);font-size:11.5px;white-space:nowrap}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="{{ rootStyle }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">38</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>BACK</span><span class="lg-rn">41</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="b5-wrap">
+      <header class="lg-head">
+        <div style="min-width:0"><h1 class="lg-h1">Payments</h1><div class="lg-sub"><span class="lg-mono">PAY</span> · 38 open · board</div></div>
+        <div class="lg-headr">
+          <div class="lg-search" style="width:150px"><span>Search</span><span class="lg-kbd">/</span></div>
+          <button class="lg-btn">New<span class="lg-btnk">C</span></button>
+        </div>
+      </header>
+      <nav class="m2-tabs">
+        <a class="m2-tabon" href="#">Tasks<span class="m2-tabn">38</span></a>
+        <a class="m2-tab" href="#"><span class="m2-ms"></span>Milestones<span class="m2-tabn">3</span></a>
+        <a class="m2-tab" href="#"><span class="m2-cyon" style="--p:79%"></span>Cycles<span class="m2-tabn">C12 · 3d left</span></a>
+      </nav>
+      <div class="lg-bar" style="gap:6px">
+        <span class="m5-f">Status <span class="lg-bv">Any</span></span>
+        <span class="m5-f">Assignee <span class="lg-bv">Any</span></span>
+        <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="m5-f">Priority <span class="lg-bv">Any</span></span></sc-if>
+        <span class="m5-fon"><span class="m5-fk">Label</span><span class="m5-fv"><span class="m5-sw" style="--c:var(--lb-teal)"></span>webhooks</span><span class="m5-fx">×</span></span>
+        <span class="m5-f">Due <span class="lg-bv">Any</span></span>
+        <span class="lg-sp"></span>
+        <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="b5-keys"><span class="lg-kbd">#</span>labels<span class="lg-kbd">⇧D</span>due</span><span class="m5-fsep"></span></sc-if>
+        <span class="m2-seg"><span class="m2-segi">List</span><span class="m2-segon">Board</span></span>
+        <span class="lg-kbd">V</span>
+      </div>
+      <div class="m2-board" style="position:relative">
+        <sc-for list="{{ cols }}" as="c" hint-placeholder-count="5">
+          <sc-if value="{{ c.open }}" hint-placeholder-val="{{ true }}">
+            <div class="m2-col">
+              <div class="m2-colh"><span class="{{ c.sq }}"></span><span>{{ c.name }}</span><span class="lg-gc">{{ c.count }}</span><span class="lg-sp"></span><span class="lg-faint" style="letter-spacing:0">+</span></div>
+              <div class="m2-colb">
+                <sc-for list="{{ c.cards }}" as="t" hint-placeholder-count="3">
+                  <div class="{{ t.cls }}">
+                    <div class="b5-top">
+                      <span class="lg-key">{{ t.key }}</span>
+                      <sc-if value="{{ t.par }}" hint-placeholder-val="{{ false }}"><span class="m5-par">↳ {{ t.par }}</span></sc-if>
+                      <span class="lg-sp"></span>
+                      <sc-if value="{{ t.blocked }}" hint-placeholder-val="{{ false }}"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></sc-if>
+                      <span class="{{ t.priCls }}">{{ t.pri }}</span>
+                    </div>
+                    <div class="m2-cardt">{{ t.title }}</div>
+                    <sc-if value="{{ t.hasLabels }}" hint-placeholder-val="{{ true }}">
+                      <div class="b5-lbls">
+                        <sc-for list="{{ t.labels }}" as="l" hint-placeholder-count="2"><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span class="m5-lbt">{{ l.n }}</span></span></sc-for>
+                        <sc-if value="{{ t.more }}" hint-placeholder-val="{{ false }}"><span class="m5-lbmore">{{ t.more }}</span></sc-if>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ t.hasFoot }}" hint-placeholder-val="{{ true }}">
+                      <div class="b5-foot">
+                        <sc-if value="{{ t.dueOver }}" hint-placeholder-val="{{ false }}"><span class="m5-dueover"><span class="m5-cal"></span>{{ t.dueOver }}</span></sc-if>
+                        <sc-if value="{{ t.dueSoon }}" hint-placeholder-val="{{ false }}"><span class="m5-duesoon"><span class="m5-cal"></span>{{ t.dueSoon }}</span></sc-if>
+                        <sc-if value="{{ t.due }}" hint-placeholder-val="{{ false }}"><span class="m5-due"><span class="m5-cal"></span>{{ t.due }}</span></sc-if>
+                        <sc-if value="{{ t.dueDone }}" hint-placeholder-val="{{ false }}"><span class="m5-duedone"><span class="m5-cal"></span>{{ t.dueDone }}</span></sc-if>
+                        <sc-if value="{{ t.sub }}" hint-placeholder-val="{{ false }}"><span class="{{ t.subCls }}"><span class="m5-subbar" style="--p:{{ t.subP }}"></span>{{ t.sub }}</span></sc-if>
+                        <span class="lg-sp"></span>
+                        <sc-if value="{{ t.has }}" hint-placeholder-val="{{ true }}"><span class="{{ t.avCls }}" style="--h:{{ t.hue }}" title="{{ t.who }}">{{ t.ini }}</span></sc-if>
+                        <sc-if value="{{ t.none }}" hint-placeholder-val="{{ false }}"><span class="m2-none"></span></sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ c.more }}" hint-placeholder-val="{{ false }}"><div class="m2-more">{{ c.more }}</div></sc-if>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ c.fold }}" hint-placeholder-val="{{ false }}">
+            <div class="m2-colfold" title="Expand {{ c.name }}"><span class="{{ c.sq }}"></span><span class="m2-colfoldt"><span>{{ c.name }}</span><span class="lg-gc">{{ c.count }}</span></span></div>
+          </sc-if>
+        </sc-for>
+        <div class="b5-tip" style="{{ tipStyle }}">Blocked by PAY-142, in progress</div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["board"], "default": "board" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const width = String(this.props.width ?? '1280');
+    const narrow = width === '1024';
+    const P = { ana: ['Ana Ruiz', 'AR', 25, 'lg-av'], tomas: ['Tomás Berg', 'TB', 220, 'lg-av'], clara: ['Clara Lindqvist', 'CL', 150, 'lg-av'], claude: ['claude-dev, for Ana Ruiz', 'C', 0, 'lg-ag'], codex: ['codex-ci, for Tomás Berg', 'X', 0, 'lg-ag'] };
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const L = { webhooks: 'teal', reliability: 'green', 'merchant-facing': 'orange', backend: 'slate', billing: 'blue', q4: 'amber', security: 'red', 'needs-docs': 'pink', refunds: 'violet', sepa: 'amber', api: 'slate', docs: 'pink' };
+    // Cards keep one line of labels: two chips, then "+N". Chips shrink and ellipsize; "+N" never does.
+    const maxChips = 2;
+    const card = (key, title, pri, who, o) => {
+      o = o || {};
+      const p = who ? P[who] : null;
+      const labels = (o.labels || []).map((n) => ({ n, c: L[n] || 'slate' }));
+      const shown = labels.slice(0, maxChips);
+      const rest = labels.length - shown.length;
+      const st = o.st || '';
+      return {
+        key, title, cls: o.cls || 'm2-card',
+        pri: PRI[pri][0], priCls: PRI[pri][1],
+        par: o.par || '', blocked: !!o.blocked,
+        labels: shown, more: rest > 0 ? '+' + rest : '', hasLabels: labels.length > 0,
+        dueOver: o.dueOver || '', dueSoon: o.dueSoon || '', due: o.due || '', dueDone: o.dueDone || '',
+        sub: o.sub || '', subP: o.subP || '0%', subCls: o.subAll ? 'm5-subdone' : 'm5-sub',
+        has: !!p, none: !p, who: p ? p[0] : 'Unassigned', ini: p ? p[1] : '', hue: p ? p[2] : 0, avCls: p ? p[3] : '',
+        hasFoot: true
+      };
+    };
+    const cols = [
+      { name: 'Backlog', sq: 'lg-sq lg-s-backlog', count: 14, open: !narrow, fold: narrow, more: 'Show 11 more', cards: [
+        card('PAY-160', 'Spike: card network tokens for recurring payments', 0, null, { labels: ['billing'] }),
+        card('PAY-165', 'Replay a webhook delivery from the dashboard', 1, null, { labels: ['webhooks', 'merchant-facing'] }),
+        card('PAY-171', 'Payout currency switch for EU merchants', 1, 'tomas', { labels: ['billing', 'sepa', 'q4'], due: 'Dec 1' })
+      ] },
+      { name: 'Todo', sq: 'lg-sq lg-s-todo', count: 9, open: true, fold: false, more: 'Show 6 more', cards: [
+        card('PAY-151', 'Webhook signature check accepts expired timestamps', 4, 'tomas', { labels: ['security', 'webhooks'], dueSoon: 'Tomorrow' }),
+        card('PAY-147', 'Alert merchants after 24h of failures', 2, null, { par: 'PAY-142', labels: ['merchant-facing'], due: 'Nov 4' }),
+        card('PAY-150', 'Merchant dashboard: failed deliveries', 2, 'clara', { labels: ['merchant-facing', 'webhooks', 'q4'], blocked: true, due: 'Nov 13', cls: 'm2-cardhov' })
+      ] },
+      { name: 'In progress', sq: 'lg-sq lg-s-prog', count: 8, open: true, fold: false, more: 'Show 5 more', cards: [
+        card('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 3, 'claude', { labels: ['webhooks', 'reliability', 'merchant-facing', 'backend'], blocked: true, dueOver: '3d overdue', sub: '3/5', subP: '60%', cls: 'm2-cardfoc' }),
+        card('PAY-146', 'Dead-letter queue after the sixth attempt', 2, 'claude', { par: 'PAY-142', labels: ['webhooks'], dueSoon: 'Thu' }),
+        card('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 2, 'codex', { labels: ['billing', 'backend'], dueSoon: 'Due today' })
+      ] },
+      { name: 'In review', sq: 'lg-sq lg-s-review', count: 3, open: true, fold: false, more: '', cards: [
+        card('PAY-133', 'Refund reasons as a fixed list', 1, 'ana', { labels: ['refunds'], sub: '4/4', subP: '100%', subAll: true, due: 'Nov 6' }),
+        card('PAY-140', 'Idempotency keys on refund requests', 3, 'claude', { labels: ['refunds', 'api'] })
+      ] },
+      { name: 'Done', sq: 'lg-sq lg-s-done', count: 21, open: !narrow, fold: narrow, more: 'Show 18 more', cards: [
+        card('PAY-143', 'Honour Retry-After on 429 responses', 2, 'claude', { par: 'PAY-142', labels: ['webhooks'], dueDone: 'Oct 22' }),
+        card('PAY-145', 'Store attempts in webhook_attempt', 1, 'codex', { par: 'PAY-142' }),
+        card('PAY-120', 'Drop the v1 webhook payload format', 2, 'claude', { labels: ['webhooks', 'api'], dueDone: 'Oct 9' })
+      ] }
+    ];
+    // Tooltip on the hovered card's Blocked marker (PAY-150, Todo column).
+    const colW = narrow ? (1024 - 64 - 80) / 3 : (1280 - 64) / 5;
+    const todoLeft = narrow ? 40 : colW;
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rootStyle: 'width:' + width + 'px;height:800px',
+      label: 'Board · PAY · labels, due, blocked, subtasks · ' + width,
+      wide: !narrow,
+      cols,
+      tipStyle: 'left:' + Math.round(todoLeft + (narrow ? 150 : 110)) + 'px;top:' + (narrow ? 312 : 326) + 'px'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+body{margin:0;background:#f0eee9}
+a{color:inherit}
+a:hover{color:#2a78d6}
+</style>
+</helmet>
+<div style="{{ box }}" data-screen-label="M5 single frame">
+  <sc-if value="{{ isKit }}" hint-placeholder-val="{{ false }}"><dc-import name="M5Kit" theme="{{ theme }}" state="{{ state }}" hint-size="1280px,1600px"></dc-import></sc-if>
+  <sc-if value="{{ isPanel }}" hint-placeholder-val="{{ true }}"><dc-import name="M5Panel" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,800px"></dc-import></sc-if>
+  <sc-if value="{{ isRel }}" hint-placeholder-val="{{ false }}"><dc-import name="M5PanelRel" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,800px"></dc-import></sc-if>
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}"><dc-import name="M5List" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,800px"></dc-import></sc-if>
+  <sc-if value="{{ isMy }}" hint-placeholder-val="{{ false }}"><dc-import name="M5MyTasks" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,800px"></dc-import></sc-if>
+  <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}"><dc-import name="M5Board" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,800px"></dc-import></sc-if>
+  <sc-if value="{{ isDash }}" hint-placeholder-val="{{ false }}"><dc-import name="M5Dashboard" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,900px"></dc-import></sc-if>
+  <sc-if value="{{ isLabels }}" hint-placeholder-val="{{ false }}"><dc-import name="M5Labels" theme="{{ theme }}" state="{{ state }}" width="{{ width }}" hint-size="1280px,800px"></dc-import></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "c": { "editor": "enum", "options": ["kit", "panel", "rel", "list", "my", "board", "dash", "labels"], "default": "panel" },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "text", "default": "full" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    let q = {};
+    try { q = Object.fromEntries(new URLSearchParams(window.location.search)); } catch (e) { q = {}; }
+    const c = q.c || this.props.c || 'panel';
+    const width = q.width || this.props.width || '1280';
+    return {
+      theme: q.theme || this.props.theme || 'light',
+      state: q.state || this.props.state || 'full',
+      width,
+      box: 'width:' + width + 'px;overflow:hidden',
+      isKit: c === 'kit', isPanel: c === 'panel', isRel: c === 'rel', isList: c === 'list', isMy: c === 'my',
+      isBoard: c === 'board', isDash: c === 'dash', isLabels: c === 'labels'
+    };
+  }
+}
+</script>
+</body>
+</html>
