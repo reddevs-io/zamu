@@ -38,6 +38,9 @@ describe('settings format', () => {
   it('describes key scopes for the table and the reveal dialog', () => {
     expect(scopeText({ projects: 'all', access: 'write' })).toBe('Workspace · read and write');
     expect(scopeText({ projects: [pay, cli], access: 'read' })).toBe('PAY, CLI · read only');
+    // A key whose only project was deleted (PM-12).
+    expect(scopeText({ projects: [], access: 'write' })).toBe('No projects · read and write');
+    expect(scopeSentence({ projects: [], access: 'read' })).toBe('Scope: no projects, read only.');
     expect(scopeSentence({ projects: [docs, cli], access: 'write' })).toBe(
       'Scope: DOCS and CLI, read and write.',
     );
