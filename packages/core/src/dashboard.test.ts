@@ -1,6 +1,6 @@
 import type { Dashboard, DashboardScope } from '@pm/contracts';
 import { schema } from '@pm/db';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Actor } from './authz';
 import { createComment, deleteComment } from './comments';
@@ -876,5 +876,116 @@ describe('agents', () => {
       alpha.id,
       beta.id,
     ]);
+  });
+  it('lastActivityAt is the newest activity row or comment in the projects in scope, as the aggregate was', async () => {
+    const world = await createWorld(ctx.db);
+    const a = await newProject(world, 'Readable');
+    const b = await newProject(world, 'Hidden from the key');
+    const addAgent = async (name: string, responsibleUserId: string) => {
+      const agent = await createUser(ctx.db, { name, kind: 'agent', responsibleUserId });
+      await ctx.db
+        .insert(member)
+        .values({ organizationId: world.workspaceId, userId: agent.id, role: 'member' });
+      return agent;
+    };
+    const suffix = randomProjectKey().toLowerCase();
+    // world.agent (the member's): newest is a comment in b; in a, a comment beats older activity.
+    // busy (the member's): newest is activity in b; in a, activity beats an older comment.
+    // elsewhere (the owner's): rows in b only. quiet (the owner's): nothing at all.
+    const busy = await addAgent(`busy-${suffix}`, world.member.id);
+    const elsewhere = await addAgent(`elsewhere-${suffix}`, world.owner.id);
+    const quiet = await addAgent(`quiet-${suffix}`, world.owner.id);
+    const taskA = await rawTask(world, a);
+    const taskB = await rawTask(world, b);
+
+    const act = async (p: ProjectRow, taskId: string, actorId: string | null, hours: number) => {
+      const createdAt = ago(hours);
+      await ctx.db.insert(activity).values({
+        ...scopeOf(p),
+        taskId,
+        actorId,
+        type: 'task.updated',
+        changes: [{ field: 'title', from: 'a', to: 'b' }],
+        createdAt,
+      });
+      return createdAt.toISOString();
+    };
+    const say = async (p: ProjectRow, taskId: string, authorId: string, hours: number) =>
+      (
+        await createCommentRow(ctx.db, scopeOf(p), { taskId, authorId, createdAt: ago(hours) })
+      ).createdAt.toISOString();
+
+    await act(a, taskA.id, world.agent.id, 10);
+    const agentInA = await say(a, taskA.id, world.agent.id, 5);
+    await act(b, taskB.id, world.agent.id, 1);
+    const agentNewest = await say(b, taskB.id, world.agent.id, 0.5);
+    const busyInA = await act(a, taskA.id, busy.id, 3);
+    await say(a, taskA.id, busy.id, 6);
+    await say(b, taskB.id, busy.id, 0.4);
+    const busyNewest = await act(b, taskB.id, busy.id, 0.2);
+    await act(b, taskB.id, elsewhere.id, 2);
+    await say(b, taskB.id, elsewhere.id, 4);
+    // Rows by people and the system never count for an agent.
+    await act(a, taskA.id, world.owner.id, 0.1);
+    await act(a, taskA.id, null, 0.1);
+    await say(a, taskA.id, world.member.id, 0.1);
+
+    /** The query before PM-8: one max() aggregate each over the agents' activity and comments. */
+    const reference = async (agentIds: string[], projectIds: string[]) => {
+      const rows = await ctx.db.execute<{ id: string; at: Date | string | null }>(sql`
+        with agent as (select unnest(${sql.param(agentIds)}::uuid[]) as id),
+        acted as (
+          select a.actor_id as id, max(a.created_at) as at from activity a
+          where a.actor_id in (select id from agent) and a.project_id = any(${sql.param(projectIds)}::uuid[])
+          group by a.actor_id),
+        wrote as (
+          select c.author_id as id, max(c.created_at) as at
+          from task wt join comment c on c.task_id = wt.id
+          where c.author_id in (select id from agent) and wt.project_id = any(${sql.param(projectIds)}::uuid[])
+          group by c.author_id)
+        select agent.id, greatest(acted.at, wrote.at) as at from agent
+        left join acted on acted.id = agent.id left join wrote on wrote.id = agent.id`);
+      return Object.fromEntries(
+        rows.rows.map((row) => [row.id, row.at === null ? null : new Date(row.at).toISOString()]),
+      );
+    };
+    const lastActivity = (result: Dashboard) =>
+      Object.fromEntries(result.agents.map((row) => [row.agent.id, row.lastActivityAt]));
+
+    const all = [world.agent.id, busy.id, elsewhere.id, quiet.id];
+    const mineAgents = [world.agent.id, busy.id];
+    const keyA = (actor: Actor) => personKey(actor, { projects: [a.id], access: 'read' });
+
+    const everyone = lastActivity(await dashboard(world.ownerActor, 'everyone'));
+    expect(everyone).toEqual({
+      [world.agent.id]: agentNewest,
+      [busy.id]: busyNewest,
+      [elsewhere.id]: expect.any(String),
+      [quiet.id]: null,
+    });
+    expect(everyone).toEqual(await reference(all, [a.id, b.id]));
+
+    const everyoneInA = lastActivity(await dashboard(keyA(world.ownerActor), 'everyone'));
+    expect(everyoneInA).toEqual({
+      [world.agent.id]: agentInA,
+      [busy.id]: busyInA,
+      [elsewhere.id]: null,
+      [quiet.id]: null,
+    });
+    expect(everyoneInA).toEqual(await reference(all, [a.id]));
+
+    const mine = lastActivity(await dashboard(world.memberActor));
+    expect(mine).toEqual({ [world.agent.id]: agentNewest, [busy.id]: busyNewest });
+    expect(mine).toEqual(await reference(mineAgents, [a.id, b.id]));
+
+    const mineInA = lastActivity(await dashboard(keyA(world.memberActor)));
+    expect(mineInA).toEqual({ [world.agent.id]: agentInA, [busy.id]: busyInA });
+    expect(mineInA).toEqual(await reference(mineAgents, [a.id]));
+
+    // The owner is responsible for elsewhere and quiet only; neither has a row in a.
+    expect(lastActivity(await dashboard(keyA(world.ownerActor)))).toEqual({
+      [elsewhere.id]: null,
+      [quiet.id]: null,
+    });
   });
 });
