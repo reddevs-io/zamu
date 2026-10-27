@@ -7,3 +7,12 @@ engineStrict: true
 
 allowBuilds:
   esbuild: true
+
+# better-auth lists framework and tooling packages as optional peers, and pnpm links an optional peer
+# whenever any workspace project has it. Through @pm/core that dragged @tanstack/react-start (vite,
+# rolldown, lightningcss, prettier), drizzle-kit and vitest into the worker's production tree.
+# We use none of the better-auth entry points that need them (tanstack-start, test-utils, CLI).
+overrides:
+  better-auth>@tanstack/react-start: "-"
+  better-auth>drizzle-kit: "-"
+  better-auth>vitest: "-"
