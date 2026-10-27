@@ -41,6 +41,7 @@ export {
   detachBacklog,
   getBacklogWebhookInfo,
   refreshBacklogNow,
+  reissueBacklogWebhookSecret,
   requestBacklogRefresh,
   setBacklogConnection,
   setBacklogFolder,

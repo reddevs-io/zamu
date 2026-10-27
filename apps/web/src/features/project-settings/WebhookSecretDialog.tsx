@@ -1,0 +1,43 @@
+// "New secret" in the webhook dialog (PM-9): a confirm dialog, then a new webhook secret for the
+// mirror. The URL stays; the old secret stops working at once. The new secret is shown once from
+// component state, never kept in the mutation cache.
+import type { BacklogWebhookSecret } from '@pm/contracts';
+import { useQueryClient } from '@tanstack/react-query';
+import { ConfirmDialog } from '../settings/ConfirmDialog';
+import { unwrap } from '../settings/result';
+import { webhookInfoQuery } from './queries';
+
+/** Issues a new secret, then refetches the webhook info so the dialog and its poll agree. */
+export function useReissueWebhookSecret(projectKey: string): () => Promise<BacklogWebhookSecret> {
+  const queryClient = useQueryClient();
+  return async () => {
+    const { reissueBacklogWebhookSecretFn } = await import('../backlog/server');
+    const issued = await unwrap(reissueBacklogWebhookSecretFn({ data: { projectKey } }));
+    await queryClient.invalidateQueries({ queryKey: webhookInfoQuery(projectKey).queryKey });
+    return issued;
+  };
+}
+
+export interface WebhookSecretDialogProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  /** Issues the secret; the dialog shows the error when it rejects. */
+  onIssue: () => Promise<BacklogWebhookSecret>;
+  /** The new secret, after the dialog closes. */
+  onIssued: (issued: BacklogWebhookSecret) => void;
+}
+
+export function WebhookSecretDialog({ isOpen, onOpenChange, onIssue, onIssued }: WebhookSecretDialogProps) {
+  return (
+    <ConfirmDialog
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      title="Issue a new webhook secret?"
+      confirmLabel="Issue new secret"
+      onConfirm={async () => onIssued(await onIssue())}
+    >
+      The current secret stops working at once. Webhooks fail until you paste the new secret into the git
+      host. Mirrors still refresh every hour.
+    </ConfirmDialog>
+  );
+}

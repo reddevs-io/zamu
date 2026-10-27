@@ -2,9 +2,9 @@
 import { schema } from '@pm/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BacklogDetached, BacklogPaused, Forbidden, Invalid } from '../errors';
+import { BacklogDetached, BacklogPaused, Conflict, Forbidden, Invalid } from '../errors';
 import { isMirrored } from '../projects';
-import { encryptSecret } from '../secrets';
+import { decryptSecret, EncryptionKeyMissing, encryptSecret } from '../secrets';
 import { createGitConnectionRow } from '../testing/backlog';
 import {
   createWorld,
@@ -19,6 +19,7 @@ import {
   detachBacklog,
   getBacklogWebhookInfo,
   refreshBacklogNow,
+  reissueBacklogWebhookSecret,
   requestBacklogRefresh,
   setBacklogConnection,
   setBacklogFolder,
@@ -185,6 +186,106 @@ describe('Backlog.md settings and status', () => {
     const member = await getBacklogWebhookInfo(ctx, world.memberActor, { projectKey: key });
     expect(member.secret).toBeNull();
     expect(member.url).toBe(admin.url);
+  });
+
+  it('webhook info: secretState ok for admins, hidden for members, unreadable with another key', async () => {
+    const { key, sourceId } = await mirror();
+    expect((await getBacklogWebhookInfo(ctx, world.ownerActor, { projectKey: key })).secretState).toBe('ok');
+    expect((await getBacklogWebhookInfo(ctx, world.memberActor, { projectKey: key })).secretState).toBe(
+      'hidden',
+    );
+    const otherKey = { ...ctx, encryptionKey: new Uint8Array(32).fill(9) };
+    const info = await getBacklogWebhookInfo(otherKey, world.ownerActor, { projectKey: key });
+    expect(info).toMatchObject({ secret: null, secretState: 'unreadable', provider: 'gitlab' });
+    const source = await loadSource(base.db, sourceId);
+    expect(info.url).toBe(`${TEST_PUBLIC_URL}/api/webhooks/backlog/${source?.webhookId}`);
+    // Members never learn that the secret is unreadable.
+    expect((await getBacklogWebhookInfo(otherKey, world.memberActor, { projectKey: key })).secretState).toBe(
+      'hidden',
+    );
+    // Without any key the secret can't be issued again either, so the error stays.
+    const { encryptionKey: _, ...noKey } = ctx;
+    await expect(getBacklogWebhookInfo(noKey, world.ownerActor, { projectKey: key })).rejects.toBeInstanceOf(
+      EncryptionKeyMissing,
+    );
+  });
+
+  it('new webhook secret: same URL, a new secret stored encrypted, one activity row', async () => {
+    const { key, sourceId, project } = await mirror();
+    const before = await loadSource(base.db, sourceId);
+    const old = await getBacklogWebhookInfo(ctx, world.ownerActor, { projectKey: key });
+    const issued = await reissueBacklogWebhookSecret(ctx, world.ownerActor, {
+      projectKey: key.toLowerCase(),
+    });
+    expect(issued.url).toBe(old.url);
+    expect(issued.secret).toHaveLength(43);
+    expect(issued.secret).not.toBe(old.secret);
+    const after = await loadSource(base.db, sourceId);
+    expect(after?.webhookId).toBe(before?.webhookId);
+    expect(after?.webhookSecretCiphertext).not.toBe(before?.webhookSecretCiphertext);
+    expect(decryptSecret(ctx, after?.webhookSecretCiphertext as string)).toBe(issued.secret);
+    expect((await getBacklogWebhookInfo(ctx, world.ownerActor, { projectKey: key })).secret).toBe(
+      issued.secret,
+    );
+    const activity = await projectActivity(base.db, project.id);
+    expect(activity.map((row) => [row.type, row.actorId, row.taskId, row.origin])).toEqual([
+      ['project.backlog_imported', null, null, 'backlog'],
+      ['project.backlog_webhook_secret_reissued', world.owner.id, null, 'app'],
+    ]);
+    const status = await getBacklogStatus(ctx, world.ownerActor, { project: key });
+    expect(status.history.map((entry) => entry.type)).toContain('project.backlog_webhook_secret_reissued');
+    // No refresh is queued and the state is unchanged.
+    expect(after?.state).toBe(before?.state);
+  });
+
+  it('new webhook secret: refused for members, agents, detached sources, imports and without a key', async () => {
+    const { key } = await mirror();
+    await expect(
+      reissueBacklogWebhookSecret(ctx, world.memberActor, { projectKey: key }),
+    ).rejects.toBeInstanceOf(Forbidden);
+    await expect(
+      reissueBacklogWebhookSecret(ctx, world.agentActor, { projectKey: key }),
+    ).rejects.toBeInstanceOf(Forbidden);
+    const { encryptionKey: _, ...noKey } = ctx;
+    await expect(
+      reissueBacklogWebhookSecret(noKey, world.ownerActor, { projectKey: key }),
+    ).rejects.toBeInstanceOf(EncryptionKeyMissing);
+
+    await detachBacklog(ctx, world.ownerActor, { projectKey: key, confirmKey: key });
+    const detached = reissueBacklogWebhookSecret(ctx, world.ownerActor, { projectKey: key });
+    await expect(detached).rejects.toBeInstanceOf(Conflict);
+    await expect(detached).rejects.toThrow('This project no longer mirrors Backlog.md.');
+
+    // An import before its first read (afterwards it is detached).
+    const pending = await mirror({ mode: 'import', refresh: false });
+    const pendingSource = await loadSource(base.db, pending.sourceId);
+    expect(pendingSource).toMatchObject({ mode: 'import', state: 'setup' });
+    await expect(
+      reissueBacklogWebhookSecret(ctx, world.ownerActor, { projectKey: pending.key }),
+    ).rejects.toThrow('This project no longer mirrors Backlog.md.');
+    expect((await loadSource(base.db, pending.sourceId))?.webhookSecretCiphertext).toBe(
+      pendingSource?.webhookSecretCiphertext,
+    );
+    const imported = await mirror({ mode: 'import' });
+    await expect(
+      reissueBacklogWebhookSecret(ctx, world.ownerActor, { projectKey: imported.key }),
+    ).rejects.toBeInstanceOf(Conflict);
+    const activity = await projectActivity(base.db, pending.project.id);
+    expect(activity.some((row) => row.type === 'project.backlog_webhook_secret_reissued')).toBe(false);
+  });
+
+  it('new webhook secret works when the old one is unreadable with the current key', async () => {
+    const { key, sourceId } = await mirror();
+    await base.db
+      .update(schema.backlogSource)
+      .set({ webhookSecretCiphertext: encryptSecret({ encryptionKey: new Uint8Array(32).fill(3) }, 'lost') })
+      .where(eq(schema.backlogSource.id, sourceId));
+    expect((await getBacklogWebhookInfo(ctx, world.ownerActor, { projectKey: key })).secretState).toBe(
+      'unreadable',
+    );
+    const issued = await reissueBacklogWebhookSecret(ctx, world.ownerActor, { projectKey: key });
+    const info = await getBacklogWebhookInfo(ctx, world.ownerActor, { projectKey: key });
+    expect(info).toMatchObject({ secret: issued.secret, secretState: 'ok' });
   });
 
   it('detach: typed key, admins only, secret dropped, one activity row, unlocked, refreshes refused', async () => {

@@ -866,6 +866,9 @@ function historyText(entry: ProjectActivity, projectName: string): ReactNode {
       </>
     );
   }
+  if (entry.type === 'project.backlog_webhook_secret_reissued') {
+    return <>{who} issued a new webhook secret</>;
+  }
   return (
     <>
       {who} detached {projectName} from Backlog.md. Every field is editable now.

@@ -13,6 +13,7 @@ import {
   DetectBacklogRepositoryInput,
   PreviewBacklogInput,
   RefreshBacklogNowInput,
+  ReissueBacklogWebhookSecretInput,
   SetBacklogConnectionInput,
   SetBacklogFolderInput,
   StartBacklogInput,
@@ -29,6 +30,7 @@ import {
   getBacklogWebhookInfo,
   previewBacklog,
   refreshBacklogNow,
+  reissueBacklogWebhookSecret,
   setBacklogConnection,
   setBacklogFolder,
   startBacklog,
@@ -118,6 +120,14 @@ export const refreshBacklogNowFn = createServerFn({ method: 'POST' })
 export const backlogWebhookInfoFn = createServerFn({ method: 'GET' })
   .validator(BacklogWebhookInfoInput)
   .handler(({ data }) => run((core, actor) => getBacklogWebhookInfo(core, actor, data)));
+
+/**
+ * A new webhook secret for a mirror (owners and admins); the URL stays. The old secret stops working
+ * at once. Callers keep the secret out of the query cache. -> BacklogWebhookSecret
+ */
+export const reissueBacklogWebhookSecretFn = createServerFn({ method: 'POST' })
+  .validator(ReissueBacklogWebhookSecretInput)
+  .handler(({ data }) => run((core, actor) => reissueBacklogWebhookSecret(core, actor, data)));
 
 /** Detaches for good after the typed key (owners and admins). -> BacklogSourceStatus */
 export const detachBacklogFn = createServerFn({ method: 'POST' })
