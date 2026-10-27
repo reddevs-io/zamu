@@ -11,7 +11,7 @@ import {
   formatPaneTime,
   toggleCheckbox,
 } from './format';
-import { buildGroups, visibleKeys } from './groups';
+import { buildGroups } from './groups';
 import { listSearchFor, rememberListSearch } from './list-memory';
 import { patchList } from './queries';
 import { eagerStatuses, listInput, parseTaskListSearch, visibleStatuses } from './search';
@@ -178,7 +178,6 @@ describe('groups', () => {
       ['backlog', 3, []],
       ['done', 64, []],
     ]);
-    expect(visibleKeys(groups, new Set(['todo']))).toEqual(['PAY-3', 'PAY-2']);
   });
 
   it('merges expanded groups and de-duplicates rows', () => {

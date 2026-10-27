@@ -15,6 +15,7 @@ import { formatDay, localDay } from './dates';
 
 // Tasks of a milestone or a cycle, grouped by status in the M1 row style (frames 17 and 24). Open groups
 // are expanded; Done and Canceled are folded until someone opens them. Enter or a click opens the task.
+// The arrow keys and J/K move between tasks and skip group rows; Left and Right collapse and expand groups.
 
 /** Group order of the task list: active work first. */
 export const STATUS_ORDER: readonly TaskStatus[] = [
@@ -26,6 +27,8 @@ export const STATUS_ORDER: readonly TaskStatus[] = [
   'canceled',
 ];
 const FOLDED: readonly TaskStatus[] = ['done', 'canceled'];
+/** Module level, so the table does not re-render every row on each render of the page. */
+const rowClassName = () => 'cursor-pointer';
 
 const priorityRank = (item: TaskListItem) => PRIORITIES.indexOf(item.priority);
 
@@ -201,7 +204,7 @@ export function PlanningTaskTable({
       collapsedGroups={collapsed}
       onCollapsedGroupsChange={setCollapsed}
       renderEmptyState={renderEmptyState}
-      rowClassName={() => 'cursor-pointer'}
+      rowClassName={rowClassName}
     />
   );
 }

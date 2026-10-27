@@ -228,6 +228,48 @@ describe('keyboard flow', () => {
     await waitFor(() => expect(searchOf(router).task).toBe('PAY-4'));
   });
 
+  it('moves with the arrow keys over group rows, and folds groups with Left and Right', async () => {
+    // Order in the table: PAY-1 (in progress), PAY-2 (in review), PAY-4, PAY-3 (todo); Backlog and Done folded.
+    const user = userEvent.setup();
+    const { router } = renderApp('/p/PAY?task=PAY-2');
+    await screen.findByRole('row', { name: /PAY-2\b/ });
+    const group = (name: string) =>
+      screen.getAllByRole('row').find((element) => element.textContent?.startsWith(name)) as HTMLElement;
+
+    await user.keyboard('j'); // from the page
+    await waitFor(() => expect(row('PAY-4').contains(document.activeElement)).toBe(true));
+    await user.keyboard('{ArrowUp}'); // over the Todo group row
+    expect(row('PAY-2')).toHaveAttribute('aria-selected', 'true');
+    expect(row('PAY-2').contains(document.activeElement)).toBe(true);
+    await user.keyboard('{ArrowUp}{ArrowUp}'); // PAY-1, then stays: never the In progress group row
+    expect(row('PAY-1').contains(document.activeElement)).toBe(true);
+    await waitFor(() => expect(searchOf(router).task).toBe('PAY-1'));
+
+    // Left folds the task's group and puts focus on the group row; the task stays selected.
+    await user.keyboard('{ArrowLeft}');
+    expect(group('In progress')).toHaveFocus();
+    expect(group('In progress')).toHaveTextContent(/collapsed/);
+    expect(screen.queryByRole('row', { name: /PAY-1\b/ })).not.toBeInTheDocument();
+    expect(within(pane()).getByRole('heading', { name: 'Task number 1' })).toBeInTheDocument();
+    await user.keyboard('{ArrowLeft}'); // folded already: nothing
+    expect(group('In progress')).toHaveFocus();
+    // Right unfolds it onto its first task.
+    await user.keyboard('{ArrowRight}');
+    expect(group('In progress')).toHaveTextContent(/expanded/);
+    await waitFor(() => expect(row('PAY-1').contains(document.activeElement)).toBe(true));
+
+    // A lazily loaded group: Right loads its tasks and focuses the first one.
+    await user.click(within(screen.getByRole('grid')).getByText('Backlog')); // unfold (loads)
+    await screen.findByRole('row', { name: /PAY-5\b/ });
+    await user.click(within(screen.getByRole('grid')).getByText('Backlog')); // fold again, focus stays
+    expect(screen.queryByRole('row', { name: /PAY-5\b/ })).not.toBeInTheDocument();
+    await user.keyboard('{ArrowRight}');
+    await waitFor(() => expect(row('PAY-5').contains(document.activeElement)).toBe(true));
+    await waitFor(() => expect(searchOf(router).task).toBe('PAY-5'));
+    await user.keyboard('{ArrowUp}'); // over the Backlog group row to the last Todo task
+    expect(row('PAY-3').contains(document.activeElement)).toBe(true);
+  });
+
   it('focuses the search with / and filters by the typed text', async () => {
     const user = userEvent.setup();
     const { router } = renderApp('/p/PAY');

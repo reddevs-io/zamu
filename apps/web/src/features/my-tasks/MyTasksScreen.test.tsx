@@ -250,6 +250,39 @@ describe('My tasks', () => {
     expect(screen.getByRole('columnheader', { name: 'Project' })).toBeInTheDocument();
   });
 
+  it('moves with the arrow keys over group rows and folds groups with Left and Right', async () => {
+    // Order: PAY-139 (in progress), WEB-91 (in review), WEB-88, PAY-152 (todo), WEB-79 (backlog).
+    const user = userEvent.setup();
+    const { router } = renderMyTasks('/my-tasks');
+    await screen.findByRole('row', { name: /WEB-88\b/ });
+    const focused = (key: string) =>
+      screen.getByRole('row', { name: new RegExp(`${key}\\b`) }).contains(document.activeElement);
+    const group = (name: string) =>
+      screen.getAllByRole('row').find((element) => element.textContent?.startsWith(name)) as HTMLElement;
+
+    await user.keyboard('j');
+    await waitFor(() => expect(focused('PAY-139')).toBe(true));
+    await user.keyboard('{ArrowDown}'); // over the In review group row
+    expect(focused('WEB-91')).toBe(true);
+    await user.keyboard('{ArrowDown}');
+    expect(focused('WEB-88')).toBe(true);
+    expect(await screen.findByText('pane WEB WEB-88 with project')).toBeInTheDocument();
+
+    await user.keyboard('{ArrowLeft}');
+    expect(group('Todo')).toHaveFocus();
+    expect(group('Todo')).toHaveTextContent(/collapsed/);
+    await user.keyboard('{ArrowDown}');
+    expect(focused('WEB-79')).toBe(true);
+    await user.keyboard('{ArrowUp}'); // over Backlog and the folded Todo group
+    expect(focused('WEB-91')).toBe(true);
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ task: 'WEB-91' }));
+
+    // Down from the search field returns to the selected row.
+    await user.click(screen.getByRole('searchbox', { name: 'Search your tasks' }));
+    await user.keyboard('{ArrowDown}');
+    expect(focused('WEB-91')).toBe(true);
+  });
+
   it('opens the panel from ?task= for a task of any project', async () => {
     renderMyTasks('/my-tasks?task=WEB-79');
     expect(await screen.findByText('pane WEB WEB-79 with project')).toBeInTheDocument();
