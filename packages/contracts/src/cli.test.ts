@@ -33,6 +33,7 @@ describe('CLI output', () => {
       'logout',
       'whoami',
       'projects.list',
+      'projects.delete',
       'tasks.list',
       'tasks.show',
       'tasks.create',
@@ -198,6 +199,14 @@ describe('CLI output', () => {
     expect(finished.data.status?.counts.tasks).toBe(3);
     expect(() => cliOutput('backlog.refresh', { ...finished.data, outcome: 'running' } as never)).toThrow();
     expect(CLI_BACKLOG_REFRESH_WAIT_MS).toBe(300_000);
+  });
+
+  it('describes pm projects delete with the deleted key', () => {
+    expect(cliOutput('projects.delete', { deleted: 'PAY' })).toEqual({
+      schema: 'pm.v1.projects.delete',
+      data: { deleted: 'PAY' },
+    });
+    expect(() => cliOutput('projects.delete', { deleted: 'pay' })).toThrow();
   });
 
   it('prints a TASK_MIRRORED error with its extensions', () => {

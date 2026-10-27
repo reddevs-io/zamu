@@ -39,6 +39,8 @@ export const ACTIVITY_TYPES = [
   'task.restored',
   'project.backlog_imported',
   'project.backlog_detached',
+  // 0.6.0
+  'project.backlog_webhook_secret_reissued',
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 

@@ -28,6 +28,7 @@ import {
   CreateTaskInput,
   DeleteCommentInput,
   DeleteMilestoneInput,
+  DeleteProjectInput,
   EndCycleInput,
   GetBacklogStatusInput,
   GetCycleInput,
@@ -142,6 +143,22 @@ export const contract = base.prefix(API_PREFIX).router({
       })
       .input(UpdateProjectInput)
       .output(Project),
+    delete: base
+      .route({
+        method: 'DELETE',
+        path: '/projects/{project}',
+        successStatus: 204,
+        tags: ['projects'],
+        summary: 'Delete a project',
+        description:
+          'Owners and admins only, with a session or a workspace-wide write key. Deletes the project ' +
+          'with its tasks, comments, history, milestones, cycles and Backlog.md mirror; this cannot be ' +
+          'undone. Confirm by sending the key again as confirmKey in the JSON body ' +
+          '({"confirmKey": "PAY"}, any case). API keys scoped to the project keep working for their ' +
+          'other projects.',
+      })
+      .input(DeleteProjectInput)
+      .output(z.void()),
   },
   tasks: {
     list: base

@@ -136,6 +136,21 @@ export const UpdateProjectInput = z
   });
 export type UpdateProjectInput = z.output<typeof UpdateProjectInput>;
 
+/**
+ * DELETE /projects/{project}. `project` is the path parameter; confirmKey (the key typed again by the
+ * person, any case) travels in the JSON body and must match it.
+ */
+export const DeleteProjectInput = z
+  .object({
+    project: ProjectKeyInput,
+    confirmKey: z.string().trim().toUpperCase(),
+  })
+  .refine((value) => value.confirmKey === value.project, {
+    path: ['confirmKey'],
+    message: 'Type the project key to confirm',
+  });
+export type DeleteProjectInput = z.output<typeof DeleteProjectInput>;
+
 // ---------------------------------------------------------------------------
 // Tasks
 // ---------------------------------------------------------------------------
@@ -761,3 +776,10 @@ export const DetachBacklogInput = z
     message: 'Type the project key to confirm',
   });
 export type DetachBacklogInput = z.output<typeof DetachBacklogInput>;
+
+/**
+ * Settings: issue a new webhook secret for a mirrored source (owners and admins). The webhook URL
+ * stays; the old secret stops working at once.
+ */
+export const ReissueBacklogWebhookSecretInput = BacklogProjectInput;
+export type ReissueBacklogWebhookSecretInput = BacklogProjectInput;
