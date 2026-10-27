@@ -77,6 +77,8 @@ test:
     - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends git >/dev/null
     - !reference [.node, before_script]
   script:
+    # The web build lets the startup tests spawn the built server (PM-1); without it they are skipped.
+    - pnpm --filter web build
     - pnpm test
 
 # Builds the image, starts the self-hosting stack with docker compose and waits for /api/healthz.

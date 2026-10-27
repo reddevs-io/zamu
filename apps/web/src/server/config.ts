@@ -7,6 +7,9 @@ import { isValidTimeZone, loadEncryptionKey, loadGitHosts } from '@pm/core';
 /** Better Auth signs sessions with BETTER_AUTH_SECRET; shorter secrets are refused. */
 export const MIN_SECRET_LENGTH = 32;
 
+const SET_SECRET =
+  'Generate one with `openssl rand -base64 32` and set it in .env or the container environment.';
+
 export interface ServerEnv {
   DATABASE_URL?: string | undefined;
   BETTER_AUTH_SECRET?: string | undefined;
@@ -79,10 +82,10 @@ export function readServerConfig(env: ServerEnv = process.env): ServerConfig {
 
   const secret = env.BETTER_AUTH_SECRET ?? '';
   if (!secret.trim()) {
-    problems.push('BETTER_AUTH_SECRET is not set. Generate one with `openssl rand -base64 32`.');
+    problems.push(`BETTER_AUTH_SECRET is not set. ${SET_SECRET}`);
   } else if (secret.length < MIN_SECRET_LENGTH) {
     problems.push(
-      `BETTER_AUTH_SECRET is ${secret.length} characters; use ${MIN_SECRET_LENGTH} or more (\`openssl rand -base64 32\`).`,
+      `BETTER_AUTH_SECRET is ${secret.length} characters; use ${MIN_SECRET_LENGTH} or more. ${SET_SECRET}`,
     );
   }
 
@@ -124,4 +127,29 @@ export function readServerConfig(env: ServerEnv = process.env): ServerConfig {
 
   if (problems.length > 0) throw new ServerConfigError(problems);
   return { databaseUrl, secret, baseUrl, publicUrl, auth, timeZone, encryptionKey, gitHosts };
+}
+
+export interface ServerConfigCheck {
+  env: ServerEnv;
+  logger: { error(message: string): void };
+  exit: (code: 1) => void;
+  /** process.env.NODE_ENV. In development the check logs and returns instead of exiting. */
+  nodeEnv: string | undefined;
+}
+
+/**
+ * The startup check (plugins/config-check.ts): logs every configuration problem, then exits 1, before the
+ * server listens. In `vite dev` it only logs, since Nitro would restart its runner in a loop; requests then
+ * fail with the same message. Returns whether the configuration is valid.
+ */
+export function checkServerConfig({ env, logger, exit, nodeEnv }: ServerConfigCheck): boolean {
+  try {
+    readServerConfig(env);
+    return true;
+  } catch (error) {
+    if (!(error instanceof ServerConfigError)) throw error;
+    logger.error(error.message);
+    if (nodeEnv !== 'development') exit(1);
+    return false;
+  }
 }
