@@ -735,6 +735,14 @@ export const ApiKeyCreated = ApiKeySummary.extend({
 });
 export type ApiKeyCreated = z.output<typeof ApiKeyCreated>;
 
+/** What creating an agent returns: the member and its first API key, with the secret (shown once). */
+export const AgentCreated = z.object({
+  agent: Member,
+  /** The agent's first API key, with its secret. Shown once. */
+  key: ApiKeyCreated,
+});
+export type AgentCreated = z.output<typeof AgentCreated>;
+
 // ---------------------------------------------------------------------------
 // Me
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import {
   ACTIVITY_TYPES,
   Activity,
   ActivityList,
+  AgentCreated,
   ApiKeyCreated,
   ApiKeyMetadata,
   ApiKeySummary,
@@ -248,6 +249,7 @@ const cases: [string, z.ZodType, unknown][] = [
   ['Invitation', Invitation, invitationFixture],
   ['ApiKeySummary', ApiKeySummary, apiKeySummaryFixture],
   ['ApiKeyCreated', ApiKeyCreated, apiKeyCreatedFixture],
+  ['AgentCreated', AgentCreated, { agent: memberFixture, key: apiKeyCreatedFixture }],
   [
     'ApiKeyMetadata',
     ApiKeyMetadata,

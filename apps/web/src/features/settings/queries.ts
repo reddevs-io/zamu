@@ -2,11 +2,13 @@
 // through oRPC; everything else calls the settings server functions. Created API keys are never put
 // in the query cache: the secret lives only in the reveal dialog's state.
 import type {
+  AgentCreated,
   ApiKeyCreated,
   ApiKeySummary,
   CreateApiKeyInput,
   CreateInvitationInput,
   Invitation,
+  ListApiKeysInput,
 } from '@pm/contracts';
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
@@ -17,15 +19,15 @@ import {
   createAgentFn,
   createApiKeyFn,
   createInvitationFn,
-  type ListApiKeysInput,
   listApiKeysFn,
   listInvitationsFn,
   removeMemberFn,
   revokeApiKeyFn,
 } from './server';
-import type { AgentCreatedResult, CreateAgentValues } from './types';
+import type { CreateAgentValues } from './types';
 
-export type KeyOwnerFilter = z.input<typeof ListApiKeysInput>['owner'];
+/** all, me or a user id. */
+export type KeyOwnerFilter = ListApiKeysInput['owner'];
 
 const settingsKey = ['settings'] as const;
 
@@ -96,7 +98,7 @@ export function useRevokeApiKey() {
  * Creating agents and keys returns the secret once. These are plain async functions rather than
  * mutations so the secret never sits in a mutation cache entry; callers refetch the lists afterwards.
  */
-export function useCreateAgent(): (values: CreateAgentValues) => Promise<AgentCreatedResult> {
+export function useCreateAgent(): (values: CreateAgentValues) => Promise<AgentCreated> {
   const invalidate = useInvalidateSettings();
   return async (values) => {
     const created = await unwrap(createAgentFn({ data: values }));

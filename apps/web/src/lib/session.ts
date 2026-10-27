@@ -9,6 +9,7 @@ import {
   type SetupState,
   setupState,
 } from '@pm/auth';
+import { AcceptInvitationInput, SetupInput, WorkspaceFields } from '@pm/contracts';
 import type { Db } from '@pm/db';
 import { redirect } from '@tanstack/react-router';
 import { createServerFn, createServerOnlyFn } from '@tanstack/react-start';
@@ -16,7 +17,6 @@ import { appendResponseHeader, getRequestHeaders } from '@tanstack/react-start/s
 import { type AuthPage, type AuthState, authRedirect } from '../routes/(auth)/-auth/guards';
 import { loadInstanceName, loadInvitation } from '../routes/(auth)/-auth/queries';
 import type { SignInOptions } from '../routes/(auth)/-auth/sso';
-import { AcceptInvitationInput, SetupInput, WorkspaceFields } from '../routes/(auth)/-auth/validation';
 import { getServerContext } from '../server/context';
 
 // Session helpers for route `beforeLoad` and the signed-out screens.

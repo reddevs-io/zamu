@@ -472,6 +472,84 @@ export const CreateInvitationInput = z.object({
 });
 export type CreateInvitationInput = z.output<typeof CreateInvitationInput>;
 
+export const CancelInvitationInput = z.object({ id: AuthId });
+export type CancelInvitationInput = z.output<typeof CancelInvitationInput>;
+
+export const RemoveMemberInput = z.object({ userId: UserId });
+export type RemoveMemberInput = z.output<typeof RemoveMemberInput>;
+
+/** Which keys to list: every key in the workspace (admins), your own, or one member's. */
+export const ListApiKeysInput = z.object({
+  owner: z.union([z.literal('all'), z.literal('me'), UserId]).default('me'),
+});
+export type ListApiKeysInput = z.output<typeof ListApiKeysInput>;
+
+// ---------------------------------------------------------------------------
+// Sign-in, first-run setup and invitation accept (web forms and server functions)
+// ---------------------------------------------------------------------------
+
+/**
+ * Same value as MIN_PASSWORD_LENGTH in @pm/auth, which Better Auth enforces. @pm/auth does not
+ * depend on this package, so a web test keeps the two equal.
+ */
+export const MIN_PASSWORD_LENGTH = 12;
+/** Better Auth's default maximum password length. */
+export const MAX_PASSWORD_LENGTH = 128;
+export const MAX_PERSON_NAME_LENGTH = 100;
+export const MAX_WORKSPACE_NAME_LENGTH = 64;
+
+/** Field messages of the sign-in, setup and invitation forms. */
+export const AUTH_FIELD_MESSAGES = {
+  name: 'Enter your name.',
+  nameTooLong: `Use ${MAX_PERSON_NAME_LENGTH} characters or fewer.`,
+  email: 'Enter a valid email address.',
+  password: 'Enter your password.',
+  newPassword: `Use ${MIN_PASSWORD_LENGTH} characters or more.`,
+  passwordTooLong: `Use ${MAX_PASSWORD_LENGTH} characters or fewer.`,
+  workspaceName: 'Enter a workspace name.',
+  workspaceNameTooLong: `Use ${MAX_WORKSPACE_NAME_LENGTH} characters or fewer.`,
+} as const;
+
+const PersonName = z
+  .string()
+  .trim()
+  .min(1, AUTH_FIELD_MESSAGES.name)
+  .max(MAX_PERSON_NAME_LENGTH, AUTH_FIELD_MESSAGES.nameTooLong);
+const SignInEmail = z.string().trim().pipe(z.email(AUTH_FIELD_MESSAGES.email));
+const NewPassword = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, AUTH_FIELD_MESSAGES.newPassword)
+  .max(MAX_PASSWORD_LENGTH, AUTH_FIELD_MESSAGES.passwordTooLong);
+
+export const SignInFields = z.object({
+  email: SignInEmail,
+  password: z.string().min(1, AUTH_FIELD_MESSAGES.password),
+});
+export type SignInFields = z.input<typeof SignInFields>;
+
+export const AccountFields = z.object({ name: PersonName, email: SignInEmail, password: NewPassword });
+export type AccountFields = z.input<typeof AccountFields>;
+
+export const WorkspaceFields = z.object({
+  workspaceName: z
+    .string()
+    .trim()
+    .min(1, AUTH_FIELD_MESSAGES.workspaceName)
+    .max(MAX_WORKSPACE_NAME_LENGTH, AUTH_FIELD_MESSAGES.workspaceNameTooLong),
+});
+export type WorkspaceFields = z.input<typeof WorkspaceFields>;
+
+/** Input of the setup server function: both steps of the first-run form. */
+export const SetupInput = AccountFields.extend(WorkspaceFields.shape);
+export type SetupInput = z.output<typeof SetupInput>;
+
+export const InviteFields = z.object({ name: PersonName, password: NewPassword });
+export type InviteFields = z.input<typeof InviteFields>;
+
+/** Input of the invitation accept server function. The email always comes from the invitation. */
+export const AcceptInvitationInput = InviteFields.extend({ invitationId: z.uuid() });
+export type AcceptInvitationInput = z.output<typeof AcceptInvitationInput>;
+
 // ---------------------------------------------------------------------------
 // Git connections (M3, server functions)
 // ---------------------------------------------------------------------------

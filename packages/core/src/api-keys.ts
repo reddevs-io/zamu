@@ -9,12 +9,12 @@ import {
   type ApiKeyScopeView,
   ApiKeySummary,
   CreateApiKeyInput,
+  ListApiKeysInput,
   RevokeApiKeyInput,
-  UserId,
 } from '@pm/contracts';
 import { type DbOrTx, schema } from '@pm/db';
 import { and, desc, eq, inArray, type SQL } from 'drizzle-orm';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { type Actor, authorize, type KeyOwner } from './authz';
 import type { AuthContext, DbContext } from './context';
 import { Invalid, NotFound, parseInput } from './errors';
@@ -24,12 +24,6 @@ const { apikey, member, project } = schema;
 
 /** Better Auth's API-key plugin rejects longer names (maximumNameLength in @pm/auth). */
 export const MAX_API_KEY_NAME_LENGTH = 100;
-
-/** Which keys to list: every key in the workspace (admins), your own, or one member's. */
-export const ListApiKeysInput = z.object({
-  owner: z.union([z.literal('all'), z.literal('me'), UserId]).default('me'),
-});
-export type ListApiKeysInput = z.output<typeof ListApiKeysInput>;
 
 /** Key metadata as stored by Better Auth (JSON text, possibly encoded twice), or null. */
 export function readKeyMetadata(raw: unknown): ApiKeyMetadata | null {

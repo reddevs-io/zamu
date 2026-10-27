@@ -1,10 +1,15 @@
 // Invitations: copyable links, no email in M1. Rows live in Better Auth's invitation table, so the
 // organization plugin and the sign-up guard in @pm/auth see them.
 import { INVITATION_EXPIRES_IN_SECONDS } from '@pm/auth';
-import { AuthId, CreateInvitationInput, Invitation, type InvitationStatus } from '@pm/contracts';
+import {
+  CancelInvitationInput,
+  CreateInvitationInput,
+  Invitation,
+  type InvitationStatus,
+} from '@pm/contracts';
 import { type DbOrTx, schema } from '@pm/db';
 import { and, desc, eq, lte, sql } from 'drizzle-orm';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { type Actor, authorize, can } from './authz';
 import type { DbContext, LinkContext } from './context';
 import { Conflict, NotFound, parseInput } from './errors';
@@ -122,9 +127,6 @@ export async function listInvitations({ db, publicUrl }: LinkContext, actor: Act
   const link = can(actor, 'member.manage') ? (id: string) => invitationLink(publicUrl, id) : null;
   return toInvitations(db, rows, link);
 }
-
-export const CancelInvitationInput = z.object({ id: AuthId });
-export type CancelInvitationInput = z.output<typeof CancelInvitationInput>;
 
 /** Cancels a pending invitation, so its link stops working. Admins only. */
 export async function cancelInvitation(
