@@ -30,7 +30,7 @@ Edit `.env`:
 
 | Variable                  | Required | Default                    | Meaning                                                                                                                       |
 | ------------------------- | -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `BETTER_AUTH_SECRET`      | yes      | none                       | Signs sessions. 32 characters or more: `openssl rand -base64 32`. Compose refuses to start without it.                        |
+| `BETTER_AUTH_SECRET`      | yes      | none                       | Signs sessions. 32 characters or more: `openssl rand -base64 32`. Without it, compose and the image refuse to start.          |
 | `BETTER_AUTH_URL`         | no       | `http://localhost:3000`    | The URL people type in their browser. Sign-in fails when it does not match.                                                   |
 | `PUBLIC_URL`              | no       | `http://localhost:3000`    | Base URL for invitation links. Use the same value as `BETTER_AUTH_URL`.                                                       |
 | `PORT`                    | no       | `3000`                     | Host port the web app is published on.                                                                                        |
@@ -88,8 +88,10 @@ lost or changed:
 - mirrors pause with "A stored secret cannot be read with the current APP_ENCRYPTION_KEY";
 - an admin edits each connection in Settings > Git connections and pastes the token again, which resumes its
   mirrors;
-- webhooks of existing mirrors stop working, because their secrets cannot be read and there is no way yet to
-  issue a new one. Those mirrors still refresh every hour, on Refresh now, and with `pm backlog refresh`.
+- webhooks of existing mirrors stop working, because their secrets cannot be read. The webhook dialog in the
+  project's Settings > Backlog.md says so; an owner or admin presses New secret there and pastes the new
+  secret into the git host. The URL stays the same. Until then those mirrors still refresh every hour, on
+  Refresh now, and with `pm backlog refresh`.
 
 There is no key rotation. Keep the same key for the life of the server.
 
@@ -136,7 +138,8 @@ services:
       - /etc/pm/internal-ca.pem:/certs/internal-ca.pem:ro
 ```
 
-Keep the certificate outside the checkout and readable by everyone (the containers run as the `node` user).
+Keep the certificate outside the checkout and readable by everyone (the containers run as UID 1000, see
+[Container user](#container-user)).
 Node reads the file once at start, so run `docker compose up -d` after you change it. Without it, testing the
 connection fails with "Host unreachable" and a certificate error code, such as
 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`.
@@ -175,6 +178,40 @@ The first build takes a few minutes. `/api/healthz` answers `{"status":"ok"}` on
 Postgres. `docker compose ps` lists `migrate` as exited (code 0); that is expected.
 
 Logs: `docker compose logs -f web worker`.
+
+Without `BETTER_AUTH_SECRET`, compose stops before it starts anything. A container started some other way
+(`docker run`, Kubernetes) exits with code 1 before it listens and logs:
+
+```text
+BETTER_AUTH_SECRET is not set. Generate one with `openssl rand -base64 32` and set it in .env or the container environment.
+```
+
+A secret under 32 characters stops it the same way, with "BETTER_AUTH_SECRET is N characters; use 32 or
+more." followed by the same advice.
+
+### Container user
+
+The image runs as UID 1000 and GID 1000 (the `node` user of the Node base image), set by number. It writes
+only to `/tmp` and its home directory, `/home/node`. Things to keep in mind:
+- If you override the user (`user:` in compose, `--user` with `docker run`), keep it a number other than 0.
+  A name such as `node` makes Kubernetes' `runAsNonRoot` check fail.
+- Anything you mount into `web`, `worker` or `migrate` must be readable by UID 1000, and writable by it if
+  the app has to write there. The Postgres volume belongs to the `db` service, which runs as its own user.
+
+On Kubernetes, give the web, worker and migrate containers this `securityContext`, which meets the
+restricted Pod Security Standard:
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  seccompProfile:
+    type: RuntimeDefault
+```
 
 ## First run
 
@@ -321,7 +358,8 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 ```
 
 This works while the app runs. Keep the dumps outside the checkout (anything in it ends up in the image build
-context) and copy them to another machine. Back up `APP_ENCRYPTION_KEY` as well, stored apart from the dumps: without
+context) and copy them to another machine. A backup is also the only way back from deleting a project,
+which has no undo: restoring one brings back the whole database as it was. Back up `APP_ENCRYPTION_KEY` as well, stored apart from the dumps: without
 it, a restored database cannot read its git tokens (see [APP_ENCRYPTION_KEY](#app_encryption_key)).
 
 To restore, stop the app, recreate the database, load the dump and start again:
@@ -357,6 +395,11 @@ status, and turns milestones and cycles on for every project. Nothing else needs
 Upgrading from 0.3.x (M2.1) to 0.4 (M3) adds git connections and Backlog.md mirrors. The migration only adds
 tables and columns: every task keeps its key. Set `APP_ENCRYPTION_KEY` before or after the upgrade to turn
 the new features on.
+
+Upgrading to 0.6 adds three indexes that the dashboard's agent and Everyone queries rely on. Run the
+migration before the new `web` serves traffic, or the dashboard is slow on large workspaces until it runs.
+Compose does this already (`migrate` finishes before `web` and `worker` start). On Kubernetes, run the
+migrate job before you roll out `web` and `worker`.
 
 The end-to-end suite checks both paths: it starts 0.1.1 and adds data, switches to 0.3.0 and adds more, then
 switches to the new image.

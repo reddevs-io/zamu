@@ -100,6 +100,7 @@ pm dashboard --everyone                         # the whole workspace
 pm dashboard --json                             # { schema: 'pm.v1.dashboard', data: Dashboard }
 
 pm projects list                                # with each project's linked repository
+pm projects delete PAY --confirm PAY            # owners and admins; cannot be undone
 
 pm tasks list                                   # every project you can read
 pm tasks list --mine                            # your tasks in every project
@@ -154,6 +155,11 @@ pm backlog refresh --wait                       # wait for it (up to 5 minutes) 
 - `--description -` and a comment body of `-` read the text from stdin.
 - `pm tasks list` returns 50 tasks by default (up to 200 with `--limit`). When there are more, it prints
   a cursor; pass it with `--cursor` to get the next page.
+- `pm projects delete` deletes the project with its tasks, comments, history, milestones, cycles and
+  Backlog.md mirror. There is no undo. `--confirm` must repeat the key (any case); without it, or with
+  another key, pm exits with code 1 ("Pass --confirm PAY to delete project PAY.") and sends nothing. It
+  needs an owner or admin, with a person's key that has whole-workspace access and write permission.
+  Agents get exit code 4, an unknown project 3.
 
 ### Milestones and cycles
 
@@ -265,6 +271,7 @@ Every command takes `--json` and prints one versioned result:
 | `pm whoami`            | `pm.v1.whoami`            |
 | `pm dashboard`         | `pm.v1.dashboard`         |
 | `pm projects list`     | `pm.v1.projects.list`     |
+| `pm projects delete`   | `pm.v1.projects.delete`   |
 | `pm tasks list`        | `pm.v1.tasks.list`        |
 | `pm tasks show`        | `pm.v1.tasks.show`        |
 | `pm tasks create`      | `pm.v1.tasks.create`      |
@@ -294,6 +301,8 @@ With `--json`, failures print `pm.v1.error` on stdout: an RFC 9457 problem with 
 `detail`, and `requestId` and `issues` when the server sent them (`field`, `file`, `backlogId` and `hint`
 for the Backlog.md mirror errors). The exit code is still non-zero.
 
+`pm.v1.projects.delete` is `{ "deleted": "PAY" }`.
+
 `pm.v1.backlog.status` holds the first 50 problems unless you pass `--problems`, which reads them all.
 `pm.v1.backlog.refresh` is the refresh request plus `outcome` and, with `--wait`, the final `status`.
 
@@ -308,7 +317,7 @@ list, oldest first, told apart by `kind` (`activity` or `comment`).
 | 1    | Usage: bad arguments, unknown milestone names, or input the server rejected (400, 409, 422) |
 | 2    | Auth: not logged in, or the key was refused (401)                                           |
 | 3    | Not found (404)                                                                             |
-| 4    | Forbidden: the key's scope or access does not allow it (403)                                |
+| 4    | Forbidden: the key's scope or access does not allow it, or owners and admins only (403)     |
 | 5    | Server: unreachable, 5xx, or a response this version does not understand                    |
 | 6    | Backlog.md: the change belongs in Backlog.md, or the mirror is paused or detached (409)     |
 

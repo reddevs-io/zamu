@@ -91,11 +91,24 @@ Each Backlog.md value maps to one value here. The setup fills them in by name, a
   the `@`. A task gets the first of its assignees that maps to a member; the others stay listed in its
   Backlog.md section.
 
-An assignee that matches no member and names a coding agent (claude, codex, copilot, cursor, gemini and
-others, alone or in names like `claude-code`) gets a **Create agent** suggestion under the table. It opens
-Add agent with the name filled in, you as the responsible human and a key for this project only. Once the
-agent exists, its key is shown once and the row maps to it. Any other unmatched assignee offers
-**Create agent…** at the top of its select. Both work in the setup and in Edit mappings.
+A note under the Assignees table helps with the rows that map to no one. It works the same in the setup and
+in Edit mappings:
+- **Coding agents.** An assignee that names a coding agent (claude, codex, copilot, cursor, gemini and
+  others, alone or in names like `claude-code`) gets a **Create agent** suggestion. It opens Add agent with
+  the name filled in, you as the responsible human and a key for this project only. Once the agent exists,
+  its key is shown once and the row maps to it.
+- **Similar agents.** When an agent here shares a word with that name, the line offers it first:
+  "@claude may be claude-dev." with **Map to claude-dev** next to **Create agent claude**. It lists up to
+  three agents, newest first. They also appear in the row's select, under Create agent….
+- **People to invite.** Any other assignee with no match gets "@francis matches no member." and
+  **Invite…**, which opens Invite person with a line saying which value it is for. The invitation does not
+  map anything: once the person joins, map the value in Settings > Backlog.md > Edit mappings. The line
+  then reads "Invited {email}" until the page reloads.
+- **Name matches.** In Edit mappings, a row that maps to no one but now matches exactly one member by name
+  (someone who joined after the setup) gets "@tomas may be Tomás Berg." with **Map to Tomás Berg**. The
+  match uses the same rule as the setup.
+
+Any unmatched assignee also offers **Create agent…** at the top of its select.
 
 A value with no mapping, including one that appears in a later push, gets the fallback (Todo, no priority,
 no assignee) and a warning. To change the mappings later, open Settings > Backlog.md > Edit mappings. The
@@ -151,8 +164,9 @@ applies every change in one database transaction. A refresh starts when:
 - the hourly check runs, at 15 minutes past each hour (UTC). It stops early when the head has not moved.
 
 Webhook pushes within a minute of each other collapse into one refresh, so a burst of pushes costs one read.
-Refresh now and `pm backlog refresh` start right away. Open pages pick up a finished refresh the next time
-they load their data; reload the page to see it at once.
+Refresh now and `pm backlog refresh` start right away, also when a webhook refresh is waiting for its slot:
+they take its place. Open pages pick up a finished refresh the next time they load their data; reload the
+page to see it at once.
 
 The source has one of these states, shown in the project header:
 
@@ -213,7 +227,15 @@ delivery.
 The server checks GitHub's `X-Hub-Signature-256`, GitLab's `X-Gitlab-Token`, and Gitea's or Forgejo's
 signature header against the secret. A request with a wrong signature or an unknown ID gets `404`. Pushes to
 other branches get `204` and change nothing. After detach the URL answers `410 Gone`; remove the webhook at
-the host then.
+the host then. Once the project is deleted the URL answers `404`; remove the webhook at the host too.
+
+### New secret
+
+Owners and admins can issue a new secret with **New secret** in the webhook dialog, for example when the old
+one leaked or `APP_ENCRYPTION_KEY` changed and the dialog says the secret can't be read. The URL stays the
+same. The old secret stops working at once: deliveries signed with it get `404` until you paste the new
+secret into the webhook settings on the git host. The new secret is shown once, unmasked, right after you
+confirm. Mirrors still refresh every hour in the meantime.
 
 ## Detach
 
@@ -225,6 +247,13 @@ Detach ends a mirror and cannot be undone. Owners and admins find it in Settings
 - hidden tasks stay hidden.
 
 An import is a mirror that detaches right after its first read.
+
+## Delete a mirrored project
+
+Owners and admins delete a project in its Settings > General > Delete this project, or with
+`pm projects delete PAY --confirm PAY`. It removes the tasks, comments, history, milestones, cycles and the
+Backlog.md mirror; the files in the repository are untouched. There is no undo: a database backup is the
+only way back. The webhook URL answers `404` afterwards, so remove the webhook on the git host.
 
 ## Agents in a mirrored project
 

@@ -1,5 +1,6 @@
 // Backlog.md import end to end, against a real Forgejo (e2e/forgejo.ts): an empty project linked to a repository
-// whose root backlog.config.yml names the folder planning/, the five setup steps in import mode, and the
+// whose root backlog.config.yml names the folder planning/, the five setup steps in import mode (with an agent
+// of a similar name offered for @claude and an invitation for @alex-agent on the Mappings step), and the
 // project afterwards: detached, every field editable by people and agents, numbering that continues, and no
 // more refreshes from the files.
 //
@@ -14,13 +15,18 @@ import { baseURL, forgejoAliases, mainStack, repoRoot } from './stack';
 const repo = 'backlog-demo';
 const project = { name: 'Backlog Demo', key: 'DEMO' };
 const agentName = 'import-agent';
+/** An existing agent the Mappings step offers for @claude (work-views.spec.ts adds it too). */
+const similarAgent = 'claude-dev';
+const invitedEmail = 'alex@example.com';
 /** Root backlog.config.yml naming planning/ as the folder, ISO timestamps, a subtask and a draft. */
 const fixture = `${repoRoot}/packages/backlog-md/test/fixtures/eras/2026-10-iso`;
+const subtaskPath = 'planning/tasks/back-786.1 - Parse-the-folder.md';
 
 interface TaskShape {
   key: string;
   title: string;
   status: string;
+  assignee: { name: string } | null;
   locked?: string[];
   backlog: { id: string } | null;
 }
@@ -47,7 +53,10 @@ async function taskOf(key: string): Promise<TaskShape> {
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(5 * 60_000);
   forgejo = await startForgejo('import', mainStack.network, forgejoAliases.import);
-  await forgejo.createRepository(repo, { 'README.md': '# Backlog demo\n', ...readTree(fixture) });
+  const files = readTree(fixture);
+  // The subtask goes to @claude, a coding agent with no member of that name.
+  files[subtaskPath] = (files[subtaskPath] as string).replace('assignee: []', "assignee:\n  - '@claude'");
+  await forgejo.createRepository(repo, { 'README.md': '# Backlog demo\n', ...files });
 
   context = await browser.newContext({
     permissions: ['clipboard-read', 'clipboard-write'],
@@ -81,6 +90,10 @@ test('import: the five setup steps on an empty project linked to the repository'
   await signInAsAdmin(page);
   await addConnection(page, forgejo, 'Forgejo · e2e import');
   await api(page.request, 'POST', '/projects', { ...project, repository: forgejo.repositoryUrl(repo) });
+  const members = await api<{ items: { name: string }[] }>(page.request, 'GET', '/members');
+  if (!members.items.some((member) => member.name === similarAgent)) {
+    await addAgent(page, similarAgent, [project.key]);
+  }
 
   await page.goto(`/p/${project.key}/backlog-setup?mode=import`);
   await settle(page);
@@ -98,6 +111,41 @@ test('import: the five setup steps on an empty project linked to the repository'
   const statusMapping = page.getByRole('group', { name: 'Status mapping' });
   await expect(statusMapping.getByRole('button', { name: /In Progress maps to/ })).toHaveAccessibleName(
     /^In progress/,
+  );
+  const assignees = page.getByRole('group', { name: 'Assignee mapping' });
+  // @claude matches no member, but claude-dev shares the agent word: map to it or create claude.
+  const claude = assignees.getByRole('button', { name: /@claude maps to/ });
+  await expect(claude).toHaveAccessibleName(/^No one/);
+  const agentLine = page
+    .getByRole('region', { name: 'Agent suggestions' })
+    .getByRole('listitem')
+    .filter({ hasText: '@claude may be' });
+  await expect(agentLine).toContainText(`@claude may be ${similarAgent}.`);
+  await expect(agentLine.getByRole('button', { name: 'Create agent claude' })).toBeVisible();
+  await agentLine.getByRole('button', { name: `Map to ${similarAgent}` }).click();
+  await expect(claude).toHaveAccessibleName(new RegExp(`^${similarAgent}`));
+  await expect(agentLine).toHaveCount(0);
+
+  // @alex-agent does not look like a coding agent: invite the person.
+  const invites = page.getByRole('region', { name: 'People to invite' });
+  await expect(invites).toContainText('No member matches this name yet.');
+  const alexLine = invites.getByRole('listitem').filter({ hasText: '@alex-agent' });
+  await expect(alexLine).toContainText('@alex-agent matches no member.');
+  await alexLine.getByRole('button', { name: 'Invite…' }).click();
+  const invite = page.getByRole('dialog', { name: 'Invite person' });
+  await expect(invite).toContainText('For @alex-agent in the files (1 task).');
+  await invite.getByLabel('Email').fill(invitedEmail);
+  await invite.getByRole('button', { name: 'Create invitation link' }).click();
+  const link = page.getByRole('dialog', { name: 'Invitation link' });
+  await expect(link).toContainText(`Invitation for ${invitedEmail}`);
+  await link.getByRole('button', { name: 'Done' }).click();
+  await expect(link).toBeHidden();
+  await expect(alexLine).toContainText(
+    `Invited ${invitedEmail}. Once they join, map @alex-agent in Settings › Backlog.md › Edit mappings.`,
+  );
+  await expect(alexLine.getByRole('button', { name: 'Invite…' })).toHaveCount(0);
+  await expect(assignees.getByRole('button', { name: /@alex-agent maps to/ })).toHaveAccessibleName(
+    /^No one/,
   );
   await page.getByRole('button', { name: 'Preview' }).click();
 
@@ -128,6 +176,9 @@ test('import: the five setup steps on an empty project linked to the repository'
 test('after the import every field is editable and the numbering continues', async () => {
   const task = await taskOf(`${project.key}-786`);
   expect(task).toMatchObject({ title: 'Mirror Backlog.md', status: 'in_progress', locked: [] });
+  expect(task.assignee).toBeNull();
+  // Mapped to the similar agent on the Mappings step.
+  expect((await taskOf(`${project.key}-786.1`)).assignee?.name).toBe(similarAgent);
   // The Backlog.md record stays on the task, and its ID still finds it.
   expect(task.backlog?.id).toBe('BACK-786');
   expect((await taskOf('BACK-786.1')).key).toBe(`${project.key}-786.1`);
