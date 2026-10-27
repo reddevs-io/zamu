@@ -8,6 +8,7 @@ import {
   createTask,
   deleteComment,
   deleteMilestone,
+  deleteProject,
   endCycle,
   getBacklogStatus,
   getCycle,
@@ -46,6 +47,9 @@ export const router = api.router({
     ),
     update: api.projects.update.handler(({ context, input }) =>
       updateProject(context.core, context.actor, input),
+    ),
+    delete: api.projects.delete.handler(({ context, input }) =>
+      deleteProject(context.core, context.actor, input),
     ),
   },
   tasks: {

@@ -3,6 +3,7 @@ import { useRouter } from '@tanstack/react-router';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { NewFromBacklogDialogHost } from '~/features/backlog-setup/NewFromBacklogDialogHost';
 import { projectSettingsHref } from '~/features/backlog-setup/paths';
+import { DeletedProjectToast } from '~/features/project-settings/DeleteProjectDialog';
 import { useNewProject } from '~/features/shell/new-project';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import { projectHref } from '~/features/shell/paths';
@@ -127,6 +128,7 @@ export function ProjectsPage() {
         </>
       )}
       <NewFromBacklogDialogHost isOpen={newFromBacklog} onClose={() => setNewFromBacklog(false)} />
+      <DeletedProjectToast />
     </section>
   );
 }

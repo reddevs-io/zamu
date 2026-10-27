@@ -1,15 +1,19 @@
 // Project settings, General (frame 2a): name, key, description, repository and the planning
 // switches. Replaces the Edit project dialog. While the project mirrors Backlog.md the key and the
 // milestones switch are locked and say why; the repository can only be cleared, which pauses the mirror.
+// Owners and admins get the Delete this project row at the bottom (PM-12).
 import { parseRepositoryUrl, UpdateProjectInput } from '@pm/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactNode, useRef, useState } from 'react';
 import { useProjectSummary } from '~/features/project-header';
+import { meQuery } from '~/features/projects/queries';
 import { editRepositoryHint, RepositoryField } from '~/features/projects/RepositoryField';
 import { normalizeKeyInput, repositoryError, repositoryMessage } from '~/features/projects/validation';
+import { isAdminRole } from '~/features/settings/format';
 import { orpc } from '~/lib/orpc';
 import { Banner, Button, cn, lockedHatch, Skeleton, Switch, TextArea, TextField, useHotkeys } from '~/ui';
+import { DeleteProjectDialog, DeleteProjectRow } from './DeleteProjectDialog';
 import {
   type GeneralChanges,
   type GeneralFailure,
@@ -21,7 +25,7 @@ import {
   keyLockReason,
   projectChanges,
 } from './general';
-import { hasTasksQuery } from './queries';
+import { hasTasksQuery, useDeleteProject } from './queries';
 
 /** The General page wired to the API. */
 export function GeneralSettings({ projectKey }: { projectKey: string }) {
@@ -30,6 +34,10 @@ export function GeneralSettings({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const update = useMutation(orpc.projects.update.mutationOptions());
+  const me = useQuery(meQuery());
+  const canDelete = isAdminRole(me.data?.role);
+  const remove = useDeleteProject(projectKey);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (!project) return <GeneralSkeleton />;
 
@@ -48,14 +56,29 @@ export function GeneralSettings({ projectKey }: { projectKey: string }) {
     return null;
   };
 
+  const backlog = project.backlog;
   return (
-    <GeneralForm
-      // Another project (or a new key) starts the form over; a save keeps it, with "Saved." showing.
-      key={project.key}
-      project={project}
-      hasTasks={hasTasks}
-      onSubmit={onSubmit}
-    />
+    <div className="flex max-w-[560px] flex-col gap-8">
+      <GeneralForm
+        // Another project (or a new key) starts the form over; a save keeps it, with "Saved." showing.
+        key={project.key}
+        project={project}
+        hasTasks={hasTasks}
+        onSubmit={onSubmit}
+      />
+      {canDelete ? (
+        <>
+          <DeleteProjectRow onDelete={() => setDeleteOpen(true)} />
+          <DeleteProjectDialog
+            isOpen={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            projectKey={project.key}
+            mirrored={backlog?.mode === 'mirror' && backlog.state !== 'detached'}
+            onDelete={(confirmKey) => remove.mutateAsync(confirmKey)}
+          />
+        </>
+      ) : null}
+    </div>
   );
 }
 
