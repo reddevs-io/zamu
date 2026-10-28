@@ -1,27 +1,43 @@
 import { ORPCError } from '@orpc/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { type ReactNode, useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { meQuery, projectsQuery } from '~/features/projects/queries';
 import { BacklogStatusView, NoSource, setupHref } from './BacklogSettings';
+import {
+  announceProjectDeleted,
+  DELETED_TOAST_MS,
+  DeletedProjectToast,
+  DeleteProjectDialog,
+} from './DeleteProjectDialog';
 import { DetachDialog } from './DetachDialog';
 import { CONNECTION, sourceStatus } from './fixtures';
-import { GeneralForm } from './GeneralSettings';
+import { GeneralForm, GeneralSettings } from './GeneralSettings';
 import { type GeneralProject, generalFailure, keyLockReason, projectChanges } from './general';
 import { webhookSteps } from './WebhookDialog';
 
-// These screens are rendered from props; the stub keeps the API and server modules out.
+// These screens are rendered from props; the stub keeps the API and server modules out. Only
+// client.projects.delete answers, through `api.deleteProject`.
+const api = vi.hoisted(() => ({ deleteProject: vi.fn(), navigate: vi.fn() }));
 vi.mock('~/lib/orpc', async () => {
   const { createTanstackQueryUtils } = await import('@orpc/tanstack-query');
-  const fail = (): unknown =>
+  const fail = (path: string[] = []): unknown =>
     new Proxy(() => {}, {
-      get: (_target, key) => (typeof key === 'string' ? fail() : undefined),
-      apply: () => Promise.reject(new Error('no API in these tests')),
+      get: (_target, key) => (typeof key === 'string' ? fail([...path, key]) : undefined),
+      apply: (_target, _this, args) =>
+        path.join('.') === 'projects.delete'
+          ? api.deleteProject(...args)
+          : Promise.reject(new Error('no API in these tests')),
     });
   const client = fail();
   return { client, orpc: createTanstackQueryUtils(client as never) };
 });
+vi.mock('@tanstack/react-router', async (original) => ({
+  ...(await original<typeof import('@tanstack/react-router')>()),
+  useNavigate: () => api.navigate,
+}));
 
 function withQuery(children: ReactNode) {
   return <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>;
@@ -298,5 +314,157 @@ describe('Webhook steps', () => {
     for (const provider of ['github', 'gitlab', 'gitea'] as const) {
       expect(webhookSteps(provider, 'gitlab.com/reddevs/payments', 'main')).toHaveLength(4);
     }
+  });
+});
+
+/** General settings until the delete navigates away; then the projects page, where the toast shows. */
+function DeleteHarness() {
+  const [onProjects, setOnProjects] = useState(false);
+  api.navigate.mockImplementation(async () => setOnProjects(true));
+  return onProjects ? <DeletedProjectToast /> : <GeneralSettings projectKey="OPS" />;
+}
+
+describe('Delete project', () => {
+  afterEach(() => {
+    api.deleteProject.mockReset();
+    api.navigate.mockReset();
+    vi.useRealTimers();
+  });
+
+  const TEXT =
+    "Deletes its tasks, comments, history, milestones, cycles and Backlog.md mirror. This can't be undone.";
+
+  it('enables Delete project only once the key is typed', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    render(
+      <DeleteProjectDialog
+        isOpen
+        onOpenChange={vi.fn()}
+        projectKey="OPS"
+        mirrored={false}
+        onDelete={onDelete}
+      />,
+    );
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete OPS?' });
+    expect(dialog).toHaveTextContent(TEXT);
+    expect(dialog).not.toHaveTextContent('Remove the webhook on the git host too.');
+    const remove = within(dialog).getByRole('button', { name: 'Delete project' });
+    const field = within(dialog).getByLabelText('Type OPS to confirm');
+    expect(remove).toBeDisabled();
+    await user.type(field, 'OP');
+    expect(remove).toBeDisabled();
+    await user.type(field, 'X');
+    expect(remove).toBeDisabled();
+    await user.clear(field);
+    await user.type(field, ' ops ');
+    expect(remove).toBeEnabled();
+    await user.click(remove);
+    expect(onDelete).toHaveBeenCalledWith('ops');
+  });
+
+  it('asks a mirrored project to remove its webhook and shows a refusal', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi
+      .fn()
+      .mockRejectedValue(
+        new ORPCError('FORBIDDEN', { message: 'Only owners and admins can delete a project.' }),
+      );
+    render(
+      <DeleteProjectDialog isOpen onOpenChange={vi.fn()} projectKey="PAY" mirrored onDelete={onDelete} />,
+    );
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete PAY?' });
+    expect(dialog).toHaveTextContent(`${TEXT} Remove the webhook on the git host too.`);
+    await user.type(within(dialog).getByLabelText('Type PAY to confirm'), 'PAY{Enter}');
+    expect(await within(dialog).findByText('Only owners and admins can delete a project.')).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Delete project' })).toBeEnabled();
+  });
+
+  function queryClientWith(role: 'owner' | 'admin' | 'member') {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const project = (key: string, name: string) => ({
+      ...PROJECT,
+      id: crypto.randomUUID(),
+      key,
+      name,
+      currentCycle: null,
+      backlog: null,
+      openCount: 0,
+      openCounts: { backlog: 0, todo: 0, in_progress: 0, in_review: 0 },
+      openAssignees: [],
+      lastActivityAt: null,
+      createdAt: '2026-10-01T10:00:00.000Z',
+      updatedAt: '2026-10-01T10:00:00.000Z',
+    });
+    queryClient.setQueryData(projectsQuery().queryKey, {
+      items: [project('OPS', 'Operations'), project('WEB', 'Website')],
+    } as never);
+    queryClient.setQueryData(meQuery().queryKey, { role } as never);
+    return queryClient;
+  }
+
+  it('is offered to owners and admins only', () => {
+    const member = render(
+      <QueryClientProvider client={queryClientWith('member')}>
+        <GeneralSettings projectKey="OPS" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole('form', { name: 'General' })).toBeVisible();
+    expect(screen.queryByText('Delete this project')).toBeNull();
+    member.unmount();
+    render(
+      <QueryClientProvider client={queryClientWith('admin')}>
+        <GeneralSettings projectKey="OPS" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('Delete this project')).toBeVisible();
+    expect(screen.getByText(TEXT)).toBeVisible();
+  });
+
+  it('deletes, goes to the projects page, drops the project from the cache and shows the toast', async () => {
+    const user = userEvent.setup();
+    api.deleteProject.mockResolvedValue(undefined);
+    api.navigate.mockResolvedValue(undefined);
+    const queryClient = queryClientWith('owner');
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DeleteHarness />
+      </QueryClientProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete project' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete OPS?' });
+    await user.type(within(dialog).getByLabelText('Type OPS to confirm'), 'ops');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete project' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Deleted OPS');
+    expect(api.deleteProject).toHaveBeenCalledWith({ project: 'OPS', confirmKey: 'ops' });
+    expect(api.navigate).toHaveBeenCalledWith({ to: '/projects' });
+    const cached = queryClient.getQueryData(projectsQuery().queryKey) as { items: { key: string }[] };
+    expect(cached.items.map((item) => item.key)).toEqual(['WEB']);
+    await waitFor(() => {
+      const keys = invalidate.mock.calls.map(([filters]) => JSON.stringify(filters?.queryKey));
+      for (const procedure of ['projects', 'tasks', 'dashboard', 'milestones', 'cycles']) {
+        expect(
+          keys.some((key) => key.includes(`"${procedure}"`)),
+          procedure,
+        ).toBe(true);
+      }
+    });
+  });
+
+  it('shows the toast once, and not for a stale deletion', () => {
+    vi.useFakeTimers();
+    announceProjectDeleted('PAY');
+    const first = render(<DeletedProjectToast />);
+    expect(screen.getByRole('status')).toHaveTextContent('Deleted PAY');
+    act(() => {
+      vi.advanceTimersByTime(DELETED_TOAST_MS + 10);
+    });
+    expect(screen.queryByRole('status')).toBeNull();
+    first.unmount();
+    announceProjectDeleted('WEB', Date.now() - DELETED_TOAST_MS - 1);
+    render(<DeletedProjectToast />);
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

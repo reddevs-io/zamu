@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<link rel="stylesheet" href="./ledger-m5.css" />
+<style>
+a{color:inherit}
+a:hover{color:var(--accent)}
+.p-grid{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-width:0;min-height:0}
+.p-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.p-rows{flex:1;min-height:0;overflow:hidden}
+.p-c1{grid-template-columns:72px minmax(0,1fr) 124px 76px 18px}
+.p-c2{grid-template-columns:72px minmax(0,1fr) 76px 18px}
+.p-row{height:36px;display:grid;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box}
+.p-rowsel{height:36px;display:grid;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;background:var(--sel);box-shadow:inset 2px 0 0 var(--accent)}
+.p-due{display:flex;justify-content:flex-end;min-width:0}
+.p-panel{border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg);position:relative}
+.p-ph{height:64px;flex:none;display:flex;align-items:center;gap:10px;padding:0 24px;border-bottom:1px solid var(--line);box-sizing:border-box}
+.p-phs{display:flex;flex-direction:column;gap:3px;min-width:0}
+.p-phl{display:flex;align-items:center;gap:8px}
+.p-body{flex:1;min-height:0;overflow:hidden;position:relative}
+.p-in{padding:18px 24px 24px;display:flex;flex-direction:column;gap:14px}
+.p-props{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);flex:none}
+.p-cell{padding:7px 10px 8px;display:flex;flex-direction:column;gap:4px;min-width:0;background:var(--bg)}
+.p-cellon{padding:7px 10px 8px;display:flex;flex-direction:column;gap:4px;min-width:0;background:var(--sel);outline:2px solid var(--focus);outline-offset:-2px}
+.p-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500;min-width:0}
+.p-cvn{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;color:var(--faint);min-width:0}
+.p-capk{display:flex;align-items:center;gap:6px}
+.p-capk .lg-kbd{letter-spacing:0;text-transform:none;font-weight:400}
+.p-fold{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;flex:none}
+.p-act{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
+.p-act b{color:var(--fg);font-weight:600}
+.p-dot{width:7px;height:7px;border-radius:50%;background:var(--line);justify-self:center}
+.p-dota{width:7px;height:7px;background:var(--accent);justify-self:center}
+.p-comp{flex:none;padding:12px 24px 16px;border-top:1px solid var(--line);background:var(--bg)}
+.p-cancel{opacity:0.55}
+.p-pop{position:absolute;z-index:6}
+.p-scroll{position:absolute;right:3px;width:4px;background:var(--line)}
+.p-listwrap{position:relative;overflow:hidden}
+.m5-dqi,.m5-dqion{white-space:nowrap}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="{{ rootStyle }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">38</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>BACK</span><span class="lg-rn">41</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+
+    <div class="p-grid">
+      <section class="p-main">
+        <header class="lg-head">
+          <div style="min-width:0"><h1 class="lg-h1">Payments</h1><div class="lg-sub"><span class="lg-mono">PAY</span> · 38 open · list</div></div>
+          <div class="lg-headr"><span class="m2-seg"><span class="m2-segon">List</span><span class="m2-segi">Board</span></span><button class="lg-btn">New<span class="lg-btnk">C</span></button></div>
+        </header>
+        <div class="lg-bar" style="gap:4px;padding:0 16px">
+          <span class="m5-f">Status</span><span class="m5-f">Assignee</span><span class="m5-f">Label</span><span class="m5-f">Due</span>
+          <span class="lg-sp"></span>
+          <span class="m5-sort">Sort: <b>Priority</b></span>
+        </div>
+        <div class="{{ thCls }}"><span>Key</span><span>Title</span><sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span>Labels</span></sc-if><span class="lg-right">Due</span><span></span></div>
+        <div class="p-rows">
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+            <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.n }}</span></div>
+            <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="4">
+              <div class="{{ r.cls }}">
+                <span class="lg-key">{{ r.key }}</span>
+                <span class="m5-tc">
+                  <span class="lg-trunc">{{ r.title }}</span>
+                  <sc-if value="{{ r.par }}" hint-placeholder-val="{{ false }}"><span class="m5-par">↳ {{ r.par }}</span></sc-if>
+                  <sc-if value="{{ r.sub }}" hint-placeholder-val="{{ false }}"><span class="m5-sub"><span class="m5-subbar" style="--p:{{ r.subP }}"></span>{{ r.sub }}</span></sc-if>
+                  <sc-if value="{{ r.blk }}" hint-placeholder-val="{{ false }}"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></sc-if>
+                </span>
+                <sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}">
+                  <span class="m5-labels"><sc-if value="{{ r.lb }}" hint-placeholder-val="{{ true }}"><span class="m5-lb" style="max-width:{{ r.lbw }}"><span class="m5-sw" style="--c:var(--lb-{{ r.lbc }})"></span><span class="m5-lbt">{{ r.lb }}</span></span></sc-if><sc-if value="{{ r.lbm }}" hint-placeholder-val="{{ false }}"><span class="m5-lbmore">{{ r.lbm }}</span></sc-if></span>
+                </sc-if>
+                <span class="p-due"><sc-if value="{{ r.due }}" hint-placeholder-val="{{ true }}"><span class="{{ r.dueCls }}"><sc-if value="{{ r.dueGlyph }}" hint-placeholder-val="{{ true }}"><span class="m5-cal"></span></sc-if>{{ r.due }}</span></sc-if></span>
+                <span class="{{ r.avCls }}" style="--h:{{ r.hue }}">{{ r.ini }}</span>
+              </div>
+            </sc-for>
+          </sc-for>
+        </div>
+      </section>
+
+      <aside class="p-panel" data-screen-label="{{ panelLabel }}">
+        <header class="p-ph">
+          <div class="p-phs">
+            <div class="p-phl"><span class="lg-mono" style="font-size:13px">{{ key }}</span><sc-if value="{{ blocked }}" hint-placeholder-val="{{ true }}"><span class="m5-blkq"><span class="m5-blkg"></span>Blocked</span></sc-if></div>
+            <sc-if value="{{ created }}" hint-placeholder-val="{{ true }}"><span class="lg-sub" style="margin:0">{{ created }}</span></sc-if>
+            <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}"><span class="lg-skel" style="width:150px"></span></sc-if>
+          </div>
+          <span class="lg-sp"></span><a class="lg-muted" href="#">Open as page</a><span class="lg-kbd">Esc</span>
+        </header>
+
+        <div class="p-body">
+          <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+            <div class="p-in" aria-busy="true">
+              <span class="lg-skel" style="height:16px;width:92%"></span>
+              <span class="lg-skel" style="height:16px;width:55%"></span>
+              <div class="p-props">
+                <sc-for list="{{ skelCells }}" as="k" hint-placeholder-count="6"><div class="p-cell" style="gap:8px;padding:10px"><span class="lg-skel" style="width:46px;height:6px"></span><span class="lg-skel" style="width:{{ k }}px"></span></div></sc-for>
+                <div class="p-cell m5-span" style="gap:8px;padding:10px"><span class="lg-skel" style="width:46px;height:6px"></span><span class="m5-labelsw"><span class="m5-lbsk"></span><span class="m5-lbsk" style="width:72px"></span><span class="m5-lbsk" style="width:44px"></span></span></div>
+              </div>
+              <span class="lg-skel" style="width:140px;height:6px;margin-top:4px"></span>
+              <span class="lg-cap">Blocked by</span>
+              <div class="m5-rl"><sc-for list="{{ skelRows2 }}" as="k" hint-placeholder-count="2"><div class="m5-r"><span class="lg-skel" style="width:8px;height:8px"></span><span class="lg-skel" style="width:48px"></span><span class="lg-skel" style="width:{{ k }}%"></span><span></span><span class="lg-skel" style="width:18px;height:18px;border-radius:50%"></span><span></span></div></sc-for></div>
+              <span class="lg-cap">Subtasks</span>
+              <div class="m5-rl"><sc-for list="{{ skelRows3 }}" as="k" hint-placeholder-count="3"><div class="m5-r"><span class="lg-skel" style="width:8px;height:8px"></span><span class="lg-skel" style="width:48px"></span><span class="lg-skel" style="width:{{ k }}%"></span><span></span><span class="lg-skel" style="width:18px;height:18px;border-radius:50%"></span><span></span></div></sc-for></div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isReady }}" hint-placeholder-val="{{ true }}">
+          <div class="p-in" style="transform:translateY(-{{ scrollY }}px)">
+            <h2 class="lg-h2" style="font-size:19px">{{ title }}</h2>
+            <div class="p-props">
+              <div class="p-cell"><span class="lg-cap">Status</span><span class="p-cv"><span class="{{ stSq }}"></span>{{ stName }}</span></div>
+              <div class="p-cell"><span class="lg-cap">Priority</span><sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}"><span class="p-cvn">No priority</span></sc-if><sc-if value="{{ notEmpty }}" hint-placeholder-val="{{ true }}"><span class="p-cv"><span class="lg-pri">■■■</span>High</span></sc-if></div>
+              <div class="p-cell"><span class="lg-cap">Assignee</span><sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}"><span class="p-cvn"><span class="m2-none"></span>No assignee</span></sc-if><sc-if value="{{ notEmpty }}" hint-placeholder-val="{{ true }}"><span class="p-cv"><span class="lg-ag">C</span>claude-dev<span class="lg-for" style="font-weight:400">for Ana Ruiz</span></span></sc-if></div>
+              <div class="{{ dueCellCls }}"><span class="lg-cap p-capk">Due date <span class="lg-kbd">⇧D</span></span><sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}"><span class="p-cvn"><span class="m5-cal"></span>No due date</span></sc-if><sc-if value="{{ notEmpty }}" hint-placeholder-val="{{ true }}"><span class="p-cv"><span class="m5-dueover"><span class="m5-cal"></span>3 days overdue</span><span class="lg-for" style="font-weight:400">Oct 24</span></span></sc-if></div>
+              <div class="p-cell"><span class="lg-cap p-capk">Milestone <span class="lg-kbd">⇧M</span></span><sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}"><span class="p-cvn"><span class="m2-ms"></span>No milestone</span></sc-if><sc-if value="{{ notEmpty }}" hint-placeholder-val="{{ true }}"><span class="p-cv"><span class="m2-ms"></span>Webhooks v2<span class="lg-for" style="font-weight:400">64%</span></span></sc-if></div>
+              <div class="p-cell"><span class="lg-cap p-capk">Cycle <span class="lg-kbd">⇧C</span></span><sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}"><span class="p-cvn"><span class="m2-cy"></span>No cycle</span></sc-if><sc-if value="{{ notEmpty }}" hint-placeholder-val="{{ true }}"><span class="p-cv"><span class="m2-cyon" style="--p:79%"></span>Cycle 12<span class="lg-for" style="font-weight:400">3d left</span></span></sc-if></div>
+              <div class="{{ lbCellCls }}">
+                <span class="lg-cap p-capk">Labels <span class="lg-kbd">#</span></span>
+                <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}"><span class="m5-add" style="padding:0;align-self:flex-start"><span class="m5-plus">+</span>Add labels</span></sc-if>
+                <sc-if value="{{ notEmpty }}" hint-placeholder-val="{{ true }}">
+                  <span class="m5-labelsw"><sc-for list="{{ labels }}" as="l" hint-placeholder-count="4"><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span class="m5-lbt">{{ l.n }}</span></span></sc-for><sc-if value="{{ lbPending }}" hint-placeholder-val="{{ false }}"><span class="m5-lb" style="opacity:0.55;border-style:dashed"><span class="m5-sw" style="--c:var(--lb-blue)"></span><span class="m5-lbt">billing</span></span></sc-if></span>
+                </sc-if>
+                <sc-if value="{{ lbErr }}" hint-placeholder-val="{{ false }}"><span class="lg-err" style="display:flex;align-items:center;gap:8px"><span class="lg-bannerx"></span>Couldn't add 'billing'. Try again.<a href="#" style="color:var(--fg);text-decoration:underline;text-underline-offset:2px">Retry</a></span></sc-if>
+              </div>
+            </div>
+
+            <div class="p-fold"><span class="lg-faint">▸</span><span>Description</span><span class="lg-faint">· {{ descNote }}</span></div>
+
+            <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+              <div class="m5-emptyrel" style="padding-top:12px;border-top:1px solid var(--line)"><span class="m5-add" style="padding:0"><span class="m5-plus">+</span>Add blocker<span class="lg-kbd">⇧B</span></span><span class="m5-add" style="padding:0"><span class="m5-plus">+</span>Add subtask<span class="lg-kbd">⇧S</span></span></div>
+            </sc-if>
+
+            <sc-if value="{{ relErr }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)">
+                <div class="m5-rsh" style="height:auto"><span class="lg-cap">Blocked by and subtasks</span></div>
+                <div class="lg-banner"><span class="lg-bannerx"></span><span style="flex:1;line-height:1.45">Couldn't load blockers and subtasks. The rest of the task is up to date.</span><button class="lg-btn2" style="height:28px">Retry</button></div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showRel }}" hint-placeholder-val="{{ true }}">
+              <div class="m5-rs" style="padding-top:8px;border-top:1px solid var(--line)">
+                <div class="m5-rsh"><span class="lg-cap">Blocked by <span class="m5-rsn">2 open · 1 done</span></span><span class="lg-sp"></span><span class="m5-add"><span class="m5-plus">+</span>Add blocker<span class="lg-kbd">⇧B</span></span></div>
+                <div class="m5-rl">
+                  <sc-for list="{{ blockers }}" as="b" hint-placeholder-count="3">
+                    <div class="{{ b.cls }}"><span class="{{ b.sq }}"></span><span class="lg-key">{{ b.key }}</span><span class="lg-trunc">{{ b.title }}</span><span class="m5-rst">{{ b.st }}</span><span class="{{ b.avCls }}" style="--h:{{ b.hue }}">{{ b.ini }}</span><span class="{{ b.xCls }}">{{ b.x }}</span></div>
+                  </sc-for>
+                </div>
+              </div>
+              <div class="m5-blocks"><span class="lg-cap">Blocks</span><a href="#">PAY-150</a><span class="lg-trunc" style="min-width:0;flex:1">Merchant dashboard: failed deliveries</span></div>
+              <div class="m5-rs" style="gap:6px">
+                <div class="m5-rsh"><span class="lg-cap">Subtasks <span class="m5-rsn">3 of 5 done</span></span><span class="lg-sp"></span><span class="m5-add"><span class="m5-plus">+</span>Add subtask<span class="lg-kbd">⇧S</span></span></div>
+                <span class="m5-subbarl" style="--p:60%"></span>
+                <div class="m5-rl">
+                  <sc-for list="{{ subs }}" as="b" hint-placeholder-count="6">
+                    <div class="{{ b.cls }}"><span class="{{ b.sq }}"></span><span class="lg-key">{{ b.key }}</span><span class="lg-trunc">{{ b.title }}</span><span class="m5-rst">{{ b.st }}</span><span class="{{ b.avCls }}" style="--h:{{ b.hue }}">{{ b.ini }}</span><span class="{{ b.xCls }}">{{ b.x }}</span></div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <div class="lg-cap" style="padding-top:12px;border-top:1px solid var(--line);display:flex;gap:10px;flex:none"><span>Activity and comments</span><span class="lg-gc">{{ feedN }}</span></div>
+            <sc-for list="{{ feed }}" as="f" hint-placeholder-count="3">
+              <div class="p-act"><span class="{{ f.dot }}"></span><span><b>{{ f.who }}</b>{{ f.forTxt }} {{ f.what }}</span><span class="lg-upd">{{ f.when }}</span></div>
+            </sc-for>
+          </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ isLabels }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-pop p-pop" style="left:24px;top:{{ popTop }}px;width:316px" data-screen-label="Label picker">
+            <div class="m5-ps"><span>{{ lq }}</span><sc-if value="{{ lqTyped }}" hint-placeholder-val="{{ true }}"><span class="lg-caret" style="margin-left:-7px"></span></sc-if><sc-if value="{{ lqEmpty }}" hint-placeholder-val="{{ false }}"><span class="lg-ph">Add or create a label…</span></sc-if><span class="lg-sp"></span><span class="lg-kbd">#</span></div>
+            <sc-if value="{{ lqTyped }}" hint-placeholder-val="{{ true }}">
+            <div class="m2-poph" style="display:flex;gap:8px"><span>On this task</span><span class="m5-rsn">4</span></div>
+            <div class="m5-pl" style="padding:2px 0">
+              <sc-for list="{{ onTask }}" as="l" hint-placeholder-count="4">
+                <div class="m5-pi"><span class="m5-ckon"></span><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span>{{ l.n }}</span><span class="m5-pk">{{ l.u }}</span></div>
+              </sc-for>
+            </div>
+              <div class="m2-poph" style="border-top:1px solid var(--line-2)">Matches</div>
+              <div class="m5-pl" style="padding:2px 0">
+                <div class="m5-pion"><span class="m5-ck"></span><span class="m5-sw" style="--c:var(--lb-blue)"></span><span><span class="m5-hl">billing</span></span><span class="m5-pk">11 tasks</span></div>
+              </div>
+              <div class="m5-pcreate"><span class="m5-plus">+</span><span>Create label</span><span class="m5-sw" style="--c:var(--lb-teal)"></span><b style="font-weight:600">billing-v2</b><span class="lg-sp"></span><span class="lg-kbd">⌘↵</span></div>
+              <div style="padding:0 10px 9px 30px;font-size:11px;color:var(--faint);line-height:1.45">New labels take the least-used colour, teal here. Change it in Settings, Labels.</div>
+            </sc-if>
+            <sc-if value="{{ lqEmpty }}" hint-placeholder-val="{{ false }}">
+              <div class="m2-poph" style="display:flex;gap:8px"><span>Labels in Payments</span><span class="m5-rsn">30 · 4 on this task</span></div>
+              <div class="p-listwrap" style="height:272px">
+                <div class="m5-pl" style="padding:2px 0">
+                  <sc-for list="{{ allLabels }}" as="l" hint-placeholder-count="10">
+                    <div class="{{ l.cls }}"><span class="{{ l.ck }}"></span><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span>{{ l.n }}</span><span class="m5-pk">{{ l.u }}</span></div>
+                  </sc-for>
+                </div>
+                <span class="p-scroll" style="top:4px;height:80px"></span>
+              </div>
+            </sc-if>
+            <div class="m5-pfoot" style="white-space:nowrap"><span class="lg-kbd">↑↓</span>move<span class="lg-kbd">↵</span>toggle<sc-if value="{{ lqTyped }}" hint-placeholder-val="{{ true }}"><span class="lg-kbd">⌘↵</span>create</sc-if><span class="lg-sp"></span><span class="lg-kbd">Esc</span>close</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDue }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-pop p-pop" style="right:16px;top:{{ popTop }}px" data-screen-label="Due date picker">
+            <div class="m5-ps"><span class="m5-cal" style="color:var(--muted)"></span><span>Oct 24, 2026</span><span class="lg-sp"></span><span class="lg-kbd">⇧D</span></div>
+            <div class="m5-dp" style="grid-template-columns:162px 252px">
+              <div class="m5-dq">
+                <div class="m5-dqi">Today<span class="m5-dqd">Tue Oct 27</span></div>
+                <div class="m5-dqi">Tomorrow<span class="m5-dqd">Wed Oct 28</span></div>
+                <div class="m5-dqi">Next week<span class="m5-dqd">Mon Nov 2</span></div>
+                <div class="m5-dqi">In 2 weeks<span class="m5-dqd">Tue Nov 10</span></div>
+                <div class="m2-popsep"></div>
+                <div class="m5-dqi" style="color:var(--muted)">Clear<span class="m5-dqd">⌫</span></div>
+              </div>
+              <div class="m5-dm">
+                <div class="m5-dmh"><span>October 2026</span><span class="m5-dmnav"><span>‹</span><span>›</span></span></div>
+                <div class="m5-dg">
+                  <sc-for list="{{ wk }}" as="w" hint-placeholder-count="7"><span class="m5-dw">{{ w }}</span></sc-for>
+                  <sc-for list="{{ days }}" as="d" hint-placeholder-count="35"><span class="{{ d.c }}">{{ d.n }}</span></sc-for>
+                </div>
+                <div class="m5-dsum">Due Oct 24 · 3 days overdue</div>
+              </div>
+            </div>
+            <div class="m5-pfoot" style="white-space:nowrap"><span class="lg-kbd">T</span>today<span class="lg-kbd">←→↑↓</span>move<span class="lg-kbd">PgUp</span><span class="lg-kbd">PgDn</span>month<span class="lg-sp"></span><span class="lg-kbd">↵</span>pick<span class="lg-kbd">⌫</span>clear</div>
+          </div>
+        </sc-if>
+
+        <div class="p-comp"><div class="m2-comp"><div class="m2-compbody lg-faint" style="min-height:40px">Leave a comment. @ to mention someone.</div><div class="m2-compfoot"><span style="display:flex;gap:6px;align-items:center"><span class="lg-kbd">M</span>to focus</span><span class="lg-sp"></span><button class="lg-btn" style="height:28px">Comment<span class="lg-btnk">⌘↵</span></button></div></div></div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 960 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["full", "full-top", "empty", "labels", "labels-many", "due", "loading", "error"], "default": "full" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'full';
+    const width = String(this.props.width ?? '1280');
+    const narrow = width === '1024';
+    const empty = state === 'empty';
+    const loading = state === 'loading';
+    const tall = state === 'full';
+    const P = { ana: ['Ana Ruiz', 'AR', 25, 'lg-av'], tomas: ['Tomás Berg', 'TB', 220, 'lg-av'], clara: ['Clara Lindqvist', 'CL', 150, 'lg-av'], claude: ['claude-dev', 'C', 0, 'lg-ag'], codex: ['codex-ci', 'X', 0, 'lg-ag'], none: ['', '', 0, 'm2-none'] };
+    const selKey = empty ? 'PAY-152' : 'PAY-142';
+    const rowGrid = narrow ? 'p-c2' : 'p-c1';
+    const dueCls = { over: 'm5-dueover', soon: 'm5-duesoon', fut: 'm5-due', done: 'm5-duedone' };
+    const row = (key, title, who, o) => {
+      o = o || {};
+      return {
+        key, title,
+        cls: (key === selKey ? 'p-rowsel ' : 'p-row ') + rowGrid,
+        ini: P[who][1], hue: P[who][2], avCls: P[who][3],
+        par: o.par || '', sub: o.sub || '', subP: o.subP || '0%', blk: !!o.blk,
+        lb: o.lb || '', lbc: o.lbc || 'slate', lbm: o.lbm || '', lbw: o.lbm ? '90px' : '124px',
+        due: o.due || '', dueCls: dueCls[o.dk || 'fut'], dueGlyph: o.dk !== 'soon' && o.dk !== 'over'
+      };
+    };
+    const groups = [
+      { name: 'In progress', sq: 'lg-sq lg-s-prog', n: 4, rows: [
+        row('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 'claude', { sub: '3/5', subP: '60%', blk: true, lb: 'webhooks', lbc: 'teal', lbm: '+3', due: '3d overdue', dk: 'over' }),
+        row('PAY-146', 'Dead-letter queue after the sixth attempt', 'claude', { par: 'PAY-142', lb: 'webhooks', lbc: 'teal', due: 'Thu', dk: 'soon' }),
+        row('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'codex', { lb: 'billing', lbc: 'blue', due: 'Tomorrow', dk: 'soon' }),
+        row('PAY-160', 'Refund reasons as a fixed list', 'ana', { lb: 'refunds', lbc: 'violet', lbm: '+1', due: 'Nov 4' })
+      ] },
+      { name: 'Todo', sq: 'lg-sq lg-s-todo', n: 9, rows: [
+        row('PAY-151', 'Webhook signature check accepts expired timestamps', 'tomas', { lb: 'security', lbc: 'red', due: 'Due today', dk: 'soon' }),
+        row('PAY-147', 'Alert merchants after 24h of failures', 'none', { par: 'PAY-142' }),
+        row('PAY-150', 'Merchant dashboard: failed deliveries', 'clara', { blk: true, lb: 'merchant-facing', lbc: 'orange', lbm: '+1', due: 'Nov 12' }),
+        row('PAY-152', 'Show retry history on the delivery page', 'none', {}),
+        row('PAY-155', 'SEPA mandate retries after a bank holiday', 'codex', { lb: 'sepa', lbc: 'amber', due: 'Nov 20' }),
+        row('PAY-158', 'Payout currency switch for EU merchants', 'ana', { lb: 'q4', lbc: 'amber', due: 'Dec 1' }),
+        row('PAY-161', 'Idempotency keys on the refunds endpoint', 'none', { lb: 'api', lbc: 'slate' }),
+        row('PAY-163', 'Explain declined cards in the merchant export', 'clara', { lb: 'merchant-facing', lbc: 'orange' }),
+        row('PAY-164', 'Rotate the webhook signing secret per merchant', 'tomas', { lb: 'security', lbc: 'red', lbm: '+1', due: 'Nov 30' })
+      ] },
+      { name: 'Backlog', sq: 'lg-sq lg-s-backlog', n: 22, rows: [
+        row('PAY-102', 'Spike: card network tokens', 'none', { lb: 'q4', lbc: 'amber' }),
+        row('PAY-109', 'Old dashboard: CSV export button', 'none', {})
+      ] }
+    ];
+    const rel = (key, title, st, sq, who, o) => {
+      o = o || {};
+      const base = o.hover ? 'm5-rh' : 'm5-r';
+      return { key, title, st, sq: 'lg-sq ' + sq, ini: P[who][1], hue: P[who][2], avCls: P[who][3],
+        cls: base + (o.done ? ' m5-rdone' : '') + (o.sdone ? ' m5-rsdone' : '') + (o.cancel ? ' m5-rdone p-cancel' : ''),
+        x: o.hover ? '×' : '', xCls: o.hover ? 'm5-rxh' : 'm5-rx' };
+    };
+    const blockers = [
+      rel('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'In progress', 'lg-s-prog', 'codex'),
+      rel('PAY-151', 'Webhook signature check accepts expired timestamps', 'Todo', 'lg-s-todo', 'tomas', { hover: state === 'full' }),
+      rel('PAY-120', 'Drop the v1 webhook payload format', 'Done', 'lg-s-done', 'claude', { done: true })
+    ];
+    const subs = [
+      rel('PAY-143', 'Honour Retry-After on 429 responses', 'Done', 'lg-s-done', 'claude', { sdone: true }),
+      rel('PAY-144', 'Add ±20% jitter to each delay', 'Done', 'lg-s-done', 'claude', { sdone: true }),
+      rel('PAY-145', 'Store attempts in webhook_attempt', 'Done', 'lg-s-done', 'codex', { sdone: true }),
+      rel('PAY-146', 'Dead-letter queue after the sixth attempt', 'In progress', 'lg-s-prog', 'claude'),
+      rel('PAY-147', 'Alert merchants after 24h of failures', 'Todo', 'lg-s-todo', 'none'),
+      rel('PAY-148', 'Retry over SMS', 'Canceled · not counted', 'lg-s-cancel', 'none', { cancel: true })
+    ];
+    const labels = [{ n: 'webhooks', c: 'teal' }, { n: 'reliability', c: 'green' }, { n: 'merchant-facing', c: 'orange' }, { n: 'backend', c: 'slate' }];
+    const onTask = [{ n: 'webhooks', c: 'teal', u: '14' }, { n: 'reliability', c: 'green', u: '9' }, { n: 'merchant-facing', c: 'orange', u: '7' }, { n: 'backend', c: 'slate', u: '22' }];
+    const more = [['q4', 'amber', 12], ['billing', 'blue', 11], ['api', 'slate', 8], ['refunds', 'violet', 6], ['docs', 'pink', 5], ['sepa', 'amber', 4], ['security', 'red', 3], ['tech-debt', 'slate', 2], ['payouts', 'green', 10], ['invoices', 'blue', 9], ['disputes', 'red', 7], ['chargebacks', 'orange', 6], ['pci', 'red', 5], ['fraud', 'pink', 5], ['ledger', 'violet', 4], ['reconciliation', 'teal', 4], ['currency', 'amber', 3], ['stripe', 'violet', 3], ['adyen', 'green', 3], ['onboarding', 'teal', 2], ['kyc', 'orange', 2], ['performance', 'green', 2], ['flaky-test', 'slate', 2], ['migrations', 'blue', 1], ['observability', 'teal', 1], ['customer-reported', 'pink', 1]];
+    const allLabels = onTask.map((l) => ({ n: l.n, c: l.c, u: l.u + ' tasks', ck: 'm5-ckon', cls: 'm5-pi' })).concat(more.map((m, i) => ({ n: m[0], c: m[1], u: m[2] + (m[2] === 1 ? ' task' : ' tasks'), ck: 'm5-ck', cls: i === 1 ? 'm5-pion' : 'm5-pi' })));
+    const days = [];
+    [28, 29, 30].forEach((n) => days.push({ n, c: 'm5-ddo' }));
+    for (let n = 1; n <= 31; n++) {
+      let c = n < 27 ? 'm5-ddp' : 'm5-dd';
+      if (n === 24) c = 'm5-dds';
+      if (n === 27) c = 'm5-ddt';
+      if (n === 28) c = 'm5-ddf';
+      days.push({ n, c });
+    }
+    days.push({ n: 1, c: 'm5-ddo' });
+    const feed = empty ? [
+      { who: 'Ana Ruiz', forTxt: '', what: 'created the task', when: '2m', dot: 'p-dot' }
+    ] : [
+      { who: 'Ana Ruiz', forTxt: '', what: 'created the task with due date Oct 24', when: 'Oct 20', dot: 'p-dot' },
+      { who: 'claude-dev', forTxt: ' for Ana Ruiz', what: 'added subtasks PAY-143 to PAY-148', when: 'Oct 21', dot: 'p-dota' },
+      { who: 'Tomás Berg', forTxt: '', what: 'marked it blocked by PAY-151', when: 'Oct 23', dot: 'p-dot' },
+      { who: 'claude-dev', forTxt: ' for Ana Ruiz', what: 'added the label merchant-facing', when: '2h', dot: 'p-dota' }
+    ];
+    const popTops = { labels: 360, 'labels-many': 360, due: 258 };
+    const labelsCellFocus = state === 'full-top' || state === 'labels' || state === 'labels-many';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rootStyle: 'width:' + width + 'px;height:' + (tall ? 960 : 800) + 'px',
+      label: 'Task panel · ' + state + ' · ' + theme + (narrow ? ' · 1024' : ''),
+      panelLabel: 'Task panel · ' + state,
+      thCls: 'lg-th ' + rowGrid,
+      showLabels: !narrow,
+      groups,
+      key: selKey,
+      blocked: !empty && !loading,
+      created: loading ? '' : (empty ? 'Created by Ana Ruiz, just now' : 'Created by Ana Ruiz, Oct 20'),
+      isLoading: loading,
+      isReady: !loading,
+      skelCells: [70, 52, 96, 84, 76, 60],
+      skelRows2: [70, 55],
+      skelRows3: [62, 48, 70],
+      title: empty ? 'Show retry history on the delivery page' : 'Retry failed webhook deliveries with exponential backoff',
+      stSq: empty ? 'lg-sq lg-s-todo' : 'lg-sq lg-s-prog',
+      stName: empty ? 'Todo' : 'In progress',
+      isEmpty: empty,
+      notEmpty: !empty,
+      dueCellCls: state === 'due' ? 'p-cellon' : 'p-cell',
+      lbCellCls: 'm5-span ' + (labelsCellFocus ? 'p-cellon' : 'p-cell'),
+      labels,
+      lbPending: false,
+      lbErr: state === 'error',
+      descNote: empty ? 'empty' : '6 lines, 4 checklist items',
+      relErr: state === 'error',
+      showRel: !empty && state !== 'error',
+      blockers, subs,
+      feed, feedN: empty ? 1 : 14,
+      scrollY: 0,
+      isLabels: state === 'labels' || state === 'labels-many',
+      isDue: state === 'due',
+      popTop: popTops[state] || 0,
+      lq: state === 'labels' ? 'billing-v2' : '',
+      lqTyped: state === 'labels',
+      lqEmpty: state === 'labels-many',
+      onTask, allLabels,
+      wk: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+      days
+    };
+  }
+}
+</script>
+</body>
+</html>

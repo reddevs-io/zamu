@@ -1,5 +1,5 @@
 // Backlog.md settings of a project: mappings, folder, connection, Refresh now (web) and refresh
-// requests from the API (pm backlog refresh), webhook info, and detach.
+// requests from the API (pm backlog refresh), webhook info, a new webhook secret, and detach.
 // Rules: M3 plan, section 5 "Setup, import and detach" and "Authorization (additions)".
 import {
   type BacklogRefreshResult,
@@ -7,9 +7,12 @@ import {
   type BacklogTrigger,
   BacklogWebhookInfo,
   BacklogWebhookInfoInput,
+  BacklogWebhookSecret,
+  type BacklogWebhookSecretState,
   DetachBacklogInput,
   RefreshBacklogInput,
   RefreshBacklogNowInput,
+  ReissueBacklogWebhookSecretInput,
   SetBacklogConnectionInput,
   SetBacklogFolderInput,
   UpdateBacklogMappingsInput,
@@ -22,15 +25,21 @@ import { recordActivity } from '../activity';
 import { type Actor, can } from '../authz';
 import type { DbContext, GitContext, LinkContext } from '../context';
 import { clockNow } from '../cycles';
-import { BacklogDetached, BacklogPaused, Invalid, parseInput } from '../errors';
+import { BacklogDetached, BacklogPaused, Conflict, Invalid, parseInput } from '../errors';
 import { providerForConnection } from '../git-connections';
 import type { ProjectRow } from '../internal';
 import type { JobQueue } from '../jobs';
-import { decryptSecret } from '../secrets';
+import {
+  decryptSecret,
+  EncryptionKeyMissing,
+  encryptSecret,
+  isEncryptionReady,
+  SecretUnreadable,
+} from '../secrets';
 import type { BacklogSourceRow } from './apply';
 import { repositoryRef } from './reader';
 import { enqueueBacklogRefresh, storedProblems } from './refresh';
-import { assertMappedMembers } from './setup';
+import { assertMappedMembers, newWebhookCredentials } from './setup';
 import { backlogStatus, sourceForProject } from './status';
 
 const { backlogSource, gitConnection } = schema;
@@ -177,7 +186,10 @@ export function backlogWebhookUrl(publicUrl: string, webhookId: string): string 
 
 /**
  * The webhook URL (always), the secret (owners and admins: backlog.manage; null for others and
- * after detach), the provider and the last delivery. backlog.read.
+ * after detach), the provider and the last delivery. backlog.read. secretState says why the secret
+ * is null: hidden (not backlog.manage, or no secret after detach) or unreadable (the stored secret
+ * doesn't decrypt with the current APP_ENCRYPTION_KEY; issue a new one). Without any key it throws
+ * EncryptionKeyMissing, since a new secret can't be stored either.
  */
 export async function getBacklogWebhookInfo(
   ctx: DbContext & GitContext & LinkContext,
@@ -194,12 +206,63 @@ export async function getBacklogWebhookInfo(
         .where(eq(gitConnection.id, source.connectionId))
         .limit(1)
     : [];
+  const { secret, secretState } =
+    manage && source.webhookSecretCiphertext
+      ? readWebhookSecret(ctx, source.webhookSecretCiphertext)
+      : { secret: null, secretState: 'hidden' as const };
   return BacklogWebhookInfo.parse({
     url: backlogWebhookUrl(ctx.publicUrl, source.webhookId),
-    secret:
-      manage && source.webhookSecretCiphertext ? decryptSecret(ctx, source.webhookSecretCiphertext) : null,
+    secret,
+    secretState,
     provider: connection?.provider ?? null,
     lastAt: source.webhookLastAt,
+  });
+}
+
+function readWebhookSecret(
+  ctx: GitContext,
+  ciphertext: string,
+): { secret: string | null; secretState: BacklogWebhookSecretState } {
+  try {
+    return { secret: decryptSecret(ctx, ciphertext), secretState: 'ok' };
+  } catch (error) {
+    if (error instanceof SecretUnreadable) return { secret: null, secretState: 'unreadable' };
+    throw error;
+  }
+}
+
+/**
+ * Issues a new webhook secret (owners and admins: backlog.manage) for a mirror: same webhook id and
+ * URL, a new secret stored encrypted, so deliveries signed with the old one answer 404 from now on.
+ * Works when the old secret is unreadable. Conflict for detached sources and imports;
+ * EncryptionKeyMissing without APP_ENCRYPTION_KEY. One project.backlog_webhook_secret_reissued
+ * activity row. Returns the URL and the secret, shown once.
+ */
+export async function reissueBacklogWebhookSecret(
+  ctx: DbContext & GitContext & LinkContext,
+  actor: Actor,
+  input: z.input<typeof ReissueBacklogWebhookSecretInput>,
+): Promise<BacklogWebhookSecret> {
+  const parsed = parseInput(ReissueBacklogWebhookSecretInput, input);
+  return ctx.db.transaction(async (tx) => {
+    const { project, source } = await sourceForProject(tx, actor, parsed.projectKey, 'backlog.manage', {
+      forUpdate: true,
+    });
+    if (source.state === 'detached' || source.mode !== 'mirror') {
+      throw new Conflict('This project no longer mirrors Backlog.md.');
+    }
+    if (!isEncryptionReady(ctx)) throw new EncryptionKeyMissing();
+    const { secret } = newWebhookCredentials();
+    await tx
+      .update(backlogSource)
+      .set({ webhookSecretCiphertext: encryptSecret(ctx, secret) })
+      .where(eq(backlogSource.id, source.id));
+    await recordActivity(tx, actor, {
+      projectId: project.id,
+      type: 'project.backlog_webhook_secret_reissued',
+      details: { mode: source.mode, repository: repositoryRef(project.repository)?.short ?? null },
+    });
+    return BacklogWebhookSecret.parse({ url: backlogWebhookUrl(ctx.publicUrl, source.webhookId), secret });
   });
 }
 

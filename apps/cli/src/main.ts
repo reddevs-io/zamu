@@ -10,7 +10,7 @@ import { createCycle, currentCycle, endCycle, listCycles } from './commands/cycl
 import { showDashboard } from './commands/dashboard';
 import { link } from './commands/link';
 import { createMilestone, listMilestones, updateMilestone } from './commands/milestones';
-import { listProjects } from './commands/projects';
+import { deleteProject, listProjects } from './commands/projects';
 import { collectKeys, collectList } from './commands/shared';
 import { createTask, listTasks, showTask, updateTask } from './commands/tasks';
 import { type CommandContext, createContext, reportError } from './context';
@@ -115,10 +115,21 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
       .option('--everyone', 'the whole workspace instead of your tasks, your agents and mentions of you'),
   ).action((options: { everyone?: boolean }) => showDashboard(context, options));
 
-  const projects = program.command('projects').description('list projects');
+  const projects = program.command('projects').description('list and delete projects');
   leaf(projects.command('list').description('list projects with open task counts')).action(() =>
     listProjects(context),
   );
+
+  leaf(
+    projects
+      .command('delete')
+      .description(
+        'delete a project with its tasks, comments, history, milestones, cycles and Backlog.md mirror; ' +
+          'cannot be undone (owners and admins)',
+      )
+      .argument('<KEY>', 'project key, e.g. PAY')
+      .option('--confirm <KEY>', 'the project key again; nothing is deleted without it'),
+  ).action((key: string, options: { confirm?: string }) => deleteProject(context, key, options));
 
   const tasks = program.command('tasks').description('list, show, create and update tasks');
   leaf(

@@ -53,7 +53,8 @@ export interface RefreshContext extends DbContext, GitContext {
  * singletonKey = source id on a stately queue: at most one queued run per source; with the
  * 60-second debounce slot a burst of triggers collapses into one run, and a trigger during a
  * running refresh queues exactly one more. Returns the job id, or null when a queued run already
- * covers this trigger.
+ * covers this trigger. An asked refresh (Refresh now, pm backlog refresh) replaces a queued run that
+ * waits for the next slot and returns the new run's id, so it starts as soon as nothing else runs.
  */
 export async function enqueueBacklogRefresh(
   ctx: { jobs?: JobQueue },
@@ -66,11 +67,15 @@ export async function enqueueBacklogRefresh(
   // A delayed retry (rate limits) skips the debounce slot, which would replace its start time.
   // Someone who asked for a refresh (setup, Refresh now, pm backlog refresh) skips it too: the
   // stately queue still keeps at most one queued run per source, but they never wait for the
-  // next minute. Webhooks and the poll keep the debounce, so bursts of pushes collapse.
+  // next minute: a queued webhook or poll run waiting for its slot gives way to theirs (PM-10).
+  // Setup creates the source, so nothing can be queued for it yet. Webhooks and the poll keep the
+  // debounce, so bursts of pushes collapse.
   const send: EnqueueOptions = options.startAfterSeconds
     ? { singletonKey: sourceId, startAfter: options.startAfterSeconds }
     : ASKED_TRIGGERS.has(trigger)
-      ? { singletonKey: sourceId }
+      ? trigger === 'setup'
+        ? { singletonKey: sourceId }
+        : { singletonKey: sourceId, replaceDebounced: true }
       : { singletonKey: sourceId, singletonSeconds: REFRESH_THROTTLE_SECONDS, singletonNextSlot: true };
   return ctx.jobs.enqueue(tx, BACKLOG_REFRESH, { sourceId, trigger }, send);
 }

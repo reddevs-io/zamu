@@ -14,7 +14,7 @@ function procedures(router: unknown, path: string[] = []): [string, AnyContractP
 const all = procedures(contract);
 
 describe('contract', () => {
-  it('exposes exactly the M1, M2, M3 and M4 routes under /api/v1', () => {
+  it('exposes exactly the M1 to M4 and 0.6.0 routes under /api/v1', () => {
     const routes = Object.fromEntries(
       all.map(([name, procedure]) => {
         const { method, path } = procedure['~orpc'].route;
@@ -27,6 +27,7 @@ describe('contract', () => {
       'projects.list': 'GET /api/v1/projects',
       'projects.create': 'POST /api/v1/projects',
       'projects.update': 'PATCH /api/v1/projects/{project}',
+      'projects.delete': 'DELETE /api/v1/projects/{project}',
       'tasks.list': 'GET /api/v1/tasks',
       'tasks.get': 'GET /api/v1/tasks/{key}',
       'tasks.create': 'POST /api/v1/tasks',
@@ -91,7 +92,7 @@ describe('contract', () => {
     }
   });
 
-  it('returns 201 from creates, 202 from backlog refreshes, 204 from milestone deletes and 200 otherwise', () => {
+  it('returns 201 from creates, 202 from backlog refreshes, 204 from milestone and project deletes, else 200', () => {
     const created = all
       .filter(([, procedure]) => procedure['~orpc'].route.successStatus === 201)
       .map(([name]) => name);
@@ -102,7 +103,10 @@ describe('contract', () => {
       'projects.create',
       'tasks.create',
     ]);
-    expect(contract.milestones.delete['~orpc'].route.successStatus).toBe(204);
+    const noContent = all
+      .filter(([, procedure]) => procedure['~orpc'].route.successStatus === 204)
+      .map(([name]) => name);
+    expect(noContent.sort()).toEqual(['milestones.delete', 'projects.delete']);
     expect(contract.backlog.refresh['~orpc'].route.successStatus).toBe(202);
     // Comment deletes are soft and return the comment, so the CLI can print it.
     expect(contract.comments.delete['~orpc'].route.successStatus).toBeUndefined();
@@ -149,6 +153,21 @@ describe('contract', () => {
       problemsLimit: 10,
     });
     expect(status.parse({ project: 'BACK' })).toMatchObject({ problemsLimit: 50 });
+  });
+
+  it('deletes a project only when confirmKey repeats the path key (JSON body)', () => {
+    const del = contract.projects.delete['~orpc'];
+    expect(del.route.description).toContain('confirmKey in the JSON body');
+    const input = del.inputSchema as z.ZodType;
+    expect(input.parse({ project: 'pay', confirmKey: ' pay ' })).toEqual({
+      project: 'PAY',
+      confirmKey: 'PAY',
+    });
+    const wrong = input.safeParse({ project: 'PAY', confirmKey: 'PA' });
+    expect(wrong.error?.issues).toEqual([
+      expect.objectContaining({ path: ['confirmKey'], message: 'Type the project key to confirm' }),
+    ]);
+    expect(input.safeParse({ project: 'PAY' }).success).toBe(false);
   });
 
   it('accepts cycle selectors and task keys as path parameters (text in URLs)', () => {

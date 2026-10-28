@@ -53,7 +53,9 @@ RUN chmod 0755 /usr/local/bin/pm-entrypoint \
  && ln -s /app/cli/dist/index.js /usr/local/bin/pm \
  && chmod 0755 /app/cli/dist/index.js
 
-USER node
+# The node user of the base image, by number so Kubernetes runAsNonRoot can verify it is not root.
+# Runtime writes go to /tmp (role marker) and $HOME=/home/node (pm CLI config), both writable by it.
+USER 1000:1000
 EXPOSE 3000
 
 # Probes /api/healthz for the web role; worker and migrate report healthy while their process runs.

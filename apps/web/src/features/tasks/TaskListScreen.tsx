@@ -1,7 +1,7 @@
 import type { TaskListItem } from '@pm/contracts';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DetachedToast,
   HiddenTasksStrip,
@@ -19,10 +19,11 @@ import { useSearchText } from '~/features/project-header/useSearchText';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';
 import { Banner, Button, DataTable, EmptyState, SearchField, useHotkeys } from '~/ui';
+import type { DataTableHandle } from '~/ui/DataTable';
 import { useNow } from './clock';
 import { describeError } from './errors';
 import { formatDay } from './format';
-import { buildGroups, buildHiddenGroup, visibleKeys } from './groups';
+import { buildGroups, buildHiddenGroup } from './groups';
 import { rememberListSearch, rememberView } from './list-memory';
 import { type TaskListData, taskListQuery, taskQuery } from './queries';
 import {
@@ -140,48 +141,17 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
   }, [selected, selectedStatus, collapsed, setCollapsed]);
 
   // ---- Keyboard -----------------------------------------------------------------------------------
-  const tableRef = useRef<HTMLDivElement>(null);
+  // In the table, the arrow keys and J/K move between tasks and skip group rows; Left and Right collapse and
+  // expand groups (DataTable). J/K pressed anywhere else on the page move the table too.
+  const tableRef = useRef<DataTableHandle>(null);
   // The shell's / shortcut focuses this field.
   const searchRef = usePageSearchRef();
-  const order = useMemo(() => visibleKeys(groups, collapsed), [groups, collapsed]);
-
-  const focusRow = (key: string) =>
-    requestAnimationFrame(() => {
-      const root = tableRef.current;
-      const row = root?.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
-      (row ?? root?.querySelector<HTMLElement>('[role="grid"]'))?.focus();
-    });
-
-  // Reads the last requested selection, not the rendered one, so quick presses each move one row.
-  const move = (step: 1 | -1) => {
-    if (!order.length) return;
-    const current = selectedRef.current;
-    const index = current ? order.indexOf(current) : -1;
-    const next =
-      index < 0
-        ? order[step === 1 ? 0 : order.length - 1]
-        : order[Math.min(order.length - 1, Math.max(0, index + step))];
-    if (!next) return;
-    select(next);
-    focusRow(next);
-  };
-  // J/K move between tasks and skip group rows, inside the table and from anywhere on the page. (Arrow keys
-  // keep the table's own behaviour, which also visits group rows so they can be collapsed.)
-  const onTableKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-    const key = event.key.toLowerCase();
-    if (key !== 'j' && key !== 'k') return;
-    if ((event.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return;
-    event.preventDefault();
-    event.stopPropagation();
-    move(key === 'j' ? 1 : -1);
-  };
 
   useHotkeys({
     v: () => actions.current.setView('board'),
     Escape: { handler: () => select(null), enabled: selected != null },
-    j: () => move(1),
-    k: () => move(-1),
+    j: () => tableRef.current?.move(1),
+    k: () => tableRef.current?.move(-1),
     Enter: {
       enabled: selected != null,
       preventDefault: false,
@@ -306,13 +276,7 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
     setView: (_view: TaskView) => {},
   });
   actions.current = {
-    enterTable: () => {
-      const current = selectedRef.current;
-      const first = current ?? order[0];
-      if (!first) return;
-      if (!current) select(first);
-      focusRow(first);
-    },
+    enterTable: () => tableRef.current?.focus(),
     newTask,
     clearFilters,
     setSearch,
@@ -415,8 +379,9 @@ export function TaskListScreen({ projectKey, search }: TaskListScreenProps) {
         {showHidden && groups.length ? (
           <HiddenTasksStrip count={hiddenCount ?? 0} branch={project?.backlog?.defaultBranch ?? null} />
         ) : null}
-        <div ref={tableRef} onKeyDownCapture={onTableKeyDownCapture} className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <DataTable
+            ref={tableRef}
             aria-label={`Tasks in ${project?.name ?? projectKey}`}
             columns={columns}
             groups={listError || isEmptyProject ? [] : groups}

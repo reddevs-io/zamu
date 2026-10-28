@@ -33,14 +33,6 @@ export function buildMyGroups(
   });
 }
 
-/** Keys of the rows J/K moves through, top to bottom, skipping collapsed groups. */
-export function rowOrder(
-  groups: readonly DataGroup<TaskListItem>[],
-  collapsed: ReadonlySet<string>,
-): string[] {
-  return groups.flatMap((group) => (collapsed.has(group.id) ? [] : group.items.map((item) => item.key)));
-}
-
 const openCount = (counts: StatusCounts) => OPEN_STATUSES.reduce((sum, status) => sum + counts[status], 0);
 
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;

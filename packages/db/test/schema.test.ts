@@ -620,3 +620,40 @@ describe('globalSetup database', () => {
     }
   });
 });
+
+describe('0.6.0 dashboard indexes', () => {
+  it('exist after migrate, as btree indexes on the expected columns', async () => {
+    const { db, pool } = createDb(sharedTestDatabaseUrl());
+    try {
+      const result = await db.execute<{ tablename: string; indexname: string; indexdef: string }>(sql`
+        select tablename, indexname, indexdef from pg_indexes
+        where schemaname = 'public' and indexname in (
+          'activity_actorId_createdAt_idx',
+          'comment_authorId_createdAt_idx',
+          'milestone_projectId_status_targetDate_idx')
+        order by indexname`);
+      expect(result.rows).toEqual([
+        {
+          tablename: 'activity',
+          indexname: 'activity_actorId_createdAt_idx',
+          indexdef:
+            'CREATE INDEX "activity_actorId_createdAt_idx" ON public.activity USING btree (actor_id, created_at)',
+        },
+        {
+          tablename: 'comment',
+          indexname: 'comment_authorId_createdAt_idx',
+          indexdef:
+            'CREATE INDEX "comment_authorId_createdAt_idx" ON public.comment USING btree (author_id, created_at)',
+        },
+        {
+          tablename: 'milestone',
+          indexname: 'milestone_projectId_status_targetDate_idx',
+          indexdef:
+            'CREATE INDEX "milestone_projectId_status_targetDate_idx" ON public.milestone USING btree (project_id, status, target_date)',
+        },
+      ]);
+    } finally {
+      await pool.end();
+    }
+  });
+});

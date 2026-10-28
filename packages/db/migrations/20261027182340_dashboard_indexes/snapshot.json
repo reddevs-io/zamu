@@ -1,0 +1,160 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3372f681-0df5-4964-bbca-b0aff21a4326",
+  "prevIds": ["e52434c9-4414-465a-9e15-f5baed93e87f"],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "activity", "activity_actorId_createdAt_idx"],
+      "writes": [
+        "s|idx|public.activity_actorId_createdAt_idx",
+        "n|idx|public.activity_actorId_createdAt_idx",
+        "e|idx|public.activity_actorId_createdAt_idx",
+        "n|rel|public.activity_actorId_createdAt_idx"
+      ],
+      "reads": [
+        "n|tbl|public.activity",
+        "n|sch|public",
+        "n|col|public.activity.actor_id",
+        "n|col|public.activity.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "comment", "comment_authorId_createdAt_idx"],
+      "writes": [
+        "s|idx|public.comment_authorId_createdAt_idx",
+        "n|idx|public.comment_authorId_createdAt_idx",
+        "e|idx|public.comment_authorId_createdAt_idx",
+        "n|rel|public.comment_authorId_createdAt_idx"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|col|public.comment.author_id",
+        "n|col|public.comment.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "milestone", "milestone_projectId_status_targetDate_idx"],
+      "writes": [
+        "s|idx|public.milestone_projectId_status_targetDate_idx",
+        "n|idx|public.milestone_projectId_status_targetDate_idx",
+        "e|idx|public.milestone_projectId_status_targetDate_idx",
+        "n|rel|public.milestone_projectId_status_targetDate_idx"
+      ],
+      "reads": [
+        "n|tbl|public.milestone",
+        "n|sch|public",
+        "n|col|public.milestone.project_id",
+        "n|col|public.milestone.status",
+        "n|col|public.milestone.target_date"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "activity",
+        "name": "activity_actorId_createdAt_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "actor_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_authorId_createdAt_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "author_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "milestone",
+        "name": "milestone_projectId_status_targetDate_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "status",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "target_date",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

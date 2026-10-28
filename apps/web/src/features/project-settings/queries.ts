@@ -3,11 +3,13 @@
 // so the header button and this page read one cache. Settings-only data (webhook secret, detach, another
 // connection) goes through the server functions in features/backlog/server.ts, loaded on first use so
 // that jsdom tests of these screens do not pull server-only modules in.
-import type { BacklogProblemPage, BacklogWebhookInfo } from '@pm/contracts';
+import type { BacklogProblemPage, BacklogWebhookInfo, ProjectList } from '@pm/contracts';
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { client, orpc } from '~/lib/orpc';
 import { connectionsKey } from '../connections/queries';
 import { SettingsError, unwrap } from '../settings/result';
+import { announceProjectDeleted } from './DeleteProjectDialog';
 
 export const backlogSettingsKey = (projectKey: string) => ['backlog-settings', projectKey] as const;
 
@@ -78,5 +80,37 @@ export function useSetConnection(projectKey: string) {
       return unwrap(setBacklogConnectionFn({ data: { projectKey, connectionId } }));
     },
     onSuccess: () => Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: connectionsKey })]),
+  });
+}
+
+/**
+ * Deletes the project (DELETE /projects/{project}). On success: the toast is queued, the page goes
+ * to /projects, the project leaves the cached list at once, and every query that could show its
+ * tasks refetches: projects, tasks (lists, My tasks, boards), the dashboard and planning.
+ */
+export function useDeleteProject(projectKey: string) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  return useMutation({
+    mutationFn: (confirmKey: string) => client.projects.delete({ project: projectKey, confirmKey }),
+    onSuccess: async () => {
+      announceProjectDeleted(projectKey);
+      await navigate({ to: '/projects' });
+      queryClient.setQueriesData<ProjectList>({ queryKey: orpc.projects.list.key() }, (data) =>
+        data ? { ...data, items: data.items.filter((item) => item.key !== projectKey) } : data,
+      );
+      queryClient.removeQueries({ queryKey: backlogSettingsKey(projectKey) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: orpc.projects.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.tasks.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.dashboard.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.milestones.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.cycles.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.comments.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.backlog.key() }),
+        // Connections list the projects that use them.
+        queryClient.invalidateQueries({ queryKey: connectionsKey }),
+      ]);
+    },
   });
 }

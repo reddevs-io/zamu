@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<link rel="stylesheet" href="./ledger-m4.css" />
+<link rel="stylesheet" href="./ledger-m5.css" />
+<style>
+a{color:inherit}
+a:hover{color:var(--accent)}
+.d-grid{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
+.d-gridp{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-width:0;min-height:0}
+.d-panel{border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.d-pb{padding:20px 24px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.d-props{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line)}
+.d-cell{padding:8px 10px 9px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.d-cell:nth-child(2n){border-right:0}
+.d-cell:nth-last-child(-n+2){border-bottom:0}
+.d-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500}
+.d-due{color:var(--warn);justify-self:center}
+.d-tt{display:flex;align-items:center;gap:8px;min-width:0}
+.d-tt .lg-trunc{min-width:0}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="{{ rootStyle }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="m4-rdon" href="#"><span>Dashboard</span><sc-if value="{{ badge }}" hint-placeholder-val="{{ true }}"><span class="m4-badge">{{ badge }}</span></sc-if></a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <sc-for list="{{ railKeys }}" as="k" hint-placeholder-count="4">
+        <a class="lg-rk" href="#"><span>{{ k.k }}</span><span class="lg-rn">{{ k.n }}</span></a>
+      </sc-for>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+
+    <div class="{{ gridCls }}">
+      <section class="m4-main">
+        <header class="lg-head">
+          <div style="min-width:0"><h1 class="lg-h1">Dashboard</h1><div class="lg-sub lg-trunc">{{ sub }}</div></div>
+          <div class="lg-headr">
+            <sc-if value="{{ showUpd }}" hint-placeholder-val="{{ true }}"><span class="m4-upd" title="{{ upd }}"><span class="{{ updDot }}"></span><sc-if value="{{ updText }}" hint-placeholder-val="{{ true }}"><span>{{ upd }}</span></sc-if></span></sc-if>
+            <sc-if value="{{ showScope }}" hint-placeholder-val="{{ true }}">
+              <span class="m4-scope"><span class="m2-seg"><span class="{{ segMine }}">Mine</span><span class="{{ segAll }}">Everyone</span></span><span class="lg-kbd">E</span></span>
+            </sc-if>
+            <sc-if value="{{ notPanel }}" hint-placeholder-val="{{ true }}"><div class="lg-search" style="width:140px"><span>Search</span><span class="lg-kbd">/</span></div></sc-if>
+            <button class="lg-btn">New<span class="lg-btnk">C</span></button>
+          </div>
+        </header>
+
+        <div class="m4-body">
+          <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+            <div class="lg-banner"><span class="lg-bannerx"></span><span style="flex:1">Couldn't load the dashboard. The server took too long to answer.</span><button class="lg-btn2" style="height:28px">Retry</button></div>
+          </sc-if>
+
+          <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
+            <div class="lg-empty" style="max-width:640px;padding-top:28px;gap:16px">
+              <h2 class="lg-h2">Nothing to show yet</h2>
+              <p class="lg-muted" style="margin:0;line-height:1.55;text-wrap:pretty">The dashboard collects what needs you across every project in Reddevs: work waiting for review, questions from people and agents, stalled tasks and close deadlines.</p>
+              <div class="m4-steps">
+                <div class="m4-step"><span class="m4-stepn">1</span><b>Create a project</b><span class="lg-muted" style="line-height:1.5">Give it a name and a short key like PAY. Link a repository if you have one.</span><button class="lg-btn" style="align-self:flex-start">New project<span class="lg-btnk">P</span></button></div>
+                <div class="m4-step"><span class="m4-stepn">2</span><b>Add an agent</b><span class="lg-muted" style="line-height:1.5">Agents get an API key and work through the pm command. Their tasks and questions show up here.</span><button class="lg-btn2" style="align-self:flex-start">Add an agent</button></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showQueue }}" hint-placeholder-val="{{ true }}">
+            <div class="m4-q" data-screen-label="Action queue">
+              <div class="m4-qh">
+                <span class="m4-qt">{{ qTitle }}</span>
+                <sc-if value="{{ qCount }}" hint-placeholder-val="{{ true }}"><span class="m4-qn">{{ qCount }}</span></sc-if>
+                <span class="lg-sp"></span>
+                <span class="m4-qnote">{{ qNote }}</span>
+              </div>
+
+              <sc-if value="{{ isClear }}" hint-placeholder-val="{{ false }}">
+                <div class="m4-clear"><span class="m4-check"></span><div class="m2-stack"><b style="font-size:13.5px">Nothing needs you right now</b><span class="lg-muted">Reviews, mentions, stalled work and deadlines for you and your agents land here. Checked just now.</span></div></div>
+              </sc-if>
+
+              <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+                <sc-for list="{{ skelGroups }}" as="sg" hint-placeholder-count="3">
+                  <div class="m4-gh"><span class="lg-skel" style="width:8px;height:8px"></span><span class="lg-skel" style="width:{{ sg }}px"></span></div>
+                  <sc-for list="{{ skelRows }}" as="k" hint-placeholder-count="2">
+                    <div class="m4-r m4-c"><span class="lg-skel" style="width:8px"></span><span class="lg-skel" style="width:48px"></span><span class="lg-skel" style="width:{{ k }}%"></span><span class="lg-skel" style="width:80px"></span><span class="lg-skel" style="width:120px"></span><span class="lg-skel" style="width:20px"></span><span class="lg-skel" style="width:60px;justify-self:end"></span></div>
+                  </sc-for>
+                </sc-for>
+              </sc-if>
+
+              <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+                <div class="{{ g.hCls }}">
+                  <sc-if value="{{ g.isReview }}" hint-placeholder-val="{{ true }}"><span class="lg-sq lg-s-review"></span></sc-if>
+                  <sc-if value="{{ g.isMention }}" hint-placeholder-val="{{ false }}"><span class="m4-at">@</span></sc-if>
+                  <sc-if value="{{ g.isStalled }}" hint-placeholder-val="{{ false }}"><span class="m4-st"></span></sc-if>
+                  <sc-if value="{{ g.isDeadline }}" hint-placeholder-val="{{ false }}"><span class="m4-dl"></span></sc-if>
+                  <span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span>
+                  <sc-if value="{{ g.empty }}" hint-placeholder-val="{{ false }}"><span class="m4-more" style="color:var(--faint)">{{ g.emptyText }}</span></sc-if>
+                  <span class="lg-sp"></span>
+                  <sc-if value="{{ g.more }}" hint-placeholder-val="{{ false }}"><span class="m4-more">{{ g.more }}<span class="lg-kbd">A</span></span></sc-if>
+                  <span class="lg-kbd">{{ g.k }}</span>
+                </div>
+                <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="2">
+                  <div class="{{ r.cls }}">
+                    <sc-if value="{{ r.isTask }}" hint-placeholder-val="{{ true }}">
+                      <span class="{{ r.sq }}"></span>
+                      <span class="lg-key">{{ r.key }}</span>
+                      <span class="lg-trunc">{{ r.title }}</span>
+                      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-cell"><span class="m4-pk">{{ r.pk }}</span><span class="lg-trunc lg-muted" style="font-size:12px">{{ r.proj }}</span></span>
+                        <span class="lg-who"><sc-if value="{{ r.agent }}" hint-placeholder-val="{{ true }}"><span class="lg-ag">{{ r.av }}</span></sc-if><sc-if value="{{ r.person }}" hint-placeholder-val="{{ false }}"><span class="lg-av" style="--h:{{ r.h }}">{{ r.av }}</span></sc-if><span style="color:var(--fg)">{{ r.who }}</span><sc-if value="{{ r.for }}" hint-placeholder-val="{{ true }}"><span class="lg-for">for {{ r.for }}</span></sc-if></span>
+                        <span class="{{ r.priCls }}">{{ r.pri }}</span>
+                      </sc-if>
+                      <span class="m4-meta"><sc-if value="{{ r.pill }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ r.pill }}</span></sc-if><sc-if value="{{ r.meta }}" hint-placeholder-val="{{ true }}"><span>{{ r.meta }}</span></sc-if></span>
+                    </sc-if>
+                    <sc-if value="{{ r.isMention }}" hint-placeholder-val="{{ false }}">
+                      <sc-if value="{{ r.agent }}" hint-placeholder-val="{{ true }}"><span class="lg-ag">{{ r.av }}</span></sc-if><sc-if value="{{ r.person }}" hint-placeholder-val="{{ false }}"><span class="lg-av" style="--h:{{ r.h }}">{{ r.av }}</span></sc-if>
+                      <span class="lg-key">{{ r.key }}</span>
+                      <span class="m4-stack">
+                        <span class="m4-line"><b>{{ r.who }}</b><sc-if value="{{ r.for }}" hint-placeholder-val="{{ true }}"><span class="lg-for">for {{ r.for }}</span></sc-if><sc-if value="{{ r.to }}" hint-placeholder-val="{{ false }}"><span class="m4-to">→</span><b>{{ r.to }}</b></sc-if><span class="lg-faint">on</span><span class="lg-trunc lg-muted">{{ r.title }}</span></span>
+                        <span class="m4-ex"><span class="m2-at">@{{ r.at }}</span> {{ r.t1 }}<sc-if value="{{ r.code }}" hint-placeholder-val="{{ false }}"> <code>{{ r.code }}</code> {{ r.t2 }}</sc-if></span>
+                      </span>
+                      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-cell"><span class="m4-pk">{{ r.pk }}</span><span class="lg-trunc lg-muted" style="font-size:12px">{{ r.proj }}</span></span>
+                        <span class="lg-faint" style="font-size:12px">{{ r.kind }}</span>
+                        <span class="{{ r.priCls }}">{{ r.pri }}</span>
+                      </sc-if>
+                      <span class="m4-meta">{{ r.meta }}</span>
+                    </sc-if>
+                    <sc-if value="{{ r.isDue }}" hint-placeholder-val="{{ false }}">
+                      <span class="m5-cal d-due"></span>
+                      <span class="lg-key">{{ r.key }}</span>
+                      <span class="d-tt"><span class="lg-trunc">{{ r.title }}</span><sc-if value="{{ r.blocked }}" hint-placeholder-val="{{ false }}"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></sc-if><sc-if value="{{ r.sub }}" hint-placeholder-val="{{ false }}"><span class="m5-sub"><span class="m5-subbar" style="--p:{{ r.subP }}"></span>{{ r.sub }}</span></sc-if></span>
+                      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-cell"><span class="m4-pk">{{ r.pk }}</span><span class="lg-trunc lg-muted" style="font-size:12px">{{ r.proj }}</span></span>
+                        <span class="lg-who"><sc-if value="{{ r.agent }}" hint-placeholder-val="{{ true }}"><span class="lg-ag">{{ r.av }}</span></sc-if><sc-if value="{{ r.person }}" hint-placeholder-val="{{ false }}"><span class="lg-av" style="--h:{{ r.h }}">{{ r.av }}</span></sc-if><span style="color:var(--fg)">{{ r.who }}</span><sc-if value="{{ r.for }}" hint-placeholder-val="{{ true }}"><span class="lg-for">for {{ r.for }}</span></sc-if></span>
+                        <span class="{{ r.priCls }}">{{ r.pri }}</span>
+                      </sc-if>
+                      <span class="m4-meta"><span class="m4-pill">{{ r.pill }}</span></span>
+                    </sc-if>
+                    <sc-if value="{{ r.isDeadline }}" hint-placeholder-val="{{ false }}">
+                      <sc-if value="{{ r.ms }}" hint-placeholder-val="{{ true }}"><span class="m2-msf" style="color:var(--warn);margin-left:3px"></span></sc-if><sc-if value="{{ r.cy }}" hint-placeholder-val="{{ false }}"><span class="m2-cyon" style="--p:{{ r.pct }}%;color:var(--warn);margin-left:2px"></span></sc-if>
+                      <span class="lg-key">{{ r.pk }}</span>
+                      <span class="m4-line"><b class="lg-trunc">{{ r.title }}</b><span class="lg-faint" style="font-size:12px">{{ r.sub }}</span></span>
+                      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-cell"><span class="m2-prog"><span class="m2-progd" style="width:{{ r.pct }}%"></span></span><span class="m2-num">{{ r.done }}</span></span>
+                        <span class="lg-muted" style="font-size:12px">{{ r.open }}</span>
+                        <span></span>
+                      </sc-if>
+                      <span class="m4-meta"><span class="m4-pill">{{ r.pill }}</span></span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ g.foot }}" hint-placeholder-val="{{ false }}"><div class="m4-foot"><span>{{ g.foot }}</span><span class="lg-sp"></span><span class="m4-more">Collapse<span class="lg-kbd">A</span></span></div></sc-if>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showProjects }}" hint-placeholder-val="{{ true }}">
+            <div data-screen-label="Projects">
+              <div class="m4-sh"><span class="m4-st2">Projects</span><span class="m4-sc">{{ projCount }}</span><span class="m4-sl">Most recently active first</span></div>
+              <div class="m4-pt">
+                <div class="{{ pthCls }}"><span>Key</span><span>Name</span><span class="lg-right">Open</span><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="lg-right">Doing</span><span class="lg-right">Review</span><span>Current cycle</span><span>Next milestone</span></sc-if><span class="lg-right">Active</span></div>
+                <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+                  <sc-for list="{{ skelRows }}" as="k" hint-placeholder-count="3"><div class="m4-pr m4-pc"><span class="lg-skel" style="width:30px"></span><span class="lg-skel" style="width:{{ k }}%"></span><span class="lg-skel" style="width:20px;justify-self:end"></span><span class="lg-skel" style="width:20px;justify-self:end"></span><span class="lg-skel" style="width:20px;justify-self:end"></span><span class="lg-skel" style="width:160px"></span><span class="lg-skel" style="width:180px"></span><span class="lg-skel" style="width:30px;justify-self:end"></span></div></sc-for>
+                </sc-if>
+                <sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+                  <div class="{{ prCls }}">
+                    <span class="lg-key" style="color:var(--fg)">{{ p.pk }}</span>
+                    <span class="m4-cell"><span class="lg-trunc" style="font-weight:600">{{ p.name }}</span><sc-if value="{{ p.src }}" hint-placeholder-val="{{ false }}"><span class="m4-src"><span class="m4-srcsq"></span>Backlog.md</span></sc-if></span>
+                    <span class="m4-n">{{ p.open }}</span>
+                    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                      <span class="{{ p.progCls }}">{{ p.prog }}</span>
+                      <span class="{{ p.revCls }}">{{ p.rev }}</span>
+                      <sc-if value="{{ p.cy }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-plan"><span class="m2-cyon" style="--p:{{ p.cyPct }}%;color:var(--muted)"></span><span class="lg-trunc">{{ p.cy }}</span><span class="m2-prog"><span class="m2-progd" style="width:{{ p.cyPct }}%"></span></span><sc-if value="{{ p.cyWarn }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ p.cyWarn }}</span></sc-if><sc-if value="{{ p.cyLeft }}" hint-placeholder-val="{{ true }}"><span class="m2-num">{{ p.cyLeft }}</span></sc-if></span>
+                      </sc-if>
+                      <sc-if value="{{ p.noCy }}" hint-placeholder-val="{{ false }}"><span class="m4-unused">{{ p.noCy }}</span></sc-if>
+                      <sc-if value="{{ p.ms }}" hint-placeholder-val="{{ true }}">
+                        <span class="m4-plan"><span class="m2-ms" style="color:var(--muted)"></span><span class="lg-trunc">{{ p.ms }}</span><span class="m2-prog"><span class="m2-progd" style="width:{{ p.msPct }}%"></span></span><sc-if value="{{ p.msWarn }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ p.msWarn }}</span></sc-if><sc-if value="{{ p.msDate }}" hint-placeholder-val="{{ true }}"><span class="m2-num">{{ p.msDate }}</span></sc-if></span>
+                      </sc-if>
+                      <sc-if value="{{ p.noMs }}" hint-placeholder-val="{{ false }}"><span class="m4-unused">{{ p.noMs }}</span></sc-if>
+                    </sc-if>
+                    <span class="lg-upd">{{ p.act }}</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ projMore }}" hint-placeholder-val="{{ false }}"><div class="m4-foot" style="padding:0 8px"><span>{{ projMore }}</span></div></sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showAgents }}" hint-placeholder-val="{{ true }}">
+            <div data-screen-label="Agents">
+              <div class="m4-sh"><span class="m4-st2">Agents</span><span class="m4-sc">{{ agentCount }}</span><span class="m4-sl">{{ agentNote }}</span></div>
+              <div class="{{ agCls }}">
+                <sc-for list="{{ agents }}" as="a" hint-placeholder-count="4">
+                  <div class="m4-a">
+                    <div class="m4-ah"><span class="lg-ag">{{ a.av }}</span><b class="lg-trunc">{{ a.name }}</b><span class="lg-for lg-trunc">for {{ a.for }}</span></div>
+                    <sc-if value="{{ a.task }}" hint-placeholder-val="{{ true }}">
+                      <div class="m4-at2"><span class="lg-sq lg-s-prog" style="align-self:center"></span><span class="lg-key">{{ a.key }}</span><span class="lg-trunc">{{ a.task }}</span><sc-if value="{{ a.plus }}" hint-placeholder-val="{{ false }}"><span class="m2-num">{{ a.plus }}</span></sc-if></div>
+                    </sc-if>
+                    <sc-if value="{{ a.idle }}" hint-placeholder-val="{{ false }}"><div class="m4-idle">Idle · nothing in progress</div></sc-if>
+                    <div class="m4-af"><sc-if value="{{ a.pill }}" hint-placeholder-val="{{ false }}"><span class="m4-pill">{{ a.pill }}</span></sc-if><span>{{ a.last }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ scrollTop }}" hint-placeholder-val="{{ false }}"><span class="m4-scroll" style="top:{{ scrollTop }}px;height:{{ scrollH }}px"></span></sc-if>
+      </section>
+
+      <sc-if value="{{ isPanel }}" hint-placeholder-val="{{ false }}">
+        <aside class="d-panel" data-screen-label="Task panel from the dashboard">
+          <header class="lg-head"><span class="lg-mono">PAY-140</span><span class="lg-faint">in Payments</span><span class="lg-sp"></span><a class="lg-muted" href="#">Open as page</a><span class="lg-kbd">Esc</span></header>
+          <div class="d-pb">
+            <h2 class="lg-h2" style="font-size:19px">Retry failed webhook deliveries with exponential backoff</h2>
+            <div class="d-props">
+              <div class="d-cell"><span class="lg-cap">Status</span><span class="d-cv"><span class="lg-sq lg-s-review"></span>In review</span></div>
+              <div class="d-cell"><span class="lg-cap">Priority</span><span class="d-cv"><span class="lg-pri">■■■</span>High</span></div>
+              <div class="d-cell"><span class="lg-cap">Assignee</span><span class="d-cv"><span class="lg-ag">C</span>claude-dev</span><span class="lg-for">for Ana Ruiz</span></div>
+              <div class="d-cell"><span class="lg-cap">Milestone</span><span class="d-cv"><span class="m2-ms"></span>Webhooks v2</span></div>
+            </div>
+            <span class="lg-cap">Latest comment</span>
+            <div class="m2-cmt">
+              <div class="m2-cmth"><span class="lg-ag">C</span><b>claude-dev</b><span>for Ana Ruiz</span><span class="lg-sp"></span><span class="lg-upd">25m</span></div>
+              <div class="m2-cmtb"><p><span class="m2-at">@Ana Ruiz</span> the retry cap is 24 hours now. Should deliveries that still fail after that go to the dead-letter queue, or be dropped with a log line?</p></div>
+            </div>
+            <div class="m2-comp"><div class="m2-compbody lg-faint">Reply to claude-dev…</div><div class="m2-compfoot"><span>Markdown · @ to mention</span><span class="lg-sp"></span><span class="lg-kbd">M</span><span>to reply</span></div></div>
+          </div>
+        </aside>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 1150 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["mine"], "default": "mine" },
+  "width": { "editor": "enum", "options": ["1280"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = 'mine';
+    const wide = true;
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const PJ = { PAY: 'Payments', WEB: 'Website', CLI: 'Command-line tool', INF: 'Infrastructure', BACK: 'Backend' };
+    const PEOPLE = { 'Ana Ruiz': ['AR', 25], 'Tomás Berg': ['TB', 220], 'Clara Lindqvist': ['CL', 150] };
+    const AGENTS = { 'claude-dev': 'C', 'codex-ci': 'X' };
+    const who = (name) => AGENTS[name] ? { agent: true, person: false, av: AGENTS[name] } : { agent: false, person: true, av: PEOPLE[name][0], h: PEOPLE[name][1] };
+    const base = { isTask: false, isMention: false, isDeadline: false, isDue: false };
+    const task = (sq, key, title, w, f, pri, meta, pill) => Object.assign({}, base, {
+      isTask: true, sq: 'lg-sq ' + sq, key, title, pk: key.split('-')[0], proj: PJ[key.split('-')[0]],
+      who: w, for: f || '', pri: PRI[pri][0], priCls: PRI[pri][1], meta: meta || '', pill: pill || ''
+    }, who(w));
+    const mention = (key, title, w, f, at, t1, pri, meta) => Object.assign({}, base, {
+      isMention: true, key, title, pk: key.split('-')[0], proj: PJ[key.split('-')[0]],
+      who: w, for: f || '', to: '', at, t1, code: '', t2: '', kind: AGENTS[w] ? 'Agent asks' : 'Person asks',
+      pri: PRI[pri][0], priCls: PRI[pri][1], meta
+    }, who(w));
+    // Deadlines under Mine: task due dates (calendar glyph) mixed with milestones (diamond) and cycles (circle),
+    // most urgent first: overdue by days late, then due today, then tomorrow.
+    const due = (key, title, w, f, pri, pill, o) => Object.assign({}, base, {
+      isDue: true, key, title, pk: key.split('-')[0], proj: PJ[key.split('-')[0]], who: w, for: f || '',
+      pri: PRI[pri][0], priCls: PRI[pri][1], pill, blocked: false, sub: '', subP: '0%'
+    }, o || {}, who(w));
+    const deadline = (kind, pk, title, sub, pct, done, open, pill) => Object.assign({}, base, {
+      isDeadline: true, ms: kind === 'ms', cy: kind === 'cy', key: pk, pk, title, sub, pct, done, open, pill
+    });
+
+    const reviewRows = [
+      task('lg-s-review', 'PAY-140', 'Idempotency keys on refund requests', 'claude-dev', 'Ana Ruiz', 3, 'in review 3h'),
+      task('lg-s-review', 'CLI-24', 'pm tasks list with --json output', 'claude-dev', 'Ana Ruiz', 2, 'in review 40m'),
+      task('lg-s-review', 'WEB-91', 'Cookie banner blocks the checkout button on small laptops', 'Ana Ruiz', '', 3, 'in review 1d')
+    ];
+    const mentionRows = [
+      mention('PAY-146', 'Dead-letter queue after the sixth attempt', 'claude-dev', 'Ana Ruiz', 'Ana Ruiz', 'should deliveries that still fail after the sixth attempt go to the dead-letter queue, or be dropped with a log line?', 2, '25m'),
+      mention('INF-31', 'Move Postgres backups to the new object store', 'Tomás Berg', '', 'Ana Ruiz', 'can you check the bucket policy before I switch the nightly backups over?', 2, '2h')
+    ];
+    const stalledRows = [
+      task('lg-s-prog', 'CLI-19', 'pm sync stops halfway through large workspaces', 'claude-dev', 'Ana Ruiz', 2, '', 'no update 26h')
+    ];
+    const deadlineRows = [
+      deadline('ms', 'PAY', 'PCI audit', 'milestone · target Oct 16', 64, '7/11', '4 open tasks', '11 days overdue'),
+      due('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 'claude-dev', 'Ana Ruiz', 3, '3 days overdue', { blocked: true, sub: '3/5', subP: '60%' }),
+      due('WEB-88', 'Pricing page copy for the new plans', 'Ana Ruiz', '', 2, 'due today'),
+      due('CLI-21', 'pm tasks due command with --overdue', 'claude-dev', 'Ana Ruiz', 1, 'due tomorrow'),
+      deadline('cy', 'WEB', 'Cycle 4', 'cycle · Oct 15 – Oct 28', 63, '12/19', '7 open tasks', 'ends tomorrow')
+    ];
+    const counts = { review: 3, mention: 2, stalled: 1, deadline: 5 };
+    let n = 0;
+    const focusAt = 0, hoverAt = 4;
+    const rowCls = (two) => {
+      const i = n++;
+      let c = 'm4-r';
+      if (i === focusAt) c = 'm4-rf';
+      else if (i === hoverAt) c = 'm4-rh';
+      return c + ' m4-c' + (two ? ' m4-two' : '');
+    };
+    const mkGroup = (id, name, rows, count, k) => ({
+      isReview: id === 'review', isMention: id === 'mention', isStalled: id === 'stalled', isDeadline: id === 'deadline',
+      name, count, k, empty: count === 0, emptyText: '', hCls: 'm4-gh', more: '', foot: '',
+      rows: rows.map((r) => Object.assign({ cls: rowCls(r.isMention) }, r))
+    });
+    const groups = [
+      mkGroup('review', 'In review', reviewRows, counts.review, '1'),
+      mkGroup('mention', 'Mentions', mentionRows, counts.mention, '2'),
+      mkGroup('stalled', 'Stalled', stalledRows, counts.stalled, '3'),
+      mkGroup('deadline', 'Deadlines', deadlineRows, counts.deadline, '4')
+    ];
+    const total = counts.review + counts.mention + counts.stalled + counts.deadline;
+
+    const projects = [
+      { pk: 'PAY', name: 'Payments', open: 38, prog: 8, rev: 3, cy: 'Cycle 12', cyPct: 79, cyLeft: '3d left', ms: 'PCI audit', msPct: 64, msWarn: '11d overdue', act: '5m' },
+      { pk: 'WEB', name: 'Website', open: 27, prog: 5, rev: 2, cy: 'Cycle 4', cyPct: 63, cyWarn: 'ends tomorrow', noMs: 'Milestones not used', act: '12m' },
+      { pk: 'BACK', name: 'Backend', src: true, open: 41, prog: 6, rev: 2, noCy: 'Cycles not used', ms: 'Sessions on Redis', msPct: 40, msDate: 'Nov 20', act: '30m' },
+      { pk: 'CLI', name: 'Command-line tool', open: 9, prog: 2, rev: 1, noCy: 'Cycles not used', ms: 'CLI 1.0', msPct: 42, msDate: 'Nov 30', act: '40m' },
+      { pk: 'INF', name: 'Infrastructure', open: 5, prog: 1, rev: 0, noCy: 'Cycles not used', noMs: 'Milestones not used', act: '1d' }
+    ].map((p) => Object.assign({ cyWarn: '', cyLeft: '', msWarn: '', msDate: '', src: false, noCy: '', noMs: '', cy: '', ms: '' }, p, {
+      progCls: p.prog ? 'm4-n' : 'm4-n0', revCls: p.rev ? 'm4-n' : 'm4-n0'
+    }));
+    const agents = [
+      { av: 'C', name: 'claude-dev', for: 'Ana Ruiz', key: 'PAY-146', task: 'Dead-letter queue after the sixth attempt', plus: '+2', pill: 'Stalled 26h', last: 'Last activity 40m ago', idle: false }
+    ];
+
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rootStyle: 'height:1150px',
+      label: 'Dashboard · Mine · deadlines with task due dates',
+      gridCls: 'd-grid', isPanel: false, notPanel: true, wide,
+      sub: 'Reddevs · you and 1 agent',
+      showUpd: true, updText: true, upd: 'Updated just now', updDot: 'm4-dot',
+      showScope: true, segMine: 'm2-segon', segAll: 'm2-segi',
+      isError: false, isNew: false, isClear: false, isLoading: false,
+      showQueue: true, qTitle: 'Needs you', qCount: String(total),
+      qNote: 'Assigned to you, your agents, and mentions of you. Items leave when they are handled.',
+      groups, skelGroups: [], skelRows: [],
+      showProjects: true, projects, projCount: String(projects.length), projMore: '',
+      pthCls: 'm4-pth m4-pc', prCls: 'm4-pr m4-pc',
+      showAgents: true, agents, agentCount: '1', agentNote: 'Yours · Everyone shows all 2',
+      agCls: 'm4-ag', badge: String(total),
+      railKeys: [{ k: 'PAY', n: 38 }, { k: 'WEB', n: 27 }, { k: 'CLI', n: 9 }, { k: 'BACK', n: 41 }, { k: 'INF', n: 5 }],
+      scrollTop: 0, scrollH: 0
+    };
+  }
+}
+</script>
+</body>
+</html>

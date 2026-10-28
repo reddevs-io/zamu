@@ -122,6 +122,10 @@ describe('jobs', () => {
       (entry) => (entry.options as { singletonSeconds?: number }).singletonSeconds,
     );
     expect(debounced.map((entry) => entry.trigger)).toEqual(['webhook', 'poll']);
+    const replacing = sent.filter(
+      (entry) => (entry.options as { replaceDebounced?: boolean }).replaceDebounced,
+    );
+    expect(replacing.map((entry) => entry.trigger)).toEqual(['manual', 'cli']);
     expect(
       sent.every((entry) => (entry.options as { singletonKey?: string }).singletonKey === sourceId),
     ).toBe(true);
@@ -177,5 +181,130 @@ describe('jobs', () => {
     const queued = await boss.getJobById(BACKLOG_REFRESH, during as string);
     expect(queued?.startAfter.getTime()).toBeGreaterThan(Date.now() - 1000);
     await boss.complete(BACKLOG_REFRESH, first as string);
+  });
+
+  /** Waits for the next minute when the current 60-second slot ends within `margin` ms. */
+  async function awayFromSlotEnd(margin = 15_000): Promise<void> {
+    const left = 60_000 - (Date.now() % 60_000);
+    if (left < margin) await new Promise((resolve) => setTimeout(resolve, left + 200));
+  }
+
+  async function refreshJobs(sourceId: string) {
+    return boss.findJobs<{ sourceId: string; trigger: string }>(BACKLOG_REFRESH, { key: sourceId });
+  }
+
+  it('starts an asked refresh now when a webhook run waits for the next slot (PM-10)', async () => {
+    await awayFromSlotEnd();
+    const queue = createJobQueue(boss);
+    const sourceId = crypto.randomUUID();
+    const running = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect((await boss.fetch(BACKLOG_REFRESH, { batchSize: 50 })).map((job) => job.id)).toContain(running);
+    // A push during the run waits for the next 60-second slot.
+    const webhook = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect(webhook).toBeTruthy();
+    const deferred = await boss.getJobById(BACKLOG_REFRESH, webhook as string);
+    expect(deferred?.startAfter.getTime()).toBeGreaterThan(Date.now() + 2_000);
+
+    // Refresh now: the waiting webhook run gives way to one that starts now.
+    const asked = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'manual'),
+    );
+    expect(asked).toBeTruthy();
+    expect(asked).not.toBe(webhook);
+    const jobs = await refreshJobs(sourceId);
+    const queued = jobs.filter((job) => job.state === 'created');
+    expect(queued.map((job) => job.id)).toEqual([asked]);
+    expect(queued[0]?.data).toEqual({ sourceId, trigger: 'manual' });
+    expect(queued[0]?.startAfter.getTime()).toBeLessThanOrEqual(Date.now() + 1_000);
+    expect(jobs.find((job) => job.id === webhook)?.state).toBe('cancelled');
+
+    // Asking again while that run waits to start reports the queued run.
+    const again = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'cli'),
+    );
+    expect(again).toBeNull();
+
+    // The asked run starts as soon as the running one ends, without waiting for the slot.
+    await boss.complete(BACKLOG_REFRESH, running as string);
+    const next = await boss.fetch(BACKLOG_REFRESH, { batchSize: 50 });
+    expect(next.map((job) => job.id)).toContain(asked);
+
+    // A push during the asked run still queues one more run (the cancelled job freed its slot).
+    const during = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect(during).toBeTruthy();
+    await boss.complete(BACKLOG_REFRESH, asked as string);
+    await boss.deleteJob(BACKLOG_REFRESH, during as string);
+  });
+
+  it('keeps the webhook and poll debounce, and a rate-limit retry, when nobody asked', async () => {
+    await awayFromSlotEnd();
+    const queue = createJobQueue(boss);
+    const sourceId = crypto.randomUUID();
+    const running = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect((await boss.fetch(BACKLOG_REFRESH, { batchSize: 50 })).map((job) => job.id)).toContain(running);
+    const webhook = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect(webhook).toBeTruthy();
+    // A second push and the hourly poll collapse into the waiting run, which keeps its slot.
+    for (const trigger of ['webhook', 'poll'] as const) {
+      const id = await ctx.db.transaction((tx) =>
+        enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, trigger),
+      );
+      expect(id).toBeNull();
+    }
+    const waiting = await boss.getJobById(BACKLOG_REFRESH, webhook as string);
+    expect(waiting?.state).toBe('created');
+    expect(waiting?.startAfter.getTime()).toBeGreaterThan(Date.now() + 2_000);
+    await boss.deleteJob(BACKLOG_REFRESH, webhook as string);
+
+    // A retry after a rate limit waits as the git host asked, even for Refresh now.
+    const retry = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'manual', { startAfterSeconds: 120 }),
+    );
+    expect(retry).toBeTruthy();
+    const asked = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'manual'),
+    );
+    expect(asked).toBeNull();
+    const kept = await boss.getJobById(BACKLOG_REFRESH, retry as string);
+    expect(kept?.state).toBe('created');
+    expect(kept?.startAfter.getTime()).toBeGreaterThan(Date.now() + 100_000);
+    await boss.complete(BACKLOG_REFRESH, running as string);
+    await boss.deleteJob(BACKLOG_REFRESH, retry as string);
+  });
+
+  it('leaves no replaced job behind when the asking transaction rolls back', async () => {
+    await awayFromSlotEnd();
+    const queue = createJobQueue(boss);
+    const sourceId = crypto.randomUUID();
+    const running = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    expect((await boss.fetch(BACKLOG_REFRESH, { batchSize: 50 })).map((job) => job.id)).toContain(running);
+    const webhook = await ctx.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'webhook'),
+    );
+    let asked: string | null = null;
+    await expect(
+      ctx.db.transaction(async (tx) => {
+        asked = await enqueueBacklogRefresh({ jobs: queue }, tx, sourceId, 'manual');
+        throw new Error('roll back');
+      }),
+    ).rejects.toThrow('roll back');
+    expect(asked).toBeTruthy();
+    const jobs = await refreshJobs(sourceId);
+    expect(jobs.find((job) => job.id === webhook)?.state).toBe('created');
+    expect(jobs.some((job) => job.id === asked)).toBe(false);
+    await boss.complete(BACKLOG_REFRESH, running as string);
+    await boss.deleteJob(BACKLOG_REFRESH, webhook as string);
   });
 });

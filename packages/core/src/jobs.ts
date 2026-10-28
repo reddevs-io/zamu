@@ -110,7 +110,18 @@ export function transactionDb(tx: Tx): PgBossDb {
 }
 
 /** Send options accepted by enqueue. `db` is always the transaction's connection. */
-export type EnqueueOptions = Omit<SendOptions, 'db'>;
+export type EnqueueOptions = Omit<SendOptions, 'db'> & {
+  /**
+   * With `singletonKey`: when a queued job with the same key suppresses this send while it waits
+   * for a later debounce slot (sent with singletonSeconds and singletonNextSlot), cancel that job
+   * and send this one in its place, so it starts now. Jobs deferred by `startAfter` alone (retries
+   * after a rate limit) and jobs about to start are left alone.
+   */
+  replaceDebounced?: boolean;
+};
+
+/** A waiting debounced job that starts within this many milliseconds is left to start on its own. */
+const REPLACE_MARGIN_MS = 2_000;
 
 /**
  * Sends a job through pg-boss using the transaction's connection: if the transaction rolls back,
@@ -124,8 +135,29 @@ export async function enqueue<N extends JobName>(
   data: JobPayloadInput<N>,
   options: EnqueueOptions = {},
 ): Promise<string | null> {
+  const { replaceDebounced, ...send } = options;
   const payload = jobPayloadSchemas[name].parse(data);
-  return boss.send(name, payload, { ...options, db: transactionDb(tx) });
+  const db = transactionDb(tx);
+  const id = await boss.send(name, payload, { ...send, db });
+  if (id !== null || !replaceDebounced || !send.singletonKey) return id;
+  // pg-boss's update() could move the waiting job's start, but it keeps the job's debounce slot:
+  // a trigger during that run would then find both slots taken and queue nothing. Cancelling frees
+  // the slot. Both statements run in `tx`, so a rollback restores the waiting job.
+  // Through the Drizzle adapter, timestamps come back as Postgres text, not Date (despite the types).
+  const startsBy = Date.now() + REPLACE_MARGIN_MS;
+  const waiting = (await boss.findJobs(name, { key: send.singletonKey, queued: true, db })).filter(
+    (job) =>
+      job.state === 'created' &&
+      job.singletonOn !== null &&
+      new Date(job.startAfter as Date | string).getTime() > startsBy,
+  );
+  if (waiting.length === 0) return null;
+  await boss.cancel(
+    name,
+    waiting.map((job) => job.id),
+    { db },
+  );
+  return boss.send(name, payload, { ...send, db });
 }
 
 /** A producer bound to one pg-boss instance, as held by the core context. */

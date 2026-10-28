@@ -16,6 +16,8 @@
 // - Backlog.md: set up, edit mappings, show the webhook secret and detach are for owners and
 //   admins; refreshing is for them and for agents whose key can write the project; anyone who can
 //   read the project reads the source status and its problems.
+// 0.6.0 (PM-12): deleting a project is for owners and admins, people only; through an API key only
+//   a workspace-wide write key.
 import type { Actor, WorkspaceRole } from '@pm/auth';
 import { Forbidden } from './errors';
 
@@ -44,6 +46,8 @@ export type Action =
   | 'project.read'
   /** Rename a project or change its key or description. */
   | 'project.update'
+  /** Delete a project with everything in it. Owners and admins, people only. */
+  | 'project.delete'
   /** Create and update tasks, milestones and cycles in a project, end cycles, comment. */
   | 'task.write'
   /** Invite people, add agents, remove members. */
@@ -115,6 +119,12 @@ export function can(actor: Actor, action: Action, resource?: Resource): boolean 
       const projectId = projectIdOf(resource);
       return projectId !== null && keyCoversProject(actor, projectId) && keyCanWrite(actor);
     }
+    case 'project.delete': {
+      const projectId = projectIdOf(resource);
+      return (
+        projectId !== null && isAdmin(actor) && canManageSettings(actor) && keyCoversProject(actor, projectId)
+      );
+    }
     case 'member.manage':
       return isAdmin(actor) && canManageSettings(actor);
     case 'apiKey.listWorkspace':
@@ -159,6 +169,7 @@ const MESSAGES: Record<Action, string> = {
   'project.create': 'Creating projects needs a key with write access to all projects',
   'project.read': 'Your API key does not cover this project',
   'project.update': 'You cannot change this project with this API key',
+  'project.delete': 'Only owners and admins can delete a project.',
   'task.write': 'You cannot change tasks in this project with this API key',
   'member.manage': 'Only workspace admins can manage members, invitations and agents',
   'apiKey.listWorkspace': 'Only workspace admins can see every API key',

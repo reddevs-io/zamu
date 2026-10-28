@@ -336,6 +336,63 @@ test('comments: mention from the web, from the CLI as the agent, edit and delete
   expect(timeline.filter((entry) => entry.kind === 'comment')).toHaveLength(2);
 });
 
+test('task list keys: Down skips a group row, Left collapses the group, Right expands it', async () => {
+  // The board test left the board as the remembered view; open the list.
+  await page.goto('/');
+  await page.evaluate((key) => localStorage.removeItem(`pm:view:${key}`), checkout.key);
+  await page.goto(`/p/${checkout.key}`);
+  await settle(page);
+  const grid = page.getByRole('grid', { name: `Tasks in ${checkout.name}` });
+  await expect(grid.locator('[data-group-row]').first()).toBeVisible();
+  const rows = await grid.locator('[role="row"][data-key]').evaluateAll((elements) =>
+    elements.map((row) => ({
+      key: row.getAttribute('data-key') ?? '',
+      group: row.hasAttribute('data-group-row'),
+    })),
+  );
+  // The last task of one group, the next group's row, and that group's first task.
+  const at = rows.findIndex(
+    (row, index) => !row.group && rows[index + 1]?.group && rows[index + 2] && !rows[index + 2]?.group,
+  );
+  expect(at, JSON.stringify(rows)).toBeGreaterThanOrEqual(0);
+  const before = rows[at]?.key ?? '';
+  const groupKey = rows[at + 1]?.key ?? '';
+  const after = rows[at + 2]?.key ?? '';
+  const row = (key: string) => grid.locator(`[role="row"][data-key="${key}"]`);
+  // Group row keys start with a control character, so find the group row by position.
+  const groupRow = grid.locator('[data-group-row]').nth(rows.slice(0, at + 1).filter((r) => r.group).length);
+  const focusedRow = () =>
+    page.evaluate(() => document.activeElement?.closest('[role="row"]')?.getAttribute('data-key') ?? null);
+
+  await row(before).getByText(before, { exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe(before);
+  await expect.poll(focusedRow).toBe(before);
+
+  // Down lands on the next task, not on the group row between them.
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe(after);
+  await expect.poll(focusedRow).toBe(after);
+  await expect(row(after)).toHaveAttribute('aria-selected', 'true');
+
+  // Left folds the task's group and puts focus on the group row; the task stays selected.
+  await page.keyboard.press('ArrowLeft');
+  await expect(row(after)).toHaveCount(0);
+  await expect.poll(focusedRow).toBe(groupKey);
+  await expect(groupRow).toContainText('collapsed');
+  expect(new URL(page.url()).searchParams.get('task')).toBe(after);
+
+  // Right opens it again and focuses its first task.
+  await page.keyboard.press('ArrowRight');
+  await expect(row(after)).toBeVisible();
+  await expect(groupRow).toContainText('expanded');
+  await expect.poll(focusedRow).toBe(after);
+
+  // Up skips the group row too.
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe(before);
+  await expect.poll(focusedRow).toBe(before);
+});
+
 test('My tasks lists tasks from both projects and opens them in the panel', async () => {
   // The agent takes WEB-2: it shows in the agent's --mine, not in Ana's My tasks.
   const assign = cli.run(['tasks', 'update', 'WEB-2', '--assignee', 'me', '--json']);

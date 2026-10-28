@@ -1,6 +1,6 @@
 import type { TaskListItem } from '@pm/contracts';
 import { describe, expect, it } from 'vitest';
-import { buildMyGroups, myTasksSubtitle, rowOrder } from './groups';
+import { buildMyGroups, myTasksSubtitle } from './groups';
 import { hasFilters, listInput, parseMyTasksSearch, shownStatuses } from './search';
 
 const MILESTONE = '01a16819-7636-72b1-86d0-aaf9ad8fff37';
@@ -112,7 +112,6 @@ describe('buildMyGroups', () => {
       ['backlog', 1],
     ]);
     expect(groups[1]?.items.map((task) => task.key)).toEqual(['WEB-2', 'WEB-4', 'PAY-1']);
-    expect(rowOrder(groups, new Set(['todo']))).toEqual(['PAY-3', 'PAY-5']);
   });
 });
 

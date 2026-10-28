@@ -1,6 +1,7 @@
 // "Refresh on every push" (frames 2k, 2l): the webhook URL and secret to paste into the repository,
 // steps per provider, and the last notification, polled every 5 seconds while the dialog is open.
-import type { BacklogWebhookInfo, GitProvider } from '@pm/contracts';
+// "New secret" issues another secret (PM-9), also when the stored one can't be read.
+import type { BacklogWebhookInfo, BacklogWebhookSecret, GitProvider } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useNow } from '~/features/tasks/clock';
@@ -25,6 +26,7 @@ import {
 import { errorMessage } from '../settings/result';
 import { agoText, maskSecret } from './format';
 import { webhookInfoQuery } from './queries';
+import { useReissueWebhookSecret, WebhookSecretDialog } from './WebhookSecretDialog';
 
 export const WEBHOOK_POLL_MS = 5_000;
 
@@ -63,16 +65,29 @@ function WebhookInfoLoader({
   defaultBranch,
   close,
 }: Omit<WebhookDialogProps, 'isOpen' | 'onOpenChange'> & { close: () => void }) {
-  // Mounted only while the dialog is open, so the polling stops with it.
+  // Mounted only while the dialog is open, so the polling stops with it and the new secret is forgotten.
   const info = useQuery({ ...webhookInfoQuery(projectKey), refetchInterval: WEBHOOK_POLL_MS });
+  const reissue = useReissueWebhookSecret(projectKey);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [issued, setIssued] = useState<BacklogWebhookSecret | null>(null);
   return (
-    <WebhookContent
-      info={info.data}
-      error={info.error ? errorMessage(info.error) : null}
-      repository={repository}
-      defaultBranch={defaultBranch}
-      close={close}
-    />
+    <>
+      <WebhookContent
+        info={info.data}
+        error={info.error ? errorMessage(info.error) : null}
+        repository={repository}
+        defaultBranch={defaultBranch}
+        issued={issued}
+        onNewSecret={() => setConfirmOpen(true)}
+        close={close}
+      />
+      <WebhookSecretDialog
+        isOpen={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onIssue={reissue}
+        onIssued={setIssued}
+      />
+    </>
   );
 }
 
@@ -81,15 +96,33 @@ export interface WebhookContentProps {
   error: string | null;
   repository: string | null;
   defaultBranch: string | null;
+  /** A secret issued while the dialog is open: shown unmasked instead of the stored one. */
+  issued?: BacklogWebhookSecret | null;
+  /** Opens the "Issue a new webhook secret?" confirmation; no "New secret" button without it. */
+  onNewSecret?: () => void;
   close: () => void;
 }
 
-export function WebhookContent({ info, error, repository, defaultBranch, close }: WebhookContentProps) {
+export function WebhookContent({
+  info,
+  error,
+  repository,
+  defaultBranch,
+  issued = null,
+  onNewSecret,
+  close,
+}: WebhookContentProps) {
   const now = useNow();
   const [provider, setProvider] = useState<GitProvider | null>(null);
   const shown = provider ?? info?.provider ?? 'github';
   const branch = defaultBranch ?? 'main';
   const repo = repository ?? 'the repository';
+  const newSecret =
+    onNewSecret && info && info.secretState !== 'hidden' ? (
+      <Button variant="secondary" size="sm" onPress={onNewSecret}>
+        New secret
+      </Button>
+    ) : null;
 
   return (
     <Dialog>
@@ -105,16 +138,39 @@ export function WebhookContent({ info, error, repository, defaultBranch, close }
         {info ? (
           <>
             <CopyField label="URL" value={info.url} />
-            <CopyField
-              label="Secret token"
-              value={info.secret ?? undefined}
-              maskedValue={maskSecret(info.secret)}
-            />
-            {info.secret === null ? (
-              <span className="-mt-2 text-[11.5px] text-muted">
-                Only owners and admins can see the secret. Ask one of them to add the webhook.
-              </span>
-            ) : null}
+            {info.secretState === 'unreadable' && !issued ? (
+              <Banner action={newSecret}>
+                The webhook secret can't be read with the current APP_ENCRYPTION_KEY. Issue a new one and
+                paste it into the git host.
+              </Banner>
+            ) : (
+              <>
+                {issued ? (
+                  // Shown once, unmasked, so it can be pasted right away.
+                  <CopyField label="Secret token" value={issued.secret} />
+                ) : (
+                  <CopyField
+                    label="Secret token"
+                    value={info.secret ?? undefined}
+                    maskedValue={maskSecret(info.secret)}
+                  />
+                )}
+                {info.secretState === 'hidden' && !issued ? (
+                  <span className="-mt-2 text-[11.5px] text-muted">
+                    Only owners and admins can see the secret. Ask one of them to add the webhook.
+                  </span>
+                ) : newSecret ? (
+                  <div className="-mt-1.5 flex items-center gap-3">
+                    <span role="status" className="min-w-0 flex-1 text-[11.5px] text-muted">
+                      {issued
+                        ? `Paste this into the webhook settings on ${PROVIDER_LABELS[info.provider ?? shown]}.`
+                        : null}
+                    </span>
+                    {newSecret}
+                  </div>
+                ) : null}
+              </>
+            )}
           </>
         ) : !error ? (
           <div aria-busy className="flex flex-col gap-3">

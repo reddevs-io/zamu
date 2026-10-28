@@ -40,14 +40,6 @@ export function buildGroups(
   return groups;
 }
 
-/** Keys of the rows a person can move through, top to bottom, skipping collapsed groups. */
-export function visibleKeys(
-  groups: readonly DataGroup<TaskListItem>[],
-  collapsed: ReadonlySet<string>,
-): string[] {
-  return groups.flatMap((group) => (collapsed.has(group.id) ? [] : group.items.map((item) => item.key)));
-}
-
 /** Id and label of the one group the hidden-tasks list shows. */
 export const HIDDEN_GROUP_ID = 'hidden';
 export const HIDDEN_GROUP_LABEL = 'Removed from Backlog.md';

@@ -1,10 +1,11 @@
-// Projects: list with open counts, create, update, and the milestone and cycle switches.
+// Projects: list with open counts, create, update, delete, and the milestone and cycle switches.
 // M3: project shapes carry their Backlog.md source summary. While a source is active the key is
 // fixed, milestones stay on and the repository cannot point elsewhere; clearing it pauses the mirror.
 import {
   BacklogProblem,
   CreateProjectInput,
   type CurrentCycle,
+  DeleteProjectInput,
   OPEN_TASK_STATUSES,
   PROJECT_OWNED_FIELDS,
   Project,
@@ -16,7 +17,7 @@ import {
   type UserRef,
 } from '@pm/contracts';
 import { type DbOrTx, schema } from '@pm/db';
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, can } from './authz';
 import type { DbContext } from './context';
@@ -34,7 +35,7 @@ import {
 
 export { isMirrored } from './internal';
 
-const { backlogFile, backlogSource, project, task, user } = schema;
+const { apikey, backlogFile, backlogSource, project, task, user } = schema;
 
 /**
  * backlog_source.last_error of a mirror paused because its project's repository was cleared. The
@@ -434,4 +435,111 @@ async function pauseOrResumeForRepository(
   } else if (source.lastError === REPOSITORY_CLEARED_ERROR) {
     await tx.update(backlogSource).set({ lastError: null }).where(eq(backlogSource.id, source.id));
   }
+}
+
+/** Where deleteProject writes its audit line. Default: one JSON object per line on stdout. */
+export interface ProjectLogger {
+  info(msg: string, fields: Record<string, unknown>): void;
+}
+
+const stdoutLogger: ProjectLogger = {
+  info(msg, fields) {
+    console.info(JSON.stringify({ time: new Date().toISOString(), level: 'info', msg, ...fields }));
+  },
+};
+
+/** CoreContext has no logger yet; adapters may pass one, tests capture the line with it. */
+export type DeleteProjectContext = DbContext & { logger?: ProjectLogger };
+
+/**
+ * Key metadata as stored (JSON text, which Better Auth may have encoded twice) and how many times
+ * it was encoded, so a rewrite keeps the same form. Null when it is not a JSON object.
+ */
+function decodeKeyMetadata(raw: string | null): { value: Record<string, unknown>; depth: number } | null {
+  let value: unknown = raw;
+  let depth = 0;
+  while (typeof value === 'string' && depth < 2) {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+    depth += 1;
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  return { value: value as Record<string, unknown>, depth };
+}
+
+function encodeKeyMetadata(value: Record<string, unknown>, depth: number): string {
+  let text: string = JSON.stringify(value);
+  for (let i = 1; i < depth; i++) text = JSON.stringify(text);
+  return text;
+}
+
+/**
+ * Removes `projectId` from the project list of every API key scoped to it in the workspace. Keys
+ * left with no project keep working for nothing and stay listed ("No projects"); none is revoked.
+ * Returns how many keys changed.
+ */
+async function stripKeyScopes(tx: DbOrTx, workspaceId: string, projectId: string): Promise<number> {
+  // Project ids are UUIDs, so a text match finds every candidate; the JSON check below decides.
+  const rows = await tx
+    .select({ id: apikey.id, metadata: apikey.metadata })
+    .from(apikey)
+    .where(like(apikey.metadata, `%${projectId}%`))
+    .for('update');
+  let changed = 0;
+  for (const row of rows) {
+    const decoded = decodeKeyMetadata(row.metadata);
+    if (!decoded || decoded.value.workspaceId !== workspaceId) continue;
+    const projects = decoded.value.projects;
+    if (!Array.isArray(projects) || !projects.includes(projectId)) continue;
+    const metadata = encodeKeyMetadata(
+      { ...decoded.value, projects: projects.filter((id) => id !== projectId) },
+      decoded.depth,
+    );
+    await tx.update(apikey).set({ metadata }).where(eq(apikey.id, row.id));
+    changed += 1;
+  }
+  return changed;
+}
+
+/**
+ * Deletes a project with its milestones, cycles, tasks, activity, comments, mentions, rollovers
+ * and Backlog.md source and files (the foreign keys cascade). Owners and admins only, people only;
+ * through a key only a workspace-wide write key. `confirmKey` must repeat the project key.
+ *
+ * One transaction: the project row is locked first (the order of updateProject and the refresh
+ * apply step, so a running refresh finds the project gone and skips), then API key scopes naming
+ * the project lose it. Activity goes with the project, so the deletion is logged instead.
+ */
+export async function deleteProject(
+  ctx: DeleteProjectContext,
+  actor: Actor,
+  input: z.input<typeof DeleteProjectInput>,
+): Promise<void> {
+  const parsed = parseInput(DeleteProjectInput, input);
+  const deleted = await ctx.db.transaction(async (tx) => {
+    const current = await findProjectByKey(tx, actor, parsed.project, { forUpdate: true });
+    authorize(actor, 'project.delete', { type: 'project', projectId: current.id });
+    const [count] = await tx
+      .select({ n: sql<number>`count(*)`.mapWith(Number) })
+      .from(task)
+      .where(eq(task.projectId, current.id));
+    const source = await loadBacklogSource(tx, current.id);
+    const keysUpdated = await stripKeyScopes(tx, actor.workspaceId, current.id);
+    await tx.delete(project).where(eq(project.id, current.id));
+    return { row: current, taskCount: count?.n ?? 0, backlogSource: source !== null, keysUpdated };
+  });
+  (ctx.logger ?? stdoutLogger).info('project deleted', {
+    actorId: actor.userId,
+    onBehalfOfId: actor.onBehalfOfId,
+    apiKeyId: actor.apiKeyId ?? null,
+    workspaceId: actor.workspaceId,
+    projectKey: deleted.row.key,
+    projectId: deleted.row.id,
+    taskCount: deleted.taskCount,
+    backlogSource: deleted.backlogSource,
+    apiKeysUpdated: deleted.keysUpdated,
+  });
 }

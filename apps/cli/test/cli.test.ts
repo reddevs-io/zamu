@@ -221,6 +221,86 @@ describe('pm projects list', () => {
   });
 });
 
+describe('pm projects delete', () => {
+  /** A fetch that records every request and answers none. */
+  function recording() {
+    const requests: string[] = [];
+    const fetch: FetchLike = async (request) => {
+      requests.push(request.url);
+      return new Response(null, { status: 500 });
+    };
+    return { requests, fetch };
+  }
+
+  it('without --confirm or with another key exits 1 and sends nothing', async () => {
+    for (const args of [
+      ['projects', 'delete', 'PAY'],
+      ['projects', 'delete', 'PAY', '--confirm', 'WEB'],
+      ['projects', 'delete', 'pay', '--confirm', ''],
+    ]) {
+      const { requests, fetch } = recording();
+      const human = await as(keys.admin, args, { fetch });
+      expect(human.code, args.join(' ')).toBe(1);
+      expect(human.stderr).toBe('pm: Pass --confirm PAY to delete project PAY.\n');
+      expect(human.stdout).toBe('');
+      const json = await as(keys.admin, [...args, '--json'], { fetch });
+      const error = expectFailure(json, 1, 'BAD_REQUEST');
+      expect(error.detail).toBe('Pass --confirm PAY to delete project PAY.');
+      expect(requests).toEqual([]);
+    }
+  });
+
+  it('deletes with the key confirmed, in any case, and prints the result', async () => {
+    const admin = (args: string[]) => as(keys.admin, args);
+    const create = (key: string) =>
+      handle(
+        new Request(`${URL}/api/v1/projects`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${keys.admin}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ name: `Doomed ${key}`, key }),
+        }),
+      );
+    expect((await create('DOOM')).status).toBe(201);
+    expect((await create('GONE')).status).toBe(201);
+
+    const human = await admin(['projects', 'delete', 'doom', '--confirm', 'Doom']);
+    expect(human.code, human.stderr).toBe(0);
+    expect(human.stdout).toBe('Deleted project DOOM\n');
+
+    const json = await admin(['projects', 'delete', 'GONE', '--confirm', 'GONE', '--json']);
+    expect(json.code, json.stderr).toBe(0);
+    expect(JSON.parse(json.stdout)).toEqual({ schema: 'pm.v1.projects.delete', data: { deleted: 'GONE' } });
+    expect(parsed(json, 'projects.delete').data).toEqual({ deleted: 'GONE' });
+
+    const listed = parsed(await admin(['projects', 'list', '--json']), 'projects.list');
+    expect(listed.data.items.map((p) => p.key).sort()).toEqual(['PAY', 'WEB']);
+    // Gone now: 404 is exit 3.
+    expectFailure(await admin(['projects', 'delete', 'GONE', '--confirm', 'GONE', '--json']), 3, 'NOT_FOUND');
+  });
+
+  it('agents and read-only keys get 403, exit 4', async () => {
+    expectFailure(
+      await as(keys.agent, ['projects', 'delete', 'PAY', '--confirm', 'PAY', '--json']),
+      4,
+      'FORBIDDEN',
+    );
+    expectFailure(
+      await as(keys.adminRead, ['projects', 'delete', 'PAY', '--confirm', 'PAY', '--json']),
+      4,
+      'FORBIDDEN',
+    );
+    const human = await as(keys.agent, ['projects', 'delete', 'PAY', '--confirm', 'PAY']);
+    expect(human.stderr).toContain('pm: Only owners and admins can delete a project.');
+  });
+
+  it('is in the help', async () => {
+    const help = await pm(['projects', '--help']);
+    expect(help.stdout).toMatch(/delete \[options\] <KEY>/);
+    const leafHelp = await pm(['projects', 'delete', '--help']);
+    expect(leafHelp.stdout).toContain('--confirm <KEY>');
+  });
+});
+
 describe('pm tasks list', () => {
   it('lists a project with counts, task keys first', async () => {
     const result = await as(keys.agent, ['tasks', 'list', '--project', 'pay', '--json']);

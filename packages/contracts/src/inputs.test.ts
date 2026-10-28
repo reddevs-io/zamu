@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_COMMENT_LENGTH } from './entities';
 import {
+  AcceptInvitationInput,
+  AccountFields,
   BacklogFolder,
+  CancelInvitationInput,
   CreateAgentInput,
   CreateApiKeyInput,
   CreateCommentInput,
@@ -18,6 +21,7 @@ import {
   DeleteCommentInput,
   DeleteGitConnectionInput,
   DeleteMilestoneInput,
+  DeleteProjectInput,
   DetachBacklogInput,
   DetectBacklogInput,
   DetectBacklogRepositoryInput,
@@ -28,17 +32,24 @@ import {
   GetMilestoneInput,
   GetTaskInput,
   GitHost,
+  InviteFields,
+  ListApiKeysInput,
   ListCommentsInput,
   ListCyclesInput,
   ListMilestonesInput,
   ListTasksInput,
   ListTaskTimelineInput,
+  MIN_PASSWORD_LENGTH,
   PreviewBacklogInput,
   RefreshBacklogInput,
   RefreshBacklogNowInput,
+  ReissueBacklogWebhookSecretInput,
+  RemoveMemberInput,
   RevokeApiKeyInput,
   SetBacklogConnectionInput,
   SetBacklogFolderInput,
+  SetupInput,
+  SignInFields,
   StartBacklogInput,
   TestGitConnectionInput,
   UpdateBacklogMappingsInput,
@@ -49,6 +60,7 @@ import {
   UpdateMilestoneInput,
   UpdateProjectInput,
   UpdateTaskInput,
+  WorkspaceFields,
 } from './inputs';
 import { projectId } from './testing/fixtures';
 
@@ -614,6 +626,72 @@ describe('settings inputs', () => {
     expect(CreateInvitationInput.safeParse({ email: 'jo' }).success).toBe(false);
     expect(CreateInvitationInput.safeParse({ email: 'jo@example.com', role: 'owner' }).success).toBe(false);
   });
+
+  it('cancels invitations and removes members by id', () => {
+    const id = '0190a1b2-0000-7000-8000-00000000e0e0';
+    expect(CancelInvitationInput.parse({ id })).toEqual({ id });
+    expect(CancelInvitationInput.safeParse({ id: 'nope' }).success).toBe(false);
+    expect(RemoveMemberInput.parse({ userId: id })).toEqual({ userId: id });
+    expect(RemoveMemberInput.safeParse({}).success).toBe(false);
+  });
+
+  it('lists your own keys unless told otherwise', () => {
+    const id = '0190a1b2-0000-7000-8000-00000000e0e0';
+    expect(ListApiKeysInput.parse({})).toEqual({ owner: 'me' });
+    expect(ListApiKeysInput.parse({ owner: 'all' })).toEqual({ owner: 'all' });
+    expect(ListApiKeysInput.parse({ owner: id })).toEqual({ owner: id });
+    expect(ListApiKeysInput.safeParse({ owner: 'everyone' }).success).toBe(false);
+  });
+});
+
+describe('sign-in, setup and invitation inputs', () => {
+  it('trims emails and names, and checks the password length on new passwords only', () => {
+    expect(SignInFields.parse({ email: ' ana@reddevs.io ', password: 'x' })).toEqual({
+      email: 'ana@reddevs.io',
+      password: 'x',
+    });
+    const password = 'a'.repeat(MIN_PASSWORD_LENGTH);
+    expect(AccountFields.parse({ name: ' Ana ', email: 'ana@reddevs.io', password })).toEqual({
+      name: 'Ana',
+      email: 'ana@reddevs.io',
+      password,
+    });
+    expect(AccountFields.safeParse({ name: 'Ana', email: 'ana@reddevs.io', password: 'short' }).success).toBe(
+      false,
+    );
+    expect(WorkspaceFields.parse({ workspaceName: ' Reddevs ' })).toEqual({ workspaceName: 'Reddevs' });
+    expect(InviteFields.safeParse({ name: 'Ana', password: 'a'.repeat(129) }).success).toBe(false);
+  });
+
+  it('takes both setup steps in one input and the invitation id on accept', () => {
+    const password = 'a'.repeat(MIN_PASSWORD_LENGTH);
+    expect(
+      SetupInput.parse({ name: 'Ana', email: 'ana@reddevs.io', password, workspaceName: 'Reddevs' }),
+    ).toEqual({ name: 'Ana', email: 'ana@reddevs.io', password, workspaceName: 'Reddevs' });
+    const invitationId = '0190a1b2-0000-7000-8000-00000000e0e0';
+    expect(AcceptInvitationInput.parse({ name: 'Jo', password, invitationId })).toEqual({
+      name: 'Jo',
+      password,
+      invitationId,
+    });
+    expect(AcceptInvitationInput.safeParse({ name: 'Jo', password }).success).toBe(false);
+  });
+});
+
+describe('DeleteProjectInput', () => {
+  it('deletes only when the typed key matches the project', () => {
+    expect(DeleteProjectInput.parse({ project: 'pay', confirmKey: ' pay ' })).toEqual({
+      project: 'PAY',
+      confirmKey: 'PAY',
+    });
+    const wrong = DeleteProjectInput.safeParse({ project: 'PAY', confirmKey: 'BILL' });
+    expect(wrong.success).toBe(false);
+    expect(wrong.error?.issues).toEqual([
+      expect.objectContaining({ path: ['confirmKey'], message: 'Type the project key to confirm' }),
+    ]);
+    expect(DeleteProjectInput.safeParse({ project: 'PAY' }).success).toBe(false);
+    expect(DeleteProjectInput.safeParse({ project: 'P', confirmKey: 'P' }).success).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -899,5 +977,10 @@ describe('Backlog.md setup and settings inputs', () => {
     expect(wrong.success).toBe(false);
     expect(wrong.error?.issues[0]?.path).toEqual(['confirmKey']);
     expect(DetachBacklogInput.safeParse({ projectKey: 'PAY' }).success).toBe(false);
+  });
+
+  it('reissues a webhook secret by project key', () => {
+    expect(ReissueBacklogWebhookSecretInput.parse({ projectKey: ' pay ' })).toEqual({ projectKey: 'PAY' });
+    expect(ReissueBacklogWebhookSecretInput.safeParse({}).success).toBe(false);
   });
 });

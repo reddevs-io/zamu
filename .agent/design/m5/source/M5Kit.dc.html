@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<link rel="stylesheet" href="./ledger-m5.css" />
+<style>
+a{color:inherit}
+a:hover{color:var(--accent)}
+.k-wrap{padding:28px 32px;display:flex;flex-direction:column;gap:30px;height:100%;box-sizing:border-box;overflow:hidden}
+.k-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px}
+.k-h{font-size:13px;font-weight:600;margin:0 0 8px}
+.k-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin:0;text-wrap:pretty}
+.k-lab{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.k-box{border:1px solid var(--line);background:var(--surface)}
+.k-tok{display:grid;grid-template-columns:150px minmax(0,1fr);gap:5px 12px;font-size:11.5px;line-height:1.45}
+.k-tok code{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px}
+.k-pal{display:flex;flex-direction:column}
+.k-palh{display:grid;grid-template-columns:28px 130px minmax(0,1fr) 62px 62px 62px;gap:10px;align-items:center;height:28px;padding:0 12px;border-bottom:1px solid var(--line);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.k-palr{display:grid;grid-template-columns:28px 130px minmax(0,1fr) 62px 62px 62px;gap:10px;align-items:center;height:32px;padding:0 12px;border-bottom:1px solid var(--line-2);font-size:12px}
+.k-palr:last-child{border-bottom:0}
+.k-big{width:20px;height:20px;background:var(--c)}
+.k-ok{font-family:"Martian Mono",ui-monospace,monospace;font-size:10.5px;text-align:right;color:var(--fg)}
+.k-ox{font-family:"Martian Mono",ui-monospace,monospace;font-size:10px;color:var(--faint)}
+.k-inv{display:grid;grid-template-columns:150px repeat(6,minmax(0,1fr))}
+.k-ih{height:30px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--line);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600;background:var(--band)}
+.k-in{min-height:44px;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:6px 10px;border-bottom:1px solid var(--line-2);font-size:12px;font-weight:600;box-sizing:border-box}
+.k-in span{font-size:10.5px;font-weight:400;color:var(--faint)}
+.k-ic{min-height:44px;display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line-2);border-left:1px solid var(--line-2);box-sizing:border-box;min-width:0;flex-wrap:wrap}
+.k-sel{background:var(--sel)}
+.k-hat{background-image:repeating-linear-gradient(135deg,var(--hatch) 0 5px,transparent 5px 10px)}
+.k-na{font-size:11px;color:var(--faint)}
+.k-same{font-size:11px;color:var(--faint);font-style:italic}
+.k-states{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:stretch}
+.k-sl{display:flex;align-items:center;padding:0 10px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line-2);border-right:1px solid var(--line-2);box-sizing:border-box}
+.k-sv{border-bottom:1px solid var(--line-2);min-width:0}
+.k-sv > *{border-bottom:0 !important}
+.k-pop{border:1px solid var(--line);background:var(--surface);width:100%}
+.k-keys{display:flex;flex-direction:column;border-top:1px solid var(--line-2)}
+.k-key{display:grid;grid-template-columns:112px minmax(0,1fr);gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-2);font-size:12px}
+.k-kk{display:flex;gap:4px;align-items:center}
+.k-kk .lg-kbd{font-family:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;font-size:11px;line-height:17px;padding:0 5px;color:var(--fg)}
+.k-kg{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:12px 0 4px}
+.k-hov{outline:1px solid var(--muted);outline-offset:2px}
+.k-bar{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 10px;border-bottom:1px solid var(--line-2)}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="height:2100px" data-screen-label="M5 tokens, components and keys">
+  <div class="k-wrap">
+
+    <div class="k-two">
+      <div>
+        <h2 class="k-h">New tokens: the label palette</h2>
+        <div class="k-box k-pal">
+          <div class="k-palh"><span></span><span>Token</span><span>In use</span><span style="text-align:right">{{ g1 }}</span><span style="text-align:right">{{ g2 }}</span><span style="text-align:right">Sel</span></div>
+          <sc-for list="{{ palette }}" as="p" hint-placeholder-count="9">
+            <div class="k-palr"><span class="k-big" style="--c:var(--lb-{{ p.n }})"></span><span class="lg-mono" style="font-size:10.5px">--lb-{{ p.n }}</span><span><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-{{ p.n }})"></span><span class="m5-lbt">{{ p.ex }}</span></span></span><span class="k-ok">{{ p.a }}</span><span class="k-ok">{{ p.b }}</span><span class="k-ok">{{ p.c }}</span></div>
+          </sc-for>
+        </div>
+        <p class="k-note" style="margin-top:8px">{{ palNote }} Swatches are graphics, so the bar is 3:1 against every ground they sit on; the lowest is {{ lowest }}. The name is always shown in --muted on --surface (7.1:1 in both themes), so colour never carries the meaning alone. The app picks the next unused hue for a new label; slate is the default for labels that arrive from Backlog.md files.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:26px">
+        <div>
+          <h2 class="k-h">No other new tokens</h2>
+          <div class="k-tok">
+            <span class="lg-muted">Due soon, overdue</span><span><code>--warn</code> text for today, tomorrow and in 2 days; <code>--warn-bg</code> pill for overdue, the same pill M4 uses for "11 days overdue".</span>
+            <span class="lg-muted">Blocked</span><span><code>--danger</code> on <code>--danger-bg</code>, always with the word and the barred-circle glyph.</span>
+            <span class="lg-muted">Subtask progress</span><span><code>--done</code> fill on <code>--track</code>.</span>
+            <span class="lg-muted">Mirrored, read-only</span><span><code>--hatch</code> as in M3, with "· file" next to the field name.</span>
+            <span class="lg-muted">Selection, focus</span><span><code>--sel</code>, <code>--focus</code>, <code>--accent</code> unchanged.</span>
+          </div>
+        </div>
+        <div>
+          <h2 class="k-h">Keyboard shortcuts this release adds</h2>
+          <div class="k-keys">
+            <div class="k-kg">Anywhere a task is focused: panel, list row, My tasks row, board card</div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">#</span></span><span>Labels picker</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">Shift</span><span class="lg-kbd">D</span></span><span>Due date picker</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">Shift</span><span class="lg-kbd">B</span></span><span>Add a blocker: search tasks in the project</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">Shift</span><span class="lg-kbd">S</span></span><span>Add a subtask: pick an existing task or type a new title</span></div>
+            <div class="k-kg">In pickers</div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">↑</span><span class="lg-kbd">↓</span></span><span>Move through the options</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">Enter</span></span><span>Toggle a label, pick a date or a task</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">⌘/Ctrl</span><span class="lg-kbd">Enter</span></span><span>Labels: create the typed name. Subtasks: create a new task with the typed title</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">T</span></span><span>Date picker: today</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">←</span><span class="lg-kbd">→</span><span class="lg-kbd">↑</span><span class="lg-kbd">↓</span></span><span>Date picker: move by a day or a week</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">PgUp</span><span class="lg-kbd">PgDn</span></span><span>Date picker: previous or next month</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">Backspace</span></span><span>Date picker: clear the due date</span></div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">Esc</span></span><span>Close the picker, focus goes back to the field</span></div>
+            <div class="k-kg">Quick create</div>
+            <div class="k-key"><span class="k-kk"><span class="lg-kbd">#</span><span class="lg-kbd">Shift D</span></span><span>Labels and due date chips, next to ⇧M and ⇧C. The title field keeps # as text; the shortcuts work once focus leaves it.</span></div>
+          </div>
+          <p class="k-note" style="margin-top:8px">Bare L and ⇧L stay with the board's h/j/k/l moves. # is Shift+3 on US layouts; the app listens for the character, so other layouts work too.</p>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="k-h">Component inventory: small pieces</h2>
+      <div class="k-box">
+        <div class="k-inv">
+          <div class="k-ih">Component</div><div class="k-ih">Default</div><div class="k-ih">Hover</div><div class="k-ih">Keyboard focus</div><div class="k-ih">Selected</div><div class="k-ih">Read-only (mirrored)</div><div class="k-ih">Loading</div>
+
+          <div class="k-in">Label chip<span>.m5-lb</span></div>
+          <div class="k-ic"><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-teal)"></span><span class="m5-lbt">webhooks</span></span></div>
+          <div class="k-ic"><span class="m5-lbh"><span class="m5-sw" style="--c:var(--lb-teal)"></span><span class="m5-lbt">webhooks</span><span class="m5-lbx">×</span></span></div>
+          <div class="k-ic"><span class="m5-lbf"><span class="m5-sw" style="--c:var(--lb-teal)"></span><span class="m5-lbt">webhooks</span></span></div>
+          <div class="k-ic k-sel"><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-teal)"></span><span class="m5-lbt">webhooks</span></span><span class="m5-lbmore">+2</span></div>
+          <div class="k-ic"><span class="m5-lbro"><span class="m5-sw" style="--c:var(--lb-slate)"></span><span class="m5-lbt">sessions</span></span></div>
+          <div class="k-ic"><span class="m5-lbsk"></span><span class="m5-lbsk" style="width:40px"></span></div>
+
+          <div class="k-in">Label picker item<span>.m5-pi in .m2-pop</span></div>
+          <div class="k-ic" style="padding:0"><div class="m5-pi" style="width:100%"><span class="m5-ck"></span><span class="m5-sw" style="--c:var(--lb-blue)"></span>billing<span class="m5-pk">11</span></div></div>
+          <div class="k-ic" style="padding:0"><div class="m5-pi" style="width:100%;background:var(--band)"><span class="m5-ck"></span><span class="m5-sw" style="--c:var(--lb-blue)"></span>billing<span class="m5-pk">11</span></div></div>
+          <div class="k-ic" style="padding:0"><div class="m5-pion" style="width:100%"><span class="m5-ck"></span><span class="m5-sw" style="--c:var(--lb-blue)"></span>billing<span class="m5-pk">↵</span></div></div>
+          <div class="k-ic" style="padding:0"><div class="m5-pi" style="width:100%"><span class="m5-ckon"></span><span class="m5-sw" style="--c:var(--lb-blue)"></span>billing<span class="m5-pk">11</span></div></div>
+          <div class="k-ic"><span class="k-na">n/a: the picker doesn't open on mirrored tasks</span></div>
+          <div class="k-ic" style="padding:0 10px"><span class="lg-skel" style="width:12px;height:12px"></span><span class="lg-skel" style="width:70px"></span></div>
+
+          <div class="k-in">Create item<span>.m5-pcreate</span></div>
+          <div class="k-ic" style="padding:0"><div class="m5-pcreate" style="width:100%;border-top:0"><span class="m5-plus">+</span><span>Create <b>billing-v2</b></span></div></div>
+          <div class="k-ic" style="padding:0"><div class="m5-pcreate" style="width:100%;border-top:0;background:var(--band)"><span class="m5-plus">+</span><span>Create <b>billing-v2</b></span></div></div>
+          <div class="k-ic" style="padding:0"><div class="m5-pcreateon" style="width:100%;border-top:0"><span class="m5-plus">+</span><span>Create <b>billing-v2</b></span><span class="m5-pk">⌘↵</span></div></div>
+          <div class="k-ic"><span class="k-same">same as focus</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+
+          <div class="k-in">Colour swatch picker<span>.m5-sws</span></div>
+          <div class="k-ic"><span class="m5-swb" style="--c:var(--lb-teal)"></span><span class="m5-swb" style="--c:var(--lb-blue)"></span><span class="m5-swb" style="--c:var(--lb-violet)"></span></div>
+          <div class="k-ic"><span class="m5-swb" style="--c:var(--lb-teal)"></span><span class="m5-swb k-hov" style="--c:var(--lb-blue)"></span><span class="m5-swb" style="--c:var(--lb-violet)"></span></div>
+          <div class="k-ic"><span class="m5-swb" style="--c:var(--lb-teal)"></span><span class="m5-swbf" style="--c:var(--lb-blue)"></span><span class="m5-swb" style="--c:var(--lb-violet)"></span></div>
+          <div class="k-ic"><span class="m5-swbon" style="--c:var(--lb-teal)"></span><span class="m5-swb" style="--c:var(--lb-blue)"></span><span class="m5-swb" style="--c:var(--lb-violet)"></span></div>
+          <div class="k-ic"><span class="m5-swbro" style="--c:var(--lb-slate)"></span><span class="m5-swbro" style="--c:var(--lb-teal)"></span><span class="m5-swbro" style="--c:var(--lb-blue)"></span></div>
+          <div class="k-ic"><span class="k-na">n/a: shown with the row</span></div>
+
+          <div class="k-in">Due date<span>future · soon</span></div>
+          <div class="k-ic"><span class="m5-due"><span class="m5-cal"></span>Nov 4</span><span class="m5-duesoon"><span class="m5-cal"></span>Tomorrow</span></div>
+          <div class="k-ic"><span class="k-same">no change; the row or cell hovers</span></div>
+          <div class="k-ic"><span class="k-same">focus is on the cell or row</span></div>
+          <div class="k-ic k-sel"><span class="m5-due"><span class="m5-cal"></span>Nov 4</span><span class="m5-duesoon"><span class="m5-cal"></span>Due today</span></div>
+          <div class="k-ic k-hat"><span class="m5-due"><span class="m5-cal"></span>Nov 4</span></div>
+          <div class="k-ic"><span class="lg-skel" style="width:48px"></span></div>
+
+          <div class="k-in">Due date<span>overdue · done, past</span></div>
+          <div class="k-ic"><span class="m5-dueover"><span class="m5-cal"></span>3d overdue</span><span class="m5-duedone"><span class="m5-cal"></span>Oct 2</span></div>
+          <div class="k-ic"><span class="k-same">no change</span></div>
+          <div class="k-ic"><span class="k-same">no change</span></div>
+          <div class="k-ic k-sel"><span class="m5-dueover"><span class="m5-cal"></span>3d overdue</span><span class="m5-duedone"><span class="m5-cal"></span>Oct 2</span></div>
+          <div class="k-ic k-hat"><span class="m5-dueover"><span class="m5-cal"></span>3 days overdue</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+
+          <div class="k-in">Due picker day<span>.m5-dd</span></div>
+          <div class="k-ic"><span class="m5-dg" style="grid-template-columns:repeat(3,32px)"><span class="m5-dd">26</span><span class="m5-ddt">27</span><span class="m5-ddo">1</span></span></div>
+          <div class="k-ic"><span class="m5-dg" style="grid-template-columns:32px"><span class="m5-dd" style="background:var(--band)">29</span></span></div>
+          <div class="k-ic"><span class="m5-dg" style="grid-template-columns:32px"><span class="m5-ddf">29</span></span></div>
+          <div class="k-ic"><span class="m5-dg" style="grid-template-columns:repeat(2,32px)"><span class="m5-dds">4</span><span class="m5-ddp">24</span></span></div>
+          <div class="k-ic"><span class="k-na">n/a: no picker</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+
+          <div class="k-in">Blocked marker<span>row .m5-blk · panel .m5-blkq</span></div>
+          <div class="k-ic"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span><span class="m5-blkq"><span class="m5-blkg"></span>Blocked</span></div>
+          <div class="k-ic"><span class="k-na">not interactive; the tooltip names the open blockers</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+          <div class="k-ic k-sel"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></div>
+          <div class="k-ic k-hat"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></div>
+          <div class="k-ic"><span class="k-na">hidden until loaded</span></div>
+
+          <div class="k-in">Subtask progress<span>.m5-sub · .m5-subdone</span></div>
+          <div class="k-ic"><span class="m5-sub"><span class="m5-subbar" style="--p:60%"></span>3/5</span><span class="m5-subdone"><span class="m5-subbar" style="--p:100%"></span>✓ 5/5</span></div>
+          <div class="k-ic"><span class="k-same">no change</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+          <div class="k-ic k-sel"><span class="m5-sub"><span class="m5-subbar" style="--p:60%"></span>3/5</span></div>
+          <div class="k-ic k-hat"><span class="m5-sub"><span class="m5-subbar" style="--p:50%"></span>1/2</span></div>
+          <div class="k-ic"><span class="lg-skel" style="width:40px"></span></div>
+
+          <div class="k-in">Parent reference<span>.m5-par</span></div>
+          <div class="k-ic"><span class="m5-par">↳ PAY-142</span></div>
+          <div class="k-ic"><span class="m5-par" style="color:var(--fg);text-decoration:underline">↳ PAY-142</span></div>
+          <div class="k-ic"><span class="m5-par" style="outline:2px solid var(--focus);outline-offset:1px;color:var(--fg)">↳ PAY-142</span></div>
+          <div class="k-ic k-sel"><span class="m5-par">↳ PAY-142</span></div>
+          <div class="k-ic k-hat"><span class="m5-par">↳ BACK-12</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+
+          <div class="k-in">Filter bar<span>.m5-f · .m5-fon</span></div>
+          <div class="k-ic"><span class="m5-f" style="padding:0">Label</span><span class="m5-f">Due</span></div>
+          <div class="k-ic"><span class="m5-f" style="background:var(--band);color:var(--fg)">Label</span></div>
+          <div class="k-ic"><span class="m5-f" style="outline:2px solid var(--focus);color:var(--fg)">Label</span></div>
+          <div class="k-ic" style="gap:4px"><span class="m5-fon"><span class="m5-fk">Label</span><span class="m5-fv">3 labels</span><span class="m5-fx">×</span></span></div>
+          <div class="k-ic"><span class="k-na">same on mirrored projects</span></div>
+          <div class="k-ic"><span class="k-na">n/a</span></div>
+        </div>
+      </div>
+      <p class="k-note" style="margin-top:8px">Selected means the piece sits on a selected row (--sel) or is checked. Read-only pieces sit on the hatch; they keep their look so filters and markers read the same in mirrored projects.</p>
+    </div>
+
+    <div class="k-two">
+      <div>
+        <h2 class="k-h">Blocker row · .m5-r in .m5-rl</h2>
+        <div class="k-box k-states">
+          <div class="k-sl">Default</div><div class="k-sv"><div class="m5-r"><span class="lg-sq lg-s-prog"></span><span class="lg-key">PAY-139</span><span class="lg-trunc">Stream invoice PDFs instead of buffering them in memory</span><span class="m5-rst">In progress</span><span class="lg-ag">X</span><span></span></div></div>
+          <div class="k-sl">Hover</div><div class="k-sv"><div class="m5-rh"><span class="lg-sq lg-s-prog"></span><span class="lg-key">PAY-139</span><span class="lg-trunc">Stream invoice PDFs instead of buffering them in memory</span><span class="m5-rst">In progress</span><span class="lg-ag">X</span><span class="m5-rxh">×</span></div></div>
+          <div class="k-sl">Focus</div><div class="k-sv"><div class="m5-rf"><span class="lg-sq lg-s-todo"></span><span class="lg-key">PAY-151</span><span class="lg-trunc">Webhook signature check accepts expired timestamps</span><span class="m5-rst">Todo</span><span class="lg-av" style="--h:220">TB</span><span class="m5-rxh">×</span></div></div>
+          <div class="k-sl">Done</div><div class="k-sv"><div class="m5-r m5-rdone"><span class="lg-sq lg-s-done"></span><span class="lg-key">PAY-120</span><span class="lg-trunc">Drop the v1 webhook payload format</span><span class="m5-rst">Done</span><span class="lg-ag">C</span><span></span></div></div>
+          <div class="k-sl">Removed</div><div class="k-sv"><div class="m5-rmiss"><span class="m5-rmisssq"></span><span class="lg-key" style="color:var(--faint)">PAY-118</span><span>Removed task</span><span class="m5-rx">×</span></div></div>
+          <div class="k-sl">Read-only</div><div class="k-sv"><div class="m5-rro"><span class="lg-sq lg-s-prog"></span><span class="lg-key">BACK-31</span><span class="lg-trunc">Rotate session signing keys</span><span class="m5-rst">In progress</span><span class="lg-ag">C</span><span></span></div></div>
+          <div class="k-sl" style="border-bottom:0">Loading</div><div class="k-sv" style="border-bottom:0"><div class="m5-r"><span class="lg-skel" style="width:8px"></span><span class="lg-skel" style="width:48px"></span><span class="lg-skel" style="width:70%"></span><span class="lg-skel" style="width:40px"></span><span class="lg-skel" style="width:18px;height:18px;border-radius:50%"></span><span></span></div></div>
+        </div>
+        <p class="k-note" style="margin-top:6px">Selected doesn't apply: Enter on a focused row opens that task in the panel. × appears on hover and focus; Delete removes the link. A done blocker stays struck and quiet; it no longer counts.</p>
+      </div>
+      <div>
+        <h2 class="k-h">Subtask row · .m5-r in .m5-rl</h2>
+        <div class="k-box k-states">
+          <div class="k-sl">Default</div><div class="k-sv"><div class="m5-r"><span class="lg-sq lg-s-prog"></span><span class="lg-key">PAY-146</span><span class="lg-trunc">Dead-letter queue after the sixth attempt</span><span class="m5-rst">In progress</span><span class="lg-ag">C</span><span></span></div></div>
+          <div class="k-sl">Hover</div><div class="k-sv"><div class="m5-rh"><span class="lg-sq lg-s-todo"></span><span class="lg-key">PAY-147</span><span class="lg-trunc">Alert merchants after 24h of failures</span><span class="m5-rst">Todo</span><span class="m2-none"></span><span class="m5-rxh">×</span></div></div>
+          <div class="k-sl">Focus</div><div class="k-sv"><div class="m5-rf"><span class="lg-sq lg-s-todo"></span><span class="lg-key">PAY-147</span><span class="lg-trunc">Alert merchants after 24h of failures</span><span class="m5-rst">Todo</span><span class="m2-none"></span><span class="m5-rxh">×</span></div></div>
+          <div class="k-sl">Done</div><div class="k-sv"><div class="m5-r m5-rsdone"><span class="lg-sq lg-s-done"></span><span class="lg-key">PAY-143</span><span class="lg-trunc">Honour Retry-After on 429 responses</span><span class="m5-rst">Done</span><span class="lg-ag">C</span><span></span></div></div>
+          <div class="k-sl">Canceled</div><div class="k-sv"><div class="m5-r m5-rdone" style="color:var(--faint)"><span class="lg-sq lg-s-cancel"></span><span class="lg-key" style="color:var(--faint)">PAY-148</span><span class="lg-trunc">Retry over SMS</span><span class="m5-rst" style="color:var(--faint)">Canceled · not counted</span><span class="m2-none"></span><span></span></div></div>
+          <div class="k-sl">Read-only</div><div class="k-sv"><div class="m5-rro m5-rwide"><span class="lg-sq lg-s-prog"></span><span class="lg-key">BACK-12.1</span><span class="lg-trunc">Write the Redis session adapter</span><span class="m5-rst">In progress</span><span class="lg-ag">C</span><span></span></div></div>
+          <div class="k-sl" style="border-bottom:0">Loading</div><div class="k-sv" style="border-bottom:0"><div class="m5-r"><span class="lg-skel" style="width:8px"></span><span class="lg-skel" style="width:48px"></span><span class="lg-skel" style="width:60%"></span><span class="lg-skel" style="width:40px"></span><span class="lg-skel" style="width:18px;height:18px;border-radius:50%"></span><span></span></div></div>
+        </div>
+        <p class="k-note" style="margin-top:6px">× removes the task from the parent; it doesn't delete it. Mirrored projects widen the key column to 76px (.m5-rwide) for keys like BACK-12.1. Done subtasks are muted; only canceled ones are struck. The status word sits next to the square, so status never relies on colour.</p>
+      </div>
+    </div>
+
+    <div class="k-two">
+      <div>
+        <h2 class="k-h">Labels settings row · .m5-ltr</h2>
+        <div class="k-box k-states">
+          <div class="k-sl">Default</div><div class="k-sv"><div class="m5-ltr"><span class="m5-ln"><span class="m5-sw" style="--c:var(--lb-teal)"></span>webhooks</span><span class="m5-lu">14 tasks</span><span></span></div></div>
+          <div class="k-sl">Hover</div><div class="k-sv"><div class="m5-ltrh"><span class="m5-ln"><span class="m5-sw" style="--c:var(--lb-teal)"></span>webhooks</span><span class="m5-lu">14 tasks</span><span class="m5-la"><span class="m5-lab">Rename</span><span class="m5-lab">Colour</span><span class="m5-labd">Delete</span></span></div></div>
+          <div class="k-sl">Focus</div><div class="k-sv"><div class="m5-ltrf"><span class="m5-ln"><span class="m5-sw" style="--c:var(--lb-teal)"></span>webhooks</span><span class="m5-lu">14 tasks</span><span class="m5-la"><span class="m5-lab">Rename</span><span class="m5-lab">Colour</span><span class="m5-labd">Delete</span></span></div></div>
+          <div class="k-sl">Editing</div><div class="k-sv"><div class="m5-ltre"><span class="m5-ln"><span class="m5-sw" style="--c:var(--lb-teal)"></span><span class="m5-ledit">webhook-delivery<span class="lg-caret" style="margin-left:0"></span></span></span><span class="m5-lu">14 tasks</span><span class="m5-la"><span class="m5-lab">Cancel</span><span class="m5-labon">Save</span></span></div></div>
+          <div class="k-sl">Read-only</div><div class="k-sv"><div class="m5-ltrro"><span class="m5-ln"><span class="m5-sw" style="--c:var(--lb-slate)"></span>sessions</span><span class="m5-lu">6 tasks</span><span class="m5-la"><span class="lg-faint" style="font-size:11.5px">From Backlog.md</span></span></div></div>
+          <div class="k-sl" style="border-bottom:0">Loading</div><div class="k-sv" style="border-bottom:0"><div class="m5-ltr"><span class="m5-ln"><span class="lg-skel" style="width:9px;height:9px"></span><span class="lg-skel" style="width:90px"></span></span><span class="lg-skel" style="width:48px"></span><span></span></div></div>
+        </div>
+        <p class="k-note" style="margin-top:6px">Selected is the editing row. Actions show on hover and focus; Enter renames, Delete asks first with the usage count.</p>
+      </div>
+      <div>
+        <h2 class="k-h">Filter bar and sort · in .lg-bar</h2>
+        <div class="k-box k-states">
+          <div class="k-sl">Unset</div><div class="k-sv"><div class="k-bar"><span class="m5-f" style="padding-left:0">Status</span><span class="m5-f">Assignee</span><span class="m5-f">Label</span><span class="m5-f">Due</span><span class="lg-sp"></span><span class="m5-sort">Sort: <b>Status</b></span></div></div>
+          <div class="k-sl">One label</div><div class="k-sv"><div class="k-bar"><span class="m5-fon"><span class="m5-fk">Label</span><span class="m5-fv"><span class="m5-sw" style="--c:var(--lb-blue)"></span>billing</span><span class="m5-fx">×</span></span><span class="m5-f">Due</span></div></div>
+          <div class="k-sl">Many labels</div><div class="k-sv"><div class="k-bar"><span class="m5-fon"><span class="m5-fk">Label</span><span class="m5-fv">3 labels</span><span class="m5-fx">×</span></span><span class="lg-faint" style="font-size:11.5px">billing, refunds or sepa</span></div></div>
+          <div class="k-sl">Due set</div><div class="k-sv"><div class="k-bar"><span class="m5-fon"><span class="m5-fk">Due</span><span class="m5-fv">Overdue</span><span class="m5-fx">×</span></span><span class="m5-fon"><span class="m5-fk">Due</span><span class="m5-fv">Next 7 days</span><span class="m5-fx">×</span></span></div></div>
+          <div class="k-sl">Focus</div><div class="k-sv"><div class="k-bar"><span class="m5-fon" style="outline:2px solid var(--focus)"><span class="m5-fk">Label</span><span class="m5-fv">3 labels</span><span class="m5-fx">×</span></span></div></div>
+          <div class="k-sl" style="border-bottom:0">Sort by due</div><div class="k-sv" style="border-bottom:0"><div class="k-bar"><span class="lg-sp"></span><span class="m5-sort">Sort: <b>Due date ↑</b></span><span class="lg-faint" style="font-size:11.5px">no date last</span></div></div>
+        </div>
+        <p class="k-note" style="margin-top:6px">A set filter shows its value; several labels collapse to a count with the names next to it. Labels match any of the chosen ones.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 2100 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["all"], "default": "all" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const dark = theme === 'dark';
+    const L = [['slate','4.2','3.8','3.6','backend'],['red','4.5','4.1','3.8','security'],['orange','4.4','4.0','3.7','merchant-facing'],['amber','4.3','3.9','3.6','q4'],['green','4.0','3.6','3.4','reliability'],['teal','3.8','3.5','3.2','webhooks'],['blue','4.2','3.8','3.6','billing'],['violet','4.5','4.0','3.8','refunds'],['pink','4.6','4.1','3.9','docs']];
+    const D = [['slate','7.1','7.5','6.3','backend'],['red','6.7','7.1','6.0','security'],['orange','6.8','7.3','6.1','merchant-facing'],['amber','7.0','7.5','6.2','q4'],['green','7.4','7.9','6.6','reliability'],['teal','7.4','7.9','6.6','webhooks'],['blue','7.1','7.6','6.3','billing'],['violet','6.8','7.2','6.0','refunds'],['pink','6.7','7.1','5.9','docs']];
+    const rows = (dark ? D : L).map((r) => ({ n: r[0], a: r[1], b: r[2], c: r[3], ex: r[4] }));
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      palette: rows,
+      g1: 'Surface',
+      g2: dark ? 'Bg' : 'Band',
+      palNote: dark ? 'Dark: oklch(0.72 0.12 h), slate oklch(0.72 0.02 250). Contrast against --surface, --bg and --sel.' : 'Light: oklch(0.58 0.13 h), slate oklch(0.58 0.02 250). Contrast against --surface, --band and --sel.',
+      lowest: dark ? 'pink on --sel at 5.9:1' : 'teal on --sel at 3.2:1'
+    };
+  }
+}
+</script>
+</body>
+</html>

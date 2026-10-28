@@ -39,6 +39,8 @@ export const ACTIVITY_TYPES = [
   'task.restored',
   'project.backlog_imported',
   'project.backlog_detached',
+  // 0.6.0
+  'project.backlog_webhook_secret_reissued',
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
@@ -142,6 +144,8 @@ export const milestone = pgTable(
   (table) => [
     uniqueIndex('milestone_projectId_name_unique').on(table.projectId, sql`lower(${table.name})`),
     index('milestone_projectId_backlogId_idx').on(table.projectId, table.backlogId),
+    // 0.6.0: the dashboard project rows' next milestone (open milestones of a project by date).
+    index('milestone_projectId_status_targetDate_idx').on(table.projectId, table.status, table.targetDate),
     check('milestone_name_check', sql`char_length(${table.name}) between 1 and 100`),
   ],
 );
@@ -280,6 +284,8 @@ export const activity = pgTable(
   (table) => [
     index('activity_taskId_createdAt_idx').on(table.taskId, table.createdAt),
     index('activity_projectId_createdAt_idx').on(table.projectId, table.createdAt),
+    // 0.6.0: the dashboard agents strip (an agent's newest activity).
+    index('activity_actorId_createdAt_idx').on(table.actorId, table.createdAt),
     check('activity_origin_check', sql`${table.origin} in ('app', 'backlog')`),
   ],
 );
@@ -332,6 +338,8 @@ export const comment = pgTable(
   },
   (table) => [
     index('comment_taskId_createdAt_idx').on(table.taskId, table.createdAt),
+    // 0.6.0: the dashboard agents strip (an agent's newest comment).
+    index('comment_authorId_createdAt_idx').on(table.authorId, table.createdAt),
     check('comment_body_check', sql`(${table.body} is null) = (${table.deletedAt} is not null)`),
   ],
 );

@@ -1,4 +1,4 @@
-import type { ApiKeyCreated, Member } from '@pm/contracts';
+import type { AgentCreated, ApiKeyCreated, Member } from '@pm/contracts';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Button } from '~/ui';
 import { AgentCreation, KeyCreation } from './CreationFlows';
 import { SettingsError } from './result';
-import type { AgentCreatedResult, CreateAgentValues, CreateApiKeyValues } from './types';
+import type { CreateAgentValues, CreateApiKeyValues } from './types';
 
 const ana = { id: '00000000-0000-4000-8000-000000000001', name: 'Ana Ruiz' };
 const tomas = { id: '00000000-0000-4000-8000-000000000002', name: 'Tomás Berg' };
@@ -36,7 +36,7 @@ function createdKey(
   };
 }
 
-function agentResult(values: CreateAgentValues): AgentCreatedResult {
+function agentResult(values: CreateAgentValues): AgentCreated {
   const agent: Member = {
     id: '00000000-0000-4000-8000-000000000003',
     name: values.name,
@@ -51,11 +51,7 @@ function agentResult(values: CreateAgentValues): AgentCreatedResult {
   return { agent, key: createdKey({ id: agent.id, name: agent.name }) };
 }
 
-function AgentHarness({
-  onSubmit,
-}: {
-  onSubmit: (values: CreateAgentValues) => Promise<AgentCreatedResult>;
-}) {
+function AgentHarness({ onSubmit }: { onSubmit: (values: CreateAgentValues) => Promise<AgentCreated> }) {
   const [open, setOpen] = useState(false);
   return (
     <>

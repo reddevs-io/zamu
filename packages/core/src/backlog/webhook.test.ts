@@ -5,9 +5,9 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BACKLOG_REFRESH } from '../jobs';
 import { decryptSecret } from '../secrets';
-import { createWorld, type TestContext, testContext, type World } from '../testing/fixtures';
+import { createWorld, TEST_PUBLIC_URL, type TestContext, testContext, type World } from '../testing/fixtures';
 import { loadSource } from './refresh';
-import { detachBacklog } from './settings';
+import { detachBacklog, reissueBacklogWebhookSecret } from './settings';
 import { startBacklog } from './setup';
 import {
   configFile,
@@ -38,12 +38,12 @@ const EVENT_HEADERS: Record<ProviderKind, (event: 'push' | 'ping' | 'other') => 
 describe('acceptBacklogWebhook', () => {
   let base: TestContext;
   let world: World;
-  let ctx: ReturnType<typeof mirrorContext>;
+  let ctx: ReturnType<typeof mirrorContext> & { publicUrl: string };
 
   beforeAll(async () => {
     base = testContext();
     world = await createWorld(base.db);
-    ctx = mirrorContext(base, new FakeProvider([]));
+    ctx = { ...mirrorContext(base, new FakeProvider([])), publicUrl: TEST_PUBLIC_URL };
   });
   afterAll(async () => {
     await base?.close();
@@ -122,6 +122,53 @@ describe('acceptBacklogWebhook', () => {
       expect(ctx.jobs.sent).toHaveLength(provider === 'gitlab' ? 2 : 1);
     });
   }
+
+  for (const provider of ['github', 'gitlab', 'gitea'] as const) {
+    it(`accepts ${provider} pushes signed with a new secret and rejects the old one`, async () => {
+      const { row, secret: old, key } = await source(provider);
+      const body = push('main');
+      const signed = (secret: string) => ({
+        ...signWebhook(provider, body, secret),
+        ...EVENT_HEADERS[provider]('push'),
+      });
+      expect(await acceptBacklogWebhook(ctx, row.webhookId, signed(old), body)).toMatchObject({
+        status: 202,
+      });
+
+      const issued = await reissueBacklogWebhookSecret(ctx, world.ownerActor, { projectKey: key });
+      expect(issued.url).toBe(`${TEST_PUBLIC_URL}/api/webhooks/backlog/${row.webhookId}`);
+      expect(await acceptBacklogWebhook(ctx, row.webhookId, signed(old), body)).toEqual({
+        status: 404,
+        reason: 'bad_signature',
+      });
+      expect(await acceptBacklogWebhook(ctx, row.webhookId, signed(issued.secret), body)).toMatchObject({
+        status: 202,
+      });
+    });
+  }
+
+  it('accepts the new secret after the old one became unreadable (another key)', async () => {
+    const { row, secret: old, key } = await source('gitea');
+    const body = push('main');
+    const signed = (secret: string) => ({
+      ...signWebhook('gitea', body, secret),
+      ...EVENT_HEADERS.gitea('push'),
+    });
+    const otherKey = { ...ctx, encryptionKey: new Uint8Array(32).fill(9) };
+    // The key changed: the stored secret no longer decrypts, so every delivery answers 404.
+    expect(await acceptBacklogWebhook(otherKey, row.webhookId, signed(old), body)).toEqual({
+      status: 404,
+      reason: 'bad_signature',
+    });
+    const issued = await reissueBacklogWebhookSecret(otherKey, world.ownerActor, { projectKey: key });
+    expect(await acceptBacklogWebhook(otherKey, row.webhookId, signed(issued.secret), body)).toMatchObject({
+      status: 202,
+    });
+    expect(await acceptBacklogWebhook(otherKey, row.webhookId, signed(old), body)).toEqual({
+      status: 404,
+      reason: 'bad_signature',
+    });
+  });
 
   it('answers 204 to a GitHub ping and a deleted branch', async () => {
     const { row, secret } = await source('github');

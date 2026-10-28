@@ -3,12 +3,13 @@
 // input with the contract schema, build the actor from the request, call core, return the result.
 // Handler bodies (and the server-only imports they use) are stripped from the client bundle.
 import {
-  AuthId,
+  CancelInvitationInput,
   CreateAgentInput,
   CreateApiKeyInput,
   CreateInvitationInput,
+  ListApiKeysInput,
+  RemoveMemberInput,
   RevokeApiKeyInput,
-  UserId,
 } from '@pm/contracts';
 import {
   type Actor,
@@ -24,16 +25,8 @@ import {
 } from '@pm/core';
 import { createServerFn } from '@tanstack/react-start';
 import { getRequestHeaders } from '@tanstack/react-start/server';
-import { z } from 'zod';
 import { getServerContext } from '../../server/context';
 import { runForRequest } from './adapter';
-
-/** Same shape as core's ListApiKeysInput, built from contract primitives to keep core out of the client. */
-export const ListApiKeysInput = z.object({
-  owner: z.union([z.literal('all'), z.literal('me'), UserId]),
-});
-const RemoveMemberInput = z.object({ userId: UserId });
-const CancelInvitationInput = z.object({ id: AuthId });
 
 function run<T>(service: (core: CoreContext, actor: Actor) => Promise<T>) {
   return runForRequest(getServerContext(), new Headers(getRequestHeaders()), service);

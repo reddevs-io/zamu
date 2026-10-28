@@ -5,6 +5,7 @@ import {
   ACTIVITY_TYPES,
   Activity,
   ActivityList,
+  AgentCreated,
   ApiKeyCreated,
   ApiKeyMetadata,
   ApiKeySummary,
@@ -16,6 +17,7 @@ import {
   BacklogRefreshResult,
   BacklogSourceStatus,
   BacklogWebhookInfo,
+  BacklogWebhookSecret,
   Comment,
   CommentList,
   Cycle,
@@ -248,6 +250,7 @@ const cases: [string, z.ZodType, unknown][] = [
   ['Invitation', Invitation, invitationFixture],
   ['ApiKeySummary', ApiKeySummary, apiKeySummaryFixture],
   ['ApiKeyCreated', ApiKeyCreated, apiKeyCreatedFixture],
+  ['AgentCreated', AgentCreated, { agent: memberFixture, key: apiKeyCreatedFixture }],
   [
     'ApiKeyMetadata',
     ApiKeyMetadata,
@@ -799,6 +802,22 @@ const m3Cases: [string, z.ZodType, unknown][] = [
     },
   ],
   [
+    'BacklogWebhookInfo unreadable',
+    BacklogWebhookInfo,
+    {
+      url: 'https://projects.example.com/api/webhooks/backlog/wh_4kQz',
+      secret: null,
+      secretState: 'unreadable',
+      provider: 'github',
+      lastAt: at('2026-10-23T14:02:00Z'),
+    },
+  ],
+  [
+    'BacklogWebhookSecret',
+    BacklogWebhookSecret,
+    { url: 'https://projects.example.com/api/webhooks/backlog/wh_4kQz', secret: 'c2VjcmV0LXNlY3JldA' },
+  ],
+  [
     'Problem TASK_MIRRORED',
     Problem,
     problem('TASK_MIRRORED', 'status comes from Backlog.md', {
@@ -921,6 +940,27 @@ describe('M3 entities', () => {
     expect(parsed).not.toHaveProperty('token');
     expect(parsed).not.toHaveProperty('tokenCiphertext');
     expect(GitConnectionTestResult.safeParse({ ...testResult, status: 'unchecked' }).success).toBe(false);
+  });
+
+  it('says why a webhook secret is missing, and infers ok or hidden when a server leaves it out', () => {
+    const base = {
+      url: 'https://projects.example.com/api/webhooks/backlog/wh_4kQz',
+      provider: null,
+      lastAt: null,
+    };
+    expect(BacklogWebhookInfo.parse({ ...base, secret: 's3cret' }).secretState).toBe('ok');
+    expect(BacklogWebhookInfo.parse({ ...base, secret: null }).secretState).toBe('hidden');
+    expect(BacklogWebhookInfo.parse({ ...base, secret: null, secretState: 'unreadable' }).secretState).toBe(
+      'unreadable',
+    );
+    expect(BacklogWebhookInfo.safeParse({ ...base, secret: null, secretState: 'lost' }).success).toBe(false);
+    expect(BacklogWebhookSecret.safeParse({ url: base.url, secret: '' }).success).toBe(false);
+  });
+
+  it('records a reissued webhook secret on the project', () => {
+    expect(
+      ProjectActivity.parse({ ...importedEntry, type: 'project.backlog_webhook_secret_reissued' }).type,
+    ).toBe('project.backlog_webhook_secret_reissued');
   });
 
   it('lists the activity types by scope', () => {

@@ -70,6 +70,8 @@ export const cliDataSchemas = {
   whoami: Me.extend({ project: CliResolvedProject.nullable().optional() }),
   /** pm projects list */
   'projects.list': ProjectList,
+  /** pm projects delete <KEY> --confirm <KEY> (0.6.0) */
+  'projects.delete': z.object({ deleted: ProjectKey }),
   /** pm tasks list [--mine] [--project ...] [--milestone ...] [--cycle ...] */
   'tasks.list': TaskListPage,
   /**

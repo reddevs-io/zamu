@@ -96,6 +96,36 @@ describe('Backlog.md jobs in the worker', () => {
     expect(JSON.stringify(lines)).not.toContain('glpat-');
   });
 
+  it('runs Refresh now at once when a webhook run waits for the next slot (PM-10)', async () => {
+    if (!worker) throw new Error('worker not started');
+    // Keep the whole check inside one 60-second slot.
+    const left = 60_000 - (Date.now() % 60_000);
+    if (left < 25_000) await new Promise((resolve) => setTimeout(resolve, left + 200));
+    const jobs = createJobQueue(worker.boss);
+    const push = await database.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs }, tx, sourceId, 'webhook'),
+    );
+    if (!push) throw new Error('webhook refresh not queued');
+    expect((await waitForJob(BACKLOG_REFRESH, push)).state).toBe('completed');
+    // A second push in the same slot waits for the next one.
+    const later = await database.db.transaction((tx) =>
+      enqueueBacklogRefresh({ jobs }, tx, sourceId, 'webhook'),
+    );
+    if (!later) throw new Error('second webhook refresh not queued');
+    const [waiting] = await worker.boss.findJobs(BACKLOG_REFRESH, { id: later });
+    expect(waiting?.startAfter.getTime()).toBeGreaterThan(Date.now() + 2_000);
+
+    const asked = Date.now();
+    const id = await database.db.transaction((tx) => enqueueBacklogRefresh({ jobs }, tx, sourceId, 'manual'));
+    if (!id) throw new Error('Refresh now not queued');
+    const job = await waitForJob(BACKLOG_REFRESH, id, 10_000);
+    expect(job.state).toBe('completed');
+    expect(job.data).toEqual({ sourceId, trigger: 'manual' });
+    expect(job.startedOn.getTime() - asked).toBeLessThan(5_000);
+    const [replaced] = await worker.boss.findJobs(BACKLOG_REFRESH, { id: later });
+    expect(replaced?.state).toBe('cancelled');
+  });
+
   it('runs backlog.poll, which queues a refresh (trigger poll) through the worker queue', async () => {
     if (!worker) throw new Error('worker not started');
     repo.set(taskPath('backlog', 'BACK-2', 'Second'), taskFile({ id: 'BACK-2', title: 'Second' })).commit();

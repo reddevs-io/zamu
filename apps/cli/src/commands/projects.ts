@@ -1,7 +1,9 @@
-// pm projects list.
-import { parseRepositoryUrl } from '@pm/contracts';
+// pm projects list | delete.
+import { DeleteProjectInput, ProjectKeyInput, parseRepositoryUrl } from '@pm/contracts';
 import { type CommandContext, emit } from '../context';
+import { usageError } from '../errors';
 import { formatDate, table } from '../format';
+import { parseInput } from './shared';
 
 export async function listProjects(context: CommandContext): Promise<void> {
   const client = await context.client();
@@ -33,5 +35,28 @@ export async function listProjects(context: CommandContext): Promise<void> {
       style,
       context.io.columns,
     );
+  });
+}
+
+/**
+ * pm projects delete <KEY> --confirm <KEY>. Without --confirm, or with another key, nothing is
+ * sent: deleting takes every task, comment and the Backlog.md mirror with it.
+ */
+export async function deleteProject(
+  context: CommandContext,
+  key: string,
+  options: { confirm?: string },
+): Promise<void> {
+  const project = parseInput(ProjectKeyInput, key);
+  const input = DeleteProjectInput.safeParse({ project, confirmKey: options.confirm ?? '' });
+  if (!input.success) {
+    throw usageError(`Pass --confirm ${project} to delete project ${project}.`, [
+      { path: 'confirmKey', message: 'Type the project key to confirm' },
+    ]);
+  }
+  const client = await context.client();
+  await client.projects.delete(input.data);
+  emit(context, 'projects.delete', { deleted: project }, (data) => {
+    return `Deleted project ${context.style.bold(data.deleted)}\n`;
   });
 }

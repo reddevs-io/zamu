@@ -1,0 +1,160 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Martian+Mono:wght@400;500&display=swap");
+
+/* Ledger (2a) design tokens. Each frame sets .lg-light or .lg-dark on its root. */
+.lg-light {
+  --bg: oklch(0.985 0.004 240);
+  --surface: oklch(0.998 0.002 240);
+  --band: oklch(0.962 0.006 240);
+  --rail: oklch(0.22 0.02 255);
+  --rail-fg: oklch(0.82 0.015 250);
+  --rail-on: oklch(0.98 0.004 240);
+  --line: oklch(0.88 0.008 245);
+  --line-2: oklch(0.93 0.006 245);
+  --fg: oklch(0.2 0.02 255);
+  --muted: oklch(0.46 0.02 255);
+  --faint: oklch(0.62 0.015 255);
+  --accent: oklch(0.52 0.2 262);
+  --on-accent: oklch(0.99 0 0);
+  --sel: oklch(0.94 0.03 262);
+  --focus: oklch(0.52 0.2 262);
+  --review: oklch(0.5 0.15 300);
+  --done: oklch(0.52 0.11 155);
+  --danger: oklch(0.55 0.2 28);
+  --danger-bg: oklch(0.96 0.03 28);
+  --scrim: oklch(0.2 0.02 255 / 0.35);
+  --shadow: 0 24px 64px -16px oklch(0.2 0.03 255 / 0.35);
+}
+.lg-dark {
+  --bg: oklch(0.185 0.012 255);
+  --surface: oklch(0.215 0.013 255);
+  --band: oklch(0.215 0.013 255);
+  --rail: oklch(0.13 0.012 255);
+  --rail-fg: oklch(0.66 0.015 250);
+  --rail-on: oklch(0.95 0.006 240);
+  --line: oklch(0.31 0.014 255);
+  --line-2: oklch(0.255 0.013 255);
+  --fg: oklch(0.94 0.006 240);
+  --muted: oklch(0.72 0.015 250);
+  --faint: oklch(0.56 0.015 250);
+  --accent: oklch(0.72 0.15 258);
+  --on-accent: oklch(0.16 0.02 255);
+  --sel: oklch(0.26 0.04 262);
+  --focus: oklch(0.72 0.15 258);
+  --review: oklch(0.76 0.11 300);
+  --done: oklch(0.76 0.12 155);
+  --danger: oklch(0.7 0.17 30);
+  --danger-bg: oklch(0.27 0.05 30);
+  --scrim: oklch(0.05 0.01 255 / 0.6);
+  --shadow: 0 24px 64px -12px oklch(0 0 0 / 0.7);
+}
+
+body { margin: 0; }
+.lg-root { width: 1280px; height: 800px; position: relative; overflow: hidden; font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: var(--fg); background: var(--bg); -webkit-font-smoothing: antialiased; text-align: left; }
+.lg-root :where(a) { color: inherit; text-decoration: none; }
+.lg-root :where(a:hover) { color: var(--accent); }
+.lg-root :where(button) { font: inherit; cursor: pointer; }
+.lg-app { display: grid; grid-template-columns: 64px minmax(0, 1fr); height: 100%; }
+
+/* Type */
+.lg-mono { font-family: "Martian Mono", ui-monospace, monospace; }
+.lg-h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
+.lg-h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; text-wrap: pretty; }
+.lg-sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.lg-cap { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.lg-muted { color: var(--muted); }
+.lg-faint { color: var(--faint); }
+.lg-for { color: var(--muted); font-size: 11.5px; }
+
+/* Rail */
+.lg-rail { background: var(--rail); display: flex; flex-direction: column; padding: 12px 0; gap: 2px; min-height: 0; }
+.lg-ws { width: 32px; height: 32px; margin: 0 auto 10px; background: var(--accent); color: oklch(0.99 0 0); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.lg-rnav { height: 38px; display: grid; place-items: center; color: var(--rail-fg); font-size: 10.5px; font-weight: 500; }
+.lg-rnavon { height: 38px; display: grid; place-items: center; color: var(--rail); background: var(--rail-on); font-size: 10.5px; font-weight: 600; }
+.lg-rdiv { height: 1px; margin: 8px 14px; background: oklch(1 0 0 / 0.12); }
+.lg-rk { height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: var(--rail-fg); font-family: "Martian Mono", ui-monospace, monospace; font-size: 10.5px; font-weight: 500; }
+.lg-rkon { height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: var(--rail); background: var(--rail-on); font-family: "Martian Mono", ui-monospace, monospace; font-size: 10.5px; font-weight: 500; }
+.lg-rn { font-size: 9px; opacity: 0.7; }
+.lg-rsp { flex: 1; }
+.lg-rme { width: 28px; height: 28px; margin: 6px auto 0; border-radius: 50%; background: oklch(0.86 0.06 25); color: oklch(0.32 0.08 25); display: grid; place-items: center; font-size: 10px; font-weight: 600; }
+
+/* Page chrome */
+.lg-head { height: 64px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--line); box-sizing: border-box; }
+.lg-headr { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.lg-search { display: flex; align-items: center; justify-content: space-between; width: 170px; height: 30px; padding: 0 6px 0 10px; border: 1px solid var(--line); color: var(--faint); box-sizing: border-box; }
+.lg-kbd { font-family: "Martian Mono", ui-monospace, monospace; font-size: 9.5px; line-height: 16px; padding: 0 4px; border: 1px solid var(--line); color: var(--muted); }
+.lg-bar { height: 36px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; box-sizing: border-box; }
+.lg-bv { color: var(--fg); font-weight: 500; }
+.lg-sp { flex: 1; }
+
+/* Buttons */
+.lg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 12px; border: 0; background: var(--fg); color: var(--bg); font-weight: 600; box-sizing: border-box; white-space: nowrap; }
+.lg-btna { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 12px; border: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; box-sizing: border-box; white-space: nowrap; }
+.lg-btn2 { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 500; box-sizing: border-box; white-space: nowrap; }
+.lg-btnd { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 28px; padding: 0 10px; border: 1px solid var(--line); background: none; color: var(--danger); font-weight: 500; box-sizing: border-box; font-size: 12px; }
+.lg-btnk { font-family: "Martian Mono", ui-monospace, monospace; font-size: 9.5px; line-height: 16px; padding: 0 4px; border: 1px solid oklch(0.6 0 0 / 0.4); }
+.lg-btnw { width: 100%; height: 38px; }
+
+/* Forms */
+.lg-field { display: flex; flex-direction: column; gap: 6px; }
+.lg-label { font-size: 12px; font-weight: 600; }
+.lg-input { height: 38px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); box-sizing: border-box; gap: 8px; }
+.lg-inputf { height: 38px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--focus); box-shadow: 0 0 0 3px oklch(0.6 0.15 262 / 0.2); background: var(--surface); color: var(--fg); box-sizing: border-box; gap: 8px; }
+.lg-inpute { height: 38px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--danger); background: var(--surface); color: var(--fg); box-sizing: border-box; }
+.lg-ph { color: var(--faint); }
+.lg-caret { display: inline-block; width: 1px; height: 16px; background: var(--fg); margin-left: -6px; }
+.lg-hint { font-size: 11.5px; color: var(--muted); }
+.lg-err { font-size: 11.5px; color: var(--danger); }
+.lg-check { width: 14px; height: 14px; flex: none; border: 1.5px solid var(--muted); box-sizing: border-box; }
+.lg-checkon { width: 14px; height: 14px; flex: none; background: var(--accent); position: relative; }
+.lg-checkon::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border-right: 2px solid var(--on-accent); border-bottom: 2px solid var(--on-accent); transform: rotate(45deg); }
+.lg-radio { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 1.5px solid var(--muted); box-sizing: border-box; }
+.lg-radioon { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 4px solid var(--accent); box-sizing: border-box; }
+.lg-toggle { width: 26px; height: 14px; flex: none; background: var(--line); position: relative; }
+.lg-toggleon { width: 26px; height: 14px; flex: none; background: var(--accent); position: relative; }
+.lg-toggle::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; background: var(--surface); }
+.lg-toggleon::after { content: ""; position: absolute; right: 2px; top: 2px; width: 10px; height: 10px; background: var(--on-accent); }
+.lg-opt { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); box-sizing: border-box; }
+.lg-opton { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--accent); background: var(--sel); box-sizing: border-box; }
+
+/* Data */
+.lg-key { font-family: "Martian Mono", ui-monospace, monospace; font-size: 10.5px; color: var(--muted); }
+.lg-trunc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-th { height: 28px; flex: none; display: grid; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--line); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 600; box-sizing: border-box; }
+.lg-g { height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 24px; background: var(--band); border-bottom: 1px solid var(--line-2); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+.lg-gc { font-family: "Martian Mono", ui-monospace, monospace; color: var(--faint); font-size: 10px; letter-spacing: 0; }
+.lg-right { text-align: right; }
+.lg-upd { font-family: "Martian Mono", ui-monospace, monospace; font-size: 10px; color: var(--faint); text-align: right; }
+.lg-av { width: 18px; height: 18px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 8.5px; font-weight: 600; background: oklch(0.86 0.06 var(--h)); color: oklch(0.32 0.08 var(--h)); }
+.lg-ag { width: 18px; height: 18px; flex: none; box-sizing: border-box; border: 1.5px solid var(--accent); color: var(--accent); display: grid; place-items: center; font-family: "Martian Mono", ui-monospace, monospace; font-size: 9px; font-weight: 500; }
+.lg-avl { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 600; background: oklch(0.86 0.06 var(--h)); color: oklch(0.32 0.08 var(--h)); }
+.lg-agl { width: 28px; height: 28px; flex: none; box-sizing: border-box; border: 1.5px solid var(--accent); color: var(--accent); display: grid; place-items: center; font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; font-weight: 500; }
+.lg-who { display: flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; overflow: hidden; font-size: 12px; min-width: 0; }
+.lg-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--line); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
+.lg-taga { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--accent); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; color: var(--accent); }
+
+/* Status squares and priority */
+.lg-sq { width: 8px; height: 8px; flex: none; box-sizing: border-box; }
+.lg-s-prog { background: var(--accent); }
+.lg-s-review { background: var(--review); }
+.lg-s-todo { border: 1.5px solid var(--muted); }
+.lg-s-backlog { border: 1.5px dashed var(--faint); }
+.lg-s-done { background: var(--done); }
+.lg-s-cancel { background: var(--faint); }
+.lg-pri { font-size: 9px; letter-spacing: 1px; color: var(--fg); }
+.lg-prilow { font-size: 9px; letter-spacing: 1px; color: var(--faint); }
+.lg-priurg { font-size: 9px; letter-spacing: 1px; color: var(--danger); }
+.lg-bars { display: flex; height: 6px; width: 120px; gap: 2px; }
+.lg-bars span { display: block; height: 100%; }
+
+/* Surfaces */
+.lg-scrim { position: absolute; inset: 0; background: var(--scrim); }
+.lg-dialog { position: absolute; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.lg-dh { height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid var(--line); box-sizing: border-box; }
+.lg-db { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.lg-df { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--band); }
+.lg-banner { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--danger); background: var(--danger-bg); color: var(--fg); }
+.lg-bannerx { width: 8px; height: 8px; background: var(--danger); flex: none; }
+.lg-skel { height: 8px; background: var(--line-2); }
+.lg-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; max-width: 420px; }
+.lg-code { font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; background: var(--band); border: 1px solid var(--line-2); padding: 8px 10px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-codei { font-family: "Martian Mono", ui-monospace, monospace; font-size: 11px; background: var(--band); padding: 1px 4px; }

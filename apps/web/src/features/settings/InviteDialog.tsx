@@ -21,6 +21,10 @@ export interface InviteDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSubmit: (input: { email: string; role: InvitationRole }) => Promise<Invitation>;
+  /** Line under the email field, for example who the invitation is for. */
+  hint?: string;
+  /** The invitation exists; the dialog now shows its link. */
+  onCreated?: (invitation: Invitation) => void;
 }
 
 const ROLE_OPTIONS = [
@@ -30,15 +34,24 @@ const ROLE_OPTIONS = [
 
 const Email = z.email();
 
-export function InviteDialog({ isOpen, onOpenChange, onSubmit }: InviteDialogProps) {
+export function InviteDialog({ isOpen, onOpenChange, onSubmit, hint, onCreated }: InviteDialogProps) {
   return (
     <Modal width={520} top={96} isOpen={isOpen} onOpenChange={onOpenChange}>
-      <InviteContent onSubmit={onSubmit} close={() => onOpenChange(false)} />
+      <InviteContent
+        onSubmit={onSubmit}
+        close={() => onOpenChange(false)}
+        hint={hint}
+        onCreated={onCreated}
+      />
     </Modal>
   );
 }
 
-function InviteContent({ onSubmit, close }: { onSubmit: InviteDialogProps['onSubmit']; close: () => void }) {
+export interface InviteContentProps extends Pick<InviteDialogProps, 'onSubmit' | 'hint' | 'onCreated'> {
+  close: () => void;
+}
+
+export function InviteContent({ onSubmit, close, hint, onCreated }: InviteContentProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<InvitationRole>('member');
   const [emailError, setEmailError] = useState<string>();
@@ -57,7 +70,9 @@ function InviteContent({ onSubmit, close }: { onSubmit: InviteDialogProps['onSub
     setPending(true);
     setFormError(undefined);
     try {
-      setInvitation(await onSubmit({ email: value, role }));
+      const created = await onSubmit({ email: value, role });
+      setInvitation(created);
+      onCreated?.(created);
     } catch (error) {
       if (error instanceof SettingsError && error.code === 'CONFLICT') setEmailError(error.message);
       else setFormError(errorMessage(error));
@@ -107,6 +122,7 @@ function InviteContent({ onSubmit, close }: { onSubmit: InviteDialogProps['onSub
             }}
             isInvalid={Boolean(emailError)}
             errorMessage={emailError}
+            description={hint}
             placeholder="name@company.com"
             autoComplete="off"
           />

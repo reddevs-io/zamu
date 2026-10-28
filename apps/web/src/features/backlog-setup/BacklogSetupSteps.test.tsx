@@ -4,11 +4,15 @@ import type {
   BacklogPreview,
   BacklogSourceStatus,
   GitConnection,
+  Invitation,
 } from '@pm/contracts';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import type { AgentSuggestion } from './agent-suggestions';
+import type { InviteDraft } from './assignee-hints';
+import { InviteFromMappings } from './InviteFromMappings';
 import { MappingsEditor } from './MappingsStep';
 import { ModeStep, type ModeStepProps } from './ModeStep';
 import { PreviewStep } from './PreviewStep';
@@ -200,6 +204,15 @@ describe('SourceStep', () => {
   });
 });
 
+const UNMATCHED_ASSIGNEES: BacklogMappingsView = {
+  ...MAPPINGS,
+  assignee: [
+    { from: '@claude', userId: null, how: 'fallback', count: 219, user: null },
+    { from: '@ana', userId: USER.id, how: 'name', count: 64, user: USER },
+    { from: '@francis', userId: null, how: 'fallback', count: 5, user: null },
+  ],
+};
+
 function Harness({ onChange }: { onChange: (view: BacklogMappingsView) => void }) {
   const [view, setView] = useState(MAPPINGS);
   return (
@@ -289,6 +302,269 @@ describe('MappingsEditor', () => {
       <MappingsEditor view={UNMATCHED} onChange={vi.fn()} members={[USER, claude]} onCreateAgent={vi.fn()} />,
     );
     expect(screen.queryByRole('region', { name: 'Agent suggestions' })).not.toBeInTheDocument();
+  });
+});
+
+// The Mappings step of the setup and Edit mappings render the same editor, with the screen state
+// BacklogSetupScreen keeps: the open invite dialog and the invitations made on the screen.
+const SCREENS = [
+  { screen: 'Setup', aside: undefined, title: undefined },
+  { screen: 'Edit mappings', aside: 'The next refresh applies them to every task.', title: undefined },
+] as const;
+
+const TOMAS = {
+  id: '01a169ed-a7a5-712d-a08b-1e796a1ac803',
+  name: 'Tomás Berg',
+  kind: 'person' as const,
+  email: 'tberg@example.com',
+};
+const agentMember = (name: string, joinedAt: string, n: number) => ({
+  id: `01a169ed-a7a5-712d-a08b-1e796a1ac8${String(n).padStart(2, '0')}`,
+  name,
+  kind: 'agent' as const,
+  email: null,
+  joinedAt,
+});
+
+const INVITATION: Invitation = {
+  id: 'inv-1',
+  email: 'francis@example.com',
+  role: 'member',
+  status: 'pending',
+  invitedBy: { id: USER.id, name: USER.name, kind: 'person' },
+  link: 'http://localhost:3000/invite/inv-1',
+  expiresAt: '2026-11-03T10:00:00.000Z',
+  createdAt: '2026-10-27T10:00:00.000Z',
+};
+
+function ScreenHarness({
+  initial,
+  members,
+  aside,
+  onChange = () => {},
+  onCreateAgent = () => {},
+  onSubmitInvite = async () => INVITATION,
+}: {
+  initial: BacklogMappingsView;
+  members: Parameters<typeof MappingsEditor>[0]['members'];
+  aside?: string | undefined;
+  onChange?: (view: BacklogMappingsView) => void;
+  onCreateAgent?: (draft: AgentSuggestion) => void;
+  onSubmitInvite?: Parameters<typeof InviteFromMappings>[0]['onSubmit'];
+}) {
+  const [view, setView] = useState(initial);
+  const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
+  const [invited, setInvited] = useState<Record<string, string>>({});
+  return (
+    <>
+      <MappingsEditor
+        view={view}
+        onChange={(next) => {
+          setView(next);
+          onChange(next);
+        }}
+        members={members}
+        {...(aside ? { aside } : {})}
+        onCreateAgent={onCreateAgent}
+        onInvite={setInviteDraft}
+        invited={invited}
+      />
+      <InviteFromMappings
+        draft={inviteDraft}
+        onClose={() => setInviteDraft(null)}
+        onSubmit={onSubmitInvite}
+        onCreated={(draft, invitation) => setInvited((all) => ({ ...all, [draft.from]: invitation.email }))}
+      />
+    </>
+  );
+}
+
+const noteLine = (section: string, text: string | RegExp) => {
+  const note = screen.getByRole('region', { name: section });
+  const line = within(note)
+    .getAllByRole('listitem')
+    .find((item) =>
+      typeof text === 'string' ? item.textContent?.includes(text) : text.test(item.textContent ?? ''),
+    );
+  if (!line) throw new Error(`No line with ${String(text)} in ${section}`);
+  return line;
+};
+
+describe.each(SCREENS)('Assignee note on $screen', ({ aside }) => {
+  const CLAUDE_DEV = agentMember('claude-dev', '2026-10-01T10:00:00.000Z', 10);
+
+  it('offers a similar agent for an unmatched agent name, and still offers to create one', async () => {
+    const onChange = vi.fn();
+    const onCreateAgent = vi.fn();
+    render(
+      <ScreenHarness
+        initial={UNMATCHED_ASSIGNEES}
+        members={[USER, CLAUDE_DEV]}
+        aside={aside}
+        onChange={onChange}
+        onCreateAgent={onCreateAgent}
+      />,
+    );
+    const line = noteLine('Agent suggestions', '@claude');
+    expect(line).toHaveTextContent('@claude may be claude-dev.');
+    const user = userEvent.setup();
+
+    await user.click(within(line).getByRole('button', { name: 'Create agent claude' }));
+    expect(onCreateAgent).toHaveBeenCalledWith({ name: 'claude', from: ['@claude'], count: 219 });
+
+    await user.click(within(line).getByRole('button', { name: 'Map to claude-dev' }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        assignee: [
+          { from: '@claude', userId: CLAUDE_DEV.id, how: 'manual', count: 219, user: null },
+          UNMATCHED_ASSIGNEES.assignee[1],
+          UNMATCHED_ASSIGNEES.assignee[2],
+        ],
+      }),
+    );
+    // Mapped: the suggestion is gone.
+    expect(screen.queryByRole('region', { name: 'Agent suggestions' })).not.toBeInTheDocument();
+  });
+
+  it('maps every spelling of the value to the similar agent', async () => {
+    const onChange = vi.fn();
+    const twoSpellings: BacklogMappingsView = {
+      ...MAPPINGS,
+      assignee: [
+        { from: '@claude-code', userId: null, how: 'fallback', count: 3, user: null },
+        { from: '@Claude_Code', userId: null, how: 'fallback', count: 2, user: null },
+      ],
+    };
+    const claudeCi = agentMember('claude-ci', '2026-10-01T10:00:00.000Z', 11);
+    render(<ScreenHarness initial={twoSpellings} members={[claudeCi]} aside={aside} onChange={onChange} />);
+    const line = noteLine('Agent suggestions', '@claude-code');
+    expect(line).toHaveTextContent('@claude-code, @Claude_Code may be claude-ci.');
+    await userEvent.setup().click(within(line).getByRole('button', { name: 'Map to claude-ci' }));
+    expect(
+      onChange.mock.lastCall?.[0].assignee.map((r: { userId: string; how: string }) => [r.userId, r.how]),
+    ).toEqual([
+      [claudeCi.id, 'manual'],
+      [claudeCi.id, 'manual'],
+    ]);
+  });
+
+  it('offers no similar agent when none shares the agent word', () => {
+    const codexCi = agentMember('codex-ci', '2026-10-01T10:00:00.000Z', 12);
+    render(<ScreenHarness initial={UNMATCHED_ASSIGNEES} members={[USER, codexCi]} aside={aside} />);
+    const line = noteLine('Agent suggestions', '@claude');
+    expect(line).not.toHaveTextContent('may be');
+    expect(within(line).queryByRole('button', { name: /Map to/ })).not.toBeInTheDocument();
+    expect(within(line).getByRole('button', { name: 'Create agent claude' })).toBeInTheDocument();
+  });
+
+  it('caps similar agents at three, newest first, in the note and under Create agent in the select', async () => {
+    const agents = [
+      agentMember('claude-dev', '2026-10-01T10:00:00.000Z', 20),
+      agentMember('claude-ci', '2026-10-20T10:00:00.000Z', 21),
+      agentMember('claude-ops', '2026-10-10T10:00:00.000Z', 22),
+      agentMember('claude-review', '2026-10-26T10:00:00.000Z', 23),
+    ];
+    render(<ScreenHarness initial={UNMATCHED_ASSIGNEES} members={[USER, ...agents]} aside={aside} />);
+    const line = noteLine('Agent suggestions', '@claude');
+    expect(line).toHaveTextContent('@claude may be claude-review, claude-ci or claude-ops.');
+    expect(
+      within(line)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Map to claude-review', 'Map to claude-ci', 'Map to claude-ops', 'Create agent claude']);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /@claude maps to/ }));
+    const order = [
+      'Create agent claude…',
+      'claude-review',
+      'claude-ci',
+      'claude-ops',
+      'No one',
+      'Ana Ruiz',
+      'claude-dev',
+    ];
+    expect(screen.getAllByRole('option')).toEqual(order.map((name) => screen.getByRole('option', { name })));
+    await user.click(screen.getByRole('option', { name: 'claude-ci' }));
+    expect(screen.getByRole('button', { name: /@claude maps to/ })).toHaveTextContent('claude-ci');
+  });
+
+  it('invites a person for an unmatched value, then says how to map it', async () => {
+    const onSubmitInvite = vi.fn(async () => INVITATION);
+    render(
+      <ScreenHarness
+        initial={UNMATCHED_ASSIGNEES}
+        members={[USER]}
+        aside={aside}
+        onSubmitInvite={onSubmitInvite}
+      />,
+    );
+    const note = screen.getByRole('region', { name: 'People to invite' });
+    expect(note).toHaveTextContent('No member matches this name yet.');
+    const line = noteLine('People to invite', '@francis');
+    expect(line).toHaveTextContent('@francis matches no member.');
+    expect(note).not.toHaveTextContent('@claude');
+
+    const user = userEvent.setup();
+    await user.click(within(line).getByRole('button', { name: 'Invite…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invite person' });
+    expect(dialog).toHaveTextContent('For @francis in the files (5 tasks).');
+    expect(within(dialog).getByRole('button', { name: /Role/ })).toHaveTextContent('Member');
+
+    await user.type(within(dialog).getByRole('textbox', { name: 'Email' }), 'francis@example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Create invitation link' }));
+    expect(onSubmitInvite).toHaveBeenCalledWith({ email: 'francis@example.com', role: 'member' });
+    const link = await screen.findByRole('dialog', { name: 'Invitation link' });
+    await user.click(within(link).getByRole('button', { name: 'Done' }));
+
+    const invited = noteLine('People to invite', '@francis');
+    expect(invited).toHaveTextContent(
+      'Invited francis@example.com. Once they join, map @francis in Settings › Backlog.md › Edit mappings.',
+    );
+    expect(within(invited).queryByRole('button')).not.toBeInTheDocument();
+    // The row stays No one.
+    expect(screen.getByRole('button', { name: /@francis maps to/ })).toHaveTextContent('No one');
+  });
+
+  it('suggests the member a No one row names', async () => {
+    const onChange = vi.fn();
+    const stored: BacklogMappingsView = {
+      ...MAPPINGS,
+      assignee: [
+        { from: '@tberg', userId: null, how: 'fallback', count: 7, user: null },
+        { from: '@francis', userId: null, how: 'fallback', count: 5, user: null },
+      ],
+    };
+    render(<ScreenHarness initial={stored} members={[USER, TOMAS]} aside={aside} onChange={onChange} />);
+    const line = noteLine('Name matches', '@tberg');
+    expect(line).toHaveTextContent('@tberg may be Tomás Berg.');
+    // The name match replaces the invite line for that value.
+    expect(screen.getByRole('region', { name: 'People to invite' })).not.toHaveTextContent('@tberg');
+
+    await userEvent.setup().click(within(line).getByRole('button', { name: 'Map to Tomás Berg' }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        assignee: [
+          { from: '@tberg', userId: TOMAS.id, how: 'manual', count: 7, user: null },
+          stored.assignee[1],
+        ],
+      }),
+    );
+    expect(screen.queryByRole('region', { name: 'Name matches' })).not.toBeInTheDocument();
+  });
+
+  it('suggests no member when two match', () => {
+    const stored: BacklogMappingsView = {
+      ...MAPPINGS,
+      assignee: [{ from: '@sam', userId: null, how: 'fallback', count: 2, user: null }],
+    };
+    const sams = [
+      { id: 'u-sam1', name: 'Sam', kind: 'person' as const, email: 'sam.one@example.com' },
+      { id: 'u-sam2', name: 'Sam', kind: 'person' as const, email: 'sam.two@example.com' },
+    ];
+    render(<ScreenHarness initial={stored} members={sams} aside={aside} />);
+    expect(screen.queryByRole('region', { name: 'Name matches' })).not.toBeInTheDocument();
+    expect(noteLine('People to invite', '@sam')).toHaveTextContent('@sam matches no member.');
   });
 });
 

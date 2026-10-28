@@ -534,18 +534,7 @@ async function agentRows(db: Db, params: Params): Promise<z.input<typeof Dashboa
         from member mb
         join "user" u on u.id = mb.user_id and u.kind = 'agent'
         where mb.organization_id = ${params.workspaceId}::uuid
-          ${mineOnly(params, sql`u.responsible_user_id = ${params.me}::uuid`)}),
-      -- One pass each over the scoped projects' activity and comments, not one per agent: neither
-      -- table has an index on its actor or author column.
-      acted as (
-        select a.actor_id as id, max(a.created_at) as at from activity a
-        where a.actor_id in (select id from agent) and ${projectIn('a.project_id', params)}
-        group by a.actor_id),
-      wrote as (
-        select c.author_id as id, max(c.created_at) as at
-        from task wt join comment c on c.task_id = wt.id
-        where c.author_id in (select id from agent) and ${projectIn('wt.project_id', params)}
-        group by c.author_id)
+          ${mineOnly(params, sql`u.responsible_user_id = ${params.me}::uuid`)})
       select ${userColumns('u', 'agent')}, ${userColumns('r', 'responsible')},
         cur."taskId", cur."taskNumber", cur."taskTitle", cur."taskStatus", cur."taskPriority",
         cur."projectKey", cur."projectName", cur.last_touch as "lastTouchedAt",
@@ -562,8 +551,21 @@ async function agentRows(db: Db, params: Params): Promise<z.input<typeof Dashboa
         where t.assignee_id = u.id and t.status = 'in_progress' and ${projectIn('t.project_id', params)}
         order by touched.at asc, t.id asc
         limit 1) cur on true
-      left join acted on acted.id = u.id
-      left join wrote on wrote.id = u.id
+      -- Newest activity row and comment per agent in the scoped projects. Each walks
+      -- activity(actor_id, created_at) or comment(author_id, created_at) backwards and stops at the
+      -- first row in scope, in both scopes. Comments are scoped through their task, as the schema
+      -- does not tie comment.project_id to the task's project.
+      left join lateral (
+        select a.created_at as at from activity a
+        where a.actor_id = u.id and ${projectIn('a.project_id', params)}
+        order by a.created_at desc
+        limit 1) acted on true
+      left join lateral (
+        select c.created_at as at
+        from comment c join task wt on wt.id = c.task_id
+        where c.author_id = u.id and ${projectIn('wt.project_id', params)}
+        order by c.created_at desc
+        limit 1) wrote on true
       order by stalled desc, u.name asc, u.id asc`,
     'objects',
   );

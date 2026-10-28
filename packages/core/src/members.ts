@@ -1,16 +1,18 @@
 // Members (people and agents), agent creation and member removal.
 import {
+  AgentCreated,
   type ApiKeyCreated,
   CreateAgentInput,
   Member,
   type MemberList,
+  RemoveMemberInput,
   UserId,
   type UserRef,
   type WorkspaceRole,
 } from '@pm/contracts';
 import { type DbOrTx, schema } from '@pm/db';
 import { and, asc, eq, inArray, max, sql } from 'drizzle-orm';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { activeKeyCounts, issueApiKey, MAX_API_KEY_NAME_LENGTH, validateScope } from './api-keys';
 import { type Actor, authorize } from './authz';
 import type { AuthContext, DbContext } from './context';
@@ -95,12 +97,6 @@ export async function getMember({ db }: DbContext, actor: Actor, userId: string)
   return found;
 }
 
-export interface AgentCreated {
-  agent: Member;
-  /** The agent's first API key, with its secret. Shown once. */
-  key: ApiKeyCreated;
-}
-
 function defaultKeyName(agentName: string): string {
   return `${agentName} key`.slice(0, MAX_API_KEY_NAME_LENGTH);
 }
@@ -174,11 +170,8 @@ export async function createAgent(
   }
   const [agent] = await loadMembers(db, actor.workspaceId, [agentId]);
   if (!agent) throw new Error('created agent could not be read back');
-  return { agent, key };
+  return AgentCreated.parse({ agent, key });
 }
-
-export const RemoveMemberInput = z.object({ userId: UserId });
-export type RemoveMemberInput = z.output<typeof RemoveMemberInput>;
 
 /**
  * Removes a person or agent from the workspace. Admins only; owners and yourself cannot be removed.

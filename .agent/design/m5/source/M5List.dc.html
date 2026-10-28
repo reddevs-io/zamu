@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<link rel="stylesheet" href="./ledger-m5.css" />
+<style>
+.ls-wrap{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.ls-cols{grid-template-columns:72px minmax(0,1fr) 176px 92px 34px 112px 34px}
+.ls-cols1024{grid-template-columns:72px minmax(0,1fr) 120px 92px 34px 112px}
+.ls-row{height:36px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box}
+.ls-rowh{height:36px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;background:var(--band)}
+.ls-rowf{height:36px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;box-shadow:inset 0 0 0 2px var(--focus)}
+.ls-rowc{height:36px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;background:var(--bg)}
+.ls-th{display:grid}
+.ls-body{flex:1;min-height:0;overflow:hidden;position:relative}
+.ls-caret{width:12px;flex:none;color:var(--muted);font-size:10px;text-align:center}
+.ls-ind{width:18px;flex:none;border-left:1px solid var(--line);align-self:stretch;margin-left:5px}
+.ls-res{display:flex;align-items:center;gap:10px;padding:0 24px;height:32px;border-bottom:1px solid var(--line-2);font-size:12px;color:var(--muted)}
+.ls-res a{color:var(--accent)}
+.ls-pop{z-index:6}
+.ls-seg{display:flex;padding:8px 10px;border-bottom:1px solid var(--line-2)}
+.ls-seg .m2-seg{width:100%}
+.ls-seg .m2-segi,.ls-seg .m2-segon{flex:1;justify-content:center}
+.ls-rad{width:12px;height:12px;flex:none;border-radius:50%;border:1.5px solid var(--muted);box-sizing:border-box}
+.ls-radon{width:12px;height:12px;flex:none;border-radius:50%;border:4px solid var(--accent);box-sizing:border-box}
+.ls-nest{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--fg);white-space:nowrap}
+.ls-tag{font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;color:var(--accent);border:1px solid var(--accent);padding:0 5px;line-height:16px}
+/* Quick create (from M2Task) */
+.qc-area{min-height:64px;border:1px solid var(--line);padding:10px 12px;color:var(--faint);box-sizing:border-box}
+.qc-t{font-size:18px;font-weight:600}
+.qc-chips{display:flex;gap:6px;flex-wrap:wrap}
+.qc-chip{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border:1px solid var(--line);font-size:12.5px;color:var(--fg);background:var(--surface);box-sizing:border-box;white-space:nowrap}
+.qc-chipon{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border:1px solid var(--focus);font-size:12.5px;color:var(--fg);background:var(--sel);box-sizing:border-box;white-space:nowrap}
+.qc-chip .m5-lb,.qc-chipon .m5-lb{height:18px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="{{ rootStyle }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <a class="lg-rkon" href="#"><span>PAY</span><span class="lg-rn">38</span></a>
+      <a class="lg-rk" href="#"><span>WEB</span><span class="lg-rn">27</span></a>
+      <a class="lg-rk" href="#"><span>CLI</span><span class="lg-rn">9</span></a>
+      <a class="lg-rk" href="#"><span>BACK</span><span class="lg-rn">41</span></a>
+      <a class="lg-rk" href="#"><span>INF</span><span class="lg-rn">5</span></a>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+    <section class="ls-wrap">
+      <header class="lg-head">
+        <div style="min-width:0"><h1 class="lg-h1">Payments</h1><div class="lg-sub"><span class="lg-mono">PAY</span> · {{ sub }}</div></div>
+        <div class="lg-headr"><div class="lg-search" style="width:140px"><span>Search</span><span class="lg-kbd">/</span></div><button class="lg-btn">New<span class="lg-btnk">C</span></button></div>
+      </header>
+      <nav class="m2-tabs">
+        <a class="m2-tabon" href="#">Tasks<span class="m2-tabn">38</span></a>
+        <a class="m2-tab" href="#"><span class="m2-ms"></span>Milestones<span class="m2-tabn">6</span></a>
+        <a class="m2-tab" href="#"><span class="m2-cyon" style="--p:79%"></span>Cycles<span class="m2-tabn">C12 · 3d left</span></a>
+        <a class="m2-tab" href="#">Settings</a>
+      </nav>
+      <div class="lg-bar" style="gap:12px">
+        <span>Status <span class="lg-bv">Any</span></span>
+        <span>Assignee <span class="lg-bv">Any</span></span>
+        <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span>Milestone <span class="lg-bv">Any</span></span><span>Cycle <span class="lg-bv">Any</span></span></sc-if>
+        <span class="m5-fsep"></span>
+        <sc-if value="{{ labelUnset }}" hint-placeholder-val="{{ true }}"><span class="{{ labelBtnCls }}">Label<span class="lg-faint">▾</span></span></sc-if>
+        <sc-if value="{{ labelSet }}" hint-placeholder-val="{{ false }}"><span class="m5-fon" style="{{ labelChipStyle }}"><span class="m5-fk">Label</span><span class="m5-fv"><span class="m5-sw" style="--c:var(--lb-teal)"></span><span class="m5-sw" style="--c:var(--lb-green);margin-left:-2px"></span><span class="m5-sw" style="--c:var(--lb-orange);margin-left:-2px"></span>3 labels</span><span class="m5-fx">×</span></span></sc-if>
+        <sc-if value="{{ dueUnset }}" hint-placeholder-val="{{ true }}"><span class="m5-f" style="{{ dueBtnStyle }}">Due<span class="lg-faint">▾</span></span></sc-if>
+        <sc-if value="{{ dueSet }}" hint-placeholder-val="{{ false }}"><span class="m5-fon" style="{{ dueChipStyle }}"><span class="m5-fk">Due</span><span class="m5-fv">Overdue</span><span class="m5-fx">×</span></span></sc-if>
+        <sc-if value="{{ isNest }}" hint-placeholder-val="{{ false }}"><span class="m5-fsep"></span><span class="ls-nest"><span class="lg-toggleon"></span>Nest subtasks</span></sc-if>
+        <span class="lg-sp"></span>
+        <span class="m5-sort">Sort: <b>{{ sortName }}</b><span class="lg-faint">{{ sortDir }}</span></span>
+        <span class="m2-seg"><span class="m2-segon">List</span><span class="m2-segi">Board</span></span>
+        <span class="lg-kbd">V</span>
+      </div>
+      <div class="{{ thCls }}"><span>Key</span><span>Title</span><span>Labels</span><span>Due</span><span>Pri</span><span>Assignee</span><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="lg-right">Upd</span></sc-if></div>
+      <sc-if value="{{ isFiltered }}" hint-placeholder-val="{{ false }}">
+        <div class="ls-res"><span><b style="color:var(--fg);font-weight:600">5</b> tasks match</span><span class="lg-faint">·</span><span>Any of webhooks, reliability, merchant-facing · overdue · oldest due date first</span><span class="lg-sp"></span><a href="#">Clear filters</a></div>
+      </sc-if>
+      <div class="ls-body">
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+          <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span><sc-if value="{{ g.note }}" hint-placeholder-val="{{ false }}"><span class="lg-gc" style="text-transform:none;letter-spacing:0;font-family:inherit;font-weight:500;font-size:11px">{{ g.note }}</span></sc-if></div>
+          <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="4">
+            <div class="{{ r.cls }}">
+              <span class="lg-key">{{ r.key }}</span>
+              <span class="m5-tc">
+                <sc-if value="{{ r.ind }}" hint-placeholder-val="{{ false }}"><span class="ls-ind"></span><span class="{{ r.sq }}"></span></sc-if>
+                <sc-if value="{{ r.caret }}" hint-placeholder-val="{{ false }}"><span class="ls-caret">{{ r.caret }}</span></sc-if>
+                <span class="lg-trunc" style="{{ r.tStyle }}">{{ r.title }}</span>
+                <sc-if value="{{ r.par }}" hint-placeholder-val="{{ false }}"><span class="m5-par">↳ {{ r.par }}</span></sc-if>
+                <sc-if value="{{ r.sub }}" hint-placeholder-val="{{ false }}"><span class="{{ r.subCls }}"><span class="m5-subbar" style="--p:{{ r.subP }}"></span>{{ r.sub }}</span></sc-if>
+                <sc-if value="{{ r.blk }}" hint-placeholder-val="{{ false }}"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></sc-if>
+              </span>
+              <span class="m5-labels"><sc-for list="{{ r.labels }}" as="l" hint-placeholder-count="2"><span class="m5-lb" style="{{ l.mw }}"><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span class="m5-lbt">{{ l.n }}</span></span></sc-for><sc-if value="{{ r.more }}" hint-placeholder-val="{{ false }}"><span class="m5-lbmore">{{ r.more }}</span></sc-if></span>
+              <span><sc-if value="{{ r.due }}" hint-placeholder-val="{{ true }}"><span class="{{ r.dueCls }}"><sc-if value="{{ r.dueGlyph }}" hint-placeholder-val="{{ true }}"><span class="m5-cal"></span></sc-if>{{ r.due }}</span></sc-if></span>
+              <span class="{{ r.priCls }}">{{ r.pri }}</span>
+              <span class="lg-who"><span class="{{ r.avCls }}" style="--h:{{ r.hue }}">{{ r.ini }}</span><span class="lg-trunc">{{ r.who }}</span></span>
+              <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span class="lg-upd">{{ r.upd }}</span></sc-if>
+            </div>
+          </sc-for>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ isFilterLabels }}" hint-placeholder-val="{{ false }}">
+        <div class="m2-pop ls-pop" style="{{ popStyle }}" data-screen-label="Label filter">
+          <div class="ls-seg"><span class="m2-seg"><span class="m2-segon">Any of</span><span class="m2-segi">All of</span></span></div>
+          <div class="m5-ps"><span class="lg-ph">Filter labels</span><span class="lg-caret" style="margin-left:-4px"></span><span class="lg-sp"></span><span class="lg-kbd">#</span></div>
+          <div class="m5-pl">
+            <sc-for list="{{ filterLabels }}" as="l" hint-placeholder-count="8">
+              <div class="{{ l.cls }}"><span class="{{ l.ck }}"></span><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span>{{ l.n }}</span><span class="m5-pk">{{ l.u }}</span></div>
+            </sc-for>
+          </div>
+          <div class="m5-pfoot"><span class="lg-kbd">↵</span>toggle<span class="lg-kbd">Tab</span>Any / All<span class="lg-sp"></span><span>Clear</span></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isFilterDue }}" hint-placeholder-val="{{ false }}">
+        <div class="m2-pop ls-pop" style="{{ popStyle }}" data-screen-label="Due filter">
+          <div class="m2-poph">Due date · open tasks</div>
+          <div class="m5-pl">
+            <sc-for list="{{ dueOpts }}" as="o" hint-placeholder-count="6">
+              <sc-if value="{{ o.sep }}" hint-placeholder-val="{{ false }}"><div class="m2-popsep"></div></sc-if>
+              <div class="{{ o.cls }}"><span class="{{ o.rad }}"></span><span>{{ o.n }}</span><span class="lg-for">{{ o.hint }}</span><span class="m5-pk">{{ o.u }}</span></div>
+            </sc-for>
+          </div>
+          <div class="m5-pfoot"><span class="lg-kbd">↑↓</span>move<span class="lg-kbd">↵</span>pick<span class="lg-sp"></span><span>Clear</span></div>
+        </div>
+      </sc-if>
+    </section>
+  </div>
+
+  <sc-if value="{{ isQuick }}" hint-placeholder-val="{{ false }}">
+    <div class="lg-scrim"></div>
+    <div class="lg-dialog" style="top:96px;width:660px" data-screen-label="Quick create with labels and a due date">
+      <div class="lg-dh"><span class="qc-chip" style="height:26px"><span class="lg-mono" style="font-size:10px">PAY</span>Payments</span><span class="lg-faint">New task</span><span class="lg-sp"></span><span class="lg-kbd">Esc</span></div>
+      <div class="lg-db" style="position:relative">
+        <div class="qc-t">Alert merchants when an endpoint fails for 24 hours</div>
+        <div class="qc-area">Add a description. Markdown works.</div>
+        <div class="qc-chips">
+          <span class="qc-chip"><span class="lg-sq lg-s-todo"></span>Todo</span>
+          <span class="qc-chip"><span class="lg-pri">■■</span>Medium</span>
+          <span class="qc-chip"><span class="lg-ag">C</span>claude-dev</span>
+          <span class="qc-chip"><span class="m2-msf"></span>Webhooks v2</span>
+          <span class="{{ lbChipCls }}"><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-blue)"></span>billing</span><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-teal)"></span>webhooks</span><span class="lg-kbd">#</span></span>
+          <span class="{{ dueChipCls }}"><span class="m5-cal" style="color:var(--muted)"></span>Nov 4<span class="lg-kbd">⇧D</span></span>
+        </div>
+        <sc-if value="{{ isQuickLabels }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-pop" style="left:435px;top:170px;width:280px" data-screen-label="Label picker in quick create">
+            <div class="m5-ps"><span>re</span><span class="lg-caret" style="margin-left:-6px"></span><span class="lg-sp"></span><span class="lg-faint" style="font-size:11px">2 of 12</span></div>
+            <div class="m5-pl">
+              <div class="m5-pion"><span class="m5-ck"></span><span class="m5-sw" style="--c:var(--lb-green)"></span><span><span class="m5-hl">re</span>liability</span><span class="m5-pk">9</span></div>
+              <div class="m5-pi"><span class="m5-ck"></span><span class="m5-sw" style="--c:var(--lb-violet)"></span><span><span class="m5-hl">re</span>funds</span><span class="m5-pk">6</span></div>
+              <div class="m2-popsep"></div>
+              <div class="m5-pi"><span class="m5-ckon"></span><span class="m5-sw" style="--c:var(--lb-blue)"></span><span>billing</span><span class="m5-pk">11</span></div>
+              <div class="m5-pi"><span class="m5-ckon"></span><span class="m5-sw" style="--c:var(--lb-teal)"></span><span>webhooks</span><span class="m5-pk">14</span></div>
+            </div>
+            <div class="m5-pcreate"><span class="m5-plus">+</span><span>Create label <b>“re”</b></span><span class="lg-sp"></span><span class="lg-kbd">⌘↵</span></div>
+            <div class="m5-pfoot"><span class="lg-kbd">↵</span>toggle<span class="lg-kbd">Esc</span>done<span class="lg-sp"></span><span>Checked go last</span></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isQuickDue }}" hint-placeholder-val="{{ false }}">
+          <div class="m2-pop" style="left:20px;top:206px" data-screen-label="Due date picker in quick create">
+            <div class="m5-dp">
+              <div class="m5-dq">
+                <sc-for list="{{ quickPicks }}" as="q" hint-placeholder-count="6">
+                  <sc-if value="{{ q.sep }}" hint-placeholder-val="{{ false }}"><div class="m2-popsep"></div></sc-if>
+                  <div class="{{ q.cls }}"><span>{{ q.n }}</span><span class="m5-dqd">{{ q.d }}</span></div>
+                </sc-for>
+              </div>
+              <div class="m5-dm">
+                <div class="m5-dmh"><span>November 2026</span><span class="m5-dmnav"><span>‹</span><span>›</span></span></div>
+                <div class="m5-dg">
+                  <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><span class="m5-dw">{{ w }}</span></sc-for>
+                  <sc-for list="{{ days }}" as="d" hint-placeholder-count="35"><span class="{{ d.cls }}">{{ d.n }}</span></sc-for>
+                </div>
+                <div class="m5-dsum">Wed, Nov 4 · in 8 days</div>
+              </div>
+            </div>
+            <div class="m5-pfoot"><span class="lg-kbd">T</span>today<span class="lg-kbd">←→</span>day<span class="lg-kbd">↑↓</span>week<span class="lg-kbd">PgDn</span>month<span class="lg-kbd">⌫</span>clear</div>
+          </div>
+        </sc-if>
+      </div>
+      <div class="lg-df"><span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)"><span class="lg-toggle"></span>Create more</span><span class="lg-hint">Labels you type that don't exist yet are created in Payments.</span><span class="lg-sp"></span><button class="lg-btn">Create task<span class="lg-btnk">⌘↵</span></button></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["list", "filtered", "filter-labels", "filter-due", "long", "quick", "quick-due"], "default": "list" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'list';
+    const width = String(this.props.width ?? '1280');
+    const wide = width !== '1024';
+    const P = { ana: ['Ana Ruiz', 'AR', 25, 'lg-av'], tomas: ['Tomás Berg', 'TB', 220, 'lg-av'], clara: ['Clara Lindqvist', 'CL', 150, 'lg-av'], claude: ['claude-dev', 'C', 0, 'lg-ag'], codex: ['codex-ci', 'X', 0, 'lg-ag'], none: ['', '', 0, 'm2-none'] };
+    const PRI = { 4: ['■■■', 'lg-priurg'], 3: ['■■■', 'lg-pri'], 2: ['■■', 'lg-pri'], 1: ['■', 'lg-pri'], 0: ['—', 'lg-prilow'] };
+    const LB = { webhooks: 'teal', reliability: 'green', 'merchant-facing': 'orange', backend: 'slate', billing: 'blue', q4: 'amber', security: 'red', 'needs-docs': 'pink', api: 'slate', refunds: 'violet', docs: 'pink', sepa: 'amber', 'tech-debt': 'slate' };
+    const DUE = {
+      over: ['m5-dueover', false], soon: ['m5-duesoon', true], fut: ['m5-due', true], done: ['m5-duedone', true]
+    };
+    const maxChips = wide ? 2 : 1;
+    const row = (key, title, o) => {
+      o = o || {};
+      const p = P[o.who || 'none'];
+      const pri = PRI[o.pri == null ? 2 : o.pri];
+      const labels = (o.labels || []);
+      // Fit chips to the column: a chip is about 25px plus 6px per character; "+N" takes 30px.
+      const avail = wide ? 176 : 120;
+      const chipW = (n) => 25 + n.length * 6;
+      const shown = [];
+      let used = 0;
+      for (let i = 0; i < labels.length && shown.length < maxChips; i++) {
+        const w = chipW(labels[i]) + (shown.length ? 4 : 0);
+        const reserve = i < labels.length - 1 ? 30 : 0;
+        if (used + w + reserve > avail && shown.length) break;
+        shown.push({ n: labels[i], c: LB[labels[i]] || 'slate', mw: 'max-width:' + (avail - used - reserve - (shown.length ? 4 : 0)) + 'px' });
+        used += w;
+      }
+      const more = labels.length > shown.length ? '+' + (labels.length - shown.length) : '';
+      const due = o.due ? DUE[o.due[0]] : null;
+      return {
+        all: labels, key, title, cls: (o.cls || 'ls-row') + ' ' + (wide ? 'ls-cols' : 'ls-cols1024'),
+        par: o.par || '', sub: o.sub || '', subP: o.subP || '0%', subCls: o.subDone ? 'm5-subdone' : 'm5-sub', blk: !!o.blk,
+        labels: shown, more,
+        due: o.due ? o.due[1] : '', dueCls: due ? due[0] : '', dueGlyph: due ? due[1] : false,
+        pri: pri[0], priCls: pri[1],
+        who: p[0] || 'Unassigned', ini: p[1], hue: p[2], avCls: p[3],
+        upd: o.upd || '', ind: !!o.ind, sq: o.sq || '', caret: o.caret || '', tStyle: o.tStyle || ''
+      };
+    };
+    const SQ = { prog: 'lg-sq lg-s-prog', review: 'lg-sq lg-s-review', todo: 'lg-sq lg-s-todo', backlog: 'lg-sq lg-s-backlog', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel' };
+    const grp = (sq, name, count, rows, note) => ({ sq: SQ[sq], name, count, rows, note: note || '' });
+
+    const isNest = state === 'long';
+    const isFiltered = state === 'filtered';
+    let groups;
+    if (isFiltered) {
+      groups = [
+        grp('prog', 'In progress', 2, [row('PAY-129', 'Backfill webhook_attempt rows for October', { who: 'codex', pri: 2, labels: ['backend', 'webhooks'], due: ['over', '8d overdue'], upd: '1d' }), row('PAY-142', 'Retry failed webhook deliveries with exponential backoff', { who: 'claude', pri: 3, labels: ['webhooks', 'reliability', 'merchant-facing', 'backend'], due: ['over', '3d overdue'], sub: '3/5', subP: '60%', blk: true, upd: '12m', cls: 'ls-rowf' })]),
+        grp('review', 'In review', 1, [row('PAY-131', 'Replay a failed delivery from the merchant dashboard', { who: 'clara', pri: 2, labels: ['merchant-facing', 'webhooks'], due: ['over', '1d overdue'], upd: '2h' })]),
+        grp('todo', 'Todo', 2, [row('PAY-128', 'Document webhook retry timing for merchants', { who: 'tomas', pri: 1, labels: ['webhooks', 'docs'], due: ['over', '6d overdue'], upd: '3d' }), row('PAY-133', 'Warn merchants before their reliability score drops', { who: 'none', pri: 2, labels: ['reliability', 'merchant-facing'], due: ['over', '1d overdue'], upd: '5d' })])
+      ];
+    } else if (isNest) {
+      const kid = (key, title, sq, o) => row(key, title, Object.assign({ ind: true, sq: SQ[sq] }, o));
+      groups = [
+        grp('prog', 'In progress', 4, [
+          row('PAY-142', 'Retry failed webhook deliveries with exponential backoff, a dead-letter queue after the sixth attempt, and alerts to the merchant after 24 hours of failures', { who: 'claude', pri: 3, labels: ['webhooks', 'reliability', 'merchant-facing', 'backend'], due: ['over', '3d overdue'], sub: '3/5', subP: '60%', blk: true, upd: '12m', caret: '▾', cls: 'ls-rowf' }),
+          kid('PAY-143', 'Honour Retry-After on 429 responses', 'done', { who: 'claude', pri: 3, labels: ['webhooks'], due: ['done', 'Oct 20'], upd: '1d', tStyle: 'color:var(--muted)' }),
+          kid('PAY-144', 'Add ±20% jitter to each delay', 'done', { who: 'claude', pri: 2, upd: '1d', tStyle: 'color:var(--muted)' }),
+          kid('PAY-145', 'Store attempts in webhook_attempt', 'done', { who: 'codex', pri: 2, labels: ['backend'], due: ['done', 'Oct 22'], upd: '2d', tStyle: 'color:var(--muted)' }),
+          kid('PAY-146', 'Dead-letter queue after the sixth attempt, with a replay button in the merchant dashboard and an audit trail', 'prog', { who: 'claude', pri: 2, labels: ['webhooks', 'reliability', 'backend'], due: ['soon', 'Tomorrow'], blk: true, upd: '40m' }),
+          kid('PAY-147', 'Alert merchants after 24h of failures', 'todo', { who: 'none', pri: 2, labels: ['webhooks'], upd: '1d' }),
+          kid('PAY-148', 'Retry over SMS', 'cancel', { who: 'none', pri: 0, upd: '4d', tStyle: 'color:var(--faint);text-decoration:line-through' }),
+          row('PAY-139', 'Stream invoice PDFs instead of buffering them in memory so large statements stop timing out', { who: 'codex', pri: 3, labels: ['billing', 'backend', 'tech-debt'], due: ['soon', 'Thu'], upd: '2h' }),
+          row('PAY-170', 'Rotate webhook signing secrets without downtime for merchants on the legacy endpoint', { who: 'tomas', pri: 4, labels: ['security', 'webhooks', 'merchant-facing'], due: ['soon', 'Due today'], sub: '0/2', subP: '0%', blk: true, upd: '3h', caret: '▸' }),
+          row('PAY-155', 'Payout currency switch for EU merchants', { who: 'tomas', pri: 1, due: ['fut', 'Nov 4'], upd: '1d' })
+        ], 'Subtasks shown under their parent'),
+        grp('review', 'In review', 2, [
+          row('PAY-160', 'Idempotency keys on refund requests', { who: 'ana', pri: 4, labels: ['refunds', 'api'], due: ['soon', 'Due today'], upd: '3h' }),
+          row('PAY-158', 'Show retry attempts in the merchant dashboard', { who: 'clara', pri: 2, labels: ['merchant-facing'], due: ['fut', 'Nov 12'], upd: '5h' })
+        ]),
+        grp('todo', 'Todo', 3, [
+          row('PAY-151', 'Webhook signature check accepts expired timestamps', { who: 'tomas', pri: 3, labels: ['security'], due: ['fut', 'Oct 30'], upd: '2d' }),
+          row('PAY-150', 'Merchant dashboard: failed deliveries', { who: 'ana', pri: 2, labels: ['merchant-facing', 'webhooks'], due: ['fut', 'Nov 18'], blk: true, upd: '3d' })
+        ])
+      ];
+    } else {
+      groups = [
+        grp('prog', 'In progress', 4, [
+          row('PAY-142', 'Retry failed webhook deliveries with exponential backoff', { who: 'claude', pri: 3, labels: ['webhooks', 'reliability', 'merchant-facing', 'backend'], due: ['over', '3d overdue'], sub: '3/5', subP: '60%', blk: true, upd: '12m', cls: 'ls-rowf' }),
+          row('PAY-146', 'Dead-letter queue after the sixth attempt', { who: 'claude', pri: 2, labels: ['webhooks'], due: ['soon', 'Tomorrow'], par: 'PAY-142', upd: '40m' }),
+          row('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', { who: 'codex', pri: 3, labels: ['billing', 'backend'], due: ['soon', 'Thu'], upd: '2h', cls: 'ls-rowh' }),
+          row('PAY-155', 'Payout currency switch for EU merchants', { who: 'tomas', pri: 1, due: ['fut', 'Nov 4'], upd: '1d' })
+        ]),
+        grp('review', 'In review', 2, [
+          row('PAY-160', 'Idempotency keys on refund requests', { who: 'ana', pri: 4, labels: ['refunds', 'api'], due: ['soon', 'Due today'], upd: '3h' }),
+          row('PAY-158', 'Show retry attempts in the merchant dashboard', { who: 'clara', pri: 2, labels: ['merchant-facing'], due: ['fut', 'Nov 12'], upd: '5h' })
+        ]),
+        grp('todo', 'Todo', 4, [
+          row('PAY-147', 'Alert merchants after 24h of failures', { who: 'none', pri: 2, labels: ['webhooks'], par: 'PAY-142', upd: '1d' }),
+          row('PAY-151', 'Webhook signature check accepts expired timestamps', { who: 'tomas', pri: 3, labels: ['security'], due: ['fut', 'Oct 30'], upd: '2d' }),
+          row('PAY-150', 'Merchant dashboard: failed deliveries', { who: 'ana', pri: 2, labels: ['merchant-facing', 'webhooks'], due: ['fut', 'Nov 18'], blk: true, upd: '3d' }),
+          row('PAY-163', 'SEPA mandate PDF in German', { who: 'none', pri: 1, labels: ['sepa', 'docs', 'needs-docs'], upd: '4d' })
+        ]),
+        grp('done', 'Done', 3, [
+          row('PAY-143', 'Honour Retry-After on 429 responses', { who: 'claude', pri: 3, labels: ['webhooks'], due: ['done', 'Oct 20'], par: 'PAY-142', upd: '1d' }),
+          row('PAY-144', 'Add ±20% jitter to each delay', { who: 'claude', pri: 2, par: 'PAY-142', upd: '1d' }),
+          row('PAY-145', 'Store attempts in webhook_attempt', { who: 'codex', pri: 2, labels: ['backend'], due: ['done', 'Oct 22'], par: 'PAY-142', upd: '2d' })
+        ])
+      ];
+    }
+
+    if (isNest) {
+      // Keep titles aligned: top-level rows without subtasks keep an empty caret slot.
+      groups.forEach((g) => g.rows.forEach((r) => { if (!r.ind && !r.caret) r.caret = '\u00a0'; }));
+    }
+    if (state === 'filter-labels') {
+      const pick = ['webhooks', 'reliability', 'merchant-facing'];
+      groups = groups.map((g) => {
+        const rows = g.rows.filter((r) => r.all.some((n) => pick.indexOf(n) >= 0));
+        return Object.assign({}, g, { rows, count: rows.length });
+      }).filter((g) => g.rows.length);
+    }
+    const filterLabelsList = [
+      ['webhooks', 'teal', 14, true], ['reliability', 'green', 9, true], ['merchant-facing', 'orange', 7, true],
+      ['backend', 'slate', 22], ['q4', 'amber', 12], ['billing', 'blue', 11], ['api', 'slate', 8], ['refunds', 'violet', 6], ['docs', 'pink', 5], ['sepa', 'amber', 4]
+    ].map((l, i) => ({ n: l[0], c: l[1], u: l[2], ck: l[3] ? 'm5-ckon' : 'm5-ck', cls: i === 3 ? 'm5-pion' : 'm5-pi' }));
+    const dueOpts = [
+      ['Overdue', 'before today', 5, false, false, true], ['Today', 'Tue, Oct 27', 2], ['This week', 'to Sun, Nov 1', 6], ['Next week', 'Nov 2 – Nov 8', 4],
+      ['Has a due date', '', 19, false, true], ['No due date', '', 19]
+    ].map((o) => ({ n: o[0], hint: o[1], u: o[2], rad: o[3] ? 'ls-radon' : 'ls-rad', cls: o[5] ? 'm5-pion' : 'm5-pi', sep: !!o[4] }));
+
+    // November 2026 starts on a Sunday; weeks start on Monday.
+    const days = [];
+    [26, 27, 28, 29, 30, 31].forEach((n) => days.push({ n, cls: n === 27 ? 'm5-ddt' : 'm5-ddo' }));
+    for (let n = 1; n <= 30; n++) days.push({ n, cls: n === 4 ? 'm5-dds' : 'm5-dd' });
+    for (let n = 1; n <= 6; n++) days.push({ n, cls: 'm5-ddo' });
+    const quickPicks = [
+      ['Today', 'Tue'], ['Tomorrow', 'Wed'], ['Friday', 'Oct 30'], ['Next week', 'Nov 2'], ['In 2 weeks', 'Nov 10'], ['No due date', '⌫', true]
+    ].map((q, i) => ({ n: q[0], d: q[1], sep: !!q[2], cls: 'm5-dqi' }));
+
+    const isQuick = state === 'quick' || state === 'quick-due';
+    const labelBtnLeft = wide ? 437 : 266;
+    const labels = { list: 'Task list · flat (default)', filtered: 'Task list · label and due filters, sorted by due date', 'filter-labels': 'Task list · label filter open', 'filter-due': 'Task list · due filter open', long: 'Task list · long titles, Nest subtasks on (proposal)', quick: 'Quick create · label picker', 'quick-due': 'Quick create · due date picker' };
+    const labelSet = state === 'filtered' || state === 'filter-labels';
+    const dueSet = state === 'filtered';
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rootStyle: 'width:' + width + 'px;height:800px',
+      label: (labels[state] || state) + (wide ? '' : ' · 1024'),
+      wide,
+      sub: isFiltered ? '5 tasks match · filtered' : (state === 'filter-labels' ? '6 tasks match · filtered' : '38 open · list'),
+      thCls: 'lg-th ls-th ' + (wide ? 'ls-cols' : 'ls-cols1024'),
+      groups,
+      isFiltered, isNest,
+      labelUnset: !labelSet, labelSet,
+      labelBtnCls: 'm5-f',
+      dueBtnStyle: state === 'filter-due' ? 'box-shadow:0 0 0 2px var(--focus);color:var(--fg)' : '',
+      labelChipStyle: state === 'filter-labels' ? 'border-color:var(--focus);box-shadow:0 0 0 2px var(--focus)' : '',
+      dueUnset: !dueSet, dueSet,
+      dueChipStyle: state === 'filter-due' ? 'border-color:var(--focus);box-shadow:0 0 0 2px var(--focus)' : '',
+      sortName: state === 'filtered' ? 'Due date' : 'Updated',
+      sortDir: state === 'filtered' ? '↑ oldest first' : '↓',
+      isFilterLabels: state === 'filter-labels',
+      isFilterDue: state === 'filter-due',
+      popStyle: state === 'filter-labels' ? 'left:' + labelBtnLeft + 'px;top:130px;width:272px' : 'left:' + (labelBtnLeft + 64) + 'px;top:130px;width:280px',
+      filterLabels: filterLabelsList, dueOpts,
+      isQuick, isQuickLabels: state === 'quick', isQuickDue: state === 'quick-due',
+      lbChipCls: state === 'quick' ? 'qc-chipon' : 'qc-chip',
+      dueChipCls: state === 'quick-due' ? 'qc-chipon' : 'qc-chip',
+      weekdays: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], days, quickPicks: quickPicks.map((q, i) => Object.assign(q, { cls: i === 3 ? 'm5-dqi' : 'm5-dqi' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

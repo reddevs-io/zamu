@@ -1,17 +1,15 @@
 import { MIN_PASSWORD_LENGTH as SERVER_MIN_PASSWORD_LENGTH } from '@pm/auth';
-import { describe, expect, it } from 'vitest';
 import {
   AccountFields,
-  fieldErrors,
   InviteFields,
   MIN_PASSWORD_LENGTH,
-  messages,
-  passwordHint,
+  AUTH_FIELD_MESSAGES as messages,
   SetupInput,
   SignInFields,
-  safeRedirect,
   WorkspaceFields,
-} from './validation';
+} from '@pm/contracts';
+import { describe, expect, it } from 'vitest';
+import { fieldErrors, passwordHint, safeRedirect } from './validation';
 
 describe('form validation', () => {
   it('uses the same minimum password length as the server', () => {

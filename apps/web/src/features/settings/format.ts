@@ -50,21 +50,29 @@ export function listText(items: readonly string[], separator: 'comma' | 'and' = 
 
 const ACCESS_TEXT = { read: 'read only', write: 'read and write' } as const;
 
-/** Table cell: "PAY, CLI · read and write", "Workspace · read only". */
+/** Table cell: "PAY, CLI · read and write", "Workspace · read only", "No projects · read only". */
 export function scopeText(scope: ApiKeyScopeView): string {
-  const where = scope.projects === 'all' ? 'Workspace' : listText(scope.projects.map((p) => p.key));
+  const where =
+    scope.projects === 'all'
+      ? 'Workspace'
+      : scope.projects.length === 0
+        ? 'No projects'
+        : listText(scope.projects.map((p) => p.key));
   return `${where} · ${ACCESS_TEXT[scope.access]}`;
 }
 
 /** Sentence for the key created dialog: "Scope: DOCS and CLI, read and write." */
 export function scopeSentence(scope: ApiKeyScopeView): string {
+  // A key whose only projects were deleted keeps an empty selection.
   const where =
     scope.projects === 'all'
       ? 'whole workspace'
-      : listText(
-          scope.projects.map((p) => p.key),
-          'and',
-        );
+      : scope.projects.length === 0
+        ? 'no projects'
+        : listText(
+            scope.projects.map((p) => p.key),
+            'and',
+          );
   return `Scope: ${where}, ${ACCESS_TEXT[scope.access]}.`;
 }
 

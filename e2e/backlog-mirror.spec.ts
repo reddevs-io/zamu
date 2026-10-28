@@ -1,10 +1,13 @@
 // Backlog.md mirror end to end, against a real Forgejo (e2e/forgejo.ts): a git connection, a project created from
 // Backlog.md with a custom status mapped by hand, the mirrored tasks in the list, board and panel, a push that
-// arrives through the webhook, a broken, a deleted and a restored file, the board refusing a status change,
-// cycles and comments on a mirrored task, the agent's pm backlog commands and refused update, and detach.
+// arrives through the webhook, a new webhook secret (Forgejo deliveries signed with the old one are refused), a
+// broken, a deleted and a restored file, the board refusing a status change, cycles and comments on a mirrored
+// task, the agent's pm backlog commands and refused update, a name match in Edit mappings, detach, and deleting
+// the project.
 //
 // The tests build on each other, so they share one page and run in order. Forgejo starts in beforeAll and is
 // removed in afterAll. E2E_SKIP_BACKLOG=1 skips the spec; so does a missing Docker daemon.
+import { createHmac } from 'node:crypto';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createCli, parseJson } from './cli';
 import { dockerAvailable, type Forgejo, fixtureFolder, readTree, startForgejo } from './forgejo';
@@ -16,6 +19,8 @@ const repo = 'payments-api';
 const project = { name: 'Payments API', key: 'API' };
 const connectionName = 'Forgejo · e2e mirror';
 const agentName = 'backlog-agent';
+/** Added after the setup, so the stored @codex row ("No one") gets a name match in Edit mappings. */
+const codexAgent = 'codex';
 
 /** A task with a status the config adds ("QA"), which no app status matches by name. */
 const qaTask = `---
@@ -54,6 +59,7 @@ interface TaskShape {
 interface SourceStatus {
   state: string;
   lastRead: { commit: string; trigger: string } | null;
+  webhookLastAt: string | null;
   problems: { counts: { files: number; values: number } };
 }
 
@@ -67,6 +73,10 @@ let forgejo: Forgejo;
 let files: Record<string, string>;
 /** The webhook URL the settings dialog shows. */
 let webhookUrl = '';
+/** The same URL as Forgejo reaches it on the stack network. */
+let hookUrl = '';
+/** The Forgejo hook and the secret it signs with. */
+let hook = { id: 0, secret: '' };
 const pageErrors: string[] = [];
 const cli = createCli();
 
@@ -92,6 +102,32 @@ async function reloadUntil(path: string, check: () => Promise<void>, timeout: nu
     await settle(page);
     await check();
   }).toPass({ timeout, intervals: [1_000, 2_000] });
+}
+
+/** Adds a push webhook to the repository, signed with `secret`. Returns its id. */
+async function addHook(secret: string): Promise<number> {
+  const created = await forgejo.api<{ id: number }>('POST', `/repos/${forgejo.user}/${repo}/hooks`, {
+    type: 'forgejo',
+    active: true,
+    events: ['push'],
+    branch_filter: 'main',
+    config: { url: hookUrl, content_type: 'json', secret },
+  });
+  return created.id;
+}
+
+/** Posts a Forgejo "issues" event signed with `secret` to the webhook URL and returns the status code. */
+async function signedDelivery(secret: string): Promise<number> {
+  const body = JSON.stringify({ action: 'opened' });
+  const response = await page.request.post(webhookUrl, {
+    data: body,
+    headers: {
+      'content-type': 'application/json',
+      'x-forgejo-event': 'issues',
+      'x-forgejo-signature': createHmac('sha256', secret).update(body).digest('hex'),
+    },
+  });
+  return response.status();
 }
 
 /** Presses Refresh now in the project header's Backlog.md popover and waits for the read to finish. */
@@ -295,14 +331,8 @@ test('webhook: a push shows up within seconds', async () => {
   expect(secret.length).toBeGreaterThan(16);
 
   // Forgejo reaches the web container by its service name on the stack network.
-  const hookUrl = `http://web:3000${new URL(url).pathname}`;
-  const hook = await forgejo.api<{ id: number }>('POST', `/repos/${forgejo.user}/${repo}/hooks`, {
-    type: 'forgejo',
-    active: true,
-    events: ['push'],
-    branch_filter: 'main',
-    config: { url: hookUrl, content_type: 'json', secret },
-  });
+  hookUrl = `http://web:3000${new URL(url).pathname}`;
+  hook = { id: await addHook(secret), secret };
 
   const commit = await forgejo.commit(repo, 'Rename the backoff subtask', {
     [subtaskPath]: (files[subtaskPath] as string).replace(
@@ -324,6 +354,65 @@ test('webhook: a push shows up within seconds', async () => {
   );
   const status = await sourceStatus();
   expect(status.lastRead).toMatchObject({ commit, trigger: 'webhook' });
+});
+
+test('new webhook secret: deliveries signed with the old one are refused, the new one works', async () => {
+  // A webhook push within a minute of the last one waits for the next slot.
+  test.setTimeout(3 * 60_000);
+  await page.goto(`/p/${project.key}/settings/backlog?webhook=1`);
+  await settle(page);
+  const dialog = page.getByRole('dialog', { name: 'Refresh on every push' });
+  await dialog.getByRole('button', { name: 'New secret' }).click();
+  const confirm = page.getByRole('alertdialog', { name: 'Issue a new webhook secret?' });
+  await expect(confirm).toContainText(
+    'The current secret stops working at once. Webhooks fail until you paste the new secret into the git ' +
+      'host. Mirrors still refresh every hour.',
+  );
+  await confirm.getByRole('button', { name: 'Issue new secret' }).click();
+  await expect(confirm).toBeHidden();
+  await expect(dialog.getByText('Paste this into the webhook settings on Gitea / Forgejo.')).toBeVisible();
+  // Shown unmasked right away; the URL stays.
+  const secretField = dialog.getByRole('group', { name: 'Secret token' });
+  const secret = ((await secretField.locator('span.select-all').textContent()) ?? '').trim();
+  expect(secret.length).toBeGreaterThan(16);
+  expect(secret).not.toBe(hook.secret);
+  await expect(dialog.getByRole('group', { name: 'URL' }).locator('span.select-all')).toHaveText(webhookUrl);
+  await page.keyboard.press('Escape');
+
+  // Forgejo still signs with the old secret: the push is refused, so no delivery is recorded.
+  const before = await sourceStatus();
+  await forgejo.commit(repo, 'Cap the backoff', {
+    [subtaskPath]: (files[subtaskPath] as string).replace(
+      'title: Retry backoff',
+      'title: Retry with capped backoff',
+    ),
+  });
+  // Forgejo delivered the last push within a second or two; give it ample time to try this one.
+  await page.waitForTimeout(10_000);
+  const after = await sourceStatus();
+  expect(after.webhookLastAt).toBe(before.webhookLastAt);
+  // The same check by hand: a delivery signed with the old secret gets 404.
+  expect(await signedDelivery(hook.secret)).toBe(404);
+
+  // Forgejo's API cannot change a hook's secret (only its URL and content type), so replace the hook.
+  const oldSecret = hook.secret;
+  await forgejo.api('DELETE', `/repos/${forgejo.user}/${repo}/hooks/${hook.id}`);
+  hook = { id: await addHook(secret), secret };
+  const accepted = await forgejo.commit(repo, 'Jitter the backoff', {
+    [subtaskPath]: (files[subtaskPath] as string).replace(
+      'title: Retry backoff',
+      'title: Retry with jittered backoff',
+    ),
+  });
+  await expect
+    .poll(async () => (await sourceStatus()).webhookLastAt, { timeout: 15_000 })
+    .not.toBe(before.webhookLastAt);
+  await expect
+    .poll(async () => (await sourceStatus()).lastRead, { timeout: 90_000, intervals: [1_000] })
+    .toMatchObject({ commit: accepted, trigger: 'webhook' });
+  expect((await taskOf(`${project.key}-12.1`)).title).toBe('Retry with jittered backoff');
+  expect(await signedDelivery(secret)).toBe(204);
+  expect(await signedDelivery(oldSecret)).toBe(404);
 
   // Later steps refresh on request: webhook pushes within a minute of each other wait for the next slot.
   await forgejo.api('DELETE', `/repos/${forgejo.user}/${repo}/hooks/${hook.id}`);
@@ -431,6 +520,49 @@ test('agent: pm backlog status and refresh --wait; pm refuses a mirrored field w
   expect(comment.code, comment.stdout + comment.stderr).toBe(0);
 });
 
+test('Edit mappings: an agent added later matches the "No one" row of @codex by name', async () => {
+  await addAgent(page, codexAgent, [project.key]);
+  await page.goto(`/p/${project.key}/settings/backlog`);
+  await settle(page);
+  await page.getByRole('link', { name: 'Edit mappings' }).click();
+  await expect(
+    page.getByRole('heading', { name: `Edit Backlog.md mappings for ${project.name}` }),
+  ).toBeVisible();
+  await settle(page);
+  const codex = page
+    .getByRole('group', { name: 'Assignee mapping' })
+    .getByRole('button', { name: /@codex maps to/ });
+  await expect(codex).toHaveAccessibleName(/^No one/);
+  const line = page
+    .getByRole('region', { name: 'Name matches' })
+    .getByRole('listitem')
+    .filter({ hasText: '@codex may be' });
+  await expect(line).toContainText(`@codex may be ${codexAgent}.`);
+  await line.getByRole('button', { name: `Map to ${codexAgent}` }).click();
+  await expect(codex).toHaveAccessibleName(new RegExp(`^${codexAgent}`));
+  await expect(line).toHaveCount(0);
+  await page.getByRole('button', { name: 'Save mappings' }).click();
+  // Saving goes back to the project settings.
+  await expect(page).toHaveURL(new RegExp(`/p/${project.key}/settings`), { timeout: 15_000 });
+
+  // Saving queues a refresh, which applies it: no value falls back any more. @alex still comes first on
+  // PAY-12, so its assignee stays.
+  await expect
+    .poll(async () => (await sourceStatus()).problems.counts.values, { timeout: 90_000, intervals: [1_000] })
+    .toBe(0);
+  expect((await taskOf(`${project.key}-12`)).assignee?.name).toBe(admin.name);
+});
+
+test('the delete dialog of a mirrored project asks to remove the webhook too', async () => {
+  await page.goto(`/p/${project.key}/settings`);
+  await settle(page);
+  await page.getByRole('button', { name: 'Delete project' }).click();
+  const dialog = page.getByRole('alertdialog', { name: `Delete ${project.key}?` });
+  await expect(dialog).toContainText('Remove the webhook on the git host too.');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+});
+
 test('detach: every field is editable and new tasks continue the numbering', async () => {
   await page.goto(`/p/${project.key}/settings/backlog`);
   await settle(page);
@@ -462,5 +594,15 @@ test('detach: every field is editable and new tasks continue the numbering', asy
   // The webhook URL of a detached mirror answers 410 Gone.
   const delivery = await page.request.post(webhookUrl, { data: {} });
   expect(delivery.status()).toBe(410);
+});
+
+test('delete the project through the API: its webhook URL answers 404', async () => {
+  const response = await page.request.delete(`/api/v1/projects/${project.key}`, {
+    data: { confirmKey: project.key.toLowerCase() },
+  });
+  expect(response.status(), await response.text()).toBe(204);
+  expect((await page.request.get(`/api/v1/tasks/${project.key}-12`)).status()).toBe(404);
+  const delivery = await page.request.post(webhookUrl, { data: {} });
+  expect(delivery.status()).toBe(404);
   expect(pageErrors).toEqual([]);
 });

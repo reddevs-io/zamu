@@ -151,6 +151,35 @@ describe('M3 actions', () => {
     );
   });
 
+  it('lets owners and admins delete a project, through a key only a workspace-wide writer', () => {
+    expect(can(person('owner'), 'project.delete', project(p1))).toBe(true);
+    expect(can(person('admin'), 'project.delete', project(p1))).toBe(true);
+    expect(can(person('member'), 'project.delete', project(p1))).toBe(false);
+    expect(can(person('owner'), 'project.delete')).toBe(false);
+    expect(can(person('owner', { projects: 'all', access: 'write' }), 'project.delete', project(p1))).toBe(
+      true,
+    );
+    expect(can(person('owner', { projects: [p1], access: 'write' }), 'project.delete', project(p1))).toBe(
+      false,
+    );
+    expect(can(person('admin', { projects: 'all', access: 'read' }), 'project.delete', project(p1))).toBe(
+      false,
+    );
+    expect(
+      can({ ...agent({ projects: 'all', access: 'write' }), role: 'admin' }, 'project.delete', project(p1)),
+    ).toBe(false);
+    expect(can({ ...agent(undefined), role: 'owner' }, 'project.delete', project(p1))).toBe(false);
+    expect(() => authorize(person('member'), 'project.delete', project(p1))).toThrow(
+      new Forbidden('Only owners and admins can delete a project.'),
+    );
+    expect(() =>
+      authorize(agent({ projects: 'all', access: 'write' }), 'project.delete', project(p1)),
+    ).toThrow(new Forbidden('Only owners and admins can delete a project.'));
+    expect(() =>
+      authorize(person('owner', { projects: 'all', access: 'read' }), 'project.delete', project(p1)),
+    ).toThrow(new Forbidden('This API key is read-only'));
+  });
+
   it('lets admins and agents whose key writes the project refresh', () => {
     expect(can(person('owner'), 'backlog.refresh', project(p1))).toBe(true);
     expect(can(person('admin'), 'backlog.refresh', project(p1))).toBe(true);

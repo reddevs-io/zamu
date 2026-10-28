@@ -1,61 +1,9 @@
-import { z } from 'zod';
+import { MIN_PASSWORD_LENGTH } from '@pm/contracts';
+import type { z } from 'zod';
 
-// Form rules shared by the sign-in, setup and invitation screens and by the setup server function.
-// Client-safe: no server imports here.
-
-/** Same value as MIN_PASSWORD_LENGTH in @pm/auth (a test keeps them equal). */
-export const MIN_PASSWORD_LENGTH = 12;
-/** Better Auth's default maximum password length. */
-export const MAX_PASSWORD_LENGTH = 128;
-export const MAX_NAME_LENGTH = 100;
-export const MAX_WORKSPACE_NAME_LENGTH = 64;
-
-export const messages = {
-  name: 'Enter your name.',
-  nameTooLong: `Use ${MAX_NAME_LENGTH} characters or fewer.`,
-  email: 'Enter a valid email address.',
-  password: 'Enter your password.',
-  newPassword: `Use ${MIN_PASSWORD_LENGTH} characters or more.`,
-  passwordTooLong: `Use ${MAX_PASSWORD_LENGTH} characters or fewer.`,
-  workspaceName: 'Enter a workspace name.',
-  workspaceNameTooLong: `Use ${MAX_WORKSPACE_NAME_LENGTH} characters or fewer.`,
-} as const;
-
-const name = z.string().trim().min(1, messages.name).max(MAX_NAME_LENGTH, messages.nameTooLong);
-const email = z.string().trim().pipe(z.email(messages.email));
-const newPassword = z
-  .string()
-  .min(MIN_PASSWORD_LENGTH, messages.newPassword)
-  .max(MAX_PASSWORD_LENGTH, messages.passwordTooLong);
-
-export const SignInFields = z.object({
-  email,
-  password: z.string().min(1, messages.password),
-});
-export type SignInFields = z.input<typeof SignInFields>;
-
-export const AccountFields = z.object({ name, email, password: newPassword });
-export type AccountFields = z.input<typeof AccountFields>;
-
-export const WorkspaceFields = z.object({
-  workspaceName: z
-    .string()
-    .trim()
-    .min(1, messages.workspaceName)
-    .max(MAX_WORKSPACE_NAME_LENGTH, messages.workspaceNameTooLong),
-});
-export type WorkspaceFields = z.input<typeof WorkspaceFields>;
-
-/** Input of the setup server function: both steps of the first-run form. */
-export const SetupInput = AccountFields.extend(WorkspaceFields.shape);
-export type SetupInput = z.output<typeof SetupInput>;
-
-export const InviteFields = z.object({ name, password: newPassword });
-export type InviteFields = z.input<typeof InviteFields>;
-
-/** Input of the invitation accept server function. The email always comes from the invitation. */
-export const AcceptInvitationInput = InviteFields.extend({ invitationId: z.uuid() });
-export type AcceptInvitationInput = z.output<typeof AcceptInvitationInput>;
+// Form helpers shared by the sign-in, setup and invitation screens. The schemas (SignInFields,
+// AccountFields, WorkspaceFields, SetupInput, InviteFields, AcceptInvitationInput) and their
+// messages live in @pm/contracts. Client-safe: no server imports here.
 
 export type FieldErrors<T> = Partial<Record<keyof T & string, string>>;
 

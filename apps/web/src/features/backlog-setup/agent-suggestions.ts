@@ -1,7 +1,8 @@
 import { AGENT_NAME_PATTERN, type BacklogMappingsView, type Member } from '@pm/contracts';
 
 // Assignee values that name a coding agent with no member here ("@claude" with no agent called
-// claude). The Mappings step suggests creating the agent; the Add agent dialog takes the name.
+// claude). The Mappings step suggests creating the agent; the Add agent dialog takes the name. When
+// an agent with a similar name exists ("claude-dev" for "@claude"), it suggests mapping to it too.
 
 /** Coding agents that commonly write Backlog.md files. A value matches when one of its words is listed. */
 export const KNOWN_AGENTS: readonly string[] = [
@@ -63,16 +64,18 @@ export function agentDraftFor(from: string): AgentSuggestion | null {
 
 /**
  * Unmatched assignee rows that look like coding agents, one suggestion per agent name, most tasks
- * first. Names an existing agent already has are left out: creating it again would fail.
+ * first. Names an existing agent already has are left out: creating it again would fail. Rows in
+ * `skip` (a member matches them by name) are left out too.
  */
 export function agentSuggestions(
   view: Pick<BacklogMappingsView, 'assignee'>,
   members: readonly Pick<Member, 'name' | 'kind'>[],
+  skip: ReadonlySet<string> = new Set(),
 ): AgentSuggestion[] {
   const taken = new Set(members.filter((m) => m.kind === 'agent').map((m) => m.name.toLowerCase()));
   const byName = new Map<string, AgentSuggestion>();
   for (const row of view.assignee) {
-    if (row.userId) continue;
+    if (row.userId || skip.has(row.from)) continue;
     const name = agentNameFrom(row.from);
     if (!name || taken.has(name) || !looksLikeAgent(name)) continue;
     const found = byName.get(name);
@@ -86,7 +89,37 @@ export function agentSuggestions(
   return [...byName.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
-/** Maps the given assignee values to a new agent, as picks made by hand. */
+/** Most similar agents offered for one value: "Map to …" buttons and select options. */
+export const MAX_SIMILAR_AGENTS = 3;
+
+/** A member as the agent and name suggestions see it. `joinedAt` orders similar agents. */
+export type SuggestionMember = Pick<Member, 'id' | 'name' | 'kind'> &
+  Partial<Pick<Member, 'email' | 'joinedAt'>>;
+
+/**
+ * Existing agents whose name shares a known coding agent word with `name` (an agentNameFrom result):
+ * "claude-dev" for "claude", "claude-ci" for "claude-code". The agent named exactly `name` is not
+ * one: core maps it by name. At most three, most recently added first.
+ */
+export function similarAgents<M extends SuggestionMember>(name: string, members: readonly M[]): M[] {
+  const words = new Set(name.split('-').filter((word) => KNOWN_AGENTS.includes(word)));
+  if (!words.size) return [];
+  const added = (member: M) => (member.joinedAt ? Date.parse(member.joinedAt) : 0);
+  return members
+    .filter(
+      (member) =>
+        member.kind === 'agent' &&
+        member.name.toLowerCase() !== name &&
+        member.name
+          .toLowerCase()
+          .split('-')
+          .some((word) => words.has(word)),
+    )
+    .sort((a, b) => added(b) - added(a) || a.name.localeCompare(b.name))
+    .slice(0, MAX_SIMILAR_AGENTS);
+}
+
+/** Maps the given assignee values to an agent (new or similar), as picks made by hand. */
 export function assignAgent(
   view: BacklogMappingsView,
   from: readonly string[],

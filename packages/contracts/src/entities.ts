@@ -502,6 +502,8 @@ export const ACTIVITY_TYPES = [
   'project.backlog_imported',
   /** Project-level: someone detached the source. */
   'project.backlog_detached',
+  /** Project-level: an owner or admin issued a new webhook secret (0.6.0). */
+  'project.backlog_webhook_secret_reissued',
 ] as const;
 export const ActivityType = z.enum(ACTIVITY_TYPES);
 export type ActivityType = z.infer<typeof ActivityType>;
@@ -518,7 +520,11 @@ export const TaskActivityType = z.enum(TASK_ACTIVITY_TYPES);
 export type TaskActivityType = z.infer<typeof TaskActivityType>;
 
 /** Types written on the project (activity.task_id null). */
-export const PROJECT_ACTIVITY_TYPES = ['project.backlog_imported', 'project.backlog_detached'] as const;
+export const PROJECT_ACTIVITY_TYPES = [
+  'project.backlog_imported',
+  'project.backlog_detached',
+  'project.backlog_webhook_secret_reissued',
+] as const;
 export const ProjectActivityType = z.enum(PROJECT_ACTIVITY_TYPES);
 export type ProjectActivityType = z.infer<typeof ProjectActivityType>;
 
@@ -734,6 +740,14 @@ export const ApiKeyCreated = ApiKeySummary.extend({
   key: ApiKeySecret,
 });
 export type ApiKeyCreated = z.output<typeof ApiKeyCreated>;
+
+/** What creating an agent returns: the member and its first API key, with the secret (shown once). */
+export const AgentCreated = z.object({
+  agent: Member,
+  /** The agent's first API key, with its secret. Shown once. */
+  key: ApiKeyCreated,
+});
+export type AgentCreated = z.output<typeof AgentCreated>;
 
 // ---------------------------------------------------------------------------
 // Me
@@ -1317,11 +1331,44 @@ export const BacklogPreview = z.object({
 });
 export type BacklogPreview = z.output<typeof BacklogPreview>;
 
-/** Webhook settings of a source. The secret is present only for backlog.manage (owners and admins). */
-export const BacklogWebhookInfo = z.object({
+export const BACKLOG_WEBHOOK_SECRET_STATES = ['ok', 'unreadable', 'hidden'] as const;
+/**
+ * Whether the webhook secret could be shown: ok (it is in `secret`), unreadable (the stored secret
+ * can't be decrypted with the current APP_ENCRYPTION_KEY; issue a new one), hidden (the actor can't
+ * manage the source, or it has no secret after detach).
+ */
+export const BacklogWebhookSecretState = z.enum(BACKLOG_WEBHOOK_SECRET_STATES);
+export type BacklogWebhookSecretState = z.infer<typeof BacklogWebhookSecretState>;
+
+const BacklogWebhookInfoShape = z.object({
   url: z.url(),
   secret: z.string().nullable(),
+  /** 0.6.0. */
+  secretState: BacklogWebhookSecretState,
   provider: GitProvider.nullable(),
   lastAt: Timestamp.nullable(),
 });
+
+/**
+ * Webhook settings of a source. The secret is present only for backlog.manage (owners and admins).
+ * Servers send secretState; when one leaves it out it follows `secret` (a string is ok, null is
+ * hidden), so shapes built before the field existed stay valid. Unreadable is never inferred.
+ */
+export const BacklogWebhookInfo = BacklogWebhookInfoShape.extend({
+  secretState: BacklogWebhookSecretState.optional(),
+})
+  .transform(
+    (info): z.input<typeof BacklogWebhookInfoShape> => ({
+      ...info,
+      secretState: info.secretState ?? (info.secret === null ? 'hidden' : 'ok'),
+    }),
+  )
+  .pipe(BacklogWebhookInfoShape);
 export type BacklogWebhookInfo = z.output<typeof BacklogWebhookInfo>;
+
+/** A newly issued webhook secret, shown once. The URL is unchanged. */
+export const BacklogWebhookSecret = z.object({
+  url: z.url(),
+  secret: z.string().min(1),
+});
+export type BacklogWebhookSecret = z.output<typeof BacklogWebhookSecret>;

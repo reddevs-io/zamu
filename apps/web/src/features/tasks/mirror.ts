@@ -254,7 +254,11 @@ export function projectRowsForTask(
   if (!history?.length) return [];
   const arrivedLater = taskItems.some((item) => item.kind === 'activity' && item.type === 'task.created');
   return history
-    .filter((entry) => entry.type === 'project.backlog_detached' || !arrivedLater)
+    .filter(
+      (entry) =>
+        entry.type === 'project.backlog_detached' ||
+        (entry.type === 'project.backlog_imported' && !arrivedLater),
+    )
     .map((entry) => ({ id: entry.id, kind: 'project', entry, createdAt: entry.createdAt }));
 }
 

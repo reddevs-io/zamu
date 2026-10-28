@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./ledger.css" />
+<link rel="stylesheet" href="./ledger-m2.css" />
+<link rel="stylesheet" href="./ledger-m3.css" />
+<link rel="stylesheet" href="./ledger-m5.css" />
+<style>
+a{color:inherit}
+a:hover{color:var(--accent)}
+.rp-grid{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-width:0;min-height:0}
+.rp-list{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.rp-rk{position:relative}
+.rp-mk{position:absolute;top:7px;right:13px;width:5px;height:5px;background:currentColor;opacity:0.75}
+.rp-row{height:34px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;min-width:0}
+.rp-rowsel{height:34px;display:grid;gap:12px;align-items:center;padding:0 24px;border-bottom:1px solid var(--line-2);box-sizing:border-box;min-width:0;background:var(--sel);box-shadow:inset 2px 0 0 var(--accent)}
+.rp-c5{grid-template-columns:72px minmax(0,1fr) 92px 76px 18px}
+.rp-c5w{grid-template-columns:84px minmax(0,1fr) 92px 76px 18px}
+.rp-c4{grid-template-columns:72px minmax(0,1fr) 76px 18px}
+.rp-c4w{grid-template-columns:84px minmax(0,1fr) 76px 18px}
+.rp-cellr{display:flex;align-items:center;min-width:0}
+.rp-panel{border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg);position:relative}
+.rp-head{height:64px;flex:none;display:flex;align-items:center;gap:10px;padding:0 24px;border-bottom:1px solid var(--line);box-sizing:border-box;min-width:0}
+.rp-body{flex:1;min-height:0;overflow:hidden;position:relative}
+.rp-stack{padding:18px 24px 20px;display:flex;flex-direction:column;gap:14px}
+.rp-props{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line);flex:none}
+.rp-c{padding:7px 10px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.rp-c:nth-child(2n){border-right:0}
+.rp-cl{grid-column:1 / -1;border-right:0;border-bottom:0}
+.rp-cv{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-weight:500;min-width:0}
+.rp-cap{display:flex;align-items:center;gap:6px}
+.rp-fold{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;flex:none}
+.rp-pick{border:1px solid var(--focus);box-shadow:0 0 0 3px oklch(0.6 0.15 262 / 0.2);background:var(--surface);display:flex;flex-direction:column;margin-top:8px}
+.rp-q{display:flex;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;color:var(--fg)}
+.rp-qlab{font-size:11px;color:var(--faint);flex:none}
+.rp-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0 4px;font-size:11px;color:var(--muted)}
+.rp-chain .lg-mono{font-size:10.5px;color:var(--fg);padding:0 4px;border:1px solid var(--line);background:var(--surface);line-height:16px}
+.rp-new{display:inline-flex;align-items:center;height:16px;padding:0 5px;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);box-sizing:border-box}
+.rp-rnew{height:32px;display:grid;grid-template-columns:8px 62px minmax(0,1fr) auto 18px 14px;gap:8px;align-items:center;padding:0 8px 0 10px;border-bottom:1px solid var(--line-2);font-size:12.5px;box-sizing:border-box;background:var(--sel);box-shadow:inset 2px 0 0 var(--accent)}
+.rp-miss{font-style:italic}
+.rp-list .m5-lb{flex:0 1 auto;min-width:0}
+.m5-rsdone{color:var(--muted)}
+.rp-wk .m5-rro{grid-template-columns:8px 76px minmax(0,1fr) auto 18px 14px}
+.rp-panel .lg-key{white-space:nowrap}
+.rp-pick .m5-hl{font-weight:600;box-shadow:inset 0 -1px 0 var(--mention)}
+.rp-panel .m5-rsh .lg-cap{white-space:nowrap}
+.rp-feed{display:flex;flex-direction:column;gap:10px}
+.rp-act{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
+.rp-act b{color:var(--fg);font-weight:600}
+.rp-dot{width:7px;height:7px;border-radius:50%;background:var(--line);justify-self:center}
+.rp-dota{width:7px;height:7px;background:var(--accent);justify-self:center}
+.rp-comp{flex:none;padding:12px 24px 16px;border-top:1px solid var(--line);background:var(--bg)}
+.rp-hint{font-size:11.5px;color:var(--faint)}
+.rp-own{font-size:9.5px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--faint)}
+.rp-ro{font-size:11px;color:var(--faint);display:inline-flex;align-items:center;gap:6px}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="{{ rootStyle }}" data-screen-label="{{ label }}">
+  <div class="lg-app">
+    <nav class="lg-rail">
+      <div class="lg-ws">R</div>
+      <a class="lg-rnav" href="#">Dashboard</a>
+      <a class="lg-rnav" href="#">My tasks</a>
+      <a class="lg-rnav" href="#">Projects</a>
+      <div class="lg-rdiv"></div>
+      <sc-for list="{{ railKeys }}" as="k" hint-placeholder-count="5">
+        <a class="{{ k.cls }}" href="#"><span>{{ k.k }}</span><span class="lg-rn">{{ k.n }}</span><sc-if value="{{ k.mirror }}" hint-placeholder-val="{{ false }}"><span class="rp-mk"></span></sc-if></a>
+      </sc-for>
+      <span class="lg-rsp"></span>
+      <a class="lg-rnav" href="#">Settings</a>
+      <span class="lg-rme">AR</span>
+    </nav>
+
+    <div class="rp-grid">
+      <section class="rp-list">
+        <header class="lg-head">
+          <div style="min-width:0">
+            <h1 class="lg-h1">{{ projName }}</h1>
+            <sc-if value="{{ isMirror }}" hint-placeholder-val="{{ false }}"><div class="lg-sub m3-src"><span class="lg-mono">BACK</span><span>· 41 open ·</span><span class="m3-dot m3-ok"></span><span>Mirrored from Backlog.md · 3m ago</span></div></sc-if>
+            <sc-if value="{{ notMirror }}" hint-placeholder-val="{{ true }}"><div class="lg-sub"><span class="lg-mono">PAY</span> · 38 open · list</div></sc-if>
+          </div>
+          <div class="lg-headr"><button class="lg-btn">New<span class="lg-btnk">C</span></button></div>
+        </header>
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+          <div class="lg-g"><span class="{{ g.sq }}"></span><span>{{ g.name }}</span><span class="lg-gc">{{ g.count }}</span></div>
+          <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+            <div class="{{ r.cls }}">
+              <span class="lg-key">{{ r.key }}</span>
+              <span class="m5-tc">
+                <span class="lg-trunc">{{ r.title }}</span>
+                <sc-if value="{{ r.par }}" hint-placeholder-val="{{ false }}"><span class="m5-par">↳ {{ r.par }}</span></sc-if>
+                <sc-if value="{{ r.sub }}" hint-placeholder-val="{{ false }}"><span class="m5-sub"><span class="m5-subbar" style="--p:{{ r.subP }}"></span>{{ r.sub }}</span></sc-if>
+                <sc-if value="{{ r.blk }}" hint-placeholder-val="{{ false }}"><span class="m5-blk"><span class="m5-blkg"></span>Blocked</span></sc-if>
+              </span>
+              <sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}">
+                <span class="m5-labels"><sc-if value="{{ r.lb }}" hint-placeholder-val="{{ true }}"><span class="m5-lb"><span class="m5-sw" style="--c:var(--lb-{{ r.lbc }})"></span><span class="m5-lbt">{{ r.lb }}</span></span></sc-if><sc-if value="{{ r.more }}" hint-placeholder-val="{{ false }}"><span class="m5-lbmore">{{ r.more }}</span></sc-if></span>
+              </sc-if>
+              <span class="rp-cellr">
+                <sc-if value="{{ r.dueOver }}" hint-placeholder-val="{{ false }}"><span class="m5-dueover">{{ r.dueOver }}</span></sc-if>
+                <sc-if value="{{ r.dueSoon }}" hint-placeholder-val="{{ false }}"><span class="m5-duesoon"><span class="m5-cal"></span>{{ r.dueSoon }}</span></sc-if>
+                <sc-if value="{{ r.due }}" hint-placeholder-val="{{ false }}"><span class="m5-due"><span class="m5-cal"></span>{{ r.due }}</span></sc-if>
+                <sc-if value="{{ r.dueDone }}" hint-placeholder-val="{{ false }}"><span class="m5-duedone">{{ r.dueDone }}</span></sc-if>
+              </span>
+              <span class="{{ r.avCls }}" style="--h:{{ r.hue }}">{{ r.ini }}</span>
+            </div>
+          </sc-for>
+        </sc-for>
+      </section>
+
+      <aside class="{{ panelCls }}" data-screen-label="{{ panelLabel }}">
+        <header class="rp-head">
+          <span class="lg-mono" style="flex:none">{{ key }}</span>
+          <sc-if value="{{ blocked }}" hint-placeholder-val="{{ true }}"><span class="m5-blkq"><span class="m5-blkg"></span>Blocked</span></sc-if>
+          <span class="lg-faint lg-trunc" style="font-size:11.5px;min-width:0">{{ headNote }}</span>
+          <span class="lg-sp"></span>
+          <a class="lg-muted" href="#" style="white-space:nowrap">Open as page</a><span class="lg-kbd">Esc</span>
+        </header>
+        <div class="rp-body">
+          <div class="rp-stack" style="transform:translateY(-{{ scrollY }}px)">
+            <sc-if value="{{ isMirror }}" hint-placeholder-val="{{ false }}">
+              <div class="m3-strip"><span class="m3-sys">B</span><span style="flex:none">Hatched fields come from</span><span class="m3-path">{{ path }}</span><span class="lg-sp"></span><a href="#" style="color:var(--accent);white-space:nowrap">Open file</a></div>
+            </sc-if>
+            <sc-if value="{{ parKey }}" hint-placeholder-val="{{ false }}">
+              <a href="#" class="m5-parline"><span>↳ Subtask of</span><span class="lg-mono" style="color:var(--fg)">{{ parKey }}</span><span class="lg-trunc" style="min-width:0">{{ parTitle }}</span><sc-if value="{{ isMirror }}" hint-placeholder-val="{{ false }}"><span class="rp-own" style="flex:none">· file</span></sc-if></a>
+            </sc-if>
+            <h2 class="lg-h2" style="font-size:19px">{{ title }}</h2>
+
+            <div class="rp-props">
+              <div class="{{ lockCls }}"><span class="lg-cap rp-cap">Status<span class="rp-own">{{ own }}</span></span><span class="rp-cv"><span class="{{ stSq }}"></span>{{ stName }}</span></div>
+              <div class="{{ lockCls }}"><span class="lg-cap rp-cap">Priority<span class="rp-own">{{ own }}</span></span><span class="rp-cv"><span class="{{ priCls }}">{{ priGlyph }}</span>{{ priName }}</span></div>
+              <div class="{{ lockCls }}"><span class="lg-cap rp-cap">Assignee<span class="rp-own">{{ own }}</span></span><span class="rp-cv"><span class="lg-ag">C</span>claude-dev<span class="lg-for" style="font-weight:400">for Ana Ruiz</span></span></div>
+              <div class="{{ lockCls }}"><span class="lg-cap rp-cap">Due date<sc-if value="{{ notMirror }}" hint-placeholder-val="{{ true }}"><span class="lg-kbd" style="letter-spacing:0">⇧D</span></sc-if><span class="rp-own">{{ own }}</span></span>
+                <span class="rp-cv">
+                  <sc-if value="{{ pDueOver }}" hint-placeholder-val="{{ false }}"><span class="m5-dueover"><span class="m5-cal"></span>{{ pDueOver }}</span><span class="lg-for" style="font-weight:400">Oct 24</span></sc-if>
+                  <sc-if value="{{ pDueSoon }}" hint-placeholder-val="{{ false }}"><span class="m5-duesoon"><span class="m5-cal"></span>{{ pDueSoon }}</span><span class="lg-for" style="font-weight:400">{{ pDueSoonDate }}</span></sc-if>
+                  <sc-if value="{{ pDue }}" hint-placeholder-val="{{ false }}"><span class="m5-dueset"><span class="m5-cal"></span>{{ pDue }}</span><span class="lg-for" style="font-weight:400">{{ pDueNote }}</span></sc-if>
+                  <sc-if value="{{ pDueNone }}" hint-placeholder-val="{{ false }}"><span class="lg-faint" style="font-weight:400">No due date</span></sc-if>
+                </span>
+              </div>
+              <div class="{{ lockCls }}"><span class="lg-cap rp-cap">Milestone<sc-if value="{{ notMirror }}" hint-placeholder-val="{{ true }}"><span class="lg-kbd" style="letter-spacing:0">⇧M</span></sc-if><span class="rp-own">{{ own }}</span></span><span class="rp-cv"><span class="m2-ms"></span>{{ msName }}</span></div>
+              <div class="rp-c"><span class="lg-cap rp-cap">Cycle<span class="lg-kbd" style="letter-spacing:0">⇧C</span></span><span class="rp-cv"><span class="m2-cyon" style="--p:79%"></span>Cycle 12<span class="lg-for" style="font-weight:400">3d left</span></span></div>
+              <div class="{{ lockClsL }}"><span class="lg-cap rp-cap">Labels<sc-if value="{{ notMirror }}" hint-placeholder-val="{{ true }}"><span class="lg-kbd" style="letter-spacing:0">#</span></sc-if><span class="rp-own">{{ own }}</span></span>
+                <span class="m5-labelsw"><sc-for list="{{ labels }}" as="l" hint-placeholder-count="4"><span class="{{ lbCls }}"><span class="m5-sw" style="--c:var(--lb-{{ l.c }})"></span><span class="m5-lbt">{{ l.n }}</span></span></sc-for></span>
+              </div>
+            </div>
+
+            <div class="rp-fold"><span class="lg-faint">▸</span><span>Description</span><span class="lg-faint">· {{ descNote }}</span></div>
+
+            <sc-if value="{{ showBlocked }}" hint-placeholder-val="{{ true }}">
+              <div class="m5-rs">
+                <div class="m5-rsh">
+                  <span class="lg-cap">Blocked by<span class="m5-rsn">{{ blkCount }}</span><sc-if value="{{ isMirror }}" hint-placeholder-val="{{ false }}"><span class="rp-own">· file</span></sc-if></span>
+                  <span class="lg-sp"></span>
+                  <sc-if value="{{ showAddBlk }}" hint-placeholder-val="{{ true }}"><span class="m5-add"><span class="m5-plus">+</span>Add blocker<span class="lg-kbd">⇧B</span></span></sc-if>
+                </div>
+                <div class="m5-rl">
+                  <sc-for list="{{ blockers }}" as="b" hint-placeholder-count="3">
+                    <sc-if value="{{ b.real }}" hint-placeholder-val="{{ true }}">
+                      <div class="{{ b.cls }}"><span class="{{ b.sq }}"></span><span class="lg-key">{{ b.key }}</span><span class="lg-trunc">{{ b.title }}</span><span class="m5-rst">{{ b.st }}</span><span class="{{ b.avCls }}" style="--h:{{ b.hue }}">{{ b.ini }}</span><span class="{{ b.xCls }}">{{ b.x }}</span></div>
+                    </sc-if>
+                    <sc-if value="{{ b.miss }}" hint-placeholder-val="{{ false }}">
+                      <div class="m5-rmiss"><span class="m5-rmisssq"></span><span class="lg-key" style="color:var(--faint)">{{ b.key }}</span><span class="lg-trunc"><span class="rp-miss">Removed task</span> · {{ b.note }}</span><span class="m5-rxh" title="Remove the link">×</span></div>
+                    </sc-if>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ pickBlk }}" hint-placeholder-val="{{ false }}">
+                  <div class="rp-pick" data-screen-label="Add blocker search">
+                    <div class="m5-ps"><span class="rp-qlab">Blocked by</span><span class="rp-q">{{ query }}<span class="lg-caret" style="margin-left:1px"></span></span><span class="lg-sp"></span><span class="rp-qlab">Same project only · PAY</span></div>
+                    <div class="m2-poph">{{ pickHead }}</div>
+                    <div class="m5-pl">
+                      <sc-for list="{{ results }}" as="x" hint-placeholder-count="4">
+                        <div class="{{ x.cls }}"><span class="{{ x.sq }}"></span><span class="lg-key" style="flex:none;width:56px"><span class="{{ x.keyCls }}">{{ x.key }}</span></span><span class="lg-trunc" style="min-width:0;flex:1">{{ x.pre }}<span class="m5-hl">{{ x.hit }}</span>{{ x.post }}</span><sc-if value="{{ x.note }}" hint-placeholder-val="{{ false }}"><span class="m5-pk" style="margin-left:0">{{ x.note }}</span></sc-if><span class="{{ x.avCls }}" style="--h:{{ x.hue }}">{{ x.ini }}</span></div>
+                      </sc-for>
+                    </div>
+                    <sc-if value="{{ refuse }}" hint-placeholder-val="{{ false }}">
+                      <div class="m5-prefuse"><span class="lg-bannerx"></span><div style="min-width:0"><b>PAY-150 already waits on PAY-142</b>, so it can't block it. That would make a loop.<div class="rp-chain"><span class="lg-mono">PAY-142</span><span>blocks</span><span class="lg-mono">PAY-150</span><span>which would block</span><span class="lg-mono">PAY-142</span></div><span class="lg-muted" style="font-size:11.5px">Nothing was added. To swap the order, remove PAY-150 from Blocks first.</span></div></div>
+                    </sc-if>
+                    <div class="m5-pfoot"><span class="lg-kbd">↑↓</span>move<span class="lg-kbd">↵</span>add<span class="lg-kbd">Esc</span>close<span class="lg-sp"></span><span>Key or title</span></div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showBlocks }}" hint-placeholder-val="{{ true }}">
+              <div class="m5-blocks"><span class="lg-cap" style="margin-right:4px">Blocks</span><a href="#">PAY-150</a><span>Merchant dashboard: failed deliveries</span></div>
+            </sc-if>
+
+            <sc-if value="{{ showSubs }}" hint-placeholder-val="{{ true }}">
+              <div class="m5-rs">
+                <div class="m5-rsh">
+                  <span class="lg-cap">Subtasks<span class="m5-rsn">{{ subCount }}</span><sc-if value="{{ isMirror }}" hint-placeholder-val="{{ false }}"><span class="rp-own">· file</span></sc-if></span>
+                  <span class="lg-sp"></span>
+                  <sc-if value="{{ showAddSub }}" hint-placeholder-val="{{ true }}"><span class="m5-add"><span class="m5-plus">+</span>Add subtask<span class="lg-kbd">⇧S</span></span></sc-if>
+                </div>
+                <div style="padding:2px 0 8px"><span class="m5-subbarl" style="--p:{{ subP }};display:block"></span></div>
+                <div class="m5-rl">
+                  <sc-for list="{{ subs }}" as="s" hint-placeholder-count="5">
+                    <div class="{{ s.cls }}"><span class="{{ s.sq }}"></span><span class="lg-key">{{ s.key }}</span><span class="m5-tc"><span class="lg-trunc">{{ s.title }}</span><sc-if value="{{ s.isNew }}" hint-placeholder-val="{{ false }}"><span class="rp-new">New</span></sc-if></span><span class="m5-rst">{{ s.st }}</span><span class="{{ s.avCls }}" style="--h:{{ s.hue }}">{{ s.ini }}</span><span class="m5-rx">{{ s.x }}</span></div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ pickSub }}" hint-placeholder-val="{{ false }}">
+                  <div class="rp-pick" data-screen-label="Add subtask search">
+                    <div class="m5-ps"><span class="rp-qlab">Subtask</span><span class="rp-q">Log every attempt with its status code<span class="lg-caret" style="margin-left:1px"></span></span></div>
+                    <div class="m2-poph">Add existing · Payments</div>
+                    <div class="m5-pl">
+                      <div class="m5-pi"><span class="lg-sq lg-s-todo"></span><span class="lg-key" style="flex:none;width:56px">PAY-160</span><span class="lg-trunc" style="flex:1;min-width:0"><span class="m5-hl">Log</span> webhook response bodies up to 4 KB</span><span class="m2-none"></span></div>
+                      <div class="m5-pidis"><span class="lg-sq lg-s-backlog"></span><span class="lg-key" style="flex:none;width:56px">PAY-162</span><span class="lg-trunc" style="flex:1;min-width:0">Reset the retry <span class="m5-hl">attempt</span> counter on deploy</span><span class="m5-pk" style="margin-left:0">subtask of PAY-130</span></div>
+                    </div>
+                    <div class="m5-pcreateon"><span class="m5-plus">+</span><span class="lg-trunc" style="flex:1;min-width:0">Create subtask “Log every attempt with its status code”</span><span class="lg-kbd">⌘↵</span></div>
+                    <div class="m5-pfoot"><span class="lg-kbd">↑↓</span>move<span class="lg-kbd">↵</span>add<span class="lg-kbd">⌘↵</span>create<span class="lg-sp"></span><span>Todo · keeps PAY-142’s milestone and cycle</span></div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ emptyRel }}" hint-placeholder-val="{{ false }}">
+              <div class="m5-emptyrel"><span class="m5-add" style="padding-left:0"><span class="m5-plus">+</span>Add blocker<span class="lg-kbd">⇧B</span></span><span class="rp-hint">A subtask can’t have subtasks of its own.</span></div>
+            </sc-if>
+            <sc-if value="{{ emptyRelRo }}" hint-placeholder-val="{{ false }}">
+              <div class="m5-emptyrel"><span>No blockers or subtasks in the file.</span></div>
+            </sc-if>
+
+            <sc-if value="{{ isMirror }}" hint-placeholder-val="{{ false }}">
+              <div class="m3-bmd">
+                <div class="m3-bmdh"><span class="m3-sys">B</span><b>Backlog.md</b><span class="lg-mono" style="font-size:11px;color:var(--muted)">{{ key }}</span><span class="lg-sp"></span><span class="lg-faint" style="font-size:11.5px">read-only · no field here for these</span></div>
+                <div class="m3-kv"><span class="m3-k">Type</span><span>{{ bType }}</span></div>
+                <div class="m3-kv"><span class="m3-k">Reporter</span><span class="lg-mono" style="font-size:11px">@ana</span></div>
+                <sc-if value="{{ bRefs }}" hint-placeholder-val="{{ true }}"><div class="m3-kv"><span class="m3-k">References</span><span class="m3-vals" style="flex-direction:column;flex-wrap:nowrap;gap:2px"><a href="#" class="lg-mono lg-trunc" style="font-size:11px">https://redis.io/docs/latest/develop/use/patterns/</a></span></div></sc-if>
+                <div class="m3-kv"><span class="m3-k">Documentation</span><span class="lg-mono lg-trunc" style="font-size:11px">{{ bDoc }}</span></div>
+                <div class="m3-kv"><span class="m3-k">Modified files</span><span class="m3-vals" style="flex-direction:column;flex-wrap:nowrap;gap:2px"><sc-for list="{{ bFiles }}" as="f" hint-placeholder-count="2"><span class="lg-mono lg-trunc" style="font-size:11px">{{ f }}</span></sc-for></span></div>
+                <div class="m3-kv"><span class="m3-k">Created</span><span class="lg-mono" style="font-size:11px">{{ bCreated }}</span></div>
+                <div class="m3-kv"><span class="m3-k">Updated</span><span class="lg-mono" style="font-size:11px">{{ bUpdated }}</span></div>
+                <div class="m3-kv"><span class="m3-k">Other fields</span><span class="m3-vals" style="flex-direction:column;flex-wrap:nowrap;gap:2px"><span class="lg-mono" style="font-size:11px">{{ bOther1 }}</span><span class="lg-mono" style="font-size:11px">{{ bOther2 }}</span></span></div>
+              </div>
+            </sc-if>
+
+            <div class="lg-cap" style="padding-top:12px;border-top:1px solid var(--line);display:flex;gap:10px;flex:none"><span>Activity and comments</span><span class="lg-gc">{{ feedN }}</span></div>
+            <div class="rp-feed">
+              <sc-for list="{{ feed }}" as="f" hint-placeholder-count="3">
+                <div class="rp-act"><span class="{{ f.dot }}"></span><span><b>{{ f.who }}</b>{{ f.forTxt }} {{ f.what }}</span><span class="lg-upd">{{ f.when }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div class="rp-comp"><div class="m2-comp"><div class="m2-compbody lg-faint" style="min-height:40px">{{ compPh }}</div><div class="m2-compfoot"><span>Markdown · @ to mention</span><span class="lg-sp"></span><span class="lg-kbd">M</span><span>to focus</span></div></div></div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "$preview": { "width": 1280, "height": 800 },
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["blocker-search", "blocker-loop", "blocker-removed", "subtask-new", "subtask-created", "subtask-child", "mirrored", "mirrored-sub"], "default": "blocker-search" },
+  "width": { "editor": "enum", "options": ["1280", "1024"], "default": "1280" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const state = this.props.state ?? 'blocker-search';
+    const width = String(this.props.width ?? '1280');
+    const narrow = width === '1024';
+    const mirror = state === 'mirrored' || state === 'mirrored-sub';
+    const P = {
+      ana: ['Ana Ruiz', 'AR', 25, 'lg-av'], tomas: ['Tomás Berg', 'TB', 220, 'lg-av'], clara: ['Clara Lindqvist', 'CL', 150, 'lg-av'],
+      claude: ['claude-dev', 'C', 0, 'lg-ag'], codex: ['codex-ci', 'X', 0, 'lg-ag'], none: ['', '', 0, 'm2-none']
+    };
+    const SQ = { prog: 'lg-sq lg-s-prog', todo: 'lg-sq lg-s-todo', review: 'lg-sq lg-s-review', done: 'lg-sq lg-s-done', cancel: 'lg-sq lg-s-cancel', backlog: 'lg-sq lg-s-backlog' };
+    const ST = { prog: 'In progress', todo: 'Todo', review: 'In review', done: 'Done', cancel: 'Canceled', backlog: 'Backlog' };
+
+    // List rows (panel open: key, title with markers, labels 1 chip, due, avatar)
+    const colCls = (narrow ? 'rp-c4' : 'rp-c5') + (mirror ? 'w' : '');
+    const row = (key, title, who, o) => Object.assign({
+      key, title, cls: 'rp-row ' + colCls, par: '', sub: '', subP: '0%', blk: false, lb: '', lbc: 'slate', more: '',
+      dueOver: '', dueSoon: '', due: '', dueDone: '', ini: P[who][1], hue: P[who][2], avCls: P[who][3]
+    }, o || {});
+    const selKey = { 'subtask-child': 'PAY-146', mirrored: 'BACK-12', 'mirrored-sub': 'BACK-12.1' }[state] || 'PAY-142';
+    let groups;
+    if (mirror) {
+      groups = [
+        { name: 'In progress', sq: SQ.prog, count: 6, rows: [
+          row('BACK-12', 'Move session storage to Redis', 'claude', { sub: '1/2', subP: '50%', blk: true, lb: 'sessions', more: '+2', due: 'Nov 4' }),
+          row('BACK-31', 'Provision a Redis cluster for sessions', 'codex', { lb: 'infra', due: 'Oct 30' }),
+          row('BACK-27', 'Trim the audit log job to 90 days', 'tomas', { lb: 'jobs' }),
+          row('BACK-40', 'Rate-limit the login endpoint per IP', 'ana', { lb: 'security', more: '+1', dueSoon: 'Tomorrow' })
+        ] },
+        { name: 'Todo', sq: SQ.todo, count: 14, rows: [
+          row('BACK-12.2', 'Migrate existing sessions on deploy', 'none', { par: 'BACK-12', lb: 'sessions', due: 'Nov 4' }),
+          row('BACK-35', 'Drop the legacy cookie format', 'none', { lb: 'sessions' }),
+          row('BACK-44', 'Health check for the worker queue', 'codex', { lb: 'infra' })
+        ] },
+        { name: 'Done', sq: SQ.done, count: 21, rows: [
+          row('BACK-12.1', 'Write the Redis session adapter', 'claude', { par: 'BACK-12', lb: 'redis', dueDone: 'Oct 22' }),
+          row('BACK-9', 'Pick a session store', 'ana', { lb: 'sessions', dueDone: 'Oct 9' })
+        ] }
+      ];
+    } else {
+      const created = state === 'subtask-created';
+      groups = [
+        { name: 'In progress', sq: SQ.prog, count: 3, rows: [
+          row('PAY-142', 'Retry failed webhook deliveries with exponential backoff', 'claude', { sub: created ? '3/6' : '3/5', subP: created ? '50%' : '60%', blk: true, lb: 'webhooks', lbc: 'teal', more: '+3', dueOver: '3d overdue' }),
+          row('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'codex', { lb: 'billing', lbc: 'blue', dueSoon: 'Thu' }),
+          row('PAY-146', 'Dead-letter queue after the sixth attempt', 'claude', { par: 'PAY-142', lb: 'webhooks', lbc: 'teal', more: '+1', dueSoon: 'Tomorrow' })
+        ] },
+        { name: 'Todo', sq: SQ.todo, count: created ? 6 : 5, rows: [
+          row('PAY-151', 'Webhook signature check accepts expired timestamps', 'tomas', { lb: 'security', lbc: 'red', due: 'Nov 4' }),
+          row('PAY-147', 'Alert merchants after 24h of failures', 'none', { par: 'PAY-142' }),
+          row('PAY-150', 'Merchant dashboard: failed deliveries', 'clara', { blk: true, lb: 'merchant-facing', lbc: 'orange', due: 'Nov 12' }),
+          row('PAY-155', 'Rotate webhook signing secrets without downtime', 'clara', { lb: 'security', lbc: 'red', more: '+1' }),
+          row('PAY-158', 'Show signature failures in the merchant dashboard', 'none', { lb: 'merchant-facing', lbc: 'orange' })
+        ].concat(created ? [row('PAY-153', 'Log every attempt with its status code', 'none', { par: 'PAY-142' })] : []) },
+        { name: 'In review', sq: SQ.review, count: 2, rows: [
+          row('PAY-137', 'Idempotency keys for refund requests', 'ana', { lb: 'refunds', lbc: 'violet', due: 'Nov 6' }),
+          row('PAY-131', 'Signed URLs for invoice PDFs', 'codex', { lb: 'billing', lbc: 'blue' })
+        ] }
+      ];
+    }
+    groups.forEach((g) => g.rows.forEach((r) => {
+      if (r.key === selKey) r.cls = 'rp-rowsel ' + colCls;
+      if (state === 'subtask-created' && r.key === 'PAY-153') r.cls = 'rp-row ' + colCls;
+    }));
+
+    // Relation rows
+    const rel = (key, title, st, who, o) => Object.assign({
+      real: true, miss: false, key, title, st: ST[st], sq: SQ[st], cls: 'm5-r', avCls: P[who][3], ini: P[who][1], hue: P[who][2], x: '×', xCls: 'm5-rx'
+    }, o || {});
+    const doneCls = (base) => base + ' m5-rdone';
+    let blockers = [
+      rel('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'prog', 'codex'),
+      rel('PAY-151', 'Webhook signature check accepts expired timestamps', 'todo', 'tomas'),
+      rel('PAY-120', 'Drop the v1 webhook payload format', 'done', 'claude', { cls: doneCls('m5-r') })
+    ];
+    let blkCount = '2 open · 1 done';
+    if (state === 'blocker-removed') {
+      blockers = [
+        rel('PAY-139', 'Stream invoice PDFs instead of buffering them in memory', 'prog', 'codex'),
+        { real: false, miss: true, key: 'PAY-133', note: 'deleted by Tomás Berg, Oct 25' },
+        rel('PAY-120', 'Drop the v1 webhook payload format', 'done', 'claude', { cls: doneCls('m5-r') })
+      ];
+      blkCount = '1 open · 1 removed';
+    }
+    if (mirror) {
+      blockers = [
+        rel('BACK-31', 'Provision a Redis cluster for sessions', 'prog', 'codex', { cls: 'm5-rro', x: '', xCls: 'm5-rx' }),
+        rel('BACK-9', 'Pick a session store', 'done', 'ana', { cls: doneCls('m5-rro'), x: '', xCls: 'm5-rx' })
+      ];
+      blkCount = '1 open · 1 done';
+    }
+
+    const sub = (key, title, st, who, o) => Object.assign({ key, title, st: ST[st], sq: SQ[st], cls: 'm5-r', avCls: P[who][3], ini: P[who][1], hue: P[who][2], x: '×', isNew: false }, o || {});
+    let subs = [
+      sub('PAY-143', 'Honour Retry-After on 429 responses', 'done', 'claude', { cls: 'm5-r m5-rsdone' }),
+      sub('PAY-144', 'Add ±20% jitter to each delay', 'done', 'claude', { cls: 'm5-r m5-rsdone' }),
+      sub('PAY-145', 'Store attempts in webhook_attempt', 'done', 'codex', { cls: 'm5-r m5-rsdone' }),
+      sub('PAY-146', 'Dead-letter queue after the sixth attempt', 'prog', 'claude'),
+      sub('PAY-147', 'Alert merchants after 24h of failures', 'todo', 'none'),
+      sub('PAY-148', 'Retry over SMS', 'cancel', 'none', { cls: doneCls('m5-r') })
+    ];
+    let subCount = '3 of 5 done · 1 canceled';
+    let subP = '60%';
+    if (state === 'subtask-created') {
+      subs = subs.slice(0, 5).concat([sub('PAY-153', 'Log every attempt with its status code', 'todo', 'none', { cls: 'rp-rnew', isNew: true }), subs[5]]);
+      subCount = '3 of 6 done · 1 canceled';
+      subP = '50%';
+    }
+    if (mirror) {
+      subs = [
+        sub('BACK-12.1', 'Write the Redis session adapter', 'done', 'claude', { cls: 'm5-rro m5-rsdone', x: '' }),
+        sub('BACK-12.2', 'Migrate existing sessions on deploy', 'todo', 'none', { cls: 'm5-rro', x: '' })
+      ];
+      subCount = '1 of 2 done';
+      subP = '50%';
+    }
+
+    // Search results
+    const res = (key, title, hitAt, hitLen, st, who, o) => Object.assign({
+      key, pre: title.slice(0, hitAt), hit: title.slice(hitAt, hitAt + hitLen), post: title.slice(hitAt + hitLen),
+      sq: SQ[st], cls: 'm5-pi', note: '', keyCls: '', avCls: P[who][3], ini: P[who][1], hue: P[who][2]
+    }, o || {});
+    let results = [];
+    let pickHead = '';
+    let query = '';
+    if (state === 'blocker-search') {
+      query = 'sig';
+      pickHead = 'Payments · 4 matches';
+      results = [
+        res('PAY-155', 'Rotate webhook signing secrets without downtime', 15, 3, 'todo', 'clara', { cls: 'm5-pion' }),
+        res('PAY-158', 'Show signature failures in the merchant dashboard', 5, 3, 'todo', 'none'),
+        res('PAY-131', 'Signed URLs for invoice PDFs', 0, 3, 'review', 'codex'),
+        res('PAY-151', 'Webhook signature check accepts expired timestamps', 8, 3, 'todo', 'tomas', { cls: 'm5-pidis', note: 'already blocks this' })
+      ];
+    }
+    if (state === 'blocker-loop') {
+      query = 'PAY-150';
+      pickHead = 'Payments · 1 match';
+      results = [res('PAY-150', 'Merchant dashboard: failed deliveries', 0, 0, 'todo', 'clara', { cls: 'm5-pion', note: 'waits on this', keyCls: 'm5-hl' })];
+    }
+
+    const sys = (what, when) => ({ who: 'Backlog.md', forTxt: '', what, when, dot: 'm3-sysdot' });
+    const act = (k, what, when, forWho) => ({ who: P[k][0], forTxt: forWho ? ' for ' + forWho : '', what, when, dot: P[k][3] === 'lg-ag' ? 'rp-dota' : 'rp-dot' });
+    let feed = [
+      act('claude', 'added PAY-139 as a blocker', '2h', 'Ana Ruiz'),
+      act('ana', 'added subtask PAY-147', '1h'),
+      act('claude', 'marked PAY-145 done, 3 of 5 subtasks done', '40m', 'Ana Ruiz')
+    ];
+    if (state === 'blocker-removed') feed = [act('claude', 'added PAY-139 as a blocker', '2h', 'Ana Ruiz'), act('tomas', 'deleted PAY-133, which blocked this task', 'Oct 25')];
+    if (state === 'subtask-created') feed = feed.concat([act('ana', 'created subtask PAY-153', 'just now')]);
+    if (state === 'subtask-child') feed = [act('ana', 'made this a subtask of PAY-142', 'Oct 21'), act('claude', 'moved it from Todo to In progress', '3h', 'Ana Ruiz')];
+    if (state === 'mirrored-sub') feed = [sys('imported the task with 40 others', 'Oct 23'), sys('moved it from In progress to Done', '3h')];
+    else if (mirror) feed = [sys('imported the task with 40 others', 'Oct 23'), sys('set the due date to Nov 4 and added BACK-31 to dependencies', '2d'), sys('moved BACK-12.1 to Done', '3h')];
+
+    const child = state === 'subtask-child';
+    const msub = state === 'mirrored-sub';
+    let labels = [{ n: 'webhooks', c: 'teal' }, { n: 'reliability', c: 'green' }, { n: 'merchant-facing', c: 'orange' }, { n: 'backend', c: 'slate' }];
+    if (child) labels = [{ n: 'webhooks', c: 'teal' }, { n: 'reliability', c: 'green' }];
+    if (state === 'mirrored') labels = [{ n: 'sessions', c: 'slate' }, { n: 'redis', c: 'slate' }, { n: 'infra', c: 'slate' }];
+    if (msub) labels = [{ n: 'sessions', c: 'slate' }, { n: 'redis', c: 'slate' }];
+
+    const scrollY = { 'blocker-search': 236, 'blocker-loop': 236, 'blocker-removed': 96, 'subtask-new': 400, 'subtask-created': 400 }[state] || 0;
+    const heights = { mirrored: 1280, 'mirrored-sub': 960 };
+    const railKeys = [['PAY', 38], ['WEB', 27], ['CLI', 9], ['BACK', 41], ['INF', 5]].map(([k, n]) => ({ k, n, mirror: k === 'BACK', cls: ((mirror ? k === 'BACK' : k === 'PAY') ? 'lg-rkon' : 'lg-rk') + ' rp-rk' }));
+
+    return {
+      rootCls: 'lg-root lg-' + theme,
+      rootStyle: 'width:' + width + 'px;height:' + (heights[state] || 800) + 'px',
+      label: 'Task panel · ' + state + ' · ' + width,
+      panelCls: mirror ? 'rp-panel rp-wk' : 'rp-panel',
+      panelLabel: mirror ? 'Mirrored task panel' : 'Task panel, relations',
+      railKeys,
+      isMirror: mirror, notMirror: !mirror,
+      projName: mirror ? 'Backend' : 'Payments',
+      groups, showLabels: !narrow,
+      key: selKey,
+      blocked: !child && !msub,
+      headNote: mirror ? 'imported Oct 23' : (child ? 'created by Ana Ruiz, Oct 21' : 'created by Ana Ruiz, Oct 20'),
+      path: msub ? 'backlog/tasks/back-12.1 - Write-the-Redis-session-adapter.md' : 'backlog/tasks/back-12 - Move-session-storage-to-Redis.md',
+      parKey: child ? 'PAY-142' : (msub ? 'BACK-12' : ''),
+      parTitle: child ? 'Retry failed webhook deliveries with exponential backoff' : 'Move session storage to Redis',
+      title: child ? 'Dead-letter queue after the sixth attempt' : (state === 'mirrored' ? 'Move session storage to Redis' : (msub ? 'Write the Redis session adapter' : 'Retry failed webhook deliveries with exponential backoff')),
+      lockCls: mirror ? 'rp-c m3-lock' : 'rp-c',
+      lockClsL: mirror ? 'rp-c rp-cl m3-lock' : 'rp-c rp-cl',
+      lbCls: mirror ? 'm5-lbro' : 'm5-lb',
+      own: mirror ? '· file' : '',
+      stSq: msub ? SQ.done : SQ.prog, stName: msub ? 'Done' : 'In progress',
+      priCls: child || mirror ? 'lg-pri' : 'lg-pri', priGlyph: child || mirror ? '■■' : '■■■', priName: child || mirror ? 'Medium' : 'High',
+      pDueOver: !mirror && !child ? '3 days overdue' : '',
+      pDueSoon: child ? 'Due tomorrow' : '', pDueSoonDate: 'Oct 28',
+      pDue: state === 'mirrored' ? 'Nov 4' : '', pDueNote: 'in 8 days',
+      pDueNone: msub,
+      msName: mirror ? 'Sessions v2' : 'Webhooks v2',
+      labels,
+      descNote: mirror ? (msub ? '2 sections from the file' : '4 sections, 2 of 5 checklist items done') : (child ? '3 lines' : '6 lines, 4 checklist items'),
+      showBlocked: !child && !msub, showAddBlk: !mirror && state !== 'blocker-search' && state !== 'blocker-loop',
+      blockers, blkCount,
+      pickBlk: state === 'blocker-search' || state === 'blocker-loop',
+      query, pickHead, results, refuse: state === 'blocker-loop',
+      showBlocks: !mirror && !child,
+      showSubs: !child && !msub, showAddSub: !mirror && state !== 'subtask-new',
+      subs, subCount, subP, pickSub: state === 'subtask-new',
+      emptyRel: child, emptyRelRo: msub,
+      bType: msub ? 'task' : 'feature', bRefs: !msub,
+      bDoc: msub ? 'docs/sessions.md#adapter' : 'docs/sessions.md',
+      bFiles: msub ? ['src/session/redis.ts'] : ['src/session/store.ts', 'src/session/redis.ts', 'deploy/redis.yaml'],
+      bCreated: msub ? '2026-10-02 09:20' : '2026-10-02 09:14', bUpdated: msub ? '2026-10-27 08:05' : '2026-10-26 17:40',
+      bOther1: 'estimate: 3', bOther2: 'owner-team: platform',
+      feed, feedN: feed.length,
+      compPh: mirror ? 'Comment here. Comments stay in this app and never go to the file.' : 'Leave a comment. @ to mention someone.',
+      scrollY
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -92,6 +92,7 @@ export {
   type DataColumn,
   type DataGroup,
   DataTable,
+  type DataTableHandle,
   type DataTableProps,
   VIRTUALIZE_FROM,
 } from './DataTable';

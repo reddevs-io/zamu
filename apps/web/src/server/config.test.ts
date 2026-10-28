@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { readServerConfig, ServerConfigError, type ServerEnv } from './config';
+import { describe, expect, it, vi } from 'vitest';
+import { checkServerConfig, readServerConfig, ServerConfigError, type ServerEnv } from './config';
 
 const BASE: ServerEnv = {
   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/pm',
@@ -118,10 +118,13 @@ describe('readServerConfig', () => {
 
   it('refuses a missing or short BETTER_AUTH_SECRET', () => {
     expect(problems({ ...BASE, BETTER_AUTH_SECRET: undefined })).toEqual([
-      expect.stringContaining('BETTER_AUTH_SECRET is not set'),
+      'BETTER_AUTH_SECRET is not set. Generate one with `openssl rand -base64 32` and set it in .env or the container environment.',
+    ]);
+    expect(problems({ ...BASE, BETTER_AUTH_SECRET: '   ' })).toEqual([
+      expect.stringMatching(/^BETTER_AUTH_SECRET is not set\./),
     ]);
     expect(problems({ ...BASE, BETTER_AUTH_SECRET: 'short-secret' })).toEqual([
-      expect.stringContaining('BETTER_AUTH_SECRET is 12 characters; use 32 or more'),
+      'BETTER_AUTH_SECRET is 12 characters; use 32 or more. Generate one with `openssl rand -base64 32` and set it in .env or the container environment.',
     ]);
   });
 
@@ -167,5 +170,58 @@ describe('readServerConfig', () => {
     expect((error as Error).message).toMatch(
       /^The server configuration is invalid:\n- DATABASE_URL is not set\./,
     );
+  });
+});
+
+describe('checkServerConfig', () => {
+  function check(env: ServerEnv, nodeEnv: string | undefined) {
+    const logger = { error: vi.fn<(message: string) => void>() };
+    const exit = vi.fn<(code: 1) => void>();
+    const ok = checkServerConfig({ env, logger, exit, nodeEnv });
+    return { ok, errors: logger.error.mock.calls.map(([message]) => message), exit };
+  }
+
+  it('passes a valid configuration without logging or exiting', () => {
+    const { ok, errors, exit } = check(BASE, 'production');
+    expect(ok).toBe(true);
+    expect(errors).toEqual([]);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['production', 'production'],
+    ['an unset NODE_ENV', undefined],
+    ['test', 'test'],
+  ])('logs once and exits 1 without BETTER_AUTH_SECRET in %s', (_label, nodeEnv) => {
+    const { ok, errors, exit } = check({ ...BASE, BETTER_AUTH_SECRET: undefined }, nodeEnv);
+    expect(ok).toBe(false);
+    expect(errors).toEqual([
+      'The server configuration is invalid:\n- BETTER_AUTH_SECRET is not set. Generate one with `openssl rand -base64 32` and set it in .env or the container environment.',
+    ]);
+    expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it('exits 1 on a short secret and lists every problem in one message', () => {
+    const { errors, exit } = check({ ...BASE, BETTER_AUTH_SECRET: 'short', DATABASE_URL: '' }, 'production');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('- DATABASE_URL is not set.');
+    expect(errors[0]).toContain('- BETTER_AUTH_SECRET is 5 characters; use 32 or more.');
+    expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it('logs the same message but keeps running in development', () => {
+    const { ok, errors, exit } = check({ ...BASE, BETTER_AUTH_SECRET: undefined }, 'development');
+    expect(ok).toBe(false);
+    expect(errors).toEqual([expect.stringContaining('BETTER_AUTH_SECRET is not set.')]);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it('rethrows errors that are not configuration problems', () => {
+    const env = new Proxy(BASE, {
+      get() {
+        throw new TypeError('env exploded');
+      },
+    });
+    expect(() => check(env, 'production')).toThrow('env exploded');
   });
 });

@@ -1,6 +1,6 @@
 // Add agent: name, responsible human, access and permission. On success the parent shows the agent's
 // first key in the reveal-once dialog.
-import { AgentName } from '@pm/contracts';
+import { type AgentCreated, AgentName } from '@pm/contracts';
 import { type FormEvent, useState } from 'react';
 import {
   Banner,
@@ -16,7 +16,7 @@ import {
 } from '~/ui';
 import { errorMessage, SettingsError } from './result';
 import { DEFAULT_SCOPE, PICK_A_PROJECT, ScopeFields, type ScopeValue, toApiKeyScope } from './ScopeFields';
-import type { AgentCreatedResult, CreateAgentValues, ScopeProject } from './types';
+import type { CreateAgentValues, ScopeProject } from './types';
 
 export interface AddAgentDialogProps {
   isOpen: boolean;
@@ -26,9 +26,9 @@ export interface AddAgentDialogProps {
   /** Preselected responsible human: the signed-in user. */
   defaultResponsibleId: string;
   projects: readonly ScopeProject[];
-  onSubmit: (values: CreateAgentValues) => Promise<AgentCreatedResult>;
+  onSubmit: (values: CreateAgentValues) => Promise<AgentCreated>;
   /** Called after the agent exists; the dialog has closed by then. */
-  onCreated: (result: AgentCreatedResult) => void;
+  onCreated: (result: AgentCreated) => void;
   /** Prefilled name, for example from a Backlog.md assignee. */
   defaultName?: string;
   /** Prefilled access and permission. Defaults to the whole workspace, read and write. */

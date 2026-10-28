@@ -33,6 +33,13 @@ Each key has two settings, chosen when you create it and fixed afterwards:
 Give each agent the narrowest key that does the job: an agent that works on one repository gets a key for
 that project only. Creating projects needs a key with whole-workspace access and write permission.
 
+Deleting a project is for owners and admins only, never agents: in the project's Settings > General, or
+with `pm projects delete PAY --confirm PAY` and a person's key with whole-workspace access and write
+permission. Without `--confirm`, or with another key in it, pm exits with code 1 and sends nothing. An
+agent's key gets exit code 4, and an unknown project exits with 3. There is no undo. Keys scoped to a
+deleted project keep their other projects; a key that covered only deleted projects stays, with no
+projects, until you revoke it.
+
 Revoke a key in Settings > API keys (admins see every key in the
 workspace) or from the agent's Manage keys page. It stops working at once: the CLI exits with code 2.
 Removing an agent from the workspace disables all of its keys.
@@ -111,15 +118,15 @@ to narrow it to one or more projects.
 
 Tell the agent about the exit codes so it can react without parsing text:
 
-| Code | Meaning                                                                                |
-| ---- | -------------------------------------------------------------------------------------- |
-| 0    | OK                                                                                     |
-| 1    | Usage error, or the server rejected the input (400, 409, 422)                          |
-| 2    | Not logged in, or the key was refused (401): revoked or wrong                          |
-| 3    | Not found (404)                                                                        |
-| 4    | Forbidden: outside the key's scope, or a read-only key writing (403)                   |
-| 5    | Server unreachable, 5xx, or a response this CLI does not understand                    |
-| 6    | Backlog.md: the change belongs in the files, or the mirror is paused or detached (409) |
+| Code | Meaning                                                                                      |
+| ---- | -------------------------------------------------------------------------------------------- |
+| 0    | OK                                                                                           |
+| 1    | Usage error, or the server rejected the input (400, 409, 422)                                |
+| 2    | Not logged in, or the key was refused (401): revoked or wrong                                |
+| 3    | Not found (404)                                                                              |
+| 4    | Forbidden: outside the key's scope, a read-only key writing, or owners and admins only (403) |
+| 5    | Server unreachable, 5xx, or a response this CLI does not understand                          |
+| 6    | Backlog.md: the change belongs in the files, or the mirror is paused or detached (409)       |
 
 Exit code 6 covers the problem codes `TASK_MIRRORED`, `MILESTONE_MIRRORED`, `PROJECT_MIRRORED`,
 `PROJECT_NOT_EMPTY`, `BACKLOG_PAUSED` and `BACKLOG_DETACHED`. Other conflicts, such as two edits racing,
@@ -336,6 +343,7 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 | `pm.v1.whoami`            | `{ user, workspace, role, auth: { method, scope }, project }`                |
 | `pm.v1.dashboard`         | `{ scope, generatedAt, groups, projects, agents }` (see Dashboard above)     |
 | `pm.v1.projects.list`     | `{ items: Project[] }` with open counts per status                           |
+| `pm.v1.projects.delete`   | `{ deleted }`: the key of the deleted project                                |
 | `pm.v1.tasks.list`        | `{ items: TaskListItem[], nextCursor, counts }`                              |
 | `pm.v1.tasks.show`        | `{ task: Task, activity: Activity[], timeline: TimelineEntry[] }`            |
 | `pm.v1.tasks.create`      | `Task`                                                                       |

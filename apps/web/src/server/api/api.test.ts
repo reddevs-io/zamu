@@ -159,7 +159,7 @@ describe('OpenAPI document', () => {
     ]);
     // Every operation has an id, a summary and a tag; ids are unique.
     const operations = Object.values(result.body.paths).flatMap((item) => Object.values(item as object));
-    expect(operations).toHaveLength(30);
+    expect(operations).toHaveLength(31);
     const ids = operations.map((op: { operationId: string }) => op.operationId);
     expect(new Set(ids).size).toBe(ids.length);
     for (const op of operations) {
@@ -1313,5 +1313,78 @@ describe('M4: dashboard', () => {
     expectProblem(await call('GET', '/api/v1/dashboard?scope=all', { auth: session() }), 400, 'BAD_REQUEST');
     expectProblem(await call('GET', '/api/v1/dashboard'), 401, 'UNAUTHORIZED');
     expectProblem(await call('GET', '/api/v1/dashboard/counts'), 401, 'UNAUTHORIZED');
+  });
+});
+
+describe('0.6.0: deleting a project', () => {
+  it('DELETE /projects/{project} with the key confirmed in the body returns 204 and removes it', async () => {
+    await call('POST', '/api/v1/projects', { auth: session(), body: { name: 'Doomed', key: 'DOOM' } });
+    await call('POST', '/api/v1/tasks', { auth: session(), body: { project: 'DOOM', title: 'Goes too' } });
+
+    const missing = await call('DELETE', '/api/v1/projects/DOOM', { auth: session() });
+    expectProblem(missing, 400, 'BAD_REQUEST');
+    const wrong = await call('DELETE', '/api/v1/projects/DOOM', {
+      auth: session(),
+      body: { confirmKey: 'PAY' },
+    });
+    expectProblem(wrong, 400, 'BAD_REQUEST');
+    expect(wrong.body.issues).toEqual([
+      expect.objectContaining({ path: 'confirmKey', message: 'Type the project key to confirm' }),
+    ]);
+    expectProblem(
+      await call('DELETE', '/api/v1/projects/NOPE', { auth: session(), body: { confirmKey: 'NOPE' } }),
+      404,
+      'NOT_FOUND',
+    );
+    expectProblem(
+      await call('DELETE', '/api/v1/projects/ELSE', { auth: session(), body: { confirmKey: 'ELSE' } }),
+      404,
+      'NOT_FOUND',
+    );
+
+    const deleted = await call('DELETE', '/api/v1/projects/doom', {
+      auth: session(),
+      body: { confirmKey: ' doom ' },
+    });
+    expect(deleted.status, JSON.stringify(deleted.body)).toBe(204);
+    expect(deleted.body).toBeNull();
+    const projects = await call('GET', '/api/v1/projects', { auth: session() });
+    expect(projects.body.items.map((p: { key: string }) => p.key)).not.toContain('DOOM');
+    expectProblem(await call('GET', '/api/v1/tasks/DOOM-1', { auth: session() }), 404, 'NOT_FOUND');
+    expectProblem(
+      await call('DELETE', '/api/v1/projects/DOOM', { auth: session(), body: { confirmKey: 'DOOM' } }),
+      404,
+      'NOT_FOUND',
+    );
+  });
+
+  it('returns 403 to agents, read-only and project-scoped keys; an owner key over all projects may delete', async () => {
+    await call('POST', '/api/v1/projects', { auth: session(), body: { name: 'Kept', key: 'KEPT' } });
+    const body = { confirmKey: 'KEPT' };
+    for (const name of ['agent', 'adminRead'] as const) {
+      expectProblem(
+        await call('DELETE', '/api/v1/projects/KEPT', { auth: key(name), body }),
+        403,
+        'FORBIDDEN',
+      );
+    }
+    expectProblem(
+      await call('DELETE', '/api/v1/projects/PAY', {
+        auth: key('agentPayOnly'),
+        body: { confirmKey: 'PAY' },
+      }),
+      403,
+      'FORBIDDEN',
+    );
+    const agentResult = await call('DELETE', '/api/v1/projects/KEPT', { auth: key('agent'), body });
+    expect(agentResult.body.detail).toBe('Only owners and admins can delete a project.');
+    expect(
+      (await call('GET', '/api/v1/projects', { auth: session() })).body.items.map(
+        (p: { key: string }) => p.key,
+      ),
+    ).toEqual(expect.arrayContaining(['PAY', 'KEPT']));
+
+    const deleted = await call('DELETE', '/api/v1/projects/KEPT', { auth: key('admin'), body });
+    expect(deleted.status).toBe(204);
   });
 });
