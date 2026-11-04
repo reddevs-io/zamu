@@ -1,6 +1,7 @@
 // Application tables: projects, tasks, milestones, cycles, comments and activity.
 // See section 5 "Domain model" of the M1 plan, section 5 "Domain model changes" of the M2 plan and
-// section 5 "Domain model and behaviour" of the M3 plan (Backlog.md tables live in ./backlog).
+// section 5 "Domain model and behaviour" of the M3 plan (Backlog.md tables live in ./backlog), and
+// section 4 "Data model" of the M5 plan (labels, due dates, blockers and subtasks).
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -60,6 +61,15 @@ export interface ActivityChange {
   from: unknown;
   to: unknown;
 }
+
+/** M5: label.color is one of the nine palette hues, --label-1 to --label-9. */
+export const LABEL_COLOR_MIN = 1;
+export const LABEL_COLOR_MAX = 9;
+/** M5: longest label name in characters. */
+export const LABEL_NAME_MAX_LENGTH = 40;
+/** M5: app labels are created in the app; backlog labels come from Backlog.md files (name locked). */
+export const LABEL_SOURCES = ['app', 'backlog'] as const;
+export type LabelSource = (typeof LABEL_SOURCES)[number];
 
 export const MILESTONE_STATUSES = ['planned', 'active', 'completed'] as const;
 export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
@@ -233,6 +243,13 @@ export const task = pgTable(
      * raw inserts (seeds, tests) valid.
      */
     rank: doublePrecision('rank').default(0).notNull(),
+    /** M5: optional due day, no time or zone. Overdue is judged in APP_TIME_ZONE, open tasks only. */
+    dueDate: date('due_date', { mode: 'string' }),
+    /**
+     * M5: the parent task for subtasks. One level, same project: core enforces both (a parent has
+     * no parent itself). Deleting the parent turns its subtasks into top-level tasks.
+     */
+    parentId: uuid('parent_id').references((): AnyPgColumn => task.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -248,9 +265,96 @@ export const task = pgTable(
     index('task_assigneeId_idx').on(table.assigneeId),
     index('task_milestoneId_idx').on(table.milestoneId),
     index('task_cycleId_idx').on(table.cycleId),
+    // M5: due-date filters and sorts, and Home's overdue and due-soon groups.
+    index('task_projectId_dueDate_idx')
+      .on(table.projectId, table.dueDate)
+      .where(sql`${table.dueDate} is not null`),
+    // M5: subtasks of a parent, and the top-level filter.
+    index('task_parentId_idx').on(table.parentId),
+    check('task_parent_check', sql`${table.parentId} <> ${table.id}`),
     check('task_priority_check', sql`${table.priority} between 0 and 4`),
     check('task_number_check', sql`${table.number} >= 1`),
     check('task_key_suffix_check', sql`${table.keySuffix} ~ ${sql.raw(`'${KEY_SUFFIX_SQL_PATTERN}'`)}`),
+  ],
+);
+
+/**
+ * M5: a project's labels. Created on use (a task write naming a label that does not exist yet) or
+ * in project settings. Names are unique per project ignoring case. Mirrored projects get labels
+ * from the files with source backlog: their name is locked, their colour stays editable.
+ */
+export const label = pgTable(
+  'label',
+  {
+    id: id(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => project.id, { onDelete: 'cascade' }),
+    /** 1 to 40 characters, as typed (trimmed). */
+    name: text('name').notNull(),
+    /** Palette hue 1 to 9 (--label-1 to --label-9). Core picks the least used one for new labels. */
+    color: smallint('color').notNull(),
+    source: text('source', { enum: LABEL_SOURCES }).default('app').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex('label_projectId_name_unique').on(table.projectId, sql`lower(${table.name})`),
+    check(
+      'label_name_check',
+      sql`char_length(${table.name}) between 1 and ${sql.raw(String(LABEL_NAME_MAX_LENGTH))}`,
+    ),
+    check(
+      'label_color_check',
+      sql`${table.color} between ${sql.raw(String(LABEL_COLOR_MIN))} and ${sql.raw(String(LABEL_COLOR_MAX))}`,
+    ),
+    check('label_source_check', sql`${table.source} in ('app', 'backlog')`),
+  ],
+);
+
+/** M5: labels on tasks. Core keeps both sides in the same project. */
+export const taskLabel = pgTable(
+  'task_label',
+  {
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => task.id, { onDelete: 'cascade' }),
+    labelId: uuid('label_id')
+      .notNull()
+      .references(() => label.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.taskId, table.labelId] }),
+    // Usage counts, the label filter and deletes.
+    index('task_label_labelId_idx').on(table.labelId),
+  ],
+);
+
+/**
+ * M5: "blocked by" links. task_id waits on blocker_id. Same project and no loops: core enforces
+ * both, the loop check under the project lock. A task is blocked while any blocker is open.
+ */
+export const taskDependency = pgTable(
+  'task_dependency',
+  {
+    /** The blocked task. */
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => task.id, { onDelete: 'cascade' }),
+    /** The task it waits on. */
+    blockerId: uuid('blocker_id')
+      .notNull()
+      .references(() => task.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.taskId, table.blockerId] }),
+    // The reverse direction ("Blocks ...") and the loop check.
+    index('task_dependency_blockerId_idx').on(table.blockerId),
+    check('task_dependency_self_check', sql`${table.taskId} <> ${table.blockerId}`),
   ],
 );
 
