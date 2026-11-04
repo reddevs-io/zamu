@@ -1,10 +1,11 @@
-// The M1 flow end to end: a person sets up the server (or signs in, when dashboard.spec.ts ran first and set
-// it up), creates a project and tasks, adds an agent with a scoped key, the agent works on a task through the
-// CLI, and the person sees it and revokes the key. Each test builds on the previous one, so they share one
-// page and run in order.
+// The M1 flow end to end, on the 0.7.0 screens: a person sets up the server (or signs in, when an earlier spec
+// set it up), creates a project from the sidebar and tasks with quick create, moves through the list with the
+// keyboard and changes a status in the task view, adds an agent with a scoped key, the agent works on a task
+// through the CLI, and the person sees it and revokes the key. Each test builds on the previous one, so they
+// share one page and run in order.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createCli, parseJson } from './cli';
-import { admin, setUpServer, signInAsAdmin } from './session';
+import { admin, homeURL, openNewProject, setUpServer, signInAsAdmin } from './session';
 import { baseURL } from './stack';
 
 const project = { name: 'Payments', key: 'PAY' };
@@ -27,7 +28,7 @@ let page: Page;
 const pageErrors: string[] = [];
 const cli = createCli();
 let apiKey = '';
-let paneTask = '';
+let viewedTask = '';
 let agentTask = '';
 
 /** Waits until the page has loaded and hydrated, so keyboard shortcuts and inputs are live. */
@@ -36,22 +37,39 @@ async function settle(target: Page = page): Promise<void> {
   await target.waitForTimeout(500);
 }
 
-function selectedTask(): string | null {
-  return new URL(page.url()).searchParams.get('task');
+/** The key of the list row under the keyboard cursor, or null. */
+async function cursorTask(): Promise<string | null> {
+  const row = page.locator('[role="row"][data-cursor][data-task-key]');
+  return (await row.count()) ? row.first().getAttribute('data-task-key') : null;
 }
 
 /**
- * Presses J or K and waits until the list has rendered the new selection, so the next key press starts from
- * it. (Waiting for the URL alone is not enough: the URL changes before the list re-renders.)
+ * Presses J or K and waits until the list has moved its cursor and focus to the new row, so the next key
+ * press starts from it.
  */
-async function moveSelection(key: 'j' | 'k'): Promise<string> {
-  const before = selectedTask();
+async function moveCursor(key: 'j' | 'k'): Promise<string> {
+  const before = await cursorTask();
   await page.keyboard.press(key);
-  await expect.poll(selectedTask).not.toBe(before);
-  const now = selectedTask() ?? '';
+  await expect.poll(cursorTask).not.toBe(before);
+  const now = (await cursorTask()) ?? '';
   expect(now).toMatch(/^PAY-\d+$/);
-  await expect(page.getByRole('row', { selected: true })).toContainText(now);
+  await expect(page.locator(`[role="row"][data-task-key="${now}"]`)).toBeFocused();
   return now;
+}
+
+/** Takes focus off any control, so single-key shortcuts reach the page. */
+async function blur(): Promise<void> {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+}
+
+/** The task view's Properties sidebar. */
+function properties() {
+  return page.getByRole('complementary', { name: 'Properties' });
+}
+
+/** A line of the task view's Activity list. */
+function activityLine(text: string) {
+  return page.getByRole('region', { name: 'Activity' }).getByRole('listitem').filter({ hasText: text });
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -83,8 +101,8 @@ test('first run: set up the admin account and the workspace', async () => {
   if (new URL(page.url()).pathname === '/setup') {
     await setUpServer(page);
   } else {
-    // dashboard.spec.ts sorts first in file order and has already set the server up through the same
-    // page (setUpServer): sign in as that admin instead.
+    // An earlier spec in file order has already set the server up through the same page (setUpServer):
+    // sign in as that admin instead.
     await signInAsAdmin(page);
     // Better Auth allows 3 sign-in attempts per address in a rolling 10-second window (counted from the last
     // attempt). Setup and this sign-in may both fall inside it, and the next test makes two more attempts:
@@ -93,8 +111,9 @@ test('first run: set up the admin account and the workspace', async () => {
     await page.goto('/');
   }
 
-  // "/" lands on the dashboard.
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
+  // "/" is Home.
+  await expect(page).toHaveURL(homeURL, { timeout: 15_000 });
+  await expect(page.getByRole('tablist', { name: 'Home' })).toBeVisible();
   await settle();
   await expect(page.getByRole('button', { name: `${admin.name}: account menu` })).toBeVisible();
 
@@ -104,10 +123,10 @@ test('first run: set up the admin account and the workspace', async () => {
 });
 
 test('sign out, wrong password banner, sign in', async () => {
-  await page.goto('/projects');
+  await page.goto('/');
   await settle();
   await page.getByRole('button', { name: `${admin.name}: account menu` }).click();
-  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+  await page.getByRole('dialog', { name: 'Account' }).getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/signin/, { timeout: 15_000 });
   await settle();
 
@@ -120,12 +139,17 @@ test('sign out, wrong password banner, sign in', async () => {
   await page.getByLabel('Password').fill(admin.password);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
+  await expect(page).toHaveURL(homeURL, { timeout: 15_000 });
   await settle();
 });
 
-test('create project PAY with P', async () => {
+test('P no longer opens New project; the sidebar + creates PAY', async () => {
+  // Since 0.7.0 P sets the priority of a selected task; on Home with nothing selected it does nothing.
+  await blur();
   await page.keyboard.press('p');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await openNewProject(page, 'New project');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'New project' })).toBeVisible();
   await dialog.getByLabel('Name', { exact: true }).fill(project.name);
@@ -134,8 +158,14 @@ test('create project PAY with P', async () => {
 
   await expect(page).toHaveURL(new RegExp(`/p/${project.key}$`), { timeout: 15_000 });
   await settle();
-  await expect(page.getByText('No tasks yet').first()).toBeVisible();
-  await expect(page.getByRole('link', { name: new RegExp(project.name) }).first()).toBeVisible();
+  await expect(page.getByText(`No tasks in ${project.name} yet`)).toBeVisible();
+  // The sidebar lists the project and opens its pages.
+  const sidebar = page.getByRole('navigation', { name: 'Main' });
+  await expect(sidebar.getByRole('link', { name: new RegExp(`^${project.name}, 0 open`) })).toBeVisible();
+  const pages = sidebar.getByRole('list', { name: `${project.name} pages` });
+  for (const name of ['List', 'Board', 'Milestones', 'Cycles', 'Settings']) {
+    await expect(pages.getByRole('link', { name, exact: true })).toBeVisible();
+  }
 });
 
 test('quick create three tasks with C and Create more', async () => {
@@ -163,46 +193,42 @@ test('quick create three tasks with C and Create more', async () => {
   for (const text of taskTitles) await expect(page.getByText(text).first()).toBeVisible();
 });
 
-test('J and K move the selection; status changes in the pane', async () => {
-  await page
-    .locator('main')
-    .first()
-    .click({ position: { x: 5, y: 5 } });
-  const first = await moveSelection('j');
-  const second = await moveSelection('j');
+test('J and K move the cursor; Enter opens the task view, where the status changes', async () => {
+  await blur();
+  const first = await moveCursor('j');
+  const second = await moveCursor('j');
   expect(second).not.toBe(first);
-  expect(await moveSelection('k')).toBe(first);
-  paneTask = first;
+  expect(await moveCursor('k')).toBe(first);
+  viewedTask = first;
 
-  // The pane shows the selected task; change its status there.
-  const pane = page.getByRole('region', { name: 'Task detail' });
-  await expect(pane.getByText(first, { exact: true })).toBeVisible();
-  const status = pane.getByRole('button', { name: /Status/ });
+  // The list has no detail pane: Enter opens the task view, which knows where it came from.
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/p/${project.key}/${viewedTask}$`), { timeout: 10_000 });
+  await settle();
+  await expect(page.getByText(/^\d+ of 3 in List$/)).toBeVisible();
+  const status = properties().getByRole('button', { name: 'Status' });
   await expect(status).toContainText('Todo');
   await status.click();
-  await page.getByRole('option', { name: 'In review' }).click();
+  await page.getByRole('menu', { name: 'Status' }).getByRole('menuitemradio', { name: 'In review' }).click();
   await expect(status).toContainText('In review');
 
   // The change is saved: it survives a reload and shows in the activity.
   await page.reload();
   await settle();
   await expect(status).toContainText('In review');
-  await expect(pane.getByText(`${admin.name} moved it from Todo to In review`)).toBeVisible();
+  await expect(activityLine(`${admin.name} moved this to In review`)).toBeVisible();
 });
 
-test('Enter opens the task page, Esc goes back to the list with the task selected', async () => {
-  await page
-    .locator('main')
-    .first()
-    .click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(new RegExp(`/p/${project.key}/${paneTask}$`), { timeout: 10_000 });
-  await settle();
-  await expect(page.getByText(paneTask, { exact: true }).first()).toBeVisible();
-
+test('Esc goes back to the list with the task focused; old ?task= links open the task view', async () => {
+  await blur();
   await page.keyboard.press('Escape');
   await expect.poll(() => new URL(page.url()).pathname).toBe(`/p/${project.key}`);
-  await expect.poll(selectedTask).toBe(paneTask);
+  await settle();
+  await expect(page.locator(`[role="row"][data-task-key="${viewedTask}"]`)).toBeFocused();
+
+  // M1 to M4 linked the list's pane with ?task=; those links now open the task view.
+  await page.goto(`/p/${project.key}?task=${viewedTask}`);
+  await expect(page).toHaveURL(new RegExp(`/p/${project.key}/${viewedTask}$`), { timeout: 10_000 });
   await settle();
 });
 
@@ -247,7 +273,7 @@ test('the CLI lists and updates tasks with the agent key', async () => {
   const tasks = parseJson<{ items: TaskSummary[] }>(list, 'pm.v1.tasks.list').items;
   expect(tasks.map((task) => task.key).sort()).toEqual(['PAY-1', 'PAY-2', 'PAY-3']);
 
-  const todo = tasks.find((task) => task.status === 'todo' && task.key !== paneTask);
+  const todo = tasks.find((task) => task.status === 'todo' && task.key !== viewedTask);
   expect(todo, 'a task still in Todo').toBeTruthy();
   agentTask = todo?.key ?? '';
 
@@ -259,14 +285,13 @@ test('the CLI lists and updates tasks with the agent key', async () => {
   });
 });
 
-test('after a reload the pane shows the agent change as "<agent> for <person>"', async () => {
-  await page.goto(`/p/${project.key}?task=${agentTask}`);
+test('the task view shows the agent change as "<agent> for <person>"', async () => {
+  await page.goto(`/p/${project.key}/${agentTask}`);
   await settle();
-  const pane = page.getByRole('region', { name: 'Task detail' });
-  await expect(pane.getByText(agentTask, { exact: true })).toBeVisible();
-  await expect(
-    pane.getByText(`${agentName} for ${admin.name} moved it from Todo to In progress`),
-  ).toBeVisible();
+  await expect(properties().getByRole('button', { name: 'Status' })).toContainText('In progress');
+  // The history names the agent and the first name of its person.
+  const person = admin.name.split(' ')[0];
+  await expect(activityLine(`${agentName} for ${person} moved this to In progress`)).toBeVisible();
 });
 
 test('a revoked key makes the CLI exit with code 2', async () => {
@@ -289,7 +314,7 @@ test('task list screenshots in light and dark', async ({ browser }, testInfo) =>
     const themed = await browser.newContext({ colorScheme, storageState });
     const themedPage = await themed.newPage();
     themedPage.on('pageerror', (error) => pageErrors.push(`pageerror (${colorScheme}): ${error.message}`));
-    await themedPage.goto(`/p/${project.key}?task=${agentTask}`);
+    await themedPage.goto(`/p/${project.key}`);
     await settle(themedPage);
     await expect(themedPage.getByText(taskTitles[0] ?? '').first()).toBeVisible();
     await testInfo.attach(`task-list-${colorScheme}`, {

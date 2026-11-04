@@ -1,5 +1,6 @@
 // Backlog.md mirror end to end, against a real Forgejo (e2e/forgejo.ts): a git connection, a project created from
-// Backlog.md with a custom status mapped by hand, the mirrored tasks in the list, board and panel, a push that
+// Backlog.md with a custom status mapped by hand, the mirrored tasks in the list, board and task view, the native
+// fields filled from the files (labels, due date, blockers, parent) and read-only in the app, a push that
 // arrives through the webhook, a new webhook secret (Forgejo deliveries signed with the old one are refused), a
 // broken, a deleted and a restored file, the board refusing a status change, cycles and comments on a mirrored
 // task, the agent's pm backlog commands and refused update, a name match in Edit mappings, detach, and deleting
@@ -11,7 +12,7 @@ import { createHmac } from 'node:crypto';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createCli, parseJson } from './cli';
 import { dockerAvailable, type Forgejo, fixtureFolder, readTree, startForgejo } from './forgejo';
-import { addAgent, admin, api, collectPageErrors, settle, signInAsAdmin } from './session';
+import { addAgent, admin, api, collectPageErrors, openNewProject, settle, signInAsAdmin } from './session';
 import { baseURL, forgejoAliases, mainStack } from './stack';
 
 const repo = 'payments-api';
@@ -22,15 +23,21 @@ const agentName = 'backlog-agent';
 /** Added after the setup, so the stored @codex row ("No one") gets a name match in Edit mappings. */
 const codexAgent = 'codex';
 
-/** A task with a status the config adds ("QA"), which no app status matches by name. */
+/**
+ * A task with a status the config adds ("QA"), which no app status matches by name. Its label, due date and
+ * dependency become native fields of the mirrored task.
+ */
 const qaTask = `---
 id: PAY-20
 title: Rate limit alerts
 status: QA
 assignee: []
 created_date: '2025-09-06 09:00'
-labels: []
-dependencies: []
+labels:
+  - alerts
+due_date: '2025-09-10'
+dependencies:
+  - PAY-12
 priority: low
 ---
 
@@ -45,6 +52,11 @@ const subtaskPath = 'backlog/tasks/pay-12.1 - Retry-backoff.md';
 const nestedPath = 'backlog/tasks/pay-12.1.2 - Backoff-jitter.md';
 const qaPath = 'backlog/tasks/pay-20 - Rate-limit-alerts.md';
 
+interface TaskRef {
+  key: string;
+  title: string;
+  status: string;
+}
 interface TaskShape {
   key: string;
   title: string;
@@ -55,6 +67,20 @@ interface TaskShape {
   locked?: string[];
   cycle: { number: number } | null;
   backlog: { id: string; file: string | null } | null;
+  labels: { id: string; name: string; color: number; source: string }[];
+  dueDate: string | null;
+  parent: TaskRef | null;
+  subtasks: TaskRef[];
+  blockedBy: (TaskRef | null)[];
+  blocks: (TaskRef | null)[];
+  blocked: boolean;
+}
+interface LabelShape {
+  id: string;
+  name: string;
+  color: number;
+  source: string;
+  usageCount: number;
 }
 interface SourceStatus {
   state: string;
@@ -91,8 +117,20 @@ async function sourceStatus(): Promise<SourceStatus> {
 /** The task list row of a task. */
 function listRow(key: string) {
   return page
-    .getByRole('grid', { name: `Tasks in ${project.name}` })
-    .locator(`[role="row"][data-key="${key}"]`);
+    .getByRole('treegrid', { name: `Tasks in ${project.name}` })
+    .locator(`[role="row"][data-task-key="${key}"]`);
+}
+
+/** The task view's Properties sidebar. */
+function properties() {
+  return page.getByRole('complementary', { name: 'Properties' });
+}
+
+/** A PATCH that the server must refuse with 409 TASK_MIRRORED for `field`. */
+async function expectMirroredRefusal(key: string, data: Record<string, unknown>, field: string) {
+  const response = await page.request.patch(`/api/v1/tasks/${key}`, { data });
+  expect(response.status(), await response.text()).toBe(409);
+  expect(await response.json()).toMatchObject({ code: 'TASK_MIRRORED', field });
 }
 
 /** Reloads `path` until `check` passes: open pages only see a refresh on their next refetch. */
@@ -214,9 +252,10 @@ test('git connection: a wrong token is rejected, the right one works', async () 
 });
 
 test('new project from Backlog.md: map the custom status, preview, start mirroring', async () => {
-  await page.goto('/projects');
+  // New from Backlog.md sits in the sidebar's "+" (the projects page is gone in 0.7.0).
+  await page.goto('/');
   await settle(page);
-  await page.getByRole('button', { name: 'New from Backlog.md' }).first().click();
+  await openNewProject(page, 'New from Backlog.md');
   const dialog = page.getByRole('dialog', { name: 'New project from Backlog.md' });
   await dialog.getByLabel('Repository').fill(forgejo.repositoryUrl(repo));
   // The connection is picked by host, and the detection reads project_name from config.yml.
@@ -267,7 +306,7 @@ test('new project from Backlog.md: map the custom status, preview, start mirrori
   expect(status.lastRead?.commit).toBe(await forgejo.head(repo));
 });
 
-test('list, board and panel show the mirrored tasks', async () => {
+test('list, board and task view show the mirrored tasks', async () => {
   // Backlog.md numbers become app keys; the draft takes the next number above the highest task.
   expect(await taskOf(`${project.key}-12`)).toMatchObject({
     title: 'Webhook retries',
@@ -293,27 +332,133 @@ test('list, board and panel show the mirrored tasks', async () => {
   await settle(page);
   await expect(page.getByRole('button', { name: 'Backlog.md: Mirroring, with problems' })).toBeVisible();
   // New explains instead of creating: tasks come from the files.
-  await expect(page.getByRole('button', { name: /^New/ }).first()).toHaveAttribute('aria-disabled', 'true');
-  // Backlog and Done start folded: the draft and the archived task sit there.
+  await expect(page.getByRole('button', { name: 'New task', exact: true })).toBeDisabled();
+  // Backlog and Done start folded: the draft and the archived task sit there. Subtasks nest under their
+  // parent, whatever their status.
   for (const key of ['12', '12.1', '12.1.2', '20']) {
     await expect(listRow(`${project.key}-${key}`)).toBeVisible();
   }
-  await expect(listRow(`${project.key}-12.1`)).toContainText(`sub of ${project.key}-12`);
+  await expect(listRow(`${project.key}-12`)).toHaveAttribute('aria-level', '2');
+  await expect(listRow(`${project.key}-12.1`)).toHaveAttribute('aria-level', '3');
 
+  // The board hides subtasks: the parent card counts them and expands in place.
   await page.goto(`/p/${project.key}?view=board`);
   await settle(page);
+  const inReview = page.getByRole('grid', { name: 'In review', exact: true });
+  await expect(inReview.locator(`[data-card-key="${project.key}-12"]`)).toBeVisible();
+  await expect(page.locator(`[data-card-key="${project.key}-12.1"]`)).toHaveCount(0);
+  await inReview.getByRole('button', { name: `Show the 1 subtask of ${project.key}-12, 0 done` }).click();
   await expect(
-    page.getByRole('grid', { name: 'In review', exact: true }).locator(`[data-card-key="${project.key}-12"]`),
+    inReview.getByRole('button', { name: `${project.key}-12.1 Retry backoff, In progress` }),
   ).toBeVisible();
 
-  await page.goto(`/p/${project.key}?task=${project.key}-12`);
+  // The task view: one quiet Backlog.md badge that links to the file, and the file's other fields in
+  // "From the file".
+  await page.goto(`/p/${project.key}/${project.key}-12`);
   await settle(page);
-  const pane = page.getByRole('region', { name: 'Task detail' });
-  await expect(pane.getByText('Webhook retries').first()).toBeVisible();
-  await expect(pane.getByText('backlog/tasks/pay-12 - Webhook-retries.md').first()).toBeVisible();
-  await expect(pane.getByText('PAY-12', { exact: true }).first()).toBeVisible();
-  // The Backlog.md block keeps the fields the app has no place for.
-  await expect(pane.getByText('webhooks', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /Webhook retries/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Backlog.md', exact: true })).toHaveAttribute(
+    'href',
+    /pay-12%20-%20Webhook-retries\.md$/,
+  );
+  await expect(
+    page
+      .getByRole('region', { name: 'Activity' })
+      .getByText('imported this from backlog/tasks/pay-12 - Webhook-retries.md'),
+  ).toBeVisible();
+  await expect(properties().getByRole('region', { name: 'From the file' })).toBeVisible();
+});
+
+test('labels, due date, blockers and parent come from the files and are read-only', async () => {
+  const parent = await taskOf(`${project.key}-12`);
+  const qa = await taskOf(`${project.key}-20`);
+  // The labels of the files are the project's labels, created with locked names.
+  expect(parent.labels).toEqual([expect.objectContaining({ name: 'webhooks', source: 'backlog' })]);
+  expect(qa.labels).toEqual([expect.objectContaining({ name: 'alerts', source: 'backlog' })]);
+  expect(qa.dueDate).toBe('2025-09-10');
+  // dependencies: PAY-12 is open, so PAY-20 is blocked; PAY-12 shows the reverse.
+  expect(qa.blockedBy.map((task) => task?.key)).toEqual([`${project.key}-12`]);
+  expect(qa.blocked).toBe(true);
+  expect(parent.blocks.map((task) => task?.key)).toContain(`${project.key}-20`);
+  // PAY-12 waits on the archived PAY-3, which is done: not blocked.
+  expect(parent.blockedBy.map((task) => task?.key)).toEqual([`${project.key}-3`]);
+  expect(parent.blocked).toBe(false);
+  // parent_task_id and dotted ids give the parent; the nested subtask keeps its own parent.
+  expect((await taskOf(`${project.key}-12.1`)).parent?.key).toBe(`${project.key}-12`);
+  expect((await taskOf(`${project.key}-12.1.2`)).parent?.key).toBe(`${project.key}-12.1`);
+  expect(parent.subtasks.map((task) => task.key)).toEqual([`${project.key}-12.1`]);
+  for (const field of ['labels', 'dueDate', 'blockedBy', 'parent']) expect(qa.locked).toContain(field);
+
+  // The API refuses every one of them, and bulk changes stay native-only.
+  await expectMirroredRefusal(qa.key, { addLabels: ['urgent'] }, 'labels');
+  await expectMirroredRefusal(qa.key, { dueDate: null }, 'dueDate');
+  await expectMirroredRefusal(qa.key, { removeBlockers: [parent.key] }, 'blockedBy');
+  await expectMirroredRefusal(`${project.key}-12.1`, { parent: null }, 'parent');
+  const bulk = await page.request.post('/api/v1/tasks/bulk', {
+    data: { keys: [parent.key, qa.key], priority: 'urgent' },
+  });
+  expect(bulk.status(), await bulk.text()).toBe(409);
+  expect(await bulk.json()).toMatchObject({ code: 'TASK_MIRRORED' });
+
+  // The list shows them like native fields: the label, the overdue date and the Blocked marker.
+  await page.goto(`/p/${project.key}`);
+  await settle(page);
+  await expect(listRow(qa.key)).toContainText('alerts');
+  await expect(listRow(qa.key)).toContainText(/\d+ days overdue/);
+  await expect(listRow(qa.key)).toContainText('Blocked');
+
+  // In the task view the fields say where they are set; the label picker opens read-only.
+  await page.goto(`/p/${project.key}/${qa.key}`);
+  await settle(page);
+  const labels = properties().getByRole('button', { name: 'Labels, set in Backlog.md' });
+  await expect(labels).toContainText('alerts');
+  await expect(properties().getByRole('button', { name: 'Due, set in Backlog.md' })).toContainText(
+    'Sep 10, 2025',
+  );
+  await expect(page.getByRole('region', { name: 'Blocked by' }).getByRole('link')).toContainText(
+    `${project.key}-12`,
+  );
+  // Trying to edit one shows the lock.
+  await labels.click();
+  await expect(page.getByRole('tooltip')).toHaveText('Set in Backlog.md. Edit the file to change it.');
+
+  // In the list, L on the task opens the label picker read-only.
+  await page.goto(`/p/${project.key}`);
+  await settle(page);
+  await listRow(qa.key).focus();
+  await page.keyboard.press('l');
+  const picker = page.getByRole('dialog', { name: 'Labels' });
+  await expect(picker.getByRole('note')).toContainText('Read-only: fields come from Backlog.md');
+  await expect(picker.getByRole('menuitemcheckbox', { name: /^alerts/ })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(picker).toBeHidden();
+
+  // Settings > Labels: names from the files are locked; their colour is the app's own.
+  await page.goto(`/p/${project.key}/settings/labels`);
+  await settle(page);
+  const table = page.getByRole('table', { name: 'Labels' });
+  const row = table.getByRole('row').filter({ hasText: 'alerts' });
+  await expect(row).toContainText('From Backlog.md');
+  await expect(row.getByRole('button', { name: 'Rename “alerts”' })).toHaveCount(0);
+  await expect(
+    row.getByRole('button', { name: '“alerts” comes from Backlog.md. Rename or remove it in the files.' }),
+  ).toBeVisible();
+  const list = await api<{ items: LabelShape[] }>(page.request, 'GET', `/projects/${project.key}/labels`);
+  const alerts = list.items.find((label) => label.name === 'alerts');
+  expect(alerts).toMatchObject({ source: 'backlog', usageCount: 1 });
+  const rename = await page.request.patch(`/api/v1/projects/${project.key}/labels/${alerts?.id}`, {
+    data: { name: 'alarms' },
+  });
+  expect(rename.status(), await rename.text()).toBe(409);
+  expect(await rename.json()).toMatchObject({ code: 'LABEL_MIRRORED' });
+  const color = alerts?.color === 5 ? 6 : 5;
+  const recoloured = await api<LabelShape>(
+    page.request,
+    'PATCH',
+    `/projects/${project.key}/labels/${alerts?.id}`,
+    { color },
+  );
+  expect(recoloured).toMatchObject({ name: 'alerts', color });
 });
 
 test('webhook: a push shows up within seconds', async () => {
@@ -452,16 +597,21 @@ test('a broken file is listed under problems; a deleted file hides its task; res
 
 test('the board refuses a status change; cycles and comments work on a mirrored task', async () => {
   const key = `${project.key}-12.1`;
+  const card = `${project.key}-20`;
   await page.goto(`/p/${project.key}?view=board`);
   await settle(page);
-  const card = page.locator(`[data-card-key="${key}"]`);
-  await card.focus();
-  await expect(card).toBeFocused();
-  await page.keyboard.press('Shift+L');
-  await expect(
-    page.getByText(`${key} stays in In progress: its status comes from Backlog.md.`),
-  ).toBeVisible();
-  expect((await taskOf(key)).status).toBe('in_progress');
+  // Show every column, so Shift+← has In progress to move to.
+  await page.getByRole('button', { name: 'Display' }).click();
+  const display = page.getByRole('dialog', { name: 'Display options' });
+  await display.getByRole('switch', { name: 'Show empty columns' }).click({ force: true });
+  await expect(display.getByRole('switch', { name: 'Show empty columns' })).toBeChecked();
+  await page.keyboard.press('Escape');
+  const target = page.locator(`[data-card-key="${card}"]`);
+  await target.focus();
+  await expect(target).toBeFocused();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect(page.getByText(`${card} stays in In review: its status comes from Backlog.md.`)).toBeVisible();
+  expect((await taskOf(card)).status).toBe('in_review');
 
   // The API refuses the same change with the explanation and the file.
   const refused = await page.request.patch(`/api/v1/tasks/${key}`, { data: { status: 'done' } });
@@ -475,15 +625,17 @@ test('the board refuses a status change; cycles and comments work on a mirrored 
   await api(page.request, 'PATCH', `/tasks/${key}`, { cycle: 'current' });
   expect((await taskOf(key)).cycle?.number).toBe(1);
 
-  await page.goto(`/p/${project.key}?task=${key}`);
+  await page.goto(`/p/${project.key}/${key}`);
   await settle(page);
-  const pane = page.getByRole('region', { name: 'Task detail' });
-  const composer = pane.getByRole('textbox', { name: 'Comment' });
-  await expect(composer).toHaveAttribute('placeholder', /Comments stay in this app/);
+  await page.keyboard.press('m');
+  const composer = page.getByRole('textbox', { name: 'Comment' });
+  await expect(composer).toBeFocused();
+  await expect(composer).toHaveAttribute('placeholder', /stays in the app/);
   await composer.fill('Backoff caps at 30 seconds.');
   await page.keyboard.press('Control+Enter');
-  await expect(composer).toHaveValue('');
-  await expect(pane.getByText('Backoff caps at 30 seconds.')).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Activity' }).getByText('Backoff caps at 30 seconds.'),
+  ).toBeVisible();
 });
 
 test('agent: pm backlog status and refresh --wait; pm refuses a mirrored field with exit code 6', async () => {
@@ -584,6 +736,17 @@ test('detach: every field is editable and new tasks continue the numbering', asy
   expect(updated.locked ?? []).toEqual([]);
   // The task keeps its Backlog.md record.
   expect(updated.backlog?.id).toBe('PAY-12.1');
+  // Labels read from the files become app labels: they can be renamed now, and the fields are editable.
+  const labels = await api<{ items: LabelShape[] }>(page.request, 'GET', `/projects/${project.key}/labels`);
+  expect(labels.items.map((label) => label.source)).toEqual(labels.items.map(() => 'app'));
+  const webhooks = labels.items.find((label) => label.name === 'webhooks');
+  await api(page.request, 'PATCH', `/projects/${project.key}/labels/${webhooks?.id}`, { name: 'hooks' });
+  const relabelled = await api<TaskShape>(page.request, 'PATCH', `/tasks/${project.key}-20`, {
+    addLabels: ['urgent'],
+    dueDate: null,
+  });
+  expect(relabelled.labels.map((label) => label.name).sort()).toEqual(['alerts', 'urgent']);
+  expect(relabelled.dueDate).toBeNull();
 
   const created = await api<TaskShape>(page.request, 'POST', '/tasks', {
     project: project.key,

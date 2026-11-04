@@ -129,8 +129,8 @@ Tell the agent about the exit codes so it can react without parsing text:
 | 6    | Backlog.md: the change belongs in the files, or the mirror is paused or detached (409)       |
 
 Exit code 6 covers the problem codes `TASK_MIRRORED`, `MILESTONE_MIRRORED`, `PROJECT_MIRRORED`,
-`PROJECT_NOT_EMPTY`, `BACKLOG_PAUSED` and `BACKLOG_DETACHED`. Other conflicts, such as two edits racing,
-stay on 1. See [Backlog.md mirrors](#backlogmd-mirrors).
+`LABEL_MIRRORED`, `PROJECT_NOT_EMPTY`, `BACKLOG_PAUSED` and `BACKLOG_DETACHED`. Other conflicts, such as two
+edits racing, a blocker loop (`DEPENDENCY_LOOP`) or a label name the project has (`LABEL_EXISTS`), stay on 1. See [Backlog.md mirrors](#backlogmd-mirrors).
 
 ## Comments and mentions
 
@@ -147,7 +147,7 @@ pm comments delete 01a16848-b25a-7da5-aceb-752a314e6b85
 
 Mention someone with `@` and their email (`@ana@example.com`) or an agent's name (`@claude-dev`). The
 server checks that they are members of the workspace and stores the mention as a link,
-`[@Ana Ruiz](mention:<userId>)`, which the web app shows as a name chip. An `@word` that matches nobody
+`[@Ana Ruiz](mention:<userId>)`, which the web app shows as the name in the accent colour. An `@word` that matches nobody
 stays plain text. Mentions send no notification yet.
 
 Only the author can edit or delete a comment. That holds for agents too: the agent's responsible human
@@ -194,6 +194,35 @@ tasks move to the next cycle; the server creates one with the same length when n
 `pm cycles end --move-to none` takes them out of cycles instead. `--milestone none` and `--cycle none`
 clear the field on `pm tasks update` and filter tasks without one on `pm tasks list`.
 
+## Labels, due dates, blockers and subtasks
+
+Native tasks have four more fields since 0.7.0. Agents set them with the same `pm tasks` commands; the
+full option list is in the [CLI reference](../apps/cli/README.md#labels-due-dates-subtasks-and-blockers).
+
+```sh
+pm tasks create --project PAY "Refund email" --parent PAY-142 --label email --due 2026-11-20
+pm tasks update PAY-150 --blocked-by PAY-142 --label backend --remove-label triage
+pm tasks list --project PAY --due overdue --sort due
+pm tasks list --project PAY --blocked
+pm tasks list --parent PAY-142                 # the subtasks of PAY-142
+pm labels list --project PAY                   # with how many tasks use each label
+```
+
+- **Labels** belong to a project. Names are unique in the project, ignoring case, and up to 40 characters.
+  `--label` creates the labels the project doesn't have yet, with a colour the app picks.
+- **Due date** is a day, `YYYY-MM-DD`, with no time. A task is overdue when it is still open after its due
+  date, in the server's `APP_TIME_ZONE`. `--due none` clears it.
+- **Blocked by** lists tasks of the same project. A task is blocked while any of its blockers is open. It is
+  a marker only: nothing stops a blocked task from moving. A blocker that would close a loop fails with exit
+  code 1: `pm: Can't add: PAY-150 already waits on PAY-142.` (`DEPENDENCY_LOOP`).
+- **Subtasks** go one level deep and stay in the parent's project (`SUBTASK_DEPTH`, `NOT_SAME_PROJECT`). A
+  new subtask takes the parent's assignee unless you pass `--assignee`. The parent shows its progress as done
+  of total, canceled subtasks left out.
+
+`pm tasks show` prints them, and `pm tasks list` adds DUE, LABELS, PARENT, SUBTASKS and BLOCKED columns when
+a row has a value for them. Mark your task blocked instead of leaving it In progress with no word: the
+person sees it on Home under Blocked.
+
 ## Backlog.md mirrors
 
 A project can mirror the Backlog.md folder of its repository (see [backlog-md.md](backlog-md.md)). The files
@@ -208,8 +237,9 @@ In a mirrored project:
 - `pm` reads the tasks, comments on them and sets their cycle. Every command that takes a task key also takes
   the Backlog.md ID: `pm tasks show BACK-786.1`. IDs such as `TASK-12` can repeat across projects; add
   `--project` when pm asks for it.
-- `pm` refuses to change the title, description, status, priority, assignee or milestone of a mirrored task,
-  to create tasks, and to change milestones. It exits with code 6 and says where the change belongs:
+- `pm` refuses to change the title, description, status, priority, assignee, milestone, labels, due date,
+  blockers or parent of a mirrored task, to create tasks, to change milestones, and to rename or delete a
+  label read from the files. It exits with code 6 and says where the change belongs:
 
   ```text
   $ pm tasks update PAY-786 --status done
@@ -246,8 +276,10 @@ creates and updates them, and edits to the files no longer reach the project. Ag
 
 ## Dashboard
 
-`pm dashboard` shows what needs someone now, across every project the key can read. It prints the same data
-as the Dashboard page in the web app.
+`pm dashboard` shows what needs someone now, across every project the key can read. In the web app, Home
+replaced the Dashboard page in 0.7.0; `pm dashboard` keeps its four groups and its `pm.v1.dashboard` output,
+so scripts written for 0.6.0 keep working. Home's own data is `GET /api/v1/home` (see the
+[API reference](api.md#home)).
 
 ```sh
 pm dashboard               # Mine: your tasks, your agents' tasks and mentions of you
@@ -275,11 +307,11 @@ every task and every mention in the projects the key can read. The key's project
 ### Ask your person for input
 
 When you need input from a person, mention your responsible person in a comment (@their-email); that puts
-it on their dashboard. It stays under Mentions until they comment on the task or change it.
+it on their Home, under Mentions. It stays there until they comment on the task or change it.
 
 ```sh
 pm comments add PAY-142 "Refunds over 500 EUR: one approval or two? @ana@example.com"
-pm tasks update PAY-142 --status in_review    # your task in review shows on their dashboard too
+pm tasks update PAY-142 --status in_review    # your task in review shows on their Home too
 ```
 
 Your own dashboard works the same way: `pm dashboard` lists the comments that mention you and your tasks
@@ -359,6 +391,10 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 | `pm.v1.cycles.create`     | `Cycle`                                                                      |
 | `pm.v1.cycles.current`    | `Cycle`, or `null` when no cycle is running                                  |
 | `pm.v1.cycles.end`        | `Cycle` with its summary, plus `rollovers`: the tasks that moved and where   |
+| `pm.v1.labels.list`       | `{ items: Label[] }` with `usageCount` per label                             |
+| `pm.v1.labels.create`     | `Label` with `usageCount`                                                    |
+| `pm.v1.labels.update`     | `Label` with `usageCount`                                                    |
+| `pm.v1.labels.delete`     | `{ deleted: Label, usageCount }`: the label as it was, and how many lost it  |
 | `pm.v1.backlog.status`    | `BacklogSourceStatus`: mode, state, source, last read, counts, problems      |
 | `pm.v1.backlog.refresh`   | The refresh request plus `outcome` and, with `--wait`, the final `status`    |
 | `pm.v1.link`              | `{ project, target, action, repository, file }`                              |
@@ -366,9 +402,13 @@ breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (
 | `pm.v1.error`             | RFC 9457 problem: `{ type, title, status, code, detail, requestId, issues }` |
 
 Statuses are `backlog`, `todo`, `in_progress`, `in_review`, `done`, `canceled`. Priorities are `none`, `low`,
-`medium`, `high`, `urgent`. Timestamps are ISO 8601 in UTC; dates such as `targetDate` and `startsOn` are
-`YYYY-MM-DD`. `assignee` is null or a user reference; agents carry their `responsible` person. `milestone`
-and `cycle` are null when the task has none. `rank` orders the cards inside a board column.
+`medium`, `high`, `urgent`. Timestamps are ISO 8601 in UTC; dates such as `targetDate`, `startsOn` and
+`dueDate` are `YYYY-MM-DD`. `assignee` is null or a user reference; agents carry their `responsible` person.
+`milestone`, `cycle`, `dueDate` and `parent` are null when the task has none. `rank` orders the cards inside
+a board column. Since 0.7.0 tasks also carry `labels` (`{ id, name, color, source }`), `dueDate`,
+`subtaskProgress` (`{ done, total }`) and `blocked`; `pm tasks show` adds `parent`, `subtasks`, `blockedBy`
+and `blocks`, where a blocker you can't see is `null` ("Removed task"). List rows carry `parentKey` instead
+of `parent`.
 
 `pm tasks list --project PAY --json`:
 

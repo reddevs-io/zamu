@@ -11,11 +11,15 @@ export async function settle(page: Page): Promise<void> {
   await page.waitForTimeout(500);
 }
 
+/** Home: "/" with no path after the host (an optional query, such as ?tab=everyone). */
+export const homeURL = /^https?:\/\/[^/]+\/(?:\?.*)?$/;
+
 /**
  * First run through the setup page: the admin account, then the workspace. Leaves the page signed in on
- * `landing`: setup sends the new admin to "/", which opens the dashboard (the projects page before 0.5.0).
+ * `landing`: setup sends the new admin to "/", which is Home (the dashboard in 0.5.0 and 0.6.0, the
+ * projects page before 0.5.0).
  */
-export async function setUpServer(page: Page, landing: RegExp = /\/dashboard$/): Promise<void> {
+export async function setUpServer(page: Page, landing: RegExp = homeURL): Promise<void> {
   await expect(page).toHaveURL(/\/setup$/);
   await settle(page);
   await expect(page.getByRole('heading', { name: 'Set up this server' })).toBeVisible();
@@ -40,12 +44,24 @@ export async function signInAsAdmin(page: Page): Promise<void> {
     await setUpServer(page);
     return;
   }
-  // Better Auth checks the Origin header once the request carries a cookie.
-  const response = await page.context().request.post('/api/auth/sign-in/email', {
-    data: { email: admin.email, password: admin.password },
-    headers: { origin: new URL(page.url()).origin },
-  });
-  expect(response.ok(), await response.text()).toBe(true);
+  // Better Auth checks the Origin header once the request carries a cookie. It also allows only 3 sign-ins
+  // per address in a rolling 10-second window, and short specs can run back to back inside one: on 429, wait
+  // for the window (Retry-After when sent) and try again.
+  for (let attempt = 1; ; attempt += 1) {
+    const response = await page.context().request.post('/api/auth/sign-in/email', {
+      data: { email: admin.email, password: admin.password },
+      headers: { origin: new URL(page.url()).origin },
+    });
+    if (response.status() === 429 && attempt < 4) {
+      const retryAfter = Number(response.headers()['retry-after']);
+      await page.waitForTimeout(
+        (Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 10) * 1_000 + 500,
+      );
+      continue;
+    }
+    expect(response.ok(), await response.text()).toBe(true);
+    return;
+  }
 }
 
 /** JSON call to /api/v1 with the context's session cookie. Fails the test on a non-2xx answer. */
@@ -59,6 +75,12 @@ export async function api<T>(
   const text = await response.text();
   expect(response.ok(), `${method} ${path}: ${response.status()} ${text}`).toBe(true);
   return (text ? JSON.parse(text) : null) as T;
+}
+
+/** Opens New project from the "+" next to the sidebar's Projects heading (P is Priority since 0.7.0). */
+export async function openNewProject(page: Page, item: 'New project' | 'New from Backlog.md'): Promise<void> {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'New project' }).click();
+  await page.getByRole('menu', { name: 'New project' }).getByRole('menuitem', { name: item }).click();
 }
 
 /** Collects page errors and console errors, so a spec can assert there were none. */

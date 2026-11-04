@@ -6,32 +6,37 @@ A self-hosted project management tool for teams where AI coding agents work next
 of the workspace with their own scoped API keys, and every change they make reads "claude-dev for Ana Ruiz":
 the agent, and the person it acts for. People use the web app; agents use the `pm` CLI.
 
-![Task list of the Payments project with the task pane open](docs/images/task-list-light.png)
+![The Checkout project's task list, with labels, due dates, a blocked task and nested subtasks](docs/images/task-list-light.png)
 
-What works today (milestone M4):
+What works today (release 0.7.0, milestone M5):
 - First-run setup, email and password sign-in, single sign-on with OpenID Connect, invitations by link.
-- A dashboard, the page you land on: tasks in review, unanswered mentions, stalled work and close deadlines
-  across every project, for you or the whole workspace, then one row per project and the agents.
-- Projects and tasks: a keyboard-first task list (J/K or the arrow keys, Left and Right to collapse and
-  expand a status group, C to create, Esc), a task pane and a task page, with status, priority, assignee
-  and a Markdown description. Owners and admins can delete a project from its settings or with
-  `pm projects delete`.
-- A board per project, one column per status. Move cards by drag and drop or with Shift+H/J/K/L, undo with
-  Ctrl+Z, and split the board into swimlanes by assignee or milestone. V switches between list and board.
+- Home, the page you land on: tasks in review, unanswered mentions, blocked and overdue work and your other
+  tasks, grouped by why they need you, across every project. Tabs for you, the whole workspace and the
+  agents, and a strip of close deadlines.
+- A collapsible sidebar with your projects, and a command palette (⌘K) for pages, projects, tasks and
+  actions.
+- Projects and tasks: a keyboard-first list and a board per project, with status, priority, assignee,
+  labels, due dates, blockers, one level of subtasks and a Markdown description. Tasks open as a full page;
+  Space shows a peek without leaving the list. Owners and admins can delete a project from its settings or
+  with `pm projects delete`.
+- Display options for the list and the board (grouping, swimlanes, order, subtasks, shown properties),
+  filters as chips, and changes to many tasks at once.
 - Milestones with a target date and progress, and numbered cycles. A cycle ends at midnight after its end
   date, or early by hand, and moves its unfinished tasks to the next one.
 - Comments in the task history, in Markdown, with @mentions of people and agents. The history shows
   comments and changes in one list.
-- My tasks: everything assigned to you, across projects.
 - Backlog.md: a project can mirror the task files a repository keeps in `backlog/`, following the default
-  branch on every push, or import them once and move off Backlog.md. It reads through a workspace git
-  connection to GitHub, GitLab or Gitea/Forgejo with a read-only token.
+  branch on every push, or import them once and move off Backlog.md. Labels, due dates, dependencies and
+  parents come in as native fields. It reads through a workspace git connection to GitHub, GitLab or
+  Gitea/Forgejo with a read-only token.
 - Light, dark or system theme, saved to your account.
 - Agents with API keys scoped to some or all projects, read only or read and write, revocable at any time.
 - The `pm` CLI with `--json` output and stable exit codes, over a REST API at `/api/v1` with an OpenAPI
-  document. Agents comment, plan with milestones and cycles, list their own tasks with `--mine`, and see
-  what needs them with `pm dashboard`.
+  document. Agents comment, plan with milestones and cycles, set labels, due dates, blockers and subtasks,
+  list their own tasks with `--mine`, and see what needs them with `pm dashboard`.
 - One Docker image (web, worker, migrations) and a docker compose file. Postgres is the only stateful service.
+
+What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Quickstart
 
@@ -57,10 +62,14 @@ On the agent's machine, build the CLI and set `PM_URL` and `PM_KEY`, as describe
 
 ## Docs
 
+- [Using the app](docs/guide.md): the sidebar, Home, the list and the board, the task view, the palette, and
+  labels, due dates, blockers and subtasks.
+- [Keyboard shortcuts](docs/keyboard.md): every key, and what changed in 0.7.0.
 - [Self-hosting](docs/self-hosting.md): configuration, first run, ports, backups and upgrades.
 - [Agents](docs/agents.md): adding agents, scoping keys, running `pm` in an agent's environment, `--json` output.
 - [Backlog.md](docs/backlog-md.md): git connections, mirrors and imports, mappings, webhooks, detach.
 - [CLI reference](apps/cli/README.md): every `pm` command and option.
+- [REST API](docs/api.md): authentication, errors, and the task, label and Home routes.
 
 ## Development
 
@@ -89,24 +98,33 @@ http://localhost:3100 and runs the specs in `e2e/`, then removes the stack. It l
 database alone. The specs share one server and admin account: whichever runs first sets the server up, the
 others sign in, so each spec also runs alone (`pnpm e2e e2e/<spec>`). The stack sets `APP_ENCRYPTION_KEY`
 and the git settings the Backlog.md specs need (`e2e/stack.ts`).
-- `dashboard.spec.ts`: the dashboard. An agent puts a task in review and mentions its person from the CLI,
-  the person answers the mention from the dashboard with the keyboard, the rail count follows, and
-  `pm dashboard --json` matches the API.
-- `person-and-agent.spec.ts`: the M1 flow, from setup (or sign-in) to an agent working through the CLI.
+- `person-and-agent.spec.ts`: the M1 flow on the 0.7.0 screens, from setup (or sign-in) to an agent working
+  through the CLI: New project from the sidebar, quick create, the list keys and the task view.
+- `home.spec.ts`: Home. The old Dashboard, My tasks and Projects links redirect there; an agent puts a task
+  in review and mentions its person from the CLI, the person answers the mention from Home with the
+  keyboard, the sidebar count follows `/home/counts`, and `pm dashboard --json` still matches the API.
+- `labels.spec.ts`, `due-dates.spec.ts`, `blockers.spec.ts` and `subtasks.spec.ts`: the four task fields.
+  Labels created from the picker, the label filter, and rename and delete in Settings > Labels; due dates in
+  the list and the picker, the Due date filter, and overdue tasks on Home; blockers with the loop refusal;
+  subtasks that take the parent's assignee and expand in place on the board.
+- `palette.spec.ts`: the command palette, from finding a task by key to the Set status step.
+- `bulk.spec.ts`: selecting tasks with X, Shift+↓ and ⌘A, and changing them from the action bar and the keys.
 - `project-delete.spec.ts`: deleting a project from its settings and with `pm projects delete`, including the
   refused cases and the keys that covered it.
 - `upgrade.spec.ts`: starts a second stack (`pm-e2e-upgrade`, port 3101) on release 0.1.1 and adds data,
-  switches it to M2.1 (0.3.0) and adds more, then switches it to the new image and checks that every key
-  and route still works. The older images come from `E2E_M1_IMAGE` and `E2E_M2_1_IMAGE` (pulled when
-  missing), or are built once from git as `project-management:m1-0.1.1` and `project-management:m2.1-<ref>`,
-  which takes a few minutes each the first time.
-- `work-views.spec.ts`: the board, milestones, cycles, comments with mentions from the web and the CLI,
-  the task list keys around group rows, My tasks and the theme.
+  switches it to M2.1 (0.3.0) and adds more, then to 0.6.0, where it mirrors a Backlog.md repository from its
+  own Forgejo container, then to the new image. It checks that every key and route still works and that the
+  0.7.0 migrations backfill the mirror's labels, due date, blockers and parent with no history lines. The
+  older images come from `E2E_M1_IMAGE`, `E2E_M2_1_IMAGE` and `E2E_0_6_IMAGE` (pulled when missing), or are
+  built once from git as `project-management:m1-0.1.1`, `project-management:m2.1-<ref>` and
+  `project-management:release-0.6.0`, which takes a few minutes each the first time.
+- `work-views.spec.ts`: the board with its display options, milestones, cycles, comments with mentions from
+  the web and the CLI, the list keys around group rows, Home across two projects and the theme.
 - `backlog-mirror.spec.ts` and `backlog-import.spec.ts` (Playwright project `backlog-md`, after the others):
   each starts its own Forgejo container from `docker/forgejo/`, attaches it to the stack's network and
   removes it at the end. They cover connections, setup and the Mappings step's suggestions, the mirrored
-  views, webhooks and a new webhook secret, refreshes, `pm backlog`, refused changes, Edit mappings, detach,
-  deleting a mirrored project and import.
+  views, the fields read from the files and their locks, webhooks and a new webhook secret, refreshes,
+  `pm backlog`, refused changes, Edit mappings, detach, deleting a mirrored project and import.
 
 `E2E_KEEP_STACK=1` keeps the stacks (and the Forgejo containers) running after the run, `E2E_SKIP_BUILD=1`
 reuses the last image, `E2E_COMPOSE_PROJECT`, `E2E_PORT`, `E2E_UPGRADE_PORT` and `PM_IMAGE` change the
@@ -115,6 +133,9 @@ project name, ports and image tag (use them when another checkout runs the suite
 
 `pnpm dev` without `BETTER_AUTH_SECRET` prints the startup error once and keeps running; pages fail until
 you set it. A built server, such as the one in the image, exits instead.
+
+Locally the suite runs Chromium's headless shell; against a stack that is not on localhost (CI) it runs full
+Chromium, which needs more system libraries.
 
 To see the dashboard's query plans on a large workspace (100 projects, 100k tasks), run
 `pnpm exec tsx packages/core/scripts/dashboard-stress.ts --help`. It creates and drops its own database on

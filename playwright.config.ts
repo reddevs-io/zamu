@@ -12,13 +12,16 @@ const backlogSpecs = /backlog-.*\.spec\.ts$/;
 const browser = {
   ...devices['Desktop Chrome'],
   viewport: { width: 1280, height: 800 },
-  // Full Chromium in new headless mode rather than the headless shell: only it honours the flag below.
-  channel: 'chromium',
   // The test reads the copied key with navigator.clipboard, which needs a secure context. In CI the stack is
-  // http://docker:<port>, not localhost.
-  launchOptions: isLocalhost
-    ? undefined
-    : { args: [`--unsafely-treat-insecure-origin-as-secure=${origin.origin}`] },
+  // http://docker:<port>, not localhost: there the suite runs full Chromium in new headless mode, the only one
+  // that honours the flag below. On localhost the headless shell is enough, and it needs fewer system
+  // libraries than full Chromium.
+  ...(isLocalhost
+    ? {}
+    : {
+        channel: 'chromium',
+        launchOptions: { args: [`--unsafely-treat-insecure-origin-as-secure=${origin.origin}`] },
+      }),
 };
 
 export default defineConfig({

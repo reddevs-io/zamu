@@ -1,7 +1,10 @@
 // Upgrades on a second compose stack (project <E2E_COMPOSE_PROJECT>-upgrade, port 3101) next to the main one. The
 // stack starts on M1 (release 0.1.1) and gets data through the M1 app, moves to M2.1 (0.3.0: the M2 and M2.1
 // migrations run against the M1 data, which shows on the board in its M1 order, and gets M2 and M2.1 data),
-// then moves to the image globalSetup built: the M3 migration runs, and every key and route still works.
+// then to 0.6.0 (the M3 and M4 migrations: every key survives, and a Backlog.md mirror reads labels, a due
+// date, a dependency and a parent into its Backlog.md block), then to the image globalSetup built: the M5
+// migrations run, the backfill turns the mirror's block into native labels, due date, blockers and parent
+// with no activity rows, the next refresh changes nothing, and every key and route still works.
 //
 // Older images, each used when it is already local:
 //   M1    E2E_M1_IMAGE (pulled if it is not local, for example
@@ -10,18 +13,23 @@
 //   M2.1  E2E_M2_1_IMAGE (pulled likewise, for example …/project-management:0.3.0), else
 //         project-management:m2.1-<ref>, built once from the git tag 0.3.0 when it exists, else from the M2.1
 //         merge commit (E2E_M2_1_REF overrides).
-// Builds use git archive, so the checkout is untouched. E2E_SKIP_UPGRADE=1 skips this spec.
+//   0.6.0 E2E_0_6_IMAGE (pulled likewise, for example …/project-management:0.6.0), else
+//         project-management:release-0.6.0, built once from the git tag 0.6.0.
+// Builds use git archive, so the checkout is untouched. The mirror reads from a Forgejo container (e2e/forgejo.ts)
+// attached to the upgrade stack's network. E2E_SKIP_UPGRADE=1 skips this spec.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { addConnection, type Forgejo, startForgejo } from './forgejo';
 import { api, settle, setUpServer, signInAsAdmin } from './session';
 import {
   composeProject,
   createStack,
   image as currentImage,
   downCommand,
+  forgejoAliases,
   baseURL as mainURL,
   repoRoot,
 } from './stack';
@@ -32,6 +40,9 @@ const m1Image = process.env.E2E_M1_IMAGE ?? `project-management:m1-${M1_TAG}`;
 const M2_1_COMMIT = '7eb6b7e';
 const m2_1Ref = process.env.E2E_M2_1_REF ?? (gitRefExists('0.3.0') ? '0.3.0' : M2_1_COMMIT);
 const m2_1Image = process.env.E2E_M2_1_IMAGE ?? `project-management:m2.1-${m2_1Ref}`;
+/** The release before M5: the backlog sweep. */
+const RELEASE_0_6_TAG = '0.6.0';
+const release0_6Image = process.env.E2E_0_6_IMAGE ?? `project-management:release-${RELEASE_0_6_TAG}`;
 const upgradePort = process.env.E2E_UPGRADE_PORT ?? '3101';
 // Same host as the main stack (localhost, or "docker" in CI), another port.
 const upgradeURL = (() => {
@@ -52,6 +63,83 @@ interface TaskRef {
   title: string;
   status: string;
 }
+interface MirroredTask extends TaskRef {
+  locked: string[];
+  backlog: {
+    id: string;
+    data: { labels: string[]; dueDate?: string | null; dependencies: unknown[] };
+  } | null;
+  labels?: { name: string; source: string }[];
+  dueDate?: string | null;
+  parent?: TaskRef | null;
+  blockedBy?: (TaskRef | null)[];
+  blocked?: boolean;
+}
+interface SourceStatus {
+  state: string;
+  lastRead: { at: string; commit: string } | null;
+}
+
+/** The Backlog.md project of the 0.6.0 step: mirrored, so the M5 backfill has a block to read. */
+const infra = { name: 'Infra', key: 'INF' };
+const infraRepo = 'infra';
+const backlogFiles: Record<string, string> = {
+  'README.md': '# Infra\n',
+  'backlog/config.yml': [
+    'project_name: "Infra"',
+    'default_status: "To Do"',
+    'statuses: ["To Do", "In Progress", "Done"]',
+    'labels: ["ops", "k8s"]',
+    'date_format: yyyy-mm-dd hh:mm',
+    'auto_commit: false',
+    'task_prefix: "inf"',
+    '',
+  ].join('\n'),
+  'backlog/tasks/inf-1 - Move-to-the-new-cluster.md': `---
+id: INF-1
+title: Move to the new cluster
+status: In Progress
+assignee: []
+created_date: '2026-10-01 09:00'
+labels:
+  - ops
+  - k8s
+due_date: '2026-12-01'
+dependencies: []
+priority: high
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Every service runs on the new cluster.
+<!-- SECTION:DESCRIPTION:END -->
+`,
+  'backlog/tasks/inf-1.1 - Drain-the-old-nodes.md': `---
+id: INF-1.1
+title: Drain the old nodes
+status: To Do
+assignee: []
+created_date: '2026-10-01 10:00'
+labels:
+  - ops
+dependencies: []
+parent_task_id: INF-1
+---
+`,
+  'backlog/tasks/inf-2 - Update-the-runbook.md': `---
+id: INF-2
+title: Update the runbook
+status: To Do
+assignee: []
+created_date: '2026-10-02 09:00'
+labels: []
+dependencies:
+  - INF-1
+---
+`,
+};
+const infraKeys = ['INF-1', 'INF-1.1', 'INF-2'];
 
 test.describe.configure({ mode: 'serial' });
 test.skip(process.env.E2E_SKIP_UPGRADE === '1', 'E2E_SKIP_UPGRADE=1');
@@ -63,6 +151,9 @@ let m1Order: Record<string, string[]> = {};
 /** Every task after the M2.1 step. */
 let m2_1Tasks: TaskRef[] = [];
 const repository = 'https://gitlab.com/reddevs/operations.git';
+let forgejo: Forgejo | undefined;
+/** Timeline length of each mirrored task before the M5 upgrade. */
+const timelineBefore: Record<string, number> = {};
 
 const byKey = (a: { key: string }, b: { key: string }) => a.key.localeCompare(b.key);
 
@@ -134,9 +225,13 @@ test.beforeAll(async ({ browser }) => {
   test.setTimeout(30 * 60_000);
   ensureImage(m1Image, Boolean(process.env.E2E_M1_IMAGE), M1_TAG);
   ensureImage(m2_1Image, Boolean(process.env.E2E_M2_1_IMAGE), m2_1Ref);
+  ensureImage(release0_6Image, Boolean(process.env.E2E_0_6_IMAGE), RELEASE_0_6_TAG);
   stack.compose(['down', '-v', '--remove-orphans'], { quiet: true });
   console.log(`[e2e] starting ${stack.project} on ${m1Image} at ${upgradeURL}`);
   await startStack();
+  // The network outlives the image switches, so Forgejo stays reachable from every step.
+  forgejo = await startForgejo('upgrade', stack.network, forgejoAliases.upgrade);
+  await forgejo.createRepository(infraRepo, backlogFiles);
   context = await browser.newContext({ baseURL: upgradeURL });
   page = await context.newPage();
 });
@@ -155,8 +250,26 @@ test.afterAll(async () => {
     console.log(`  ${downCommand(stack)}`);
     return;
   }
+  forgejo?.stop();
   stack.compose(['down', '-v', '--remove-orphans'], { quiet: true });
 });
+
+async function timelineLength(key: string): Promise<number> {
+  return (await api<{ items: unknown[] }>(page.request, 'GET', `/tasks/${key}/timeline`)).items.length;
+}
+
+async function sourceStatus(): Promise<SourceStatus> {
+  return api<SourceStatus>(page.request, 'GET', `/projects/${infra.key}/backlog`);
+}
+
+/** Queues a read of the mirror (Refresh now) and waits until it finishes. */
+async function refreshMirror(): Promise<void> {
+  const before = (await sourceStatus()).lastRead?.at;
+  await api(page.request, 'POST', `/projects/${infra.key}/backlog/refresh`);
+  await expect
+    .poll(async () => (await sourceStatus()).lastRead?.at, { timeout: 90_000, intervals: [1_000] })
+    .not.toBe(before);
+}
 
 test('M1 0.1.1: set up the server and add a project with tasks', async () => {
   await page.goto('/');
@@ -260,9 +373,9 @@ test('M2.1 (0.3.0): the M2 migrations keep the M1 data and its board order', asy
   ]);
 });
 
-test('this build: the M3 migration keeps every key, and every route still works', async () => {
-  test.setTimeout(5 * 60_000);
-  await switchTo(currentImage);
+test('0.6.0: the M3 and M4 migrations keep every key; a Backlog.md mirror reads the files', async () => {
+  test.setTimeout(6 * 60_000);
+  await switchTo(release0_6Image);
   await signInAsAdmin(page);
 
   // Every task keeps its key, title and status, and has no Backlog.md data.
@@ -312,13 +425,109 @@ test('this build: the M3 migration keeps every key, and every route still works'
   expect(created.key).toBe('OPS-7');
   await api(page.request, 'PATCH', '/tasks/OPS-3', { status: 'done' });
 
+  // A mirror through the 0.6.0 setup: a git connection, a project linked to the repository, the five steps.
+  const host = forgejo as Forgejo;
+  await addConnection(page, host, 'Forgejo · e2e upgrade');
+  await api(page.request, 'POST', '/projects', { ...infra, repository: host.repositoryUrl(infraRepo) });
+  await page.goto(`/p/${infra.key}/backlog-setup?mode=mirror`);
+  await settle(page);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('backlog/').first()).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Preview' }).click();
+  await expect(page.getByRole('heading', { name: `Mirror 3 tasks into ${infra.name}?` })).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.getByRole('button', { name: 'Start mirroring' }).click();
+  await expect(page.getByText(`${infra.name} now mirrors`)).toBeVisible({ timeout: 60_000 });
+  await expect.poll(async () => (await sourceStatus()).state, { timeout: 30_000 }).toBe('healthy');
+
+  // 0.6.0 keeps labels, the due date and dependencies in the task's Backlog.md block only.
+  const parent = await api<MirroredTask>(page.request, 'GET', '/tasks/INF-1');
+  expect(parent.backlog?.data.labels).toEqual(['ops', 'k8s']);
+  expect(parent).not.toHaveProperty('labels');
+  const runbook = await api<MirroredTask>(page.request, 'GET', '/tasks/INF-2');
+  expect(runbook.backlog?.data.dependencies).toHaveLength(1);
+  for (const key of infraKeys) timelineBefore[key] = await timelineLength(key);
+});
+
+test('this build: the M5 migrations backfill the mirror, and every key and route still works', async () => {
+  test.setTimeout(6 * 60_000);
+  await switchTo(currentImage);
+  await signInAsAdmin(page);
+
+  // Native tasks have the new fields, empty.
+  const ops = await api<MirroredTask>(page.request, 'GET', '/tasks/OPS-1');
+  expect(ops).toMatchObject({ labels: [], dueDate: null, parent: null, blockedBy: [], blocked: false });
+  const opsList = await api<{ items: TaskRef[] }>(page.request, 'GET', '/tasks?project=OPS&limit=100');
+  expect(opsList.items.map((task) => task.key).sort()).toEqual(
+    [...m2_1Tasks.map((t) => t.key), 'OPS-7'].sort(),
+  );
+
+  // The backfill filled the native fields of the mirrored tasks from their Backlog.md block.
+  const parent = await api<MirroredTask>(page.request, 'GET', '/tasks/INF-1');
+  expect(
+    parent.labels?.map(({ name, source }) => ({ name, source })).sort((a, b) => a.name.localeCompare(b.name)),
+  ).toEqual([
+    { name: 'k8s', source: 'backlog' },
+    { name: 'ops', source: 'backlog' },
+  ]);
+  expect(parent.dueDate).toBe('2026-12-01');
+  const child = await api<MirroredTask>(page.request, 'GET', '/tasks/INF-1.1');
+  expect(child.parent?.key).toBe('INF-1');
+  expect(child.labels?.map((label) => label.name)).toEqual(['ops']);
+  const runbook = await api<MirroredTask>(page.request, 'GET', '/tasks/INF-2');
+  expect(runbook.blockedBy?.map((task) => task?.key)).toEqual(['INF-1']);
+  expect(runbook.blocked).toBe(true);
+  for (const field of ['labels', 'dueDate', 'blockedBy', 'parent']) expect(runbook.locked).toContain(field);
+  const labels = await api<{ items: { name: string; source: string; usageCount: number }[] }>(
+    page.request,
+    'GET',
+    `/projects/${infra.key}/labels`,
+  );
+  expect(labels.items.map(({ name, source, usageCount }) => ({ name, source, usageCount }))).toEqual([
+    { name: 'k8s', source: 'backlog', usageCount: 1 },
+    { name: 'ops', source: 'backlog', usageCount: 2 },
+  ]);
+  // The backfill wrote no activity rows.
+  for (const key of infraKeys) expect(await timelineLength(key), key).toBe(timelineBefore[key]);
+
+  // The first refresh after the upgrade reads the same files and changes nothing.
+  await refreshMirror();
+  for (const key of infraKeys) expect(await timelineLength(key), key).toBe(timelineBefore[key]);
+  expect((await api<MirroredTask>(page.request, 'GET', '/tasks/INF-1')).labels).toHaveLength(2);
+
+  // Later pushes keep the native fields in step with the files.
+  const file = 'backlog/tasks/inf-2 - Update-the-runbook.md';
+  await (forgejo as Forgejo).commit(infraRepo, 'Label the runbook task', {
+    [file]: (backlogFiles[file] as string).replace('labels: []', 'labels:\n  - docs'),
+  });
+  await refreshMirror();
+  const relabelled = await api<MirroredTask>(page.request, 'GET', '/tasks/INF-2');
+  expect(relabelled.labels?.map(({ name, source }) => ({ name, source }))).toEqual([
+    { name: 'docs', source: 'backlog' },
+  ]);
+  expect(await timelineLength('INF-2')).toBe((timelineBefore['INF-2'] ?? 0) + 1);
+
+  // The numbering continues on the native project.
+  const created = await api<TaskRef>(page.request, 'POST', '/tasks', {
+    project: 'OPS',
+    title: 'Rotate keys',
+  });
+  expect(created.key).toBe('OPS-8');
+
   // The screens render on the upgraded data.
   const pages: [string, RegExp | string][] = [
+    ['/', /^Good (morning|afternoon|evening)/],
     ['/p/OPS', 'Rotate the database password'],
     ['/p/OPS?view=board', 'Renew the TLS certificate'],
     ['/p/OPS/OPS-1', 'Rotated on the primary; replicas next.'],
     ['/p/OPS/milestones', 'Hardening'],
-    ['/settings/connections', 'No git connections yet'],
+    ['/p/OPS/cycles', 'Cycle 1'],
+    ['/p/INF', 'Move to the new cluster'],
+    ['/p/INF/INF-2', 'Update the runbook'],
+    ['/p/INF/settings/labels', 'k8s'],
+    ['/settings/connections', 'Forgejo · e2e upgrade'],
   ];
   for (const [path, text] of pages) {
     await page.goto(path);

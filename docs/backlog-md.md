@@ -58,7 +58,8 @@ Settings > Backlog.md > Use another connection.
 ## Set up a mirror or an import
 
 There are two ways in:
-- **New project from Backlog.md** on the Projects page. Paste the clone URL. The dialog finds the connection
+- **New from Backlog.md** in the "+" next to Projects in the sidebar, in the workspace menu, or in the command
+  palette (⌘K). Paste the clone URL. The dialog finds the connection
   by host, reads the folder and fills the name from `project_name` in `config.yml` and the key from the task
   prefix (`task_prefix: "pay"` gives `PAY`). Pick Mirror or Import once. It creates the project and opens the
   setup at the mappings step.
@@ -116,25 +117,54 @@ next refresh applies them to every task.
 
 ## What a mirror owns
 
-| Object    | Comes from Backlog.md                                                       | Editable here                                  |
-| --------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
-| Task      | Title, description, status, priority, assignee, milestone, creation date    | Cycle, order inside its board column, comments |
-| Milestone | Name, description, target date, status, and creating or deleting milestones | Nothing                                        |
-| Project   | Key (it has tasks), repository, and turning milestones off                  | Name, description, cycles switch               |
+| Object    | Comes from Backlog.md                                                                                             | Editable here                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Task      | Title, description, status, priority, assignee, milestone, creation date, labels, due date, blockers, parent task | Cycle, order inside its board column, comments |
+| Label     | Name, and creating or deleting labels                                                                             | Colour                                         |
+| Milestone | Name, description, target date, status, and creating or deleting milestones                                       | Nothing                                        |
+| Project   | Key (it has tasks), repository, and turning milestones off                                                        | Name, description, cycles switch               |
 
-In the web app, fields that come from the files have a hatch, and a click explains where to change them. The
-board does not let a mirrored card move to another column. New is disabled and says that tasks are created
-in Backlog.md. The API and `pm` refuse the same changes with `409` and the codes `TASK_MIRRORED`,
-`MILESTONE_MIRRORED` or `PROJECT_MIRRORED`, naming the field, the file and a `backlog` command that makes the
+In the web app, the task view shows one small Backlog.md badge, which links to the file. A field shows a lock
+only when you point at it or try to change it, and the pickers open read-only. The board does not let a
+mirrored card move to another column. New task is disabled and says that tasks are created in Backlog.md.
+Changes to several tasks at once (the action bar, `POST /api/v1/tasks/bulk`) work in native projects only.
+The API and `pm` refuse the same changes with `409` and the codes `TASK_MIRRORED`, `MILESTONE_MIRRORED`,
+`PROJECT_MIRRORED` or `LABEL_MIRRORED`, naming the field, the file and a `backlog` command that makes the
 change.
 
 The description is the task's Description section followed by its other sections under `##` headings:
 Acceptance criteria, Definition of done, Implementation plan, Implementation notes, Comments from Backlog.md
 and Final summary. Checklists keep their `- [ ]` and `- [x]` items.
 
-Everything else in the file (labels, extra assignees, dependencies, parent task, subtasks, due date, type,
-references, documentation, modified files, reporter, last update, unknown keys) is shown read-only in the
-task's Backlog.md section. Dependencies, the parent and subtasks link to their tasks here.
+Labels, the due date, dependencies and the parent task fill the task's own fields (see below). Everything
+else in the file (extra assignees, type, references, documentation, modified files, reporter, the dates as
+written in the file, unknown keys) is shown read-only in the collapsed "From the file" section at the bottom
+of the task's properties.
+
+## Labels, due dates, blockers and subtasks
+
+Since 0.7.0 a mirror fills the same four fields as native tasks, so filters, the Blocked marker, overdue
+dates and subtask progress work the same in both kinds of project. Every one of them is read-only here.
+
+| Backlog.md key                                    | Field here | Rules                                                                                                                          |
+| ------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `labels`                                          | Labels     | Each name becomes a label of the project, matched ignoring case. Names over 40 characters are left out with a warning.         |
+| `due_date`                                        | Due date   | `YYYY-MM-DD` only. Any other value leaves the task without a due date and is listed as a problem.                              |
+| `dependencies`                                    | Blocked by | Backlog.md IDs of the same folder. An ID that matches no task, or the task itself, is left out and listed as a problem.        |
+| `parent_task_id`, or the dotted ID (`BACK-786.1`) | Parent     | The parent's subtasks follow from it. Mirrored subtasks can nest as deep as the files do; native subtasks stay one level deep. |
+
+Labels read from the files are marked "From Backlog.md" in Settings > Labels. Their names are locked: rename
+or remove them in the files. Their colour belongs to the app, and changing it never writes to the files.
+
+The task history shows changes to these fields as ordinary lines ("Backlog.md added the label webhooks"),
+not under "Backlog.md-only fields changed".
+
+### Upgrading from 0.6.0
+
+Before 0.7.0 these values sat only in the task's Backlog.md section. The 0.7.0 migrations copy them into the
+native fields of every existing mirror, from the data the last refresh stored. The copy writes no history
+lines, and the next refresh reads the same values from the files, so it changes nothing for files that did
+not change. Imports that were already detached get their labels as app labels.
 
 ## Keys and subtasks
 
@@ -188,7 +218,8 @@ same task.
 ## Hidden tasks
 
 When a task's file disappears from the default branch, the task is hidden, not deleted. It drops out of the
-list, the board, My tasks and every count, and keeps its comments, cycle and board position. Opening it by
+list, the board, Home and every count, and keeps its comments, cycle and board position. A task that it
+blocked reads "Removed task" in its Blocked by list. Opening it by
 URL shows "Removed from Backlog.md" with the commit where it was last seen.
 
 To list hidden tasks, use the "Removed from Backlog.md" filter on the task list (`/p/PAY?hidden=only`), or
@@ -243,7 +274,10 @@ Detach ends a mirror and cannot be undone. Owners and admins find it in Settings
 - every field of every task and milestone is editable here, by people and agents;
 - changes to the files no longer reach the project, and the webhook URL answers `410 Gone`;
 - new tasks continue the numbering (after `PAY-812` comes `PAY-813`);
-- each task keeps its Backlog.md ID and section as a read-only record, and its ID still finds it;
+- labels from the files become app labels, which you can rename, recolour and delete;
+- labels, due dates, blockers and parents keep their values and become editable;
+- each task keeps its Backlog.md ID and its "From the file" section as a read-only record, and its ID still
+  finds it;
 - hidden tasks stay hidden.
 
 An import is a mirror that detaches right after its first read.
