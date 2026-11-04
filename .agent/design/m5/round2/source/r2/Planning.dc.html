@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./margin.css" />
+<link rel="stylesheet" href="./screens.css" />
+<script src="./data.js"></script>
+<style>
+body{margin:0}
+.page .list{flex:1;min-height:0;overflow:hidden}
+.ms-row .dl-ico{margin-left:3px}
+.ms-row.done .ms-n b{color:var(--text-2)}
+.ms-row .cnt{color:var(--text-2);font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
+.ms-row .ms-st{justify-self:end}
+.page-hd .crumbs{display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:var(--fs-sm)}
+.page-hd .row2{display:flex;align-items:flex-end;gap:24px}
+.page-hd .row2 .page-d{flex:1}
+.cyc-l{display:flex;flex-direction:column;gap:10px;min-width:0}
+.cyc-t{display:flex;align-items:baseline;gap:10px}
+.cyc-t b{font-family:var(--display);font-size:22px;font-weight:500}
+.cyc-t span{color:var(--text-3);font-size:var(--fs-sm)}
+.cyc-note{color:var(--text-3);font-size:var(--fs-xs)}
+.sec-h{padding:18px 18px 6px;color:var(--text-3);font-size:var(--fs-xs);font-weight:500}
+.page-stats{display:flex;gap:26px}
+</style>
+</helmet>
+<div class="{{ rootClass }}" data-screen-label="Planning">
+<dc-import name="Side" project="HBR" view="{{ sideView }}" theme="{{ theme }}" hint-size="236px,900px"></dc-import>
+<main class="main">
+<header class="vh">
+<div class="crumb"><span class="tile c1">H</span><span class="crumb-proj">Harbor</span><span class="crumb-sep">/</span><span class="crumb-page">{{ crumbPage }}</span><sc-if value="{{ hasCrumb2 }}"><span class="crumb-sep">/</span><span class="crumb-page" style="color:var(--text)">{{ crumb2 }}</span></sc-if></div>
+<sc-if value="{{ isPage }}"><span class="btn"><span class="filters-glyph"></span>Filter</span><span class="btn">Display</span></sc-if>
+<span class="spacer"></span>
+<span class="sync"><span class="dot"></span><b>Backlog.md</b>synced 38 min ago</span>
+<sc-if value="{{ isCyc }}"><span class="btn ghost">New cycle</span></sc-if>
+<span class="btn primary">New task<span class="kbd">C</span></span>
+</header>
+<div class="page">
+
+<sc-if value="{{ isMsList }}">
+<div class="page-hd"><div class="page-t">Milestones</div><div class="page-meta"><span>2 open</span><span>1 completed</span><span class="muted">Milestones come from Backlog.md. Edit them in the files.</span></div></div>
+<div class="ms-row hd"><span></span><span>Milestone</span><span>Progress</span><span>Target</span><span>Tasks</span><span></span></div>
+<sc-for list="{{ milestones }}" as="m">
+<div class="{{ m.cls }}"><span class="dl-ico"></span><span class="ms-n"><b>{{ m.n }}</b><span>{{ m.d }}</span></span><span class="ms-prog"><span class="{{ m.bar }}"></span>{{ m.pct }}</span><span class="{{ m.dateCls }}">{{ m.date }}</span><span class="cnt">{{ m.cnt }}</span><span class="ms-st"><span class="{{ m.pillCls }}">{{ m.pill }}</span></span></div>
+</sc-for>
+<div class="grp"><span class="tri"></span><span>Completed</span><span class="col-count">1</span></div>
+</sc-if>
+
+<sc-if value="{{ isCycList }}">
+<div class="page-hd"><div class="page-t">Cycles</div><div class="page-meta"><span>Two weeks, starting Mondays</span><span class="muted">Unfinished tasks move to the next cycle when one ends.</span></div></div>
+<div class="cyc-cur">
+<div class="cyc-l">
+<div class="cyc-t"><b>Cycle 12</b><span class="pill acc">Current</span><span>Oct 27 – Nov 9 · day 8 of 14</span></div>
+<div class="seg-bar"><span class="s-done" style="width:38%"></span><span class="s-rev" style="width:21%"></span><span class="s-prog" style="width:17%"></span></div>
+<div class="legend"><span><i style="background:var(--st-done)"></i>Done 9</span><span><i style="background:var(--st-rev)"></i>In review 5</span><span><i style="background:var(--st-prog)"></i>In progress 4</span><span><i style="background:var(--line)"></i>Todo 6</span></div>
+<div class="cyc-note">3 tasks added after the cycle started</div>
+</div>
+<div class="cyc-stats"><div class="stat"><b>24</b><span>in scope</span></div><div class="stat"><b>9</b><span>done</span></div><div class="stat"><b>6</b><span>days left</span></div></div>
+</div>
+<div class="sec-h">Other cycles</div>
+<div class="ms-row hd"><span></span><span>Cycle</span><span>Progress</span><span>Dates</span><span>Tasks</span><span></span></div>
+<sc-for list="{{ cycles }}" as="m">
+<div class="{{ m.cls }}"><span class="dl-ico cyc"></span><span class="ms-n"><b>{{ m.n }}</b><span>{{ m.d }}</span></span><span class="ms-prog"><span class="{{ m.bar }}"></span>{{ m.pct }}</span><span class="ms-date">{{ m.date }}</span><span class="cnt">{{ m.cnt }}</span><span class="ms-st"><span class="{{ m.pillCls }}">{{ m.pill }}</span></span></div>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{ isPage }}">
+<div class="page-hd">
+<div class="crumbs"><span class="{{ pageIco }}"></span><span>{{ pageKind }}</span><sc-if value="{{ isMsPage }}"><span class="bm">Backlog.md</span></sc-if></div>
+<div class="page-t">{{ pageT }}</div>
+<div class="row2">
+<div class="page-d">{{ pageD }}</div>
+<div class="page-stats"><sc-for list="{{ stats }}" as="st"><div class="stat"><b>{{ st.b }}</b><span>{{ st.s }}</span></div></sc-for></div>
+</div>
+<div class="seg-bar" style="margin-top:6px"><span class="s-done" style="{{ segDone }}"></span><span class="s-rev" style="{{ segRev }}"></span><span class="s-prog" style="{{ segProg }}"></span></div>
+<div class="legend"><sc-for list="{{ legend }}" as="lg"><span><i style="{{ lg.st }}"></i>{{ lg.t }}</span></sc-for><span class="spacer"></span><span>{{ pageWhen }}</span></div>
+</div>
+<div class="list">
+<sc-for list="{{ groups }}" as="g">
+<div class="grp"><span class="tri down"></span><span class="{{ g.st }}"></span><span>{{ g.name }}</span><span class="col-count">{{ g.count }}</span></div>
+<sc-for list="{{ g.rows }}" as="r">
+<div class="{{ r.cls }}">
+<sc-if value="{{ r.pu }}"><span class="pri u">!</span></sc-if>
+<sc-if value="{{ r.ph }}"><span class="pri h"></span></sc-if>
+<sc-if value="{{ r.priBlank }}"><span class="pri blank"></span></sc-if>
+<span class="key">{{ r.key }}</span>
+<span class="{{ r.stCls }}"></span>
+<span class="row-t">{{ r.title }}</span>
+<span class="row-r">
+<sc-if value="{{ r.blocked }}"><span class="blk">Blocked</span></sc-if>
+<sc-for list="{{ r.labels }}" as="l"><span class="lb"><span class="{{ l.cls }}"></span>{{ l.n }}</span></sc-for>
+<sc-if value="{{ r.showSub }}"><span class="subp"><span class="{{ r.ringCls }}"></span>{{ r.subTxt }}</span></sc-if>
+<sc-if value="{{ r.showDue }}"><span class="{{ r.dueCls }}">{{ r.dueTxt }}</span></sc-if>
+<sc-if value="{{ r.showAv }}"><span class="{{ r.avCls }}">{{ r.avI }}</span></sc-if>
+<sc-if value="{{ r.noAv }}"><span class="av-slot"></span></sc-if>
+<span class="row-upd">{{ r.upd }}</span>
+</span>
+</div>
+</sc-for>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["mslist", "mspage", "cyclist", "cycpage"], "default": "mslist" }
+}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (!window.PM) { const i = setInterval(() => { if (window.PM) { clearInterval(i); this.forceUpdate(); } }, 30); }
+  }
+  renderVals() {
+    const P = window.PM;
+    const theme = this.props.theme ?? 'light';
+    const s = this.props.state ?? 'mslist';
+    const isCyc = s === 'cyclist' || s === 'cycpage';
+    const isPage = s === 'mspage' || s === 'cycpage';
+    const milestones = [
+      { cls: 'ms-row sel', n: 'Mobile app release', d: 'Store release 1.22.0 with the offline cache and savings goals', bar: 'bar wide p60', pct: '60%', date: 'Nov 14 · in 11 days', dateCls: 'ms-date', cnt: '18 of 30', pill: 'On track', pillCls: 'pill ok' },
+      { cls: 'ms-row', n: 'Trends verification', d: 'Every trend figure checked against the export before marketing uses it', bar: 'bar wide p25', pct: '25%', date: 'No date', dateCls: 'ms-date muted', cnt: '4 of 16', pill: '2 blocked', pillCls: 'pill warn' }
+    ];
+    const cycles = [
+      { cls: 'ms-row', n: 'Cycle 13', d: 'Starts Monday · 6 tasks planned', bar: 'bar wide', pct: '', date: 'Nov 10 – 23', cnt: '6', pill: 'Upcoming', pillCls: 'pill' },
+      { cls: 'ms-row done', n: 'Cycle 11', d: '3 unfinished tasks moved to Cycle 12', bar: 'bar wide p80', pct: '88%', date: 'Oct 13 – 26', cnt: '22 of 25', pill: 'Completed', pillCls: 'pill' },
+      { cls: 'ms-row done', n: 'Cycle 10', d: 'Everything done', bar: 'bar wide p100', pct: '100%', date: 'Sep 29 – Oct 12', cnt: '19 of 19', pill: 'Completed', pillCls: 'pill' },
+      { cls: 'ms-row done', n: 'Cycle 9', d: '1 unfinished task moved to Cycle 10', bar: 'bar wide p80', pct: '94%', date: 'Sep 15 – 28', cnt: '17 of 18', pill: 'Completed', pillCls: 'pill' }
+    ];
+    let groups = [];
+    if (P && isPage) {
+      const mk = (arr, st, n) => arr.slice(0, n).map((t, i) => P.row(t, '', i, st));
+      if (s === 'mspage') groups = [
+        { name: 'In progress', st: 'st prog', count: 4, rows: mk([P.PROG[3], P.PROG[5], P.PROG[0], P.PROG[8]], 'prog', 4) },
+        { name: 'In review', st: 'st rev', count: 5, rows: mk([P.REVIEW[5], P.REVIEW[0], P.REVIEW[3], P.REVIEW[10], P.REVIEW[6]], 'rev', 5) },
+        { name: 'Todo', st: 'st todo', count: 3, rows: mk([P.TODO[8], P.TODO[16], P.TODO[3]], 'todo', 3) }
+      ];
+      else groups = [
+        { name: 'In progress', st: 'st prog', count: 4, rows: mk([P.PROG[1], P.PROG[2], P.PROG[4], P.PROG[9]], 'prog', 4) },
+        { name: 'In review', st: 'st rev', count: 5, rows: mk([P.REVIEW[1], P.REVIEW[4], P.REVIEW[7], P.REVIEW[11], P.REVIEW[13]], 'rev', 5) },
+        { name: 'Todo', st: 'st todo', count: 6, rows: mk([P.TODO[0], P.TODO[1], P.TODO[10], P.TODO[13]], 'todo', 4) }
+      ];
+    }
+    const L = (v, t) => ({ st: 'background:' + v, t });
+    return {
+      rootClass: 'app ' + theme, theme, sideView: isCyc ? 'Cycles' : 'Milestones',
+      crumbPage: isCyc ? 'Cycles' : 'Milestones', hasCrumb2: isPage, crumb2: s === 'mspage' ? 'Mobile app release' : 'Cycle 12',
+      isCyc, isPage, isMsPage: s === 'mspage', isMsList: s === 'mslist', isCycList: s === 'cyclist', milestones, cycles, groups,
+      pageIco: s === 'mspage' ? 'dl-ico' : 'dl-ico cyc', pageKind: s === 'mspage' ? 'Milestone' : 'Cycle · current',
+      pageT: s === 'mspage' ? 'Mobile app release' : 'Cycle 12',
+      pageD: s === 'mspage' ? 'Ship store release 1.22.0 with the offline cache and savings goals. The store review needs a week, so the build must be in review by Nov 7.' : 'Finish the offline cache and get savings goals into review. The push provider move waits on the credential rotation.',
+      stats: s === 'mspage' ? [{ b: '30', s: 'tasks' }, { b: '18', s: 'done' }, { b: '11', s: 'days left' }] : [{ b: '24', s: 'in scope' }, { b: '9', s: 'done' }, { b: '6', s: 'days left' }],
+      segDone: s === 'mspage' ? 'width:60%' : 'width:38%', segRev: s === 'mspage' ? 'width:17%' : 'width:21%', segProg: s === 'mspage' ? 'width:13%' : 'width:17%',
+      legend: s === 'mspage' ? [L('var(--st-done)', 'Done 18'), L('var(--st-rev)', 'In review 5'), L('var(--st-prog)', 'In progress 4'), L('var(--line)', 'Todo 3')] : [L('var(--st-done)', 'Done 9'), L('var(--st-rev)', 'In review 5'), L('var(--st-prog)', 'In progress 4'), L('var(--line)', 'Todo 6')],
+      pageWhen: s === 'mspage' ? 'Target Nov 14 · done tasks hidden' : 'Oct 27 – Nov 9 · done tasks hidden'
+    };
+  }
+}
+</script>
+</body>
+</html>

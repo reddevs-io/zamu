@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>body{margin:0}</style>
+</helmet>
+<div>
+<sc-if value="{{ isBoard }}"><dc-import name="Board" theme="{{ theme }}" state="{{ state }}" narrow="{{ narrow }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ isList }}"><dc-import name="List" theme="{{ theme }}" state="{{ state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ isKit }}"><dc-import name="Kit" theme="{{ theme }}" hint-size="1440px,1600px"></dc-import></sc-if>
+<sc-if value="{{ isTask }}"><dc-import name="Task" theme="{{ theme }}" state="{{ state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ isOver }}"><dc-import name="Overlays" theme="{{ theme }}" state="{{ state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ isHome }}"><dc-import name="Home" theme="{{ theme }}" state="{{ state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ isPlan }}"><dc-import name="Planning" theme="{{ theme }}" state="{{ state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ isSet }}"><dc-import name="Settings" theme="{{ theme }}" state="{{ state }}" hint-size="1440px,900px"></dc-import></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    // #<file>-<theme>-<state>[-narrow]
+    const h = (window.location.hash || '#board-light-default').slice(1).split('-');
+    const f = h[0];
+    return { theme: h[1] || 'light', state: h[2] || 'default', narrow: h[3] === 'narrow',
+      isBoard: f === 'board', isList: f === 'list', isKit: f === 'kit', isTask: f === 'task', isOver: f === 'over', isHome: f === 'home', isPlan: f === 'plan', isSet: f === 'set' };
+  }
+}
+</script>
+</body>
+</html>
