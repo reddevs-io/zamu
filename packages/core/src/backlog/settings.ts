@@ -36,7 +36,7 @@ import {
   isEncryptionReady,
   SecretUnreadable,
 } from '../secrets';
-import type { BacklogSourceRow } from './apply';
+import { type BacklogSourceRow, releaseBacklogLabels } from './apply';
 import { repositoryRef } from './reader';
 import { enqueueBacklogRefresh, storedProblems } from './refresh';
 import { assertMappedMembers, newWebhookCredentials } from './setup';
@@ -294,6 +294,8 @@ export async function detachBacklog(
       .where(eq(backlogSource.id, found.source.id))
       .returning();
     if (!row) throw new Error('backlog source update returned no row');
+    // M5: labels from the files become app labels (names editable); tasks keep them.
+    await releaseBacklogLabels(tx, found.project.id);
     await recordActivity(tx, actor, {
       projectId: found.project.id,
       type: 'project.backlog_detached',

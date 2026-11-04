@@ -1,7 +1,14 @@
 // Backlog.md mirror engine (M3-06): detection, preview, refresh (plan, then apply), mappings,
 // hide and restore, detach, webhook acceptance and the refresh and poll jobs.
 // Rules: M3 plan (.agent/plans/m3-backlog-md-mirror.html), section 5.
-export { type ApplyInput, type ApplyResult, applyPlan, type BacklogSourceRow } from './apply';
+export {
+  type ApplyInput,
+  type ApplyResult,
+  applyPlan,
+  type BacklogSourceRow,
+  releaseBacklogLabels,
+} from './apply';
+export { backlogDueDate, backlogLabelNames, leastUsedLabelColor } from './fields';
 export {
   FALLBACK_PRIORITY,
   FALLBACK_STATUS,

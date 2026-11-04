@@ -212,6 +212,7 @@ function planFor(
       nextTaskNumber: target.nextTaskNumber,
       firstRead: true,
       problems: [],
+      labels: [],
     },
   });
 }

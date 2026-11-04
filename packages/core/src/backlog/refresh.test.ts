@@ -260,8 +260,9 @@ describe('refreshBacklogSource', () => {
           { field: 'title', from: 'Second', to: 'Second renamed' },
           { field: 'description', from: 'About Second.', to: 'About Second renamed.' },
           { field: 'status', from: 'todo', to: 'done' },
-          // The raw status shows through the status change; only block-only fields are listed.
-          { field: 'backlog', from: null, to: ['labels'] },
+          // M5: labels are a native field with their own change; the raw status shows through the
+          // status change, so no block-only field is listed.
+          { field: 'labels', from: [], to: [{ id: expect.any(String), name: 'api' }] },
         ],
       }),
     ]);
