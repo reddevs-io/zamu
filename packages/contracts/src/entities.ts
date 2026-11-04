@@ -14,6 +14,9 @@ import {
   GitConnectionId,
   GitConnectionStatus,
   GitProvider,
+  LabelColor,
+  LabelId,
+  LabelSource,
   MilestoneId,
   MilestoneOwnedField,
   MilestoneStatus,
@@ -272,6 +275,63 @@ export const TaskBacklog = z.object({
 export type TaskBacklog = z.output<typeof TaskBacklog>;
 
 // ---------------------------------------------------------------------------
+// Labels and task relations (M5)
+// ---------------------------------------------------------------------------
+
+/**
+ * A project label. Names are unique per project ignoring case, 1 to 40 characters. `color` is the
+ * palette hue 1 to 9, drawn with --label-1 to --label-9. Labels with source backlog come from
+ * Backlog.md files: their name is locked (LABEL_MIRRORED), their colour stays editable and is
+ * never written back.
+ */
+export const Label = z.object({
+  id: LabelId,
+  name: z.string(),
+  color: LabelColor,
+  source: LabelSource,
+});
+export type Label = z.output<typeof Label>;
+
+/** A label in project settings and in GET /projects/{project}/labels: with its task count. */
+export const LabelWithUsage = Label.extend({
+  /** Visible tasks carrying the label; hidden ones are left out ("Used on 12 tasks"). */
+  usageCount: z.number().int().nonnegative(),
+});
+export type LabelWithUsage = z.output<typeof LabelWithUsage>;
+
+/** GET /projects/{project}/labels: every label of the project, by name (case-insensitive). */
+export const LabelList = z.object({ items: z.array(LabelWithUsage) });
+export type LabelList = z.output<typeof LabelList>;
+
+/**
+ * Another task of the same project as a relation shows it: a subtask, the parent, a blocker or a
+ * task this one blocks. Lists that may point at a task the caller can't see (hidden by a
+ * Backlog.md refresh) carry null for it, which the UI reads as "Removed task".
+ */
+export const RelatedTask = z.object({
+  key: TaskKey,
+  title: z.string(),
+  status: TaskStatus,
+  assignee: UserRef.nullable(),
+});
+export type RelatedTask = z.output<typeof RelatedTask>;
+
+/**
+ * Subtask progress: done of total, canceled subtasks left out of both. A task without subtasks
+ * (or with only canceled ones) has total 0; the UI shows nothing then.
+ */
+export const SubtaskProgress = z
+  .object({
+    done: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+  })
+  .refine((progress) => progress.done <= progress.total, {
+    message: 'done cannot be above total',
+    path: ['done'],
+  });
+export type SubtaskProgress = z.output<typeof SubtaskProgress>;
+
+// ---------------------------------------------------------------------------
 // Tasks
 // ---------------------------------------------------------------------------
 
@@ -308,6 +368,25 @@ export const Task = z.object({
   hidden: z.boolean().optional(),
   /** M3: when the task was hidden; null while visible. */
   hiddenAt: Timestamp.nullable().optional(),
+  // M5 fields are optional in the type, so shapes built before M5 (fixtures, fakes) stay valid.
+  // Servers from M5 on always send them; read a missing list as [], a missing value as null, a
+  // missing flag as false and missing progress as { done: 0, total: 0 }.
+  /** M5: labels of the task, by name (case-insensitive). */
+  labels: z.array(Label).optional(),
+  /** M5: due day, no time; null when none. See dueState() for how it reads. */
+  dueDate: CalendarDate.nullable().optional(),
+  /** M5: the parent when this is a subtask (one level, same project); null for top-level tasks. */
+  parent: RelatedTask.nullable().optional(),
+  /** M5: subtasks, by key. Canceled ones included ("1 canceled"). */
+  subtasks: z.array(RelatedTask).optional(),
+  /** M5: done of total over `subtasks`, canceled excluded. */
+  subtaskProgress: SubtaskProgress.optional(),
+  /** M5: tasks this one waits on, by key. null entries: a blocker hidden from the caller ("Removed task"). */
+  blockedBy: z.array(RelatedTask.nullable()).optional(),
+  /** M5: the reverse, tasks waiting on this one ("Blocks PAY-150"). Same null rule. */
+  blocks: z.array(RelatedTask.nullable()).optional(),
+  /** M5: at least one blocker is open (not Done or Canceled). Display only: status changes are never refused. */
+  blocked: z.boolean().optional(),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });
@@ -330,6 +409,10 @@ export const TaskListItem = Task.pick({
   locked: true,
   hidden: true,
   hiddenAt: true,
+  labels: true,
+  dueDate: true,
+  subtaskProgress: true,
+  blocked: true,
   createdAt: true,
   updatedAt: true,
 }).extend({
@@ -337,6 +420,8 @@ export const TaskListItem = Task.pick({
   backlogId: z.string().nullable().optional(),
   /** M3: live comments, for the "removed · 3 comments" note on hidden rows. Optional. */
   commentCount: z.number().int().nonnegative().optional(),
+  /** M5: the parent's key for subtasks (nesting in the list, hiding on the board); null for top-level tasks. */
+  parentKey: TaskKey.nullable().optional(),
 });
 export type TaskListItem = z.output<typeof TaskListItem>;
 
@@ -360,6 +445,12 @@ export const TaskChangedData = z.object({
   task: Task,
 });
 export type TaskChangedData = z.output<typeof TaskChangedData>;
+
+/** POST /tasks/bulk: every changed task as it is now, in the order of the keys sent. */
+export const TaskBulkResult = z.object({
+  items: z.array(TaskListItem),
+});
+export type TaskBulkResult = z.output<typeof TaskBulkResult>;
 
 // ---------------------------------------------------------------------------
 // Milestones
@@ -537,8 +628,33 @@ export const ActivityCycleRef = CycleRef.pick({ id: true, number: true, name: tr
 export type ActivityCycleRef = z.output<typeof ActivityCycleRef>;
 
 /**
+ * M5: a label inside an activity change. The name is the one recorded with the change (renames
+ * and deletes don't rewrite history); color is the label's colour now, null once it was deleted.
+ */
+export const ActivityLabelRef = z.object({
+  id: LabelId,
+  name: z.string(),
+  color: LabelColor.nullable(),
+});
+export type ActivityLabelRef = z.output<typeof ActivityLabelRef>;
+
+/**
+ * M5: a task inside an activity change (blockers, parent). The row stores the id with the key and
+ * title at the time; core returns the current key and title while the task exists. removed: the
+ * task was deleted or is hidden now ("Removed task").
+ */
+export const ActivityTaskRef = z.object({
+  key: TaskKey,
+  title: z.string(),
+  removed: z.boolean(),
+});
+export type ActivityTaskRef = z.output<typeof ActivityTaskRef>;
+
+/**
  * One field change. The API resolves the assignee, milestone and cycle to references; the
- * database row stores ids, and core resolves them when reading.
+ * database row stores ids, and core resolves them when reading. M5 adds labels, dueDate, blockedBy
+ * and parent; labels and blockedBy record the whole list before and after (sorted by name and by
+ * key), so the UI diffs them for "added payouts, removed backend".
  */
 export const ActivityChange = z.discriminatedUnion('field', [
   z.object({ field: z.literal('title'), from: z.string().nullable(), to: z.string().nullable() }),
@@ -552,6 +668,11 @@ export const ActivityChange = z.discriminatedUnion('field', [
     to: ActivityMilestoneRef.nullable(),
   }),
   z.object({ field: z.literal('cycle'), from: ActivityCycleRef.nullable(), to: ActivityCycleRef.nullable() }),
+  // M5
+  z.object({ field: z.literal('labels'), from: z.array(ActivityLabelRef), to: z.array(ActivityLabelRef) }),
+  z.object({ field: z.literal('dueDate'), from: CalendarDate.nullable(), to: CalendarDate.nullable() }),
+  z.object({ field: z.literal('blockedBy'), from: z.array(ActivityTaskRef), to: z.array(ActivityTaskRef) }),
+  z.object({ field: z.literal('parent'), from: ActivityTaskRef.nullable(), to: ActivityTaskRef.nullable() }),
 ]);
 export type ActivityChange = z.output<typeof ActivityChange>;
 
@@ -577,8 +698,9 @@ export const Activity = z.object({
   /** M3: the commit a Backlog.md refresh read; null for app changes. */
   originRef: z.string().nullable().optional(),
   /**
-   * M3: Backlog.md-only fields a refresh changed (labels, dependencies, createdAt, ...), named
-   * after BacklogBlock keys or task fields; `changes` holds the mapped ones. Empty otherwise.
+   * M3: Backlog.md-only fields a refresh changed (references, type, createdAt, ...), named
+   * after BacklogBlock keys or task fields; `changes` holds the mapped ones (from M5 on labels,
+   * dueDate, blockedBy and parent too). Empty otherwise.
    */
   backlogFields: z.array(z.string()).optional(),
   createdAt: Timestamp,
@@ -977,6 +1099,300 @@ export const DashboardCounts = z
     path: ['total'],
   });
 export type DashboardCounts = z.output<typeof DashboardCounts>;
+
+// ---------------------------------------------------------------------------
+// Home (M5): replaces the dashboard and My tasks
+// ---------------------------------------------------------------------------
+
+/**
+ * mine: what needs the caller: tasks In review that wait on them (including their agents'
+ * work), mentions of them, and their own tasks (assigned to them, or created by them with
+ * nobody holding it) that are blocked, overdue or assigned. Their agents' other work is on the
+ * agents tab. everyone: the whole workspace the caller can read. agents: one card per agent and
+ * what agents wait on people for.
+ */
+export const HOME_TABS = ['mine', 'everyone', 'agents'] as const;
+export const HomeTab = z.enum(HOME_TABS);
+export type HomeTab = z.infer<typeof HomeTab>;
+
+/**
+ * Home groups. review: tasks In review. mentions: unanswered comments mentioning the caller (Mine
+ * only). blocked: open tasks with an open blocker. overdue: open tasks due before today.
+ * assigned: the rest of the caller's open tasks, by due date (overdue first, none last) then
+ * priority. dueThisWeek: open tasks due from today to the end of the week (Everyone).
+ * waiting: agent questions and review requests that wait on a person (Agents).
+ */
+export const HOME_GROUP_KEYS = [
+  'review',
+  'mentions',
+  'blocked',
+  'overdue',
+  'assigned',
+  'dueThisWeek',
+  'waiting',
+] as const;
+export const HomeGroupKey = z.enum(HOME_GROUP_KEYS);
+export type HomeGroupKey = z.infer<typeof HomeGroupKey>;
+
+/** The groups of each tab, in order. A task shows once, in the first group it qualifies for. */
+export const HOME_GROUPS_BY_TAB = {
+  mine: ['review', 'mentions', 'blocked', 'overdue', 'assigned'],
+  everyone: ['review', 'blocked', 'overdue', 'dueThisWeek'],
+  agents: ['waiting'],
+} as const satisfies Record<HomeTab, readonly HomeGroupKey[]>;
+
+/** Most items a Home group returns. `total` still counts every item. */
+export const HOME_GROUP_ITEM_LIMIT = 50;
+
+/** Most recent actions on an agent card. */
+export const HOME_AGENT_ACTION_LIMIT = 5;
+
+/** A task as Home names it outside the rows: deadlines and agent cards. */
+export const HomeTaskRef = z.object({
+  key: TaskKey,
+  title: z.string(),
+  status: TaskStatus,
+  project: ProjectRef,
+});
+export type HomeTaskRef = z.output<typeof HomeTaskRef>;
+
+/**
+ * Mine only: why the task is the caller's. assignee: assigned to them. agent: assigned to an agent
+ * they are responsible for. creator: they created it and nobody holds it ("you created it").
+ */
+export const HOME_RELATIONS = ['assignee', 'agent', 'creator'] as const;
+export const HomeRelation = z.enum(HOME_RELATIONS);
+export type HomeRelation = z.infer<typeof HomeRelation>;
+
+/** The comment behind a mention or an agent question. */
+const HomeComment = z.object({
+  id: CommentId,
+  /** Plain text, at most 200 characters plus an ellipsis. Inline code keeps its backticks. */
+  excerpt: z.string(),
+});
+
+/**
+ * Why a row is in its group: the reason line at the right of a Home row. The reason actor and
+ * time sit on the variant that has them.
+ */
+export const HomeReason = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('review'),
+    /** Who moved it to In review ("claude-dev · 40 min ago"); null when no activity records it. */
+    requestedBy: UserRef.nullable(),
+    /** The agent's responsible human when an agent asked; null for people. */
+    onBehalfOf: UserRef.nullable(),
+    /**
+     * Who the review waits on ("waits on Ana"): the responsible human of an agent assignee, else
+     * the task's creator. Null when nobody can be named.
+     */
+    waitingOn: UserRef.nullable(),
+    /** When it entered In review; its updatedAt when no activity records it. */
+    at: Timestamp,
+  }),
+  z.object({
+    kind: z.literal('mention'),
+    /** The comment's author ("Tomás · 1 d ago"); on Agents, the agent that asks. */
+    author: UserRef,
+    onBehalfOf: UserRef.nullable(),
+    /** Who has to answer ("asks Ana"). */
+    mentioned: UserRef,
+    comment: HomeComment,
+    at: Timestamp,
+  }),
+  z.object({
+    kind: z.literal('blocked'),
+    /** The open blockers ("by PAY-120, PAY-138"), by key. null: hidden from the caller. */
+    blockers: z.array(RelatedTask.nullable()).min(1),
+  }),
+  z.object({
+    kind: z.literal('overdue'),
+    dueDate: CalendarDate,
+    /** Days since the due date in APP_TIME_ZONE: 1 the day after it. */
+    daysOverdue: z.number().int().positive(),
+  }),
+  z.object({
+    kind: z.literal('due'),
+    dueDate: CalendarDate,
+    /** Days until the due date: 0 today. */
+    daysLeft: z.number().int().nonnegative(),
+  }),
+  /** Assigned to you: no reason line. */
+  z.object({ kind: z.literal('assigned') }),
+]);
+export type HomeReason = z.output<typeof HomeReason>;
+
+/**
+ * The task's other states, as small pills after the title ("blocked", "3 d overdue", "blocks 2",
+ * "in Cycle 12", "asks a question", "needs owner"). The state of the row's own group is not
+ * repeated. Order: as listed here.
+ */
+export const HomePill = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('review') }),
+  z.object({ kind: z.literal('blocked') }),
+  z.object({ kind: z.literal('overdue'), daysOverdue: z.number().int().positive() }),
+  z.object({ kind: z.literal('due'), daysLeft: z.number().int().nonnegative() }),
+  /** Open tasks waiting on this one. */
+  z.object({ kind: z.literal('blocks'), count: z.number().int().positive() }),
+  z.object({ kind: z.literal('cycle'), cycle: CycleRef.pick({ number: true, name: true }) }),
+  /** The newest unanswered mention is a question from an agent. */
+  z.object({ kind: z.literal('question') }),
+  /** Nobody holds the task. */
+  z.object({ kind: z.literal('unassigned') }),
+]);
+export type HomePill = z.output<typeof HomePill>;
+
+/** One Home row: the task as the list shows it, why it is here, and its other states. */
+export const HomeItem = z.object({
+  task: TaskListItem,
+  reason: HomeReason,
+  /** Mine only; null on the other tabs. */
+  relation: HomeRelation.nullable(),
+  pills: z.array(HomePill),
+});
+export type HomeItem = z.output<typeof HomeItem>;
+
+/** One Home group: the uncapped count and the first HOME_GROUP_ITEM_LIMIT items. */
+export const HomeGroup = z
+  .object({
+    key: HomeGroupKey,
+    total: z.number().int().nonnegative(),
+    items: z.array(HomeItem).max(HOME_GROUP_ITEM_LIMIT),
+  })
+  .refine((group) => group.total >= group.items.length, {
+    message: 'total counts every item, so it cannot be below the number of items',
+    path: ['total'],
+  });
+export type HomeGroup = z.output<typeof HomeGroup>;
+
+/**
+ * One entry of the deadlines strip, soonest first: milestones not Completed and current cycles
+ * ending within 2 days (or milestones past their target) with open tasks, and open tasks of the
+ * tab due within 2 days or overdue. Milestone progress leaves canceled tasks out; cycle progress
+ * counts every task in the cycle.
+ */
+export const HomeDeadline = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('milestone'),
+    project: ProjectRef,
+    milestone: MilestoneRef.pick({ id: true, name: true }).extend({ targetDate: CalendarDate }),
+    /** Days from today to the target date: 0 on the day, negative once overdue. */
+    daysLeft: z.number().int(),
+    progress: DashboardProgress,
+  }),
+  z.object({
+    kind: z.literal('cycle'),
+    project: ProjectRef,
+    cycle: CycleRef.pick({ number: true, name: true, startsOn: true, endsOn: true }),
+    /** Days left including today: 1 on the last day. */
+    daysLeft: z.number().int().positive(),
+    progress: DashboardProgress,
+  }),
+  z.object({
+    kind: z.literal('task'),
+    task: HomeTaskRef,
+    dueDate: CalendarDate,
+    /** Days from today to the due date: 0 today, negative once overdue. */
+    daysLeft: z.number().int(),
+  }),
+]);
+export type HomeDeadline = z.output<typeof HomeDeadline>;
+
+/** working: the agent holds an In progress task updated in the last hour. idle otherwise. */
+export const HOME_AGENT_STATES = ['working', 'idle'] as const;
+export const HomeAgentState = z.enum(HOME_AGENT_STATES);
+export type HomeAgentState = z.infer<typeof HomeAgentState>;
+
+/**
+ * One line of an agent card's recent actions, newest first. The UI words it from the activity
+ * changes ("moved to In review") or the comment ("asked Ana a question").
+ */
+export const HomeAgentAction = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('activity'),
+    id: RowId,
+    task: HomeTaskRef,
+    type: TaskActivityType,
+    changes: z.array(ActivityChange),
+    at: Timestamp,
+  }),
+  z.object({
+    kind: z.literal('comment'),
+    id: CommentId,
+    task: HomeTaskRef,
+    excerpt: z.string(),
+    /** Members the comment mentions, in order of first mention. */
+    mentions: z.array(UserRef),
+    at: Timestamp,
+  }),
+]);
+export type HomeAgentAction = z.output<typeof HomeAgentAction>;
+
+/** One agent card on the Agents tab. */
+export const HomeAgent = z.object({
+  /** With its responsible human ("acts for Ana"). */
+  agent: AssigneeRef,
+  state: HomeAgentState,
+  /** working only: the task and when it entered In progress ("for 22 min"). Null when idle. */
+  currentTask: HomeTaskRef.extend({ since: Timestamp }).nullable(),
+  counts: z.object({
+    /** Open tasks assigned to the agent. */
+    assigned: z.number().int().nonnegative(),
+    /** Its tasks In review ("waiting for review"). */
+    inReview: z.number().int().nonnegative(),
+    /** Its open tasks with an open blocker. */
+    blocked: z.number().int().nonnegative(),
+    /** Activity rows and comments by the agent since the start of today in APP_TIME_ZONE. */
+    changesToday: z.number().int().nonnegative(),
+  }),
+  /** Newest first, at most HOME_AGENT_ACTION_LIMIT. An idle card shows the first as "Last: …". */
+  recent: z.array(HomeAgentAction).max(HOME_AGENT_ACTION_LIMIT),
+  /** Newest activity row or comment by the agent; null when none. */
+  lastActivityAt: Timestamp.nullable(),
+});
+export type HomeAgent = z.output<typeof HomeAgent>;
+
+/**
+ * Tab counts in the Home header. mine: review + mentions + blocked + overdue (assigned is not
+ * counted; the sidebar shows the same number). everyone: the sum of its four groups. agents: the
+ * number of agent cards.
+ */
+export const HomeTabCounts = z.object({
+  mine: z.number().int().nonnegative(),
+  everyone: z.number().int().nonnegative(),
+  agents: z.number().int().nonnegative(),
+});
+export type HomeTabCounts = z.output<typeof HomeTabCounts>;
+
+/** GET /home?tab=mine|everyone|agents. */
+export const Home = z.object({
+  tab: HomeTab,
+  generatedAt: Timestamp,
+  counts: HomeTabCounts,
+  /** Empty on the Agents tab. */
+  deadlines: z.array(HomeDeadline),
+  /** HOME_GROUPS_BY_TAB[tab], in that order, empty groups included. */
+  groups: z.array(HomeGroup),
+  /** Agents tab only (empty otherwise): working first, then by name. */
+  agents: z.array(HomeAgent),
+});
+export type Home = z.output<typeof Home>;
+
+/** GET /home/counts: the sidebar count of what needs the caller (the Mine tab count). */
+export const HomeCounts = z
+  .object({
+    review: z.number().int().nonnegative(),
+    mentions: z.number().int().nonnegative(),
+    blocked: z.number().int().nonnegative(),
+    overdue: z.number().int().nonnegative(),
+    /** review + mentions + blocked + overdue. */
+    total: z.number().int().nonnegative(),
+  })
+  .refine((c) => c.total === c.review + c.mentions + c.blocked + c.overdue, {
+    message: 'total is the sum of the four groups',
+    path: ['total'],
+  });
+export type HomeCounts = z.output<typeof HomeCounts>;
 
 // ---------------------------------------------------------------------------
 // List wrappers

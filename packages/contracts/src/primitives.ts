@@ -17,6 +17,8 @@ export const TaskId = RowId;
 export const MilestoneId = RowId;
 export const CycleId = RowId;
 export const CommentId = RowId;
+/** M5. */
+export const LabelId = RowId;
 
 /**
  * Timestamps travel as ISO 8601 UTC strings. Servers may hand in a Date (what Drizzle returns);
@@ -470,7 +472,10 @@ export type ActivityOrigin = z.infer<typeof ActivityOrigin>;
 /** Name shown for activity a Backlog.md refresh wrote (actor null, origin backlog). */
 export const BACKLOG_ACTOR_NAME = 'Backlog.md';
 
-/** Task fields Backlog.md owns while the project mirrors. Contract field names. */
+/**
+ * Task fields Backlog.md owns while the project mirrors. Contract field names. M5 adds labels,
+ * dueDate, blockedBy and parent (filled from the files on refresh).
+ */
 export const TASK_OWNED_FIELDS = [
   'title',
   'description',
@@ -479,6 +484,10 @@ export const TASK_OWNED_FIELDS = [
   'assignee',
   'milestone',
   'createdAt',
+  'labels',
+  'dueDate',
+  'blockedBy',
+  'parent',
 ] as const;
 export const TaskOwnedField = z.enum(TASK_OWNED_FIELDS);
 export type TaskOwnedField = z.infer<typeof TaskOwnedField>;
@@ -495,6 +504,54 @@ export type MilestoneOwnedField = z.infer<typeof MilestoneOwnedField>;
 export const PROJECT_OWNED_FIELDS = ['key', 'repository', 'usesMilestones'] as const;
 export const ProjectOwnedField = z.enum(PROJECT_OWNED_FIELDS);
 export type ProjectOwnedField = z.infer<typeof ProjectOwnedField>;
+
+// ---------------------------------------------------------------------------
+// Labels (M5)
+// ---------------------------------------------------------------------------
+
+/** Longest label name in characters. Names are unique per project, ignoring case. */
+export const MAX_LABEL_NAME_LENGTH = 40;
+
+/** Number of palette hues. A label colour is 1 to LABEL_COLOR_COUNT, drawn with --label-N. */
+export const LABEL_COLOR_COUNT = 9;
+export const LabelColor = z
+  .number()
+  .int()
+  .min(1, `Use a colour from 1 to ${LABEL_COLOR_COUNT}`)
+  .max(LABEL_COLOR_COUNT, `Use a colour from 1 to ${LABEL_COLOR_COUNT}`);
+export type LabelColor = z.infer<typeof LabelColor>;
+
+/** app: created in the app. backlog: read from Backlog.md files; the name is locked, the colour isn't. */
+export const LABEL_SOURCES = ['app', 'backlog'] as const;
+export const LabelSource = z.enum(LABEL_SOURCES);
+export type LabelSource = z.infer<typeof LabelSource>;
+
+// ---------------------------------------------------------------------------
+// Due dates (M5)
+// ---------------------------------------------------------------------------
+
+/**
+ * "Due soon": an open task due today or within this many days after today, in APP_TIME_ZONE
+ * (today, tomorrow, the day after). Overdue: an open task due before today.
+ */
+export const DUE_SOON_DAYS = 2;
+
+/** How a due date reads, for chips and filters. done covers Done and Canceled tasks with a date. */
+export const DUE_STATES = ['none', 'future', 'soon', 'today', 'overdue', 'done'] as const;
+export const DueState = z.enum(DUE_STATES);
+export type DueState = z.infer<typeof DueState>;
+
+/**
+ * The due state of a task. `today` is the CalendarDate of today in APP_TIME_ZONE; dates compare
+ * as strings because CalendarDate is YYYY-MM-DD.
+ */
+export function dueState(dueDate: string | null, status: TaskStatus, today: string): DueState {
+  if (dueDate === null) return 'none';
+  if (!isOpenStatus(status)) return 'done';
+  if (dueDate < today) return 'overdue';
+  if (dueDate === today) return 'today';
+  return cycleLengthDays(today, dueDate) - 1 <= DUE_SOON_DAYS ? 'soon' : 'future';
+}
 
 // ---------------------------------------------------------------------------
 // Theme

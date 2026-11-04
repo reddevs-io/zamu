@@ -10,6 +10,10 @@ import {
   CycleList,
   Dashboard,
   DashboardCounts,
+  Home,
+  HomeCounts,
+  LabelList,
+  LabelWithUsage,
   Me,
   MemberList,
   MilestoneList,
@@ -17,26 +21,32 @@ import {
   Project,
   ProjectList,
   Task,
+  TaskBulkResult,
   TaskListPage,
   Timeline,
 } from './entities';
 import {
+  BulkUpdateTasksInput,
   CreateCommentInput,
   CreateCycleInput,
+  CreateLabelInput,
   CreateMilestoneInput,
   CreateProjectInput,
   CreateTaskInput,
   DeleteCommentInput,
+  DeleteLabelInput,
   DeleteMilestoneInput,
   DeleteProjectInput,
   EndCycleInput,
   GetBacklogStatusInput,
   GetCycleInput,
   GetDashboardInput,
+  GetHomeInput,
   GetMilestoneInput,
   GetTaskInput,
   ListCommentsInput,
   ListCyclesInput,
+  ListLabelsInput,
   ListMilestonesInput,
   ListTaskActivityInput,
   ListTasksInput,
@@ -44,6 +54,7 @@ import {
   RefreshBacklogInput,
   UpdateCommentInput,
   UpdateCycleInput,
+  UpdateLabelInput,
   UpdateMeInput,
   UpdateMilestoneInput,
   UpdateProjectInput,
@@ -85,6 +96,17 @@ export const apiErrors = {
   BACKLOG_PAUSED: { status: PROBLEM_STATUS.BACKLOG_PAUSED, data: ProblemData },
   /** Refreshing a source that was detached. */
   BACKLOG_DETACHED: { status: PROBLEM_STATUS.BACKLOG_DETACHED, data: ProblemData },
+  // M5
+  /** A label name the project has already, ignoring case (409). */
+  LABEL_EXISTS: { status: PROBLEM_STATUS.LABEL_EXISTS, data: ProblemData },
+  /** Renaming or deleting a label from Backlog.md files (409). */
+  LABEL_MIRRORED: { status: PROBLEM_STATUS.LABEL_MIRRORED, data: ProblemData },
+  /** A blocker that would close a loop (409). */
+  DEPENDENCY_LOOP: { status: PROBLEM_STATUS.DEPENDENCY_LOOP, data: ProblemData },
+  /** A parent or subtask that would nest more than one level (409). */
+  SUBTASK_DEPTH: { status: PROBLEM_STATUS.SUBTASK_DEPTH, data: ProblemData },
+  /** Related tasks, labels, or a bulk milestone or cycle across projects (422). */
+  NOT_SAME_PROJECT: { status: PROBLEM_STATUS.NOT_SAME_PROJECT, data: ProblemData },
 };
 
 const base = oc.errors(apiErrors);
@@ -170,7 +192,9 @@ export const contract = base.prefix(API_PREFIX).router({
         description:
           'Tasks of one or more projects, or of every readable project when project is omitted. ' +
           'order=list (default): status, then priority (highest first), then last update. order=board: ' +
-          'status, then board rank. Paginate with nextCursor.',
+          'status, then board rank. sort (priority, due, updated, created, manual) orders the whole ' +
+          'result by one key instead. Filters: label ids (any of), due (overdue, soon, none, set), ' +
+          'blocked, topLevel and parent. Paginate with nextCursor.',
       })
       .input(ListTasksInput)
       .output(TaskListPage),
@@ -185,7 +209,11 @@ export const contract = base.prefix(API_PREFIX).router({
         successStatus: 201,
         tags: ['tasks'],
         summary: 'Create a task',
-        description: 'New tasks go to the top of their board column. cycle takes a number, current or next.',
+        description:
+          'New tasks go to the top of their board column. cycle takes a number, current or next. ' +
+          'labels are names; missing ones are created. parent makes it a subtask (one level, same ' +
+          'project) that takes the parent assignee unless one is given. blockedBy lists task keys of ' +
+          'the same project.',
       })
       .input(CreateTaskInput)
       .output(Task),
@@ -196,12 +224,30 @@ export const contract = base.prefix(API_PREFIX).router({
         tags: ['tasks'],
         summary: 'Update a task',
         description:
-          'Send only the fields to change. null clears assignee, description, milestone and cycle. ' +
-          'position places the task before or after another task of its target status column. With ' +
-          'ifUpdatedAt, a task changed since then fails with 409 TASK_CHANGED and the current task.',
+          'Send only the fields to change. null clears assignee, description, milestone, cycle, ' +
+          'dueDate and parent. position places the task before or after another task of its target ' +
+          'status column. labels replaces the labels; addLabels and removeLabels change some. ' +
+          'addBlockers and removeBlockers change what the task waits on; a loop fails with 409 ' +
+          'DEPENDENCY_LOOP. With ifUpdatedAt, a task changed since then fails with 409 TASK_CHANGED ' +
+          'and the current task.',
       })
       .input(UpdateTaskInput)
       .output(Task),
+    bulkUpdate: base
+      .route({
+        method: 'POST',
+        path: '/tasks/bulk',
+        tags: ['tasks'],
+        summary: 'Change several tasks at once',
+        description:
+          'Up to 100 task keys of native projects, one change for all of them, in one transaction ' +
+          'with one activity row per changed task. Status, priority, assignee, milestone, cycle, ' +
+          'dueDate, addLabels and removeLabels. A mirrored task fails the request with 409 ' +
+          'TASK_MIRRORED; milestone and cycle need every task in one project (422 NOT_SAME_PROJECT). ' +
+          'Returns the tasks in the order sent.',
+      })
+      .input(BulkUpdateTasksInput)
+      .output(TaskBulkResult),
     activity: base
       .route({
         method: 'GET',
@@ -380,6 +426,57 @@ export const contract = base.prefix(API_PREFIX).router({
       .input(EndCycleInput)
       .output(CycleDetail),
   },
+  labels: {
+    list: base
+      .route({
+        method: 'GET',
+        path: '/projects/{project}/labels',
+        tags: ['labels'],
+        summary: 'List the labels of a project',
+        description: 'By name, with the number of tasks using each label.',
+      })
+      .input(ListLabelsInput)
+      .output(LabelList),
+    create: base
+      .route({
+        method: 'POST',
+        path: '/projects/{project}/labels',
+        successStatus: 201,
+        tags: ['labels'],
+        summary: 'Create a label',
+        description:
+          'Names are unique per project ignoring case (409 LABEL_EXISTS), up to 40 characters. ' +
+          'color is 1 to 9; omitted, the app picks the least used one. Task writes also create labels ' +
+          'by name.',
+      })
+      .input(CreateLabelInput)
+      .output(LabelWithUsage),
+    update: base
+      .route({
+        method: 'PATCH',
+        path: '/projects/{project}/labels/{id}',
+        tags: ['labels'],
+        summary: 'Rename or recolour a label',
+        description:
+          'Labels from Backlog.md keep their name (409 LABEL_MIRRORED) but take a new colour. Task ' +
+          'history keeps the name it recorded.',
+      })
+      .input(UpdateLabelInput)
+      .output(LabelWithUsage),
+    delete: base
+      .route({
+        method: 'DELETE',
+        path: '/projects/{project}/labels/{id}',
+        successStatus: 204,
+        tags: ['labels'],
+        summary: 'Delete a label',
+        description:
+          'Takes the label off every task, without activity rows. Labels from Backlog.md cannot be ' +
+          'deleted (409 LABEL_MIRRORED).',
+      })
+      .input(DeleteLabelInput)
+      .output(z.void()),
+  },
   backlog: {
     status: base
       .route({
@@ -434,6 +531,35 @@ export const contract = base.prefix(API_PREFIX).router({
           'projects or agents.',
       })
       .output(DashboardCounts),
+  },
+  home: {
+    get: base
+      .route({
+        method: 'GET',
+        path: '/home',
+        tags: ['home'],
+        summary: 'Get Home',
+        description:
+          'What needs attention, grouped by why. tab=mine (default): needs your review, mentions, ' +
+          'blocked, overdue and assigned to you. tab=everyone: needs review, blocked, overdue and ' +
+          'due this week across the workspace. tab=agents: one card per agent and what agents wait ' +
+          'on people for. Each task shows once, in its first group; each group has its total and up ' +
+          'to 50 items. Mine and Everyone add the deadlines strip. Filter by project, label name ' +
+          'and priority.',
+      })
+      .input(GetHomeInput)
+      .output(Home),
+    counts: base
+      .route({
+        method: 'GET',
+        path: '/home/counts',
+        tags: ['home'],
+        summary: 'Count what needs you',
+        description:
+          'The Mine counts of needs your review, mentions, blocked and overdue, and their sum (the ' +
+          'sidebar count), without items.',
+      })
+      .output(HomeCounts),
   },
   members: {
     list: base

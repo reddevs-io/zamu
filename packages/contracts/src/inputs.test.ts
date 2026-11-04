@@ -192,14 +192,32 @@ describe('ListTasksInput', () => {
     expect(ListTasksInput.safeParse({ project: 'PAY', priority: [5] }).success).toBe(false);
   });
 
-  it.each(['me', 'agents', '0190a1b2-0000-7000-8000-00000000a0a0'])(
-    'accepts assignee filter %s',
+  it.each(['me', 'agents', 'none', '0190a1b2-0000-7000-8000-00000000a0a0'])(
+    'accepts assignee filter %s, as a list of one',
     (assignee) => {
-      expect(ListTasksInput.parse({ project: 'PAY', assignee }).assignee).toBe(assignee);
+      expect(ListTasksInput.parse({ project: 'PAY', assignee }).assignee).toEqual([assignee]);
     },
   );
 
-  it('rejects an assignee that is neither me, agents nor a user id, and an over-long query', () => {
+  it('takes several assignees, milestones and cycles, de-duplicated', () => {
+    const userId = '0190a1b2-0000-7000-8000-00000000a0a0';
+    expect(ListTasksInput.parse({ assignee: ['me', 'none', userId, 'me'] }).assignee).toEqual([
+      'me',
+      'none',
+      userId,
+    ]);
+    expect(ListTasksInput.parse({ milestone: ['none', projectId] }).milestone).toEqual(['none', projectId]);
+    expect(ListTasksInput.parse({ cycle: ['12', 12, 'current', 'none'] }).cycle).toEqual([
+      12,
+      'current',
+      'none',
+    ]);
+    expect(ListTasksInput.safeParse({ assignee: [] }).success).toBe(false);
+    expect(ListTasksInput.safeParse({ cycle: ['12', 'previous'] }).success).toBe(false);
+    expect(ListTasksInput.safeParse({ milestone: ['none', 'Webhooks v2'] }).success).toBe(false);
+  });
+
+  it('rejects an assignee that is neither me, agents, none nor a user id, and an over-long query', () => {
     expect(ListTasksInput.safeParse({ project: 'PAY', assignee: '' }).success).toBe(false);
     expect(ListTasksInput.safeParse({ project: 'PAY', assignee: 'ana' }).success).toBe(false);
     expect(ListTasksInput.safeParse({ project: 'PAY', q: 'x'.repeat(201) }).success).toBe(false);
@@ -220,8 +238,8 @@ describe('ListTasksInput', () => {
   });
 
   it('filters by milestone id or none', () => {
-    expect(ListTasksInput.parse({ milestone: 'none' }).milestone).toBe('none');
-    expect(ListTasksInput.parse({ milestone: projectId }).milestone).toBe(projectId);
+    expect(ListTasksInput.parse({ milestone: 'none' }).milestone).toEqual(['none']);
+    expect(ListTasksInput.parse({ milestone: projectId }).milestone).toEqual([projectId]);
     expect(ListTasksInput.safeParse({ milestone: 'Webhooks v2' }).success).toBe(false);
   });
 
@@ -232,7 +250,7 @@ describe('ListTasksInput', () => {
     ['12', 12],
     [12, 12],
   ])('filters by cycle %j', (cycle, parsed) => {
-    expect(ListTasksInput.parse({ cycle }).cycle).toBe(parsed);
+    expect(ListTasksInput.parse({ cycle }).cycle).toEqual([parsed]);
   });
 
   it.each(['0', '-1', '1.5', 'C12', 'previous', '', 0, 2.5, 99_999_999_999])(
