@@ -41,6 +41,7 @@ export function agentsBlock(project: string | null): string {
     `- Hand it over for review: \`pm tasks update ${task} --status in_review\``,
     `- Add a follow-up: \`pm tasks create "Title"${projectFlag} --description -\``,
     `- Milestones and cycles: \`pm milestones list${projectFlag}\`, \`pm cycles current${projectFlag}\``,
+    `- Split or link work: \`pm tasks create "Title" --parent ${task}\`, \`pm tasks update ${task} --blocked-by ${key}-9 --label bug\``,
     '',
     'In a project mirrored from Backlog.md, Backlog.md ids work as task keys, and the task files own title,',
     'description, status, priority, assignee and milestone: change those in the files (or with `backlog task edit`)',

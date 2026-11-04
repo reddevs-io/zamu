@@ -6,8 +6,10 @@ import {
   CreateTaskInput,
   FILTER_NONE,
   GetTaskInput,
+  LabelId,
   ListTasksInput,
   MilestoneId,
+  type RelatedTask,
   TASK_STATUSES,
   type Task,
   Timeline,
@@ -30,6 +32,7 @@ import {
   timelineText,
 } from '../format';
 import { requireProject, resolveProject } from '../project';
+import { resolveLabelIds } from './labels';
 import {
   isNone,
   normalizeChoice,
@@ -65,15 +68,51 @@ function planningFields(task: Pick<Task, 'milestone' | 'cycle'>): [string, strin
   return entries;
 }
 
+/** "PAY-9  Settle refunds (In progress)", or "Removed task" for a task the caller can't see. */
+function relatedLine(task: RelatedTask | null): string {
+  return task ? `${task.key}  ${task.title} (${statusLabel(task.status)})` : 'Removed task';
+}
+
+/** "PAY-9, Removed task": relation keys on one line, for the create and update summaries. */
+function relatedKeys(tasks: readonly (RelatedTask | null)[]): string {
+  return tasks.map((task) => task?.key ?? 'Removed task').join(', ');
+}
+
+/** One entry per related task: the label on the first line, blank labels after it. */
+function relatedEntries(label: string, tasks: readonly (RelatedTask | null)[]): [string, string][] {
+  return tasks.map((task, i) => [i === 0 ? label : '', relatedLine(task)]);
+}
+
+/** "Todo", or "Todo · blocked" while a blocker is open. */
+function statusField(context: CommandContext, task: Pick<Task, 'status' | 'blocked'>): string {
+  const status = context.style.status(task.status, statusLabel(task.status));
+  return task.blocked ? `${status} · ${context.style.warn('blocked')}` : status;
+}
+
+/** M5 lines, only for what the task has: labels, due date and parent. */
+function fieldEntries(task: Pick<Task, 'labels' | 'dueDate' | 'parent'>): [string, string][] {
+  const entries: [string, string][] = [];
+  if (task.labels?.length) entries.push(['Labels', task.labels.map((label) => label.name).join(', ')]);
+  if (task.dueDate) entries.push(['Due', task.dueDate]);
+  if (task.parent) entries.push(['Parent', relatedLine(task.parent)]);
+  return entries;
+}
+
 function taskSummary(context: CommandContext, verb: string, task: Task): string {
   const { style } = context;
   const head = `${verb} ${style.bold(task.key)}  ${task.title}`;
+  const progress = task.subtaskProgress;
   return `${head}\n${fields(
     [
-      ['Status', style.status(task.status, statusLabel(task.status))],
+      ['Status', statusField(context, task)],
       ['Priority', style.priority(task.priority, priorityLabel(task.priority))],
       ['Assignee', assigneeLabel(task.assignee)],
       ...planningFields(task),
+      ...fieldEntries(task),
+      ...(task.blockedBy?.length ? [['Blocked by', relatedKeys(task.blockedBy)] as [string, string]] : []),
+      ...(progress && progress.total > 0
+        ? [['Subtasks', `${progress.done} of ${progress.total} done`] as [string, string]]
+        : []),
     ],
     style,
   )}`;
@@ -104,6 +143,18 @@ function cycleValue(value: string): string | null {
   return cycle === FILTER_NONE ? null : cycle;
 }
 
+/** --due and --parent: the value as typed (trimmed), or null for none. */
+function valueOrNull(value: string): string | null {
+  return isNone(value) ? null : value.trim();
+}
+
+/** Today on this machine as YYYY-MM-DD, to mark overdue dates in the list (colour only). */
+function localToday(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 // ---------------------------------------------------------------------------
 // pm tasks list
 // ---------------------------------------------------------------------------
@@ -115,6 +166,12 @@ export interface ListOptions {
   assignee?: string;
   milestone?: string;
   cycle?: string;
+  label?: string[];
+  due?: string;
+  blocked?: boolean;
+  topLevel?: boolean;
+  parent?: string;
+  sort?: string;
   limit?: string;
   cursor?: string;
 }
@@ -129,7 +186,10 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
     options.milestone !== undefined &&
     !milestoneNone &&
     !MilestoneId.safeParse(options.milestone.trim()).success;
-  const fallback = !options.project?.length && milestoneName ? await resolveProject(context) : null;
+  // Label names are looked up the same way (label ids need no project).
+  const labelName = options.label?.some((value) => !LabelId.safeParse(value).success) ?? false;
+  const fallback =
+    !options.project?.length && (milestoneName || labelName) ? await resolveProject(context) : null;
   const projects = options.project?.length ? options.project : fallback ? [fallback.key] : undefined;
   const draft = {
     ...(projects ? { project: projects } : {}),
@@ -137,6 +197,11 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
     ...(options.mine ? { assignee: ASSIGNEE_ME } : {}),
     ...(milestoneNone ? { milestone: FILTER_NONE } : {}),
     ...(options.cycle !== undefined ? { cycle: normalizeCycle(options.cycle) } : {}),
+    ...(options.due !== undefined ? { due: normalizeChoice(options.due) } : {}),
+    ...(options.blocked !== undefined ? { blocked: options.blocked } : {}),
+    ...(options.topLevel ? { topLevel: true } : {}),
+    ...(options.parent !== undefined ? { parent: options.parent } : {}),
+    ...(options.sort !== undefined ? { sort: normalizeChoice(options.sort) } : {}),
     ...(options.limit !== undefined ? { limit: options.limit } : {}),
     ...(options.cursor !== undefined ? { cursor: options.cursor } : {}),
   };
@@ -155,10 +220,14 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
           checked.project?.length === 1 ? checked.project[0] : undefined,
           options.milestone,
         );
+  const label = options.label?.length
+    ? await resolveLabelIds(client, checked.project, options.label)
+    : undefined;
   const input = parseInput(ListTasksInput, {
     ...draft,
     ...(assignee ? { assignee } : {}),
     ...(milestone ? { milestone } : {}),
+    ...(label ? { label } : {}),
   });
   const page = await client.tasks.list(input);
 
@@ -167,9 +236,13 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
     if (data.items.length === 0) {
       return input.project ? `No tasks in ${input.project.join(', ')} match.\n` : 'No tasks match.\n';
     }
-    // Milestone and cycle columns appear only when some task has one.
+    // Milestone, cycle and the M5 columns appear only when some task has a value for them.
+    type Row = (typeof data.items)[number];
     const withMilestone = data.items.some((t) => t.milestone);
     const withCycle = data.items.some((t) => t.cycle);
+    const optional = (header: string, value: (t: Row) => string, style?: (t: Row, cell: string) => string) =>
+      data.items.some((t) => value(t) !== '') ? [{ header, value, ...(style ? { style } : {}) }] : [];
+    const today = localToday();
     const rows = table(
       data.items,
       [
@@ -196,6 +269,26 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
               },
             ]
           : []),
+        ...optional(
+          'DUE',
+          (t) => t.dueDate ?? '',
+          (t, cell) =>
+            t.dueDate && t.dueDate < today && t.status !== 'done' && t.status !== 'canceled'
+              ? style.warn(cell)
+              : cell,
+        ),
+        ...optional('LABELS', (t) => (t.labels ?? []).map((l) => l.name).join(', ')),
+        ...optional('PARENT', (t) => t.parentKey ?? ''),
+        ...optional('SUBTASKS', (t) =>
+          t.subtaskProgress && t.subtaskProgress.total > 0
+            ? `${t.subtaskProgress.done}/${t.subtaskProgress.total}`
+            : '',
+        ),
+        ...optional(
+          'BLOCKED',
+          (t) => (t.blocked ? 'blocked' : ''),
+          (_t, cell) => style.warn(cell),
+        ),
         { header: 'TITLE', value: (t) => t.title },
       ],
       style,
@@ -228,6 +321,17 @@ async function loadTimeline(client: ApiClient, input: GetTaskInput): Promise<Tim
   }
 }
 
+/** "Subtasks  1 of 2 done" then one line per subtask, canceled ones included. */
+function subtaskEntries(task: Pick<Task, 'subtasks' | 'subtaskProgress'>): [string, string][] {
+  const subtasks = task.subtasks ?? [];
+  if (subtasks.length === 0) return [];
+  const progress = task.subtaskProgress ?? { done: 0, total: 0 };
+  return [
+    ['Subtasks', `${progress.done} of ${progress.total} done`],
+    ...subtasks.map((subtask): [string, string] => ['', relatedLine(subtask)]),
+  ];
+}
+
 export async function showTask(
   context: CommandContext,
   key: string,
@@ -252,10 +356,14 @@ export async function showTask(
       `${style.bold(t.key)}  ${style.bold(t.title)}\n`,
       fields(
         [
-          ['Status', style.status(t.status, statusLabel(t.status))],
+          ['Status', statusField(context, t)],
           ['Priority', style.priority(t.priority, priorityLabel(t.priority))],
           ['Assignee', assigneeLabel(t.assignee)],
           ...planningFields(t),
+          ...fieldEntries(t),
+          ...subtaskEntries(t),
+          ...relatedEntries('Blocked by', t.blockedBy ?? []),
+          ...relatedEntries('Blocks', t.blocks ?? []),
           ['Project', `${t.project.key}  ${t.project.name}`],
           ...backlogFields(t),
           ['Created', `${formatTime(t.createdAt)} by ${createdBy}`],
@@ -283,6 +391,10 @@ export interface CreateOptions {
   status?: string;
   milestone?: string;
   cycle?: string;
+  label?: string[];
+  due?: string;
+  parent?: string;
+  blockedBy?: string[];
 }
 
 export async function createTask(
@@ -302,6 +414,10 @@ export async function createTask(
     ...(options.priority !== undefined ? { priority: normalizeChoice(options.priority) } : {}),
     ...(options.status !== undefined ? { status: normalizeChoice(options.status) } : {}),
     ...(options.cycle !== undefined ? { cycle: cycleValue(options.cycle) } : {}),
+    ...(options.label?.length ? { labels: options.label } : {}),
+    ...(options.due !== undefined ? { dueDate: valueOrNull(options.due) } : {}),
+    ...(options.parent !== undefined ? { parent: valueOrNull(options.parent) } : {}),
+    ...(options.blockedBy?.length ? { blockedBy: options.blockedBy } : {}),
   };
   const checked = parseInput(CreateTaskInput, draft);
   const client = await context.client();
@@ -336,6 +452,12 @@ export interface UpdateOptions {
   description?: string;
   milestone?: string;
   cycle?: string;
+  label?: string[];
+  removeLabel?: string[];
+  due?: string;
+  parent?: string;
+  blockedBy?: string[];
+  unblock?: string[];
 }
 
 export async function updateTask(
@@ -359,6 +481,12 @@ export async function updateTask(
     ...(options.unassign ? { assignee: null } : {}),
     ...(milestoneNone ? { milestone: null } : {}),
     ...(options.cycle !== undefined ? { cycle: cycleValue(options.cycle) } : {}),
+    ...(options.label?.length ? { addLabels: options.label } : {}),
+    ...(options.removeLabel?.length ? { removeLabels: options.removeLabel } : {}),
+    ...(options.due !== undefined ? { dueDate: valueOrNull(options.due) } : {}),
+    ...(options.parent !== undefined ? { parent: valueOrNull(options.parent) } : {}),
+    ...(options.blockedBy?.length ? { addBlockers: options.blockedBy } : {}),
+    ...(options.unblock?.length ? { removeBlockers: options.unblock } : {}),
   };
   // `me` and null stand in for names still to be resolved, so "change at least one field" passes.
   parseInput(UpdateTaskInput, {

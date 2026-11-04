@@ -119,6 +119,21 @@ pm tasks update PAY-142 --unassign
 pm tasks update PAY-142 --milestone "Webhooks v2" --cycle 12
 pm tasks update PAY-142 --milestone none --cycle none
 
+pm tasks list --project PAY --label bug,ui --due overdue --sort due
+pm tasks list --project PAY --blocked                  # or --no-blocked
+pm tasks list --project PAY --top-level                # leave subtasks out
+pm tasks list --parent PAY-142                         # the subtasks of PAY-142
+pm tasks create --project PAY "Refund email" --parent PAY-142 --label email --due 2026-11-20
+pm tasks create --project PAY "Send receipts" --blocked-by PAY-140,PAY-141
+pm tasks update PAY-142 --label ui --remove-label bug --due none
+pm tasks update PAY-150 --blocked-by PAY-142 --unblock PAY-139
+pm tasks update PAY-151 --parent none                  # back to the top level
+
+pm labels list --project PAY                           # with the number of tasks using each
+pm labels create --project PAY "Needs design" --color 4
+pm labels update "needs design" --project PAY --name design --color 7
+pm labels delete design --project PAY --confirm design
+
 pm comments list PAY-142
 pm comments add PAY-142 "Ready for review, @ana@example.com"
 pnpm test 2>&1 | tail -20 | pm comments add PAY-142 -
@@ -176,6 +191,39 @@ pm backlog refresh --wait                       # wait for it (up to 5 minutes) 
 - `pm cycles end` ends the current cycle unless you pass a number. Unfinished tasks move to
   `--move-to` (a cycle number, or `none`), else the next upcoming cycle, else a new cycle of the same
   length.
+
+### Labels, due dates, subtasks and blockers
+
+- Labels belong to a project. Names are up to 40 characters and unique in the project, ignoring case.
+  `--label` on `pm tasks create` and `pm tasks update` adds labels by name and creates the ones the
+  project doesn't have; `--remove-label` takes them off. Both repeat or take a comma-separated list.
+- `pm tasks list --label` looks names up in `--project` (or the folder's project) and matches tasks with
+  any of them. With several projects a name matches in each project that has it. A name none of them
+  has fails with exit code 1 and lists the project's labels.
+- `pm labels` lists, creates, renames, recolours (`--color 1` to `9`) and deletes labels. Commands take a
+  label name (any case) or id. An unknown label exits 3, a name the project has already 1
+  (`LABEL_EXISTS`). Labels read from Backlog.md files keep their name: renaming or deleting one exits 6
+  (`LABEL_MIRRORED`); the colour still changes. Renames and deletes write no task history.
+- `pm labels delete` takes the label off every task. `--confirm` repeats the name (any case); without
+  it, or with another name, pm exits 1 ("Pass --confirm design to delete label design from PAY.") and
+  sends nothing.
+- `--due YYYY-MM-DD` sets the due date; `none` clears it on `pm tasks update`. `pm tasks list --due`
+  takes `overdue` (open tasks due before today), `soon` (open tasks due today or in the next 2 days),
+  `none` or `set`. Today is the server's day.
+- `--parent KEY` makes a task a subtask of another task in the same project; `none` makes it top level
+  again. Subtasks go one level deep (`SUBTASK_DEPTH`, exit 1). A new subtask takes the parent's
+  assignee unless `--assignee` is given.
+- `--blocked-by KEY` adds a blocker from the same project (`NOT_SAME_PROJECT` otherwise), `--unblock KEY`
+  removes one. A task is blocked while any blocker is open; status changes are never refused. A
+  blocker that closes a loop fails with exit code 1: `pm: Can't add: PAY-150 already waits on PAY-142.`
+  (`DEPENDENCY_LOOP`, with `loop: { task, blocker }` in the `--json` error).
+- `pm tasks list --sort` orders the whole list by `priority`, `due` (soonest first, none last),
+  `updated`, `created` (newest first) or `manual` (board order). Without it the list is grouped by
+  status, then priority.
+- `pm tasks show` adds Labels, Due, Parent, Subtasks (done of total, canceled left out, then one line
+  each), Blocked by and Blocks, and "· blocked" after the status. A blocker you can't see reads
+  "Removed task". `pm tasks list` adds DUE, LABELS, PARENT, SUBTASKS and BLOCKED columns when a row has
+  a value for them.
 
 ### Dashboard
 
@@ -291,6 +339,10 @@ Every command takes `--json` and prints one versioned result:
 | `pm agents`            | `pm.v1.agents`            |
 | `pm backlog status`    | `pm.v1.backlog.status`    |
 | `pm backlog refresh`   | `pm.v1.backlog.refresh`   |
+| `pm labels list`       | `pm.v1.labels.list`       |
+| `pm labels create`     | `pm.v1.labels.create`     |
+| `pm labels update`     | `pm.v1.labels.update`     |
+| `pm labels delete`     | `pm.v1.labels.delete`     |
 | any failure            | `pm.v1.error`             |
 
 The data schemas live in `@pm/contracts` (`cliDataSchemas`, `parseCliOutput`). Within `v1`, fields are
@@ -299,9 +351,11 @@ indented at a terminal.
 
 With `--json`, failures print `pm.v1.error` on stdout: an RFC 9457 problem with `code`, `status`,
 `detail`, and `requestId` and `issues` when the server sent them (`field`, `file`, `backlogId` and `hint`
-for the Backlog.md mirror errors). The exit code is still non-zero.
+for the Backlog.md mirror errors, `loop` for `DEPENDENCY_LOOP`). The exit code is still non-zero.
 
-`pm.v1.projects.delete` is `{ "deleted": "PAY" }`.
+`pm.v1.projects.delete` is `{ "deleted": "PAY" }`. `pm.v1.labels.delete` is the label as it was and
+the number of tasks it was on:
+`{ "deleted": { "id": "...", "name": "design", "color": 7, "source": "app" }, "usageCount": 3 }`.
 
 `pm.v1.backlog.status` holds the first 50 problems unless you pass `--problems`, which reads them all.
 `pm.v1.backlog.refresh` is the refresh request plus `outcome` and, with `--wait`, the final `status`.
