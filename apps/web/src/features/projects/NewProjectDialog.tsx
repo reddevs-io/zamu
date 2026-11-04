@@ -191,7 +191,7 @@ export function NewProjectForm({ onCancel, onSubmit }: NewProjectFormProps) {
           mono
           autoComplete="off"
           spellCheck="false"
-          inputClassName="w-[140px] text-[13px] tracking-[0.04em]"
+          inputClassName="w-35 text-sm tracking-[0.04em]"
           value={values.key}
           onChange={onKeyChange}
           description={keyHint(values.key, !keyEdited)}
@@ -202,7 +202,7 @@ export function NewProjectForm({ onCancel, onSubmit }: NewProjectFormProps) {
         <TextField
           label={
             <>
-              Description <span className="font-normal text-faint">optional</span>
+              Description <span className="font-normal text-fg-3">optional</span>
             </>
           }
           name="description"

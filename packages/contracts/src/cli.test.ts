@@ -54,6 +54,10 @@ describe('CLI output', () => {
       'backlog.status',
       'backlog.refresh',
       'dashboard',
+      'labels.list',
+      'labels.create',
+      'labels.update',
+      'labels.delete',
       'error',
     ]);
   });

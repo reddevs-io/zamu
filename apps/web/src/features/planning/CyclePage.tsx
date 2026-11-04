@@ -1,55 +1,51 @@
 import type { CycleDetail, CycleRollover, CycleSelector, TaskListItem } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
-import { useProjectSummary, ViewSwitch } from '~/features/project-header';
-import { useNow } from '~/features/tasks/clock';
-import { atTime, formatAge } from '~/features/tasks/format';
+import { type ReactNode, useMemo, useState } from 'react';
+import { Link } from 'react-aria-components';
+import { useOptionalQuickCreate } from '~/features/shell/quick-create';
 import { taskListQuery } from '~/features/tasks/queries';
+import { clearedFilter, DisplayButton, FilterButton, FilterChips } from '~/features/views';
 import {
   Button,
   CycleGlyph,
-  DaysLeftPill,
   EmptyState,
-  FilterBar,
-  MemberLabel,
+  OPEN_STATUSES,
   type PickerItem,
   PickerPopover,
-  PriorityGlyph,
   Skeleton,
   STATUS_LABELS,
-  StatStrip,
-  StatTile,
-  StatusSquare,
-  Tag,
+  StatusGlyph,
   useCopy,
   useHotkeys,
 } from '~/ui';
 import { EditCycleDialog, nextCycleNumber } from './CycleDialogHost';
-import { CycleBars, cycleHref, elapsedDays, splitCycles } from './CyclesScreen';
-import { describeStart, formatRange, lengthInDays } from './dates';
+import { cycleDay, cycleHref, daysAfterToday, splitCycles } from './CyclesScreen';
+import { daysBetween, formatRange, formatShortRange, lengthInDays } from './dates';
 import { EndCycleDialog } from './EndCycleDialog';
-import { filterUnassigned, PlanningFilters, taskFilters } from './PlanningFilters';
-import { compareTasks, PlanningTaskTable } from './PlanningTaskTable';
+import { EmptyTasks, LegendEnd } from './MilestonePage';
+import { PlanningHeader } from './PlanningHeader';
+import { PlanningTaskTable } from './PlanningTaskTable';
 import {
-  CrumbHeader,
-  GroupBand,
-  ListCell,
-  ListHead,
-  ListRow,
-  ListTable,
+  FoldGroup,
   LoadError,
-  RowLink,
+  PageHead,
+  PageKind,
+  PageTitle,
+  type StatItem,
+  Stats,
+  StatusBar,
+  StatusLegend,
+  splitOf,
   useServerToday,
 } from './parts';
 import { cycleQuery, cyclesQuery, useAddToCycle, useEndCycle } from './queries';
-import type { PlanningTasksSearch } from './search';
+import { planningGroupChoices, usePlanningTasks } from './usePlanningTasks';
 
-// /p/PAY/cycles/12 (frames 24 to 27). A current or upcoming cycle shows its bars and tasks grouped by
-// status, with "+ Oct 17" on tasks added after the start; End cycle opens the end dialog. A completed
-// cycle shows the summary written when it ended and the record of what rolled over.
-
-const OPEN_STATUSES = ['backlog', 'todo', 'in_progress', 'in_review'] as const;
+// /p/HBR/cycles/12 (frame 110): kind, serif title, the cycle's goal (its name), the numbers, the
+// segmented bar and legend, then its tasks in the list rows with Filter and Display. A current cycle
+// has End cycle; an upcoming one has Edit. A completed cycle shows its summary, what rolled over and
+// where to, then the tasks that stayed (done and canceled, folded).
 
 /** Route param to a cycle selector: 12, current or next. */
 export function parseCycleParam(value: string): CycleSelector | null {
@@ -60,28 +56,21 @@ export function parseCycleParam(value: string): CycleSelector | null {
 export interface CyclePageProps {
   projectKey: string;
   selector: CycleSelector;
-  search: PlanningTasksSearch;
 }
 
-export function CyclePage({ projectKey, selector, search }: CyclePageProps) {
+export function CyclePage({ projectKey, selector }: CyclePageProps) {
   const navigate = useNavigate();
-  const project = useProjectSummary(projectKey);
   const cycle = useQuery(cycleQuery(projectKey, selector));
   const data = cycle.data;
-  const projectName = project?.name ?? projectKey;
-  const crumbs = [
-    { label: projectName, href: `/p/${projectKey}` },
-    { label: 'Cycles', href: `/p/${projectKey}/cycles` },
-    { label: data ? `Cycle ${data.number}` : typeof selector === 'number' ? `Cycle ${selector}` : '…' },
-  ];
+  const title = data ? `Cycle ${data.number}` : typeof selector === 'number' ? `Cycle ${selector}` : 'Cycle';
 
   if (cycle.isError && !data) {
     const missing = (cycle.error as { code?: string }).code === 'NOT_FOUND';
     return (
-      <section aria-label="Cycle" className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
-        <CrumbHeader crumbs={crumbs} />
+      <Frame label="Cycle">
+        <PlanningHeader projectKey={projectKey} section="cycles" title={title} />
         {missing ? (
-          <div className="flex px-6 py-12">
+          <div className="flex px-4.5 py-12">
             <EmptyState
               title={
                 selector === 'current'
@@ -109,31 +98,58 @@ export function CyclePage({ projectKey, selector, search }: CyclePageProps) {
             isRetrying={cycle.isFetching}
           />
         )}
-      </section>
+      </Frame>
     );
   }
 
   if (!data) {
     return (
-      <section aria-label="Cycle" className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
-        <CrumbHeader crumbs={crumbs} />
-        <div aria-busy="true" className="flex flex-col gap-3.5 border-b border-line px-6 py-[18px]">
-          <Skeleton width={240} height={20} />
-          <Skeleton width={420} height={6} />
-          <Skeleton width={420} height={6} />
-        </div>
-      </section>
+      <Frame label="Cycle">
+        <PlanningHeader projectKey={projectKey} section="cycles" title={title} />
+        <PageHead>
+          <div aria-busy="true" className="flex flex-col gap-3">
+            <Skeleton width={120} height={10} />
+            <Skeleton width={200} height={24} />
+            <Skeleton height={8} />
+          </div>
+        </PageHead>
+      </Frame>
     );
   }
 
   return data.state === 'completed' ? (
-    <CompletedCycle projectKey={projectKey} cycle={data} crumbs={crumbs} />
+    <CompletedCycle projectKey={projectKey} cycle={data} />
   ) : (
-    <ActiveCycle projectKey={projectKey} cycle={data} crumbs={crumbs} search={search} selector={selector} />
+    <ActiveCycle projectKey={projectKey} cycle={data} selector={selector} />
   );
 }
 
-type Crumbs = { label: string; href?: string }[];
+function Frame({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section aria-label={label} className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
+      {children}
+    </section>
+  );
+}
+
+/** "24 in scope  9 done  6 days left", or "6 planned  starts in 4 days" for an upcoming cycle. */
+export function activeCycleStats(cycle: CycleDetail, today: string | null): StatItem[] {
+  const scope = cycle.counts.total - cycle.counts.canceled;
+  if (cycle.state === 'current') {
+    const left = daysAfterToday(cycle);
+    return [
+      { value: scope, label: 'in scope' },
+      { value: cycle.counts.done, label: 'done' },
+      { value: left, label: left === 1 ? 'day left' : 'days left' },
+    ];
+  }
+  const items: StatItem[] = [{ value: scope, label: 'planned' }];
+  if (today) {
+    const days = Math.max(0, daysBetween(today, cycle.startsOn));
+    items.push({ value: days, label: days === 1 ? 'day to start' : 'days to start' });
+  }
+  return items;
+}
 
 // ---------------------------------------------------------------------------
 // Current and upcoming
@@ -142,47 +158,31 @@ type Crumbs = { label: string; href?: string }[];
 interface ActiveCycleProps {
   projectKey: string;
   cycle: CycleDetail;
-  crumbs: Crumbs;
-  search: PlanningTasksSearch;
   selector: CycleSelector;
 }
 
-function ActiveCycle({ projectKey, cycle, crumbs, search, selector }: ActiveCycleProps) {
+function ActiveCycle({ projectKey, cycle, selector }: ActiveCycleProps) {
   const navigate = useNavigate();
-  const project = useProjectSummary(projectKey);
-  const now = useNow();
+  const quickCreate = useOptionalQuickCreate();
   const today = useServerToday(projectKey);
   const isCurrent = cycle.state === 'current';
   const number = cycle.number;
-  const tasks = useQuery(
-    taskListQuery({ project: projectKey, cycle: String(number), ...taskFilters(search) }),
-  );
-  // Unfiltered, for the end dialog's list.
-  const allTasks = useQuery(taskListQuery({ project: projectKey, cycle: String(number) }));
+  const view = usePlanningTasks(projectKey, { cycle: number });
+  const { filter, setFilter, fields, display, tasks, all } = view;
   const cycles = useQuery(cyclesQuery(projectKey));
   const [ending, setEnding] = useState(false);
   const [editing, setEditing] = useState(false);
   const end = useEndCycle();
+  const from = `Cycle ${number}`;
 
-  const visibleTasks = useMemo(() => filterUnassigned(tasks.data?.items ?? [], search), [tasks.data, search]);
   const unfinished = useMemo(
-    () => (allTasks.data?.items ?? []).filter((task) => task.status !== 'done' && task.status !== 'canceled'),
-    [allTasks.data],
+    () => (all.data?.items ?? []).filter((task) => task.status !== 'done' && task.status !== 'canceled'),
+    [all.data],
   );
   const split = cycles.data ? splitCycles(cycles.data.items) : undefined;
   const next = split?.upcoming.find((item) => item.number !== number);
-
-  const openTask = (key: string) =>
-    void navigate({ to: '/p/$projectKey/$taskKey', params: { projectKey, taskKey: key } });
+  const newTask = () => quickCreate?.open(projectKey);
   const toBoard = () => void navigate({ href: `/p/${projectKey}?view=board&cycle=${number}` });
-  const writeSearch = (nextSearch: PlanningTasksSearch) =>
-    void navigate({
-      to: '/p/$projectKey/cycles/$cycleNumber',
-      params: { projectKey, cycleNumber: String(selector) },
-      search: nextSearch as never,
-      replace: true,
-    });
-
   useHotkeys({ v: toBoard });
 
   const onEnd = async (moveTo: number | 'none' | undefined) => {
@@ -202,21 +202,32 @@ function ActiveCycle({ projectKey, cycle, crumbs, search, selector }: ActiveCycl
     return null;
   };
 
+  const counts = splitOf(cycle.counts);
   const length = lengthInDays(cycle.startsOn, cycle.endsOn);
+  const range = formatShortRange(cycle.startsOn, cycle.endsOn);
   const added = cycle.counts.addedAfterStart;
-  const filtered = Object.keys(search).length > 0;
 
   return (
-    <section
-      aria-label={`Cycle ${number}`}
-      className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg"
-    >
-      <CrumbHeader
-        crumbs={crumbs}
+    <Frame label={from}>
+      <PlanningHeader
+        projectKey={projectKey}
+        section="cycles"
+        title={from}
+        filter={<FilterButton fields={fields} filter={filter} onChange={setFilter} />}
+        display={
+          <DisplayButton
+            projectKey={projectKey}
+            view="list"
+            groupChoices={planningGroupChoices('cycle')}
+            onLayoutChange={(layout) => {
+              if (layout === 'board') toBoard();
+            }}
+          />
+        }
         actions={
           <>
             {isCurrent ? (
-              <Button variant="secondary" isDisabled={!allTasks.data} onPress={() => setEnding(true)}>
+              <Button variant="secondary" isDisabled={!all.data} onPress={() => setEnding(true)}>
                 End cycle
               </Button>
             ) : (
@@ -225,56 +236,38 @@ function ActiveCycle({ projectKey, cycle, crumbs, search, selector }: ActiveCycl
               </Button>
             )}
             <AddTasks projectKey={projectKey} number={number} />
+            <Button kbd="C" aria-keyshortcuts="c" onPress={newTask}>
+              New task
+            </Button>
           </>
         }
       />
-      <div className="flex shrink-0 flex-col gap-3.5 border-b border-line px-6 py-[18px]">
-        <div className="flex min-w-0 items-center gap-3">
-          <CycleGlyph
-            state={isCurrent ? 'progress' : 'empty'}
-            progress={length ? elapsedDays(cycle) / length : 0}
-            size={14}
-            className={isCurrent ? 'text-accent' : undefined}
-          />
-          <h1 className="m-0 shrink-0 text-[24px] leading-tight font-semibold tracking-[-0.015em]">
-            Cycle {number}
-          </h1>
-          {cycle.name ? <span className="truncate text-[16px] text-muted">{cycle.name}</span> : null}
-          <Tag tone={isCurrent ? 'accent' : 'default'}>{isCurrent ? 'Current' : 'Upcoming'}</Tag>
-          <span className="flex-1" />
-          <span className="shrink-0 text-muted">{formatRange(cycle.startsOn, cycle.endsOn)}</span>
-          {isCurrent && cycle.daysLeft != null ? (
-            <DaysLeftPill daysLeft={cycle.daysLeft} />
-          ) : today ? (
-            <span className="shrink-0 text-[11.5px] text-muted">{describeStart(cycle.startsOn, today)}</span>
-          ) : null}
-        </div>
-        {isCurrent ? (
-          <CycleBars
-            cycle={cycle}
-            barWidth={420}
-            note={
-              added
-                ? `${added} ${added === 1 ? 'task' : 'tasks'} added after the start ${added === 1 ? 'is' : 'are'} marked +`
-                : undefined
-            }
-          />
-        ) : (
-          <p className="m-0 text-[11.5px] text-muted">
-            {cycle.counts.total} {cycle.counts.total === 1 ? 'task' : 'tasks'} planned. Tasks added once it
-            starts are marked +.
-          </p>
-        )}
-      </div>
-      <FilterBar end={<ViewSwitch view="list" onChange={(view) => view === 'board' && toBoard()} />}>
-        <PlanningFilters
-          projectKey={projectKey}
-          search={search}
-          onChange={writeSearch}
-          third={project?.usesMilestones === false ? undefined : 'milestone'}
-        />
-      </FilterBar>
-      <div className="flex min-h-0 flex-1 flex-col">
+      <FilterChips
+        fields={fields}
+        filter={filter}
+        onChange={setFilter}
+        {...(tasks.data ? { matchCount: view.shown.length } : {})}
+      />
+      <div className="min-h-0 flex-1 overflow-auto">
+        <PageHead className="pt-5.5">
+          <PageKind kind="cycle">Cycle · {isCurrent ? 'current' : 'upcoming'}</PageKind>
+          <PageTitle>{from}</PageTitle>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+            <p className="m-0 min-w-0 flex-1 basis-120 text-md leading-prose text-fg-2">
+              {cycle.name ?? (
+                <span className="text-fg-3">
+                  {isCurrent
+                    ? `Day ${cycleDay(cycle)} of ${length}.`
+                    : `${length} days from ${formatRange(cycle.startsOn, cycle.endsOn)}.`}
+                  {added ? ` ${added} ${added === 1 ? 'task was' : 'tasks were'} added after the start.` : ''}
+                </span>
+              )}
+            </p>
+            <Stats items={activeCycleStats(cycle, today)} />
+          </div>
+          <StatusBar split={counts} label={`${from} progress`} className="mt-1.5" />
+          <StatusLegend split={counts} end={<LegendEnd text={range} view={view} />} />
+        </PageHead>
         {tasks.isError && !tasks.data ? (
           <LoadError
             what="the tasks"
@@ -284,27 +277,30 @@ function ActiveCycle({ projectKey, cycle, crumbs, search, selector }: ActiveCycl
           />
         ) : (
           <PlanningTaskTable
-            aria-label={`Tasks in Cycle ${number}`}
-            tasks={visibleTasks}
-            extra={isCurrent ? 'added' : undefined}
-            cycleStartsOn={cycle.startsOn}
-            statuses={search.status}
+            aria-label={`Tasks in ${from}`}
+            projectKey={projectKey}
+            tasks={view.shown}
+            display={display}
+            from={from}
+            hide="cycle"
             isLoading={tasks.isPending}
-            now={now}
-            onOpen={openTask}
             renderEmptyState={() => (
-              <div className="flex flex-col items-start gap-2 px-6 py-8 text-muted">
-                <span>
-                  {filtered
+              <EmptyTasks
+                text={
+                  view.filtered
                     ? 'No tasks in this cycle match these filters.'
-                    : 'No tasks in this cycle yet. Add the ones you mean to finish in it.'}
-                </span>
-                {filtered ? (
-                  <Button variant="secondary" size="sm" onPress={() => writeSearch({})}>
-                    Clear filters
-                  </Button>
-                ) : null}
-              </div>
+                    : view.hiddenClosed
+                      ? 'Every task in this cycle is done.'
+                      : 'No tasks in this cycle yet. Add the ones you mean to finish in it.'
+                }
+                action={
+                  view.filtered ? (
+                    <Button variant="secondary" size="sm" onPress={() => setFilter(clearedFilter(filter))}>
+                      Clear filters
+                    </Button>
+                  ) : null
+                }
+              />
             )}
           />
         )}
@@ -328,7 +324,7 @@ function ActiveCycle({ projectKey, cycle, crumbs, search, selector }: ActiveCycl
           today={today}
         />
       ) : null}
-    </section>
+    </Frame>
   );
 }
 
@@ -347,8 +343,8 @@ function AddTasks({ projectKey, number }: { projectKey: string; number: number }
         .map((task) => ({
           id: task.key,
           label: task.title,
-          lead: <StatusSquare status={task.status} />,
-          meta: task.cycle ? `${task.key} · C${task.cycle.number}` : task.key,
+          lead: <StatusGlyph status={task.status} decorative />,
+          meta: task.cycle ? `${task.key} · Cycle ${task.cycle.number}` : task.key,
           textValue: `${task.key} ${task.title}`,
         })),
     [candidates.data, number],
@@ -363,7 +359,7 @@ function AddTasks({ projectKey, number }: { projectKey: string; number: number }
       onChange={(key) => {
         if (key) add.mutate({ key, cycle: number });
       }}
-      searchPlaceholder="Add a task to the cycle…"
+      searchPlaceholder="Add a task to the cycle"
       emptyText={candidates.isPending ? 'Loading tasks…' : 'No open tasks outside this cycle'}
       footer={
         add.isError
@@ -373,7 +369,9 @@ function AddTasks({ projectKey, number }: { projectKey: string; number: number }
       placement="bottom end"
       width={420}
     >
-      <Button isPending={add.isPending}>Add tasks</Button>
+      <Button variant="secondary" isPending={add.isPending}>
+        Add tasks
+      </Button>
     </PickerPopover>
   );
 }
@@ -381,8 +379,6 @@ function AddTasks({ projectKey, number }: { projectKey: string; number: number }
 // ---------------------------------------------------------------------------
 // Completed
 // ---------------------------------------------------------------------------
-
-const ROLL_TEMPLATE = '72px minmax(0,1fr) 200px 120px';
 
 /** Text copied by "Copy summary". */
 export function cycleSummaryText(cycle: CycleDetail, canceled: readonly TaskListItem[]): string {
@@ -418,230 +414,132 @@ export function rolledOverTo(rollovers: readonly CycleRollover[]): string {
   return `to ${targets.join(' and ')}`;
 }
 
-function CompletedCycle({
-  projectKey,
-  cycle,
-  crumbs,
-}: {
-  projectKey: string;
-  cycle: CycleDetail;
-  crumbs: Crumbs;
-}) {
-  const now = useNow();
-  const tasks = useQuery(taskListQuery({ project: projectKey, cycle: String(cycle.number) }));
+function CompletedCycle({ projectKey, cycle }: { projectKey: string; cycle: CycleDetail }) {
+  const view = usePlanningTasks(projectKey, { cycle: cycle.number });
+  const { all, display } = view;
   const { copied, copy } = useCopy();
+  const [rolledOpen, setRolledOpen] = useState(true);
+  const from = `Cycle ${cycle.number}`;
   const summary = cycle.summary;
-  const done = useMemo(
-    () => (tasks.data?.items ?? []).filter((task) => task.status === 'done'),
-    [tasks.data],
-  );
-  const canceled = useMemo(
-    () => (tasks.data?.items ?? []).filter((task) => task.status === 'canceled'),
-    [tasks.data],
-  );
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
-  const toggle = (status: string) =>
-    setOpen((current) => {
-      const next = new Set(current);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
+  const tasks = all.data?.items ?? [];
+  const canceled = tasks.filter((task) => task.status === 'canceled');
   const scope = summary?.scope ?? cycle.counts.total;
   const completed = summary?.completed ?? cycle.counts.done;
   const percent = scope ? Math.round((completed / scope) * 100) : 0;
-  const canceledKeys = canceled.map((task) => task.key);
+  const rolled = summary?.rolledOver ?? cycle.rollovers.length;
 
   return (
-    <section
-      aria-label={`Cycle ${cycle.number}`}
-      className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg"
-    >
-      <CrumbHeader
-        crumbs={crumbs}
+    <Frame label={from}>
+      <PlanningHeader
+        projectKey={projectKey}
+        section="cycles"
+        title={from}
         actions={
           <Button variant="secondary" onPress={() => void copy(cycleSummaryText(cycle, canceled))}>
             {copied ? 'Copied' : 'Copy summary'}
           </Button>
         }
       />
-      <div className="flex shrink-0 flex-col gap-3.5 border-b border-line px-6 py-[18px]">
-        <div className="flex min-w-0 items-center gap-3">
-          <CycleGlyph state="done" size={14} />
-          <h1 className="m-0 shrink-0 text-[24px] leading-tight font-semibold tracking-[-0.015em]">
-            Cycle {cycle.number}
-          </h1>
-          {cycle.name ? <span className="truncate text-[16px] text-muted">{cycle.name}</span> : null}
-          <Tag>Completed</Tag>
-          <span className="flex-1" />
-          <span className="shrink-0 text-muted">{formatRange(cycle.startsOn, cycle.endsOn)}</span>
-        </div>
-        <StatStrip aria-label={`Cycle ${cycle.number} summary`}>
-          <StatTile label="Scope" value={scope} sub={`${summary?.addedAfterStart ?? 0} added after start`} />
-          <StatTile label="Completed" value={completed} sub={`${percent}%`} tone="done" />
-          <StatTile
-            label="Rolled over"
-            value={summary?.rolledOver ?? cycle.rollovers.length}
-            sub={rolledOverTo(cycle.rollovers)}
-            tone="warn"
-          />
-          <StatTile
-            label="Canceled"
-            value={summary?.canceled ?? canceled.length}
-            sub={
-              canceledKeys.length
-                ? canceledKeys.slice(0, 4).join(', ') + (canceledKeys.length > 4 ? '…' : '')
-                : 'none'
-            }
-            tone="muted"
-          />
-        </StatStrip>
-      </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div>
-          <GroupBand label="Rolled over" count={cycle.rollovers.length} />
-          {cycle.rollovers.length ? (
-            <>
-              <ListHead
-                template={ROLL_TEMPLATE}
-                headers={['Key', 'Title', 'Status when it ended → now', 'Moved to']}
-              />
-              <ListTable label="Rolled over">
+        <PageHead className="pt-5.5">
+          <PageKind kind="cycle">Cycle · completed</PageKind>
+          <PageTitle>{from}</PageTitle>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+            <p className="m-0 min-w-0 flex-1 basis-120 text-md leading-prose text-fg-2">
+              {cycle.name ? `${cycle.name}. ` : ''}
+              <span className="text-fg-3">
+                {formatShortRange(cycle.startsOn, cycle.endsOn)}. {percent}% done
+                {rolled ? `, ${rolled} rolled over ${rolledOverTo(cycle.rollovers)}` : ''}.
+              </span>
+            </p>
+            <Stats
+              items={[
+                { value: scope, label: 'in scope' },
+                { value: completed, label: 'completed' },
+                { value: rolled, label: 'rolled over' },
+                { value: summary?.canceled ?? canceled.length, label: 'canceled' },
+              ]}
+            />
+          </div>
+          <StatusBar
+            split={{ done: completed, review: 0, progress: 0, todo: Math.max(0, scope - completed) }}
+            label={`${from} result`}
+            className="mt-1.5"
+          />
+        </PageHead>
+        <section aria-label={`Rolled over, ${cycle.rollovers.length}`}>
+          <FoldGroup
+            label="Rolled over"
+            count={cycle.rollovers.length}
+            expanded={rolledOpen}
+            onToggle={() => setRolledOpen(!rolledOpen)}
+          />
+          {rolledOpen ? (
+            cycle.rollovers.length ? (
+              <ul className="m-0 list-none p-0">
                 {cycle.rollovers.map((roll) => (
                   <RolloverRow key={roll.task.id} projectKey={projectKey} roll={roll} />
                 ))}
-              </ListTable>
-            </>
-          ) : (
-            <p className="m-0 border-b border-line-2 px-6 py-3 text-muted">
-              Every task was finished or canceled.
-            </p>
-          )}
-        </div>
-        {/* Done and Canceled tasks still in the cycle, folded until opened. */}
-        {(['done', 'canceled'] as const).map((status) => {
-          const items = status === 'done' ? done : canceled;
-          const count = (status === 'done' ? summary?.completed : summary?.canceled) ?? items.length;
-          return (
-            <div key={status}>
-              <GroupBand
-                label={status === 'done' ? 'Completed' : 'Canceled'}
-                status={status}
-                count={count}
-                expanded={open.has(status)}
-                onToggle={() => toggle(status)}
-              />
-              {open.has(status) ? (
-                <FinishedRows
-                  label={status === 'done' ? 'Completed tasks' : 'Canceled tasks'}
-                  projectKey={projectKey}
-                  tasks={items}
-                  isLoading={tasks.isPending}
-                  now={now}
-                />
-              ) : null}
-            </div>
-          );
-        })}
+              </ul>
+            ) : (
+              <p className="m-0 px-4.5 py-3 text-md text-fg-2">Every task was finished or canceled.</p>
+            )
+          ) : null}
+        </section>
+        {all.isError && !all.data ? (
+          <LoadError
+            what="the tasks"
+            error={all.error}
+            onRetry={() => void all.refetch()}
+            isRetrying={all.isFetching}
+          />
+        ) : (
+          <PlanningTaskTable
+            aria-label={`Tasks left in ${from}`}
+            projectKey={projectKey}
+            tasks={tasks}
+            display={{ ...display, groupBy: 'status' }}
+            from={from}
+            hide="cycle"
+            isLoading={all.isPending}
+            renderEmptyState={() => <EmptyTasks text="No tasks stayed in this cycle." />}
+          />
+        )}
       </div>
-    </section>
+    </Frame>
   );
 }
 
 function RolloverRow({ projectKey, roll }: { projectKey: string; roll: CycleRollover }) {
-  const href = `/p/${projectKey}/${roll.task.key}`;
+  const href = `/p/${encodeURIComponent(projectKey)}/${encodeURIComponent(roll.task.key)}`;
   return (
-    <ListRow template={ROLL_TEMPLATE} href={href} minHeight={38}>
-      <ListCell>
-        <RowLink href={href} className="font-mono text-[10.5px] font-normal text-muted">
-          {roll.task.key}
-        </RowLink>
-      </ListCell>
-      <ListCell className="truncate">{roll.task.title}</ListCell>
-      <ListCell className="flex items-center gap-1.5 text-[12px] whitespace-nowrap text-muted">
-        <StatusSquare status={roll.statusAtEnd} withLabel />
-        <span aria-hidden className="text-faint">
+    <li className="flex h-9.5 items-center gap-2.5 pr-4.5 pl-4 whitespace-nowrap hover:bg-surface-hover">
+      <span aria-hidden className="w-3.5 shrink-0" />
+      <span className="w-15.5 shrink-0 text-xs font-medium text-fg-3 tabular-nums">{roll.task.key}</span>
+      <StatusGlyph status={roll.task.status} />
+      <Link
+        href={href}
+        className="min-w-0 flex-1 cursor-pointer truncate rounded-sm font-[450] text-fg outline-none hover:underline focus-visible:shadow-[var(--focus-ring)]"
+      >
+        {roll.task.title}
+      </Link>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs text-fg-2">
+        <span>{STATUS_LABELS[roll.statusAtEnd]} when it ended</span>
+        <span aria-hidden className="text-fg-3">
           →
         </span>
-        <span className="sr-only">now</span>
-        <StatusSquare status={roll.task.status} withLabel />
-      </ListCell>
-      <ListCell className="flex items-center gap-1.5 text-[12px] whitespace-nowrap text-muted">
         {roll.movedTo ? (
-          <RowLink
+          <Link
             href={cycleHref(projectKey, roll.movedTo.number)}
-            className="flex items-center gap-1.5 font-normal text-muted"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm text-fg-2 outline-none hover:text-fg focus-visible:shadow-[var(--focus-ring)]"
           >
-            <CycleGlyph />
+            <CycleGlyph className="text-fg-3" />
             Cycle {roll.movedTo.number}
-          </RowLink>
+          </Link>
         ) : (
-          'No cycle'
+          <span>No cycle</span>
         )}
-      </ListCell>
-    </ListRow>
-  );
-}
-
-const FINISHED_TEMPLATE = '72px minmax(0,1fr) 34px 150px 34px';
-
-/** Done or canceled tasks of a completed cycle, in the M1 row style without a header. */
-function FinishedRows({
-  label,
-  projectKey,
-  tasks,
-  isLoading,
-  now,
-}: {
-  label: string;
-  projectKey: string;
-  tasks: readonly TaskListItem[];
-  isLoading: boolean;
-  now: number | null;
-}) {
-  if (isLoading) {
-    return (
-      <div className="border-b border-line-2 px-6 py-3">
-        <Skeleton width="40%" />
-      </div>
-    );
-  }
-  if (!tasks.length) {
-    return <p className="m-0 border-b border-line-2 px-6 py-3 text-muted">None left in this cycle.</p>;
-  }
-  const age = atTime(formatAge, now);
-  return (
-    <ListTable label={label}>
-      {[...tasks].sort(compareTasks).map((task) => {
-        const href = `/p/${projectKey}/${task.key}`;
-        return (
-          <ListRow key={task.key} template={FINISHED_TEMPLATE} href={href} minHeight={34}>
-            <ListCell>
-              <RowLink href={href} className="font-mono text-[10.5px] font-normal text-muted">
-                {task.key}
-              </RowLink>
-            </ListCell>
-            <ListCell className="truncate">{task.title}</ListCell>
-            <ListCell>
-              <PriorityGlyph priority={task.priority} />
-            </ListCell>
-            <ListCell>
-              {task.assignee ? (
-                <MemberLabel
-                  name={task.assignee.name}
-                  kind={task.assignee.kind}
-                  className="text-[12px] text-muted"
-                />
-              ) : null}
-            </ListCell>
-            <ListCell className="text-right">
-              <time dateTime={task.updatedAt} className="font-mono text-[10px] whitespace-nowrap text-faint">
-                {age(task.updatedAt)}
-              </time>
-            </ListCell>
-          </ListRow>
-        );
-      })}
-    </ListTable>
+      </span>
+    </li>
   );
 }

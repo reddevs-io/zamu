@@ -10,10 +10,13 @@ import {
   cycle,
   cycleRollover,
   gitConnection,
+  label,
   milestone,
   organization,
   project,
   task,
+  taskDependency,
+  taskLabel,
   user,
 } from '../src/schema';
 import { createTestDatabase, sharedTestDatabaseUrl, type TestDatabase } from './index';
@@ -76,12 +79,15 @@ describe('schema on a throwaway database', () => {
       'cycle_rollover',
       'git_connection',
       'invitation',
+      'label',
       'member',
       'milestone',
       'organization',
       'project',
       'session',
       'task',
+      'task_dependency',
+      'task_label',
       'user',
       'verification',
     ]);
@@ -606,6 +612,175 @@ describe('M3 schema', () => {
       })
       .returning();
     expect(row).toMatchObject({ backlogId: 'm-3', hiddenAt: null });
+  });
+});
+
+describe('M5 schema', () => {
+  let database: TestDatabase;
+  let db: Db;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    db = database.db;
+  });
+
+  afterAll(async () => {
+    await database?.drop();
+  });
+
+  async function newTask(world: Awaited<ReturnType<typeof seed>>, number: number, values = {}) {
+    const [row] = await db
+      .insert(task)
+      .values({
+        projectId: world.pay.id,
+        number,
+        title: `Task ${number}`,
+        createdById: world.owner.id,
+        ...values,
+      })
+      .returning();
+    if (!row) throw new Error('task insert failed');
+    return row;
+  }
+
+  async function newLabel(world: Awaited<ReturnType<typeof seed>>, name: string, color = 1) {
+    const [row] = await db
+      .insert(label)
+      .values({ workspaceId: world.workspace.id, projectId: world.pay.id, name, color })
+      .returning();
+    if (!row) throw new Error('label insert failed');
+    return row;
+  }
+
+  it('defaults the new task columns to none', async () => {
+    const world = await seed(db);
+    const row = await newTask(world, 1);
+    expect(row).toMatchObject({ dueDate: null, parentId: null });
+    await db.update(task).set({ dueDate: '2026-11-14' }).where(eq(task.id, row.id));
+    const reloaded = await db.query.task.findFirst({ where: { id: row.id } });
+    expect(reloaded?.dueDate).toBe('2026-11-14');
+  });
+
+  it('keeps label names unique per project ignoring case, and checks colour, length and source', async () => {
+    const world = await seed(db);
+    const payouts = await newLabel(world, 'payouts', 3);
+    expect(payouts).toMatchObject({ source: 'app', color: 3 });
+    expect(await pgErrorCode(newLabel(world, 'Payouts'))).toBe('23505');
+    expect(await pgErrorCode(newLabel(world, ''))).toBe('23514');
+    expect(await pgErrorCode(newLabel(world, 'x'.repeat(41)))).toBe('23514');
+    await expect(newLabel(world, 'x'.repeat(40))).resolves.toBeTruthy();
+    expect(await pgErrorCode(newLabel(world, 'zero', 0))).toBe('23514');
+    expect(await pgErrorCode(newLabel(world, 'ten', 10))).toBe('23514');
+    await expect(newLabel(world, 'nine', 9)).resolves.toBeTruthy();
+    expect(
+      await pgErrorCode(db.execute(sql`update label set source = 'file' where id = ${payouts.id}`)),
+    ).toBe('23514');
+    await db.execute(sql`update label set source = 'backlog' where id = ${payouts.id}`);
+
+    const other = await seed(db);
+    await expect(newLabel(other, 'payouts')).resolves.toBeTruthy();
+  });
+
+  it('puts a label on a task once and drops the link when either side goes', async () => {
+    const world = await seed(db);
+    const one = await newTask(world, 1);
+    const two = await newTask(world, 2);
+    const payouts = await newLabel(world, 'payouts');
+    const backend = await newLabel(world, 'backend');
+    await db.insert(taskLabel).values([
+      { taskId: one.id, labelId: payouts.id },
+      { taskId: one.id, labelId: backend.id },
+      { taskId: two.id, labelId: payouts.id },
+    ]);
+    expect(await pgErrorCode(db.insert(taskLabel).values({ taskId: one.id, labelId: payouts.id }))).toBe(
+      '23505',
+    );
+
+    await db.delete(label).where(eq(label.id, payouts.id));
+    const afterLabel = await db.select().from(taskLabel).where(eq(taskLabel.taskId, one.id));
+    expect(afterLabel).toEqual([{ taskId: one.id, labelId: backend.id }]);
+
+    await db.delete(task).where(eq(task.id, one.id));
+    expect(await db.select().from(taskLabel).where(eq(taskLabel.labelId, backend.id))).toEqual([]);
+
+    await db.delete(project).where(eq(project.id, world.pay.id));
+    expect(await db.select().from(label).where(eq(label.projectId, world.pay.id))).toEqual([]);
+  });
+
+  it('links blockers once, never to the task itself, and drops links with either task', async () => {
+    const world = await seed(db);
+    const blocked = await newTask(world, 1);
+    const blocker = await newTask(world, 2);
+    const other = await newTask(world, 3);
+    const [link] = await db
+      .insert(taskDependency)
+      .values({ taskId: blocked.id, blockerId: blocker.id })
+      .returning();
+    expect(link?.createdAt).toBeInstanceOf(Date);
+    await db.insert(taskDependency).values({ taskId: blocked.id, blockerId: other.id });
+    expect(
+      await pgErrorCode(db.insert(taskDependency).values({ taskId: blocked.id, blockerId: blocker.id })),
+    ).toBe('23505');
+    expect(
+      await pgErrorCode(db.insert(taskDependency).values({ taskId: blocked.id, blockerId: blocked.id })),
+    ).toBe('23514');
+
+    await db.delete(task).where(eq(task.id, blocker.id));
+    const left = await db.select().from(taskDependency).where(eq(taskDependency.taskId, blocked.id));
+    expect(left.map((row) => row.blockerId)).toEqual([other.id]);
+
+    await db.delete(task).where(eq(task.id, blocked.id));
+    expect(await db.select().from(taskDependency).where(eq(taskDependency.blockerId, other.id))).toEqual([]);
+  });
+
+  it('refuses a task as its own parent and turns subtasks top-level when the parent goes', async () => {
+    const world = await seed(db);
+    const parent = await newTask(world, 1);
+    const child = await newTask(world, 2, { parentId: parent.id });
+    expect(child.parentId).toBe(parent.id);
+    expect(
+      await pgErrorCode(db.update(task).set({ parentId: parent.id }).where(eq(task.id, parent.id))),
+    ).toBe('23514');
+    await db.delete(task).where(eq(task.id, parent.id));
+    const reloaded = await db.query.task.findFirst({ where: { id: child.id } });
+    expect(reloaded?.parentId).toBeNull();
+  });
+
+  it('indexes due dates, parents, blockers and label links', async () => {
+    const result = await db.execute<{ indexname: string; indexdef: string }>(sql`
+      select indexname, indexdef from pg_indexes
+      where schemaname = 'public' and indexname in (
+        'label_projectId_name_unique',
+        'task_dependency_blockerId_idx',
+        'task_label_labelId_idx',
+        'task_parentId_idx',
+        'task_projectId_dueDate_idx')
+      order by indexname`);
+    expect(result.rows).toEqual([
+      {
+        indexname: 'label_projectId_name_unique',
+        indexdef:
+          'CREATE UNIQUE INDEX "label_projectId_name_unique" ON public.label USING btree (project_id, lower(name))',
+      },
+      {
+        indexname: 'task_dependency_blockerId_idx',
+        indexdef:
+          'CREATE INDEX "task_dependency_blockerId_idx" ON public.task_dependency USING btree (blocker_id)',
+      },
+      {
+        indexname: 'task_label_labelId_idx',
+        indexdef: 'CREATE INDEX "task_label_labelId_idx" ON public.task_label USING btree (label_id)',
+      },
+      {
+        indexname: 'task_parentId_idx',
+        indexdef: 'CREATE INDEX "task_parentId_idx" ON public.task USING btree (parent_id)',
+      },
+      {
+        indexname: 'task_projectId_dueDate_idx',
+        indexdef:
+          'CREATE INDEX "task_projectId_dueDate_idx" ON public.task USING btree (project_id, due_date) WHERE (due_date IS NOT NULL)',
+      },
+    ]);
   });
 });
 

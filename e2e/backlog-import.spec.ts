@@ -1,8 +1,8 @@
 // Backlog.md import end to end, against a real Forgejo (e2e/forgejo.ts): an empty project linked to a repository
 // whose root backlog.config.yml names the folder planning/, the five setup steps in import mode (with an agent
 // of a similar name offered for @claude and an invitation for @alex-agent on the Mappings step), and the
-// project afterwards: detached, every field editable by people and agents, numbering that continues, and no
-// more refreshes from the files.
+// project afterwards: detached, every field editable by people and agents (the labels, due date and parent
+// read from the files included), numbering that continues, and no more refreshes from the files.
 //
 // The tests build on each other, so they share one page and run in order. Forgejo starts in beforeAll and is
 // removed in afterAll. E2E_SKIP_BACKLOG=1 skips the spec; so does a missing Docker daemon.
@@ -29,6 +29,9 @@ interface TaskShape {
   assignee: { name: string } | null;
   locked?: string[];
   backlog: { id: string } | null;
+  labels: { name: string; source: string }[];
+  dueDate: string | null;
+  parent: { key: string } | null;
 }
 interface SourceStatus {
   mode: string;
@@ -183,11 +186,29 @@ test('after the import every field is editable and the numbering continues', asy
   expect(task.backlog?.id).toBe('BACK-786');
   expect((await taskOf('BACK-786.1')).key).toBe(`${project.key}-786.1`);
 
+  // Labels, the due date and the parent came from the files as native fields. The import detached the
+  // project, so they are the app's own now: the label is an app label, and nothing is locked.
+  expect(task.labels).toEqual([expect.objectContaining({ name: 'cli', source: 'app' })]);
+  expect(task.dueDate).toBe('2026-11-15');
+  expect((await taskOf(`${project.key}-786.1`)).parent?.key).toBe(`${project.key}-786`);
+  const labels = await api<{ items: { id: string; name: string; source: string; usageCount: number }[] }>(
+    page.request,
+    'GET',
+    `/projects/${project.key}/labels`,
+  );
+  expect(labels.items).toEqual([expect.objectContaining({ name: 'cli', source: 'app', usageCount: 1 })]);
+  await api(page.request, 'PATCH', `/projects/${project.key}/labels/${labels.items[0]?.id}`, {
+    name: 'pm-cli',
+  });
+
   const updated = await api<TaskShape>(page.request, 'PATCH', `/tasks/${project.key}-786`, {
     title: 'Mirror Backlog.md folders',
     status: 'done',
+    addLabels: ['docs'],
+    dueDate: null,
   });
-  expect(updated).toMatchObject({ title: 'Mirror Backlog.md folders', status: 'done' });
+  expect(updated).toMatchObject({ title: 'Mirror Backlog.md folders', status: 'done', dueDate: null });
+  expect(updated.labels.map((label) => label.name).sort()).toEqual(['docs', 'pm-cli']);
 
   const milestones = await api<{ items: { id: string; name: string }[] }>(
     page.request,
@@ -208,10 +229,7 @@ test('after the import every field is editable and the numbering continues', asy
   await page.goto(`/p/${project.key}`);
   await settle(page);
   await expect(page.getByRole('button', { name: /^Backlog\.md: / })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /^New/ }).first()).not.toHaveAttribute(
-    'aria-disabled',
-    'true',
-  );
+  await expect(page.getByRole('button', { name: 'New task', exact: true })).toBeEnabled();
 });
 
 test('agents edit imported tasks with pm; the files no longer reach the project', async () => {

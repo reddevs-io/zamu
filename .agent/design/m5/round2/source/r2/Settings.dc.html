@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./margin.css" />
+<link rel="stylesheet" href="./screens.css" />
+<script src="./data.js"></script>
+<style>
+body{margin:0}
+.lbl-tools{display:flex;gap:8px;align-items:center}
+.lbl-tools .input{width:260px;height:32px}
+.lbl-row .nm{display:flex;align-items:center;gap:8px;min-width:0;font-weight:500}
+.lbl-row .acts .btn{color:var(--text-3)}
+.lbl-row .acts .lock{margin:0 8px 4px 0;color:var(--text-3)}
+.lbl-row .edit{display:flex;align-items:center;gap:6px}
+.lbl-row .edit .input{flex:1}
+.lbl-row .pop{top:36px;left:4px}
+.lbl-row .sw.btnsw{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
+.lbl-empty{padding:34px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.lbl-empty .empty-t{font-size:20px}
+.lbl-empty .empty-d{max-width:380px}
+.dz{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid color-mix(in oklch,var(--danger) 35%,transparent);border-radius:var(--r)}
+.dz .t{flex:1;display:flex;flex-direction:column;gap:2px}
+.dz .t span{color:var(--text-3);font-size:var(--fs-sm)}
+.dz .btn{color:var(--danger);border-color:color-mix(in oklch,var(--danger) 40%,transparent)}
+.dlg .dlg-t{font-size:20px}
+.auth .input{width:100%}
+.auth .or{display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:var(--fs-xs)}
+.auth .or::before,.auth .or::after{content:"";flex:1;border-top:1px solid var(--line)}
+.auth .row-l{display:flex;justify-content:space-between;align-items:center}
+.pmark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--text);color:var(--bg);font-family:var(--display);font-size:16px;font-weight:600}
+</style>
+</helmet>
+<sc-if value="{{ isSignin }}">
+<div class="{{ authCls }}" data-screen-label="Sign in">
+<div class="auth-card">
+<div class="auth-logo"><span class="pmark">N</span>Northwind Labs</div>
+<div><div class="auth-t">Sign in</div></div>
+<div class="auth-d">Use the email your workspace invite went to.</div>
+<div class="field"><span class="flabel">Email</span><span class="input focus"><span>ana@northwind.dev</span><span class="caretbar"></span></span></div>
+<div class="field"><div class="row-l"><span class="flabel">Password</span><span class="link" style="font-size:var(--fs-sm)">Forgot it?</span></div><span class="input err"><span>••••••••••</span></span><span class="help err">That password doesn’t match. 2 tries left before a 15-minute pause.</span></div>
+<span class="btn primary block">Sign in<span class="kbd">↵</span></span>
+<div class="or">or</div>
+<span class="btn ghost block">Continue with single sign-on</span>
+</div>
+<div class="auth-ft">Self-hosted at pm.northwind.dev · version 0.7.0</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isApp }}">
+<div class="{{ rootClass }}" data-screen-label="Settings">
+<dc-import name="Side" project="{{ projKey }}" view="Settings" theme="{{ theme }}" hint-size="236px,900px"></dc-import>
+<main class="main">
+<header class="vh">
+<div class="crumb"><span class="{{ tileCls }}">{{ projI }}</span><span class="crumb-proj">{{ projName }}</span><span class="crumb-sep">/</span><span class="crumb-page">Settings</span></div>
+<span class="spacer"></span>
+<sc-if value="{{ mirrored }}"><span class="sync"><span class="dot"></span><b>Backlog.md</b>synced 38 min ago</span><span class="btn ghost">Refresh</span></sc-if>
+</header>
+<div class="setg">
+<nav class="set-nav">
+<div class="sec">Project</div>
+<sc-for list="{{ nav }}" as="n"><div class="{{ n.cls }}"><span class="nav-n">{{ n.n }}</span></div></sc-for>
+</nav>
+<div class="set-c">
+<div class="set-col">
+
+<sc-if value="{{ isGeneral }}">
+<div class="set-t">General</div>
+<div class="set-d">The project’s name, key and defaults for new tasks.</div>
+<div class="field"><span class="flabel">Name</span><span class="input focus"><span>Payments</span><span class="caretbar"></span></span></div>
+<div class="set-row2">
+<div class="field"><span class="flabel">Key</span><span class="input ro"><span>PAY</span><span class="spacer"></span><span class="lock"></span></span><span class="help">A key can’t change once the project has tasks.</span></div>
+<div class="field"><span class="flabel">Web address</span><span class="input err"><span class="muted">pm.northwind.dev/</span><span>payments</span></span><span class="help err">Another project already uses /payments.</span></div>
+</div>
+<div class="field"><span class="flabel">Description</span><span class="input textarea"><span>Payouts, refunds and the merchant statement. Owned by Ana; agents may pick up anything labelled backend.</span></span></div>
+<div class="set-row2">
+<div class="field"><span class="flabel">Default status for new tasks</span><span class="selb" style="height:36px"><span>Todo</span><span class="caret">▾</span></span></div>
+<div class="field"><span class="flabel">Default assignee</span><span class="selb" style="height:36px"><span>No one</span><span class="caret">▾</span></span></div>
+</div>
+<div class="field"><span class="flabel">Cycles</span><span class="input dis"><span>Two weeks, starting Mondays</span></span><span class="help">Cycle length is set for the whole workspace.</span></div>
+<div class="set-ft"><span class="btn primary">Save changes</span><span class="btn ghost">Discard</span></div>
+<div class="set-sec"><div class="set-sec-t">Archive</div>
+<div class="dz"><div class="t"><b>Archive Payments</b><span>Hides it from the sidebar and Home. Tasks stay searchable and you can restore it.</span></div><span class="btn ghost">Archive project</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLabels }}">
+<div class="set-t">Labels</div>
+<div class="set-d">{{ labelsD }}</div>
+<sc-if value="{{ mirrored }}"><div class="ro-note"><span class="lock"></span><span>Harbor’s labels come from its Backlog.md files. Rename or remove them in the files. Colours are set here and never written to the files.</span></div></sc-if>
+<sc-if value="{{ hasTools }}"><div class="lbl-tools"><span class="input"><span class="ico ico-search"></span><span class="ph">Filter labels</span></span><span class="spacer"></span><span class="muted" style="font-size:var(--fs-sm)">{{ countTxt }}</span><sc-if value="{{ native }}"><span class="btn primary">New label</span></sc-if></div></sc-if>
+<div class="lbl-tbl">
+<div class="lbl-row hd"><span></span><span>Name</span><span>Used on</span><span></span></div>
+<sc-if value="{{ isEmptyL }}"><div class="lbl-empty"><div class="empty-t">No labels yet</div><div class="empty-d">Labels group work inside a project. Create one here, or press L on any task and type a new name.</div><div class="empty-a"><span class="btn primary">New label</span></div></div></sc-if>
+<sc-for list="{{ rows }}" as="r">
+<div class="{{ r.cls }}">
+<span class="anchor"><span class="{{ r.sw }}"></span>
+<sc-if value="{{ r.recolour }}"><div class="pop menu" style="width:252px;left:-6px;top:30px">
+<div class="menu-h">Colour for “{{ r.n }}”</div>
+<div class="swatches" style="grid-template-columns:repeat(9,18px);gap:8px;padding:6px 8px 8px"><sc-for list="{{ swatches }}" as="sw"><span class="{{ sw.cls }}" style="width:18px;height:18px"></span></sc-for></div>
+<div class="menu-tip" style="margin:0 2px 4px;padding:8px 10px;border-radius:var(--r-sm);background:var(--bg-lane);color:var(--text-2);font-size:var(--fs-xs);line-height:1.45">Each colour passes AA contrast in both themes.</div>
+</div></sc-if>
+</span>
+<sc-if value="{{ r.editing }}"><span class="edit"><span class="input focus"><span>{{ r.n }}</span><span class="caretbar"></span></span><span class="btn sm primary">Save</span><span class="btn sm ghost">Cancel</span></span></sc-if>
+<sc-if value="{{ r.showName }}"><span class="nm">{{ r.n }}<sc-if value="{{ r.fromFile }}"><span class="bm">From Backlog.md</span></sc-if></span></sc-if>
+<span class="cnt">{{ r.cnt }}</span>
+<span class="acts">
+<sc-if value="{{ r.showActs }}"><span class="btn icon sm">✎</span><span class="btn icon sm">···</span></sc-if>
+<sc-if value="{{ r.locked }}"><span class="lock"></span></sc-if>
+</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+</div>
+</div>
+</main>
+<sc-if value="{{ isDelete }}">
+<div class="scrim"></div>
+<div class="dlg sm">
+<div class="dlg-b" style="padding-top:18px">
+<div class="dlg-t">Delete the label “reliability”?</div>
+<div class="dlg-msg">It’s used on <b>12 tasks</b> in Payments. They lose this label and keep everything else. You can’t undo this.</div>
+</div>
+<div class="dlg-ft"><span class="spacer"></span><span class="btn ghost">Cancel</span><span class="btn danger">Delete label</span></div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["labels", "labelsempty", "rename", "recolour", "delete", "mirrored", "general", "signin"], "default": "labels" }
+}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (!window.PM) { const i = setInterval(() => { if (window.PM) { clearInterval(i); this.forceUpdate(); } }, 30); }
+  }
+  renderVals() {
+    const P = window.PM;
+    const theme = this.props.theme ?? 'light';
+    const s = this.props.state ?? 'labels';
+    const mirrored = s === 'mirrored';
+    const isLabels = ['labels', 'labelsempty', 'rename', 'recolour', 'delete', 'mirrored'].includes(s);
+    const PAY12 = [['payouts', 'c6', 34], ['backend', 'c2', 22], ['api', 'c1', 14], ['reliability', 'c9', 12], ['ledger', 'c5', 11], ['frontend', 'c1', 10], ['customer-facing', 'c8', 9], ['webhooks', 'c1', 9], ['reporting', 'c5', 8], ['refunds', 'c4', 7], ['security', 'c4', 7], ['reconciliation', 'c3', 6]];
+    let rows = [];
+    if (mirrored) rows = (P ? P.LABELS : []).map((l, i) => ({ n: l.n, sw: l.sw, cnt: l.count + ' tasks', cls: 'lbl-row' + (i === 2 ? ' hover' : ''), editing: false, showName: true, fromFile: true, showActs: false, locked: true, recolour: false }));
+    else if (s !== 'labelsempty') rows = PAY12.map(([n, c, k], i) => {
+      const hover = (s === 'labels' && i === 3) || (s === 'delete' && i === 3);
+      const editing = s === 'rename' && i === 3;
+      const recolour = s === 'recolour' && i === 4;
+      return { n: editing ? 'reliability and retries' : n, sw: 'sw ' + c + (recolour ? ' btnsw' : ''), cnt: k + ' tasks', cls: 'lbl-row' + (hover || recolour ? ' hover' : ''), editing, showName: !editing, fromFile: false, showActs: hover || recolour, locked: false, recolour };
+    });
+    const swatches = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].map((c) => ({ cls: 'sw ' + c + (c === 'c5' ? ' on' : '') }));
+    const navNames = mirrored ? ['General', 'Labels', 'Members', 'Agents', 'Backlog.md sync'] : ['General', 'Labels', 'Members', 'Agents', 'Integrations'];
+    const nav = navNames.map((n) => ({ n, cls: 'nav-i' + ((n === 'Labels' && isLabels) || (n === 'General' && s === 'general') ? ' on' : '') }));
+    return {
+      theme, rootClass: 'app ' + theme, authCls: 'auth ' + theme, isSignin: s === 'signin', isApp: s !== 'signin',
+      mirrored, native: !mirrored, projKey: mirrored ? 'HBR' : 'PAY', projName: mirrored ? 'Harbor' : 'Payments', projI: mirrored ? 'H' : 'P', tileCls: mirrored ? 'tile c1' : 'tile c6',
+      nav, isGeneral: s === 'general', isLabels, isEmptyL: s === 'labelsempty', hasTools: s !== 'labelsempty', isDelete: s === 'delete',
+      labelsD: mirrored ? 'Labels used by Harbor’s tasks.' : 'Labels group tasks inside Payments. Labels with the same name in other projects show as one label in workspace filters.',
+      countTxt: mirrored ? '12 labels' : '12 labels', rows, swatches
+    };
+  }
+}
+</script>
+</body>
+</html>

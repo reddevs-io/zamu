@@ -12,9 +12,9 @@ import {
   type TaskStatus,
 } from '@pm/contracts';
 
-// In-memory /api/v1 client for the board's component tests: board order (rank), one status per
-// request, cursor pagination, moves with position and the ifUpdatedAt check (TASK_CHANGED with the
-// current task). Calls the board does not use answer with an empty list.
+// In-memory /api/v1 client for the board's component tests: board order (rank) or a `sort`, one status
+// per request (or all), topLevel and parent, cursor pagination, moves with position and the ifUpdatedAt
+// check (TASK_CHANGED with the current task). Calls the board does not use answer with an empty list.
 
 const ANA = { id: '00000000-0000-4000-8000-000000000001', name: 'Ana Ruiz', kind: 'person' as const };
 const TOMAS = { id: '00000000-0000-4000-8000-000000000002', name: 'Tomás Berg', kind: 'person' as const };
@@ -38,6 +38,8 @@ export interface FakeBoardOptions {
   usesCycles?: boolean;
   /** The project mirrors Backlog.md: status, assignee and milestone come from the files. */
   mirrored?: boolean;
+  /** Subtasks added under a card: `count` of them, the first `done` of them Done, the rest Todo. */
+  subtasks?: { parent: string; count: number; done?: number };
 }
 
 export function createFakeBoardApi({
@@ -45,6 +47,7 @@ export function createFakeBoardApi({
   usesMilestones = true,
   usesCycles = true,
   mirrored = false,
+  subtasks,
 }: FakeBoardOptions = {}) {
   const project = { id: '10000000-0000-4000-8000-000000000001', key: 'PAY', name: 'Payments' };
   const base = Date.parse('2026-10-20T10:00:00.000Z');
@@ -84,6 +87,38 @@ export function createFakeBoardApi({
     }
   }
 
+  if (subtasks) {
+    const parent = tasks.find((task) => task.key === subtasks.parent);
+    const done = subtasks.done ?? 0;
+    for (let index = 0; index < subtasks.count; index++) {
+      number++;
+      tasks.push({
+        id: `20000000-0000-4000-8000-${String(number).padStart(12, '0')}`,
+        key: `PAY-${number}`,
+        number,
+        project,
+        title: `Subtask ${index + 1}`,
+        description: null,
+        status: index < done ? 'done' : 'todo',
+        priority: 'medium',
+        assignee: null,
+        createdBy: ANA,
+        createdOnBehalfOf: null,
+        milestone: null,
+        cycle: null,
+        cycleAddedAt: null,
+        rank: 100 + index,
+        locked: [],
+        parent: parent
+          ? { key: parent.key, title: parent.title, status: parent.status, assignee: null }
+          : null,
+        createdAt: new Date(base + index * 1000).toISOString(),
+        updatedAt: new Date(base + number * 1000).toISOString(),
+      });
+    }
+    if (parent) parent.subtaskProgress = { done, total: subtasks.count };
+  }
+
   const calls = { update: [] as Input[], list: [] as Input[] };
   const control = {
     /** Make the next update of this key fail with TASK_CHANGED after moving it elsewhere. */
@@ -96,8 +131,16 @@ export function createFakeBoardApi({
     return task;
   };
   const toItem = (task: Task): TaskListItem => {
-    const { description: _d, createdBy: _c, createdOnBehalfOf: _o, ...item } = task;
-    return item;
+    const { description: _d, createdBy: _c, createdOnBehalfOf: _o, parent, ...item } = task;
+    return { ...item, parentKey: parent?.key ?? null };
+  };
+  const PRIORITY_ORDER = ['none', 'low', 'medium', 'high', 'urgent'];
+  const bySort = (sort: string) => (a: Task, b: Task) => {
+    const updated = b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id);
+    if (sort === 'manual') return a.rank - b.rank || updated;
+    if (sort === 'priority')
+      return PRIORITY_ORDER.indexOf(b.priority) - PRIORITY_ORDER.indexOf(a.priority) || updated;
+    return updated;
   };
   const boardOrder = (a: Task, b: Task) =>
     TASK_STATUSES.indexOf(a.status) - TASK_STATUSES.indexOf(b.status) ||
@@ -166,22 +209,34 @@ export function createFakeBoardApi({
       },
     },
     members: { list: async () => ({ items: members }) },
+    me: {
+      get: async () => ({
+        user: { ...ANA, email: 'ana@example.com', responsible: null, theme: 'system' },
+        role: 'owner',
+      }),
+    },
     tasks: {
       list: async (input: Input): Promise<TaskListPage> => {
         calls.list.push(input);
         const status = asList(input.status) as TaskStatus[] | undefined;
-        const assignee = input.assignee as string | undefined;
-        const cycle = input.cycle as string | number | undefined;
+        const assignees = asList(input.assignee) as string[] | undefined;
+        const cycles = asList(input.cycle) as (string | number)[] | undefined;
+        const parentKey = input.parent as string | undefined;
         const matching = [...tasks]
-          .sort(boardOrder)
+          .sort(typeof input.sort === 'string' ? bySort(input.sort) : boardOrder)
+          .filter((task) => (parentKey ? task.parent?.key === parentKey : true))
+          .filter((task) => (input.topLevel === true ? !task.parent : true))
           .filter(
             (task) =>
-              !assignee ||
-              (assignee === 'agents' ? task.assignee?.kind === 'agent' : task.assignee?.id === assignee),
+              !assignees ||
+              assignees.some((assignee) =>
+                assignee === 'agents' ? task.assignee?.kind === 'agent' : task.assignee?.id === assignee,
+              ),
           )
           .filter(
             (task) =>
-              cycle === undefined || (cycle === 'none' ? !task.cycle : task.cycle?.number === Number(cycle)),
+              !cycles ||
+              cycles.some((cycle) => (cycle === 'none' ? !task.cycle : task.cycle?.number === Number(cycle))),
           );
         const counts = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as StatusCounts;
         for (const task of matching) counts[task.status]++;
@@ -216,6 +271,7 @@ export function createFakeBoardApi({
           });
         }
         if (typeof input.status === 'string') task.status = input.status as TaskStatus;
+        if (typeof input.priority === 'string') task.priority = input.priority as Task['priority'];
         const column = tasks
           .filter((other) => other.status === task.status && other !== task)
           .sort(boardOrder);

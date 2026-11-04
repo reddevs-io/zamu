@@ -1,8 +1,7 @@
 import { cycleLengthDays, type ProjectWithCounts } from '@pm/contracts';
-import { CycleGlyph, MilestoneGlyph, type ViewTab } from '~/ui';
 
-// Tabs of the project header: Tasks, Milestones and Cycles when the project uses them, then Settings
-// (project details and the Backlog.md source).
+// Links to a project's pages and the current cycle's note. (M5 dropped the M4 header tabs: the sidebar
+// lists a project's pages.)
 
 export type ProjectView = 'tasks' | 'milestones' | 'cycles' | 'settings';
 
@@ -28,38 +27,4 @@ export function cycleElapsed(currentCycle: NonNullable<ProjectTabsInput['current
   const length = cycleLengthDays(currentCycle.startsOn, currentCycle.endsOn);
   if (length <= 0) return 0;
   return Math.max(0, Math.min(1, (length - currentCycle.daysLeft) / length));
-}
-
-/** The header tabs: always Tasks and Settings, Milestones and Cycles when the project uses them. */
-export function projectTabs(project: ProjectTabsInput, milestoneCount?: number): ViewTab[] {
-  const tabs: ViewTab[] = [
-    {
-      id: 'tasks',
-      label: 'Tasks',
-      href: projectViewHref(project.key, 'tasks'),
-      ...(project.openCount != null ? { count: project.openCount } : {}),
-    },
-  ];
-  if (project.usesMilestones) {
-    tabs.push({
-      id: 'milestones',
-      label: 'Milestones',
-      href: projectViewHref(project.key, 'milestones'),
-      glyph: <MilestoneGlyph />,
-      ...(milestoneCount != null ? { count: milestoneCount } : {}),
-    });
-  }
-  if (project.usesCycles) {
-    const current = project.currentCycle;
-    const note = cycleNote(current);
-    tabs.push({
-      id: 'cycles',
-      label: 'Cycles',
-      href: projectViewHref(project.key, 'cycles'),
-      glyph: current ? <CycleGlyph state="progress" progress={cycleElapsed(current)} /> : <CycleGlyph />,
-      ...(note ? { note } : {}),
-    });
-  }
-  tabs.push({ id: 'settings', label: 'Settings', href: projectViewHref(project.key, 'settings') });
-  return tabs;
 }

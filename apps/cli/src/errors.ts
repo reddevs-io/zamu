@@ -24,8 +24,9 @@ export const EXIT = {
   server: 5,
   /**
    * M3: the write conflicts with a Backlog.md mirror (TASK_MIRRORED, MILESTONE_MIRRORED,
-   * PROJECT_MIRRORED, PROJECT_NOT_EMPTY) or the mirror cannot refresh (BACKLOG_PAUSED,
-   * BACKLOG_DETACHED). Other 409s (CONFLICT, TASK_CHANGED) keep exit code 1, as in v1.
+   * PROJECT_MIRRORED, PROJECT_NOT_EMPTY, and from M5 LABEL_MIRRORED) or the mirror cannot refresh
+   * (BACKLOG_PAUSED, BACKLOG_DETACHED). Other 409s (CONFLICT, TASK_CHANGED, LABEL_EXISTS,
+   * DEPENDENCY_LOOP, SUBTASK_DEPTH) keep exit code 1, as in v1.
    */
   conflict: 6,
 } as const;
@@ -98,6 +99,7 @@ const BACKLOG_CONFLICT_CODES = new Set<string>([
   'MILESTONE_MIRRORED',
   'PROJECT_MIRRORED',
   'PROJECT_NOT_EMPTY',
+  'LABEL_MIRRORED',
   'BACKLOG_PAUSED',
   'BACKLOG_DETACHED',
 ] satisfies ProblemCode[]);
@@ -190,6 +192,8 @@ export function toCliError(error: unknown, url?: string): CliError {
     const issues = Array.isArray(data?.issues) ? (data.issues as ProblemIssue[]) : undefined;
     // TASK_CHANGED carries the task as it is now. decodeProblem already validated it.
     const task = code === 'TASK_CHANGED' && data?.task ? (data.task as Problem['task']) : undefined;
+    // DEPENDENCY_LOOP names both ends of the refused link (M5).
+    const loop = code === 'DEPENDENCY_LOOP' && data?.loop ? (data.loop as Problem['loop']) : undefined;
     const body: Problem = {
       ...problem(code, error.message || undefined, {
         ...(requestId ? { requestId } : {}),
@@ -197,6 +201,7 @@ export function toCliError(error: unknown, url?: string): CliError {
         ...(task ? { task } : {}),
         ...mirroredExtensions(data),
       }),
+      ...(loop ? { loop } : {}),
       status: status >= 400 && status <= 599 ? status : 500,
     };
     if (BACKLOG_CONFLICT_CODES.has(code)) {

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./margin.css" />
+<script src="./data.js"></script>
+<style>body{margin:0}a{color:inherit}a:hover{color:inherit}
+.skrow{display:flex;align-items:center;gap:14px;height:38px;padding:0 18px 0 16px}
+.list-msg{padding:14px 18px}
+</style>
+</helmet>
+<div class="{{ rootClass }}" data-screen-label="List">
+<dc-import name="Side" project="{{ sideProject }}" view="{{ sideView }}" theme="{{ theme }}" hint-size="236px,900px"></dc-import>
+<main class="main">
+<header class="vh">
+<div class="crumb"><span class="{{ tileCls }}">{{ projInitial }}</span><span class="crumb-proj">{{ projName }}</span></div>
+<div class="seg"><span class="seg-i on">List</span><span class="seg-i">Board</span></div>
+<div class="anchor">
+<span class="{{ filterCls }}"><span class="filters-glyph"></span>Filter</span>
+<sc-if value="{{ showFilterMenu }}">
+<div class="pop below menu" style="width:240px">
+<div class="menu-in"><span class="ph">Filter by…</span></div>
+<sc-for list="{{ filterFields }}" as="ff"><div class="{{ ff.cls }}"><span>{{ ff.n }}</span><span class="spacer"></span><span class="caret">›</span></div></sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ showLabelMenu }}">
+<div class="pop menu" style="top:calc(100% + 8px);left:248px;width:268px">
+<div class="menu-in"><span>la</span><span class="caretbar"></span><span class="spacer"></span><span class="kbd">L</span></div>
+<div class="menu-h">Labels in Harbor</div>
+<sc-for list="{{ labelOpts }}" as="lo"><div class="{{ lo.cls }}"><span class="{{ lo.boxCls }}"><sc-if value="{{ lo.on }}"><span class="check"></span></sc-if></span><span class="{{ lo.dot }}"></span><span>{{ lo.n }}</span><span class="spacer"></span><span class="sm">{{ lo.count }}</span></div></sc-for>
+<div class="menu-foot"><span>3 selected</span><span class="spacer"></span><span><span class="kbd">↵</span>apply</span><span><span class="kbd">Esc</span>back</span></div>
+</div>
+</sc-if>
+</div>
+<span class="btn">Display</span>
+<span class="spacer"></span>
+<sc-if value="{{ mirrored }}"><span class="sync"><span class="dot"></span><b>Backlog.md</b>synced 38 min ago</span></sc-if>
+<span class="search"><span class="ico ico-search"></span><span class="nav-l search-l">Search</span><span class="nav-l kbd">/</span></span>
+<span class="btn primary">New task<span class="kbd">C</span></span>
+</header>
+<sc-if value="{{ showFbar }}">
+<div class="fbar">
+<sc-for list="{{ chips }}" as="ch"><span class="fchip"><span class="fk">{{ ch.k }}</span><span class="fop">{{ ch.op }}</span><span class="fv">{{ ch.v }}</span><span class="fx">×</span></span></sc-for>
+<span class="btn sm"><span class="ico ico-plus" style="width:10px;height:10px"></span>Filter</span>
+<span class="spacer"></span>
+<span class="muted" style="font-size:var(--fs-sm)">{{ matchTxt }}</span>
+<span class="link">Clear</span>
+</div>
+</sc-if>
+<div class="list">
+<sc-if value="{{ isError }}"><div class="list-msg"><div class="err"><span>Couldn’t load tasks. The server didn’t answer in time.</span><span class="btn sm ghost">Try again</span></div></div></sc-if>
+<sc-if value="{{ isLoading }}">
+<sc-for list="{{ skGroups }}" as="sg">
+<div class="grp"><span class="skel w12"></span><span class="skel" style="width:90px"></span></div>
+<sc-for list="{{ sg.rows }}" as="sr"><div class="skrow"><span class="skel" style="width:14px"></span><span class="skel" style="width:54px"></span><span class="skel round" style="width:13px;height:13px"></span><span class="{{ sr.cls }}"></span><span class="spacer"></span><span class="skel" style="width:60px"></span><span class="skel round"></span></div></sc-for>
+</sc-for>
+</sc-if>
+<sc-if value="{{ isEmpty }}">
+<div style="display:flex;height:100%"><div class="empty">
+<div class="empty-t">{{ emptyT }}</div>
+<div class="empty-d">{{ emptyD }}</div>
+<div class="empty-a"><sc-for list="{{ emptyBtns }}" as="eb"><span class="{{ eb.cls }}">{{ eb.n }}<sc-if value="{{ eb.k }}"><span class="kbd">{{ eb.k }}</span></sc-if></span></sc-for></div>
+</div></div>
+</sc-if>
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+<div class="grp"><span class="tri down"></span><span class="{{ g.st }}"></span><span>{{ g.name }}</span><span class="col-count">{{ g.count }}</span><span class="spacer"></span><span class="col-add">+</span></div>
+<sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="8">
+<div class="{{ r.cls }}">
+<sc-if value="{{ showBoxes }}"><span class="{{ r.boxCls }}"><sc-if value="{{ r.checked }}"><span class="check"></span></sc-if></span></sc-if>
+<sc-if value="{{ r.pu }}"><span class="pri u">!</span></sc-if>
+<sc-if value="{{ r.ph }}"><span class="pri h"></span></sc-if>
+<sc-if value="{{ r.priBlank }}"><span class="pri blank"></span></sc-if>
+<span class="key">{{ r.key }}</span>
+<span class="{{ r.stCls }}"></span>
+<span class="row-t">{{ r.title }}</span>
+<span class="row-r">
+<sc-if value="{{ r.blocked }}"><span class="blk">Blocked</span></sc-if>
+<sc-for list="{{ r.labels }}" as="l"><span class="lb"><span class="{{ l.cls }}"></span>{{ l.n }}</span></sc-for>
+<sc-if value="{{ r.isParent }}"><span class="subp"><span class="{{ r.ringCls }}"></span>{{ r.subTxt }}</span></sc-if>
+<sc-if value="{{ r.showSub }}"><span class="subp"><span class="{{ r.ringCls }}"></span>{{ r.subTxt }}</span></sc-if>
+<sc-if value="{{ r.showDue }}"><span class="{{ r.dueCls }}">{{ r.dueTxt }}</span></sc-if>
+<sc-if value="{{ r.showAv }}"><span class="{{ r.avCls }}">{{ r.avI }}</span></sc-if>
+<sc-if value="{{ r.noAv }}"><span class="av-slot"></span></sc-if>
+<span class="row-upd">{{ r.upd }}</span>
+</span>
+</div>
+</sc-for>
+</sc-for>
+</div>
+<sc-if value="{{ isMulti }}">
+<div class="actbar"><span class="cnt">3 selected</span><span class="btn">Status<span class="kbd">S</span></span><span class="btn">Assignee<span class="kbd">A</span></span><span class="btn">Labels<span class="kbd">L</span></span><span class="btn">Priority<span class="kbd">P</span></span><span class="btn">Due<span class="kbd">⇧D</span></span><span class="sep"></span><span class="btn icon">···</span><span class="btn"><span class="kbd">Esc</span></span></div>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["default", "label", "filters", "multi", "long", "empty", "noresults", "loading", "error", "filter", "filterlabels"], "default": "default" }
+}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (!window.PM) { const i = setInterval(() => { if (window.PM) { clearInterval(i); this.forceUpdate(); } }, 30); }
+  }
+  renderVals() {
+    const P = window.PM;
+    const theme = this.props.theme ?? 'light';
+    const s = this.props.state ?? 'default';
+    const isEmptyProj = s === 'empty';
+    const v = {
+      rootClass: 'app ' + theme, theme, sideProject: isEmptyProj ? '' : 'HBR', sideView: isEmptyProj ? '' : 'List',
+      tileCls: isEmptyProj ? 'tile c4' : 'tile c1', projInitial: isEmptyProj ? 'B' : 'H', projName: isEmptyProj ? 'Beacon' : 'Harbor', mirrored: !isEmptyProj,
+      filterCls: (s === 'filter' || s === 'filterlabels') ? 'btn on' : 'btn', showFilterMenu: s === 'filter' || s === 'filterlabels', showLabelMenu: s === 'filterlabels',
+      showFbar: s === 'filters' || s === 'noresults', isError: s === 'error', isLoading: s === 'loading', isEmpty: s === 'empty' || s === 'noresults', isMulti: s === 'multi', showBoxes: s === 'multi',
+      groups: [], chips: [], filterFields: [], labelOpts: [], skGroups: [], emptyBtns: [], matchTxt: '', emptyT: '', emptyD: ''
+    };
+    v.filterFields = ['Status', 'Priority', 'Assignee', 'Labels', 'Due date', 'Blocked', 'Milestone', 'Cycle', 'Created'].map((n) => ({ n, cls: 'menu-i' + (n === 'Labels' ? ' on' : '') }));
+    if (!P) return v;
+    v.labelOpts = P.LABELS.slice(0, 9).map((l) => { const on = ['frontend', 'mobile', 'i18n'].includes(l.n); return { n: l.n, dot: l.cls, count: l.count, on, boxCls: 'box' + (on ? ' on' : ''), cls: 'menu-i' + (l.n === 'i18n' ? ' on' : '') }; });
+    if (s === 'empty') { v.emptyT = 'No tasks in Beacon yet'; v.emptyD = 'Create the first task, or mirror an existing Backlog.md folder from a repository.'; v.emptyBtns = [{ n: 'New task', k: 'C', cls: 'btn primary' }, { n: 'Mirror Backlog.md', k: '', cls: 'btn ghost' }]; return v; }
+    if (s === 'noresults') { v.chips = [{ k: 'Labels', op: 'is', v: 'design' }, { k: 'Assignee', op: 'is', v: 'review-bot' }]; v.matchTxt = '0 of 123 tasks'; v.emptyT = 'No tasks match these filters'; v.emptyD = 'Nothing in Harbor is labelled design and assigned to review-bot. Remove a filter or clear them all.'; v.emptyBtns = [{ n: 'Clear filters', k: '', cls: 'btn ghost' }]; return v; }
+    if (s === 'loading') { v.skGroups = [0, 1].map((g) => ({ rows: [80, 60, 45, 80, 30, 60, 45, 60, 80].slice(0, g ? 6 : 9).map((w) => ({ cls: 'skel w' + w })) })); return v; }
+    if (s === 'error') return v;
+    const markRow = (r, i, sel) => Object.assign(r, { boxCls: 'box', checked: false });
+    if (s === 'label') {
+      const by = (lab) => P.PROG.concat(P.REVIEW, P.TODO).filter((t) => (t[3] || '').split(' ').includes(lab));
+      v.groups = [['mobile', 'c3', 27], ['i18n', 'c6', 12], ['security', 'c4', 9]].map(([lab, c, count]) => ({ name: lab, st: 'lbd ' + c, count,
+        rows: by(lab).slice(0, 8).map((t, i) => markRow(P.row(t, '', i, P.PROG.includes(t) ? 'prog' : P.REVIEW.includes(t) ? 'rev' : 'todo'), i)) }));
+      return v;
+    }
+    if (s === 'filters') {
+      v.chips = [{ k: 'Labels', op: 'is any of', v: '3 labels' }, { k: 'Assignee', op: 'is', v: 'claude-dev' }];
+      v.matchTxt = '21 of 123 tasks';
+      const f = (t) => t[4] === 'cd' && (t[3] || '').split(' ').some((x) => ['frontend', 'mobile', 'i18n'].includes(x));
+      v.groups = [['In progress', 'st prog', P.PROG, 'prog'], ['In review', 'st rev', P.REVIEW, 'rev'], ['Todo', 'st todo', P.TODO, 'todo']].map(([name, st, arr, k]) => {
+        const rows = arr.filter(f).map((t, i) => markRow(P.row(t, '', i, k), i)); return { name, st, count: rows.length, rows };
+      });
+      return v;
+    }
+    if (s === 'long') {
+      const rows = P.LONG.map((t, i) => markRow(P.row(t, i === 0 ? 'sel' : '', i, 'prog'), i)).concat(P.PROG.slice(1, 5).map((t, i) => markRow(P.row(t, '', i, 'prog'), i)));
+      v.groups = [{ name: 'In progress', st: 'st prog', count: 16, rows }, { name: 'In review', st: 'st rev', count: 27, rows: P.REVIEW.slice(0, 10).map((t, i) => markRow(P.row(t, '', i, 'rev'), i)) }];
+      return v;
+    }
+    const prog = [];
+    P.PROG.forEach((t, i) => {
+      const selCls = s === 'multi' ? ([1, 3, 4].includes(i) ? 'multi' : '') : (i === 2 ? 'sel' : '');
+      const r = markRow(P.row(t, selCls, i, 'prog'), i);
+      if (s === 'multi' && [1, 3, 4].includes(i)) { r.checked = true; r.boxCls = 'box on'; }
+      prog.push(r);
+      if (t[0] === 'HBR-164' && s !== 'multi') P.SUBS.forEach((k, j) => prog.push(markRow(P.row(k, 'child' + (j === P.SUBS.length - 1 ? ' last' : ''), j + 3, 'rev'), j)));
+    });
+    v.groups = [
+      { name: 'In progress', st: 'st prog', count: 13, rows: prog },
+      { name: 'In review', st: 'st rev', count: 27, rows: P.REVIEW.map((t, i) => markRow(P.row(t, '', i + 2, 'rev'), i)) },
+      { name: 'Todo', st: 'st todo', count: 78, rows: P.TODO.map((t, i) => markRow(P.row(t, '', i + 5, 'todo'), i)) }
+    ];
+    return v;
+  }
+}
+</script>
+</body>
+</html>

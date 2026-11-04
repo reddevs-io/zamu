@@ -1,8 +1,13 @@
-// Dashboard stress run (PM-8): query plans of the Everyone dashboard before and after the
-// dashboard_indexes migration on a large throwaway workspace.
+// Dashboard and Home stress run (PM-8, M5): query plans on a large throwaway workspace.
 //
-//   pnpm exec tsx packages/core/scripts/dashboard-stress.ts [--db-prefix pm_stress] [--runs 5]
-//     [--scope everyone|mine] [--verbose] [--keep] [--try-index "create index ..."]...
+//   pnpm exec tsx packages/core/scripts/dashboard-stress.ts [--suite dashboard|home]
+//     [--db-prefix pm_stress] [--runs 5] [--scope everyone|mine] [--verbose] [--keep]
+//     [--try-index "create index ..."]...
+//
+// --suite home (M5): applies every migration, seeds the same data plus the M5 fields (due dates,
+// labels, blockers, subtasks), then EXPLAINs every query getHome issues for the owner on the Mine,
+// Everyone and Agents tabs, with a label filter on Mine, and getHomeCounts. Phases: "current", then
+// one per --try-index. The rest of this note describes the default dashboard suite.
 //
 // Creates a database on the server in STRESS_DATABASE_URL (else TEST_DATABASE_URL, else the local
 // dev Postgres), applies every migration before dashboard_indexes, seeds 100 projects, 100k tasks,
@@ -25,6 +30,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate as drizzleMigrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Actor } from '../src/authz';
 import { getDashboard } from '../src/dashboard';
+import { getHome, getHomeCounts } from '../src/home';
 
 type Pool = DbHandle['pool'];
 
@@ -41,6 +47,7 @@ const AGENTS = 10;
 
 const { values: options } = parseArgs({
   options: {
+    suite: { type: 'string', default: 'dashboard' },
     'db-prefix': { type: 'string', default: 'pm_stress' },
     runs: { type: 'string', default: '5' },
     scope: { type: 'string', default: 'everyone' },
@@ -52,6 +59,9 @@ const { values: options } = parseArgs({
 const runs = Math.max(1, Number(options.runs) || 5);
 if (options.scope !== 'everyone' && options.scope !== 'mine') throw new Error('--scope is everyone or mine');
 const scope = options.scope;
+if (options.suite !== 'dashboard' && options.suite !== 'home')
+  throw new Error('--suite is dashboard or home');
+const suite = options.suite;
 const serverUrl =
   process.env.STRESS_DATABASE_URL ||
   process.env.TEST_DATABASE_URL ||
@@ -171,10 +181,46 @@ const SEED_SQL = [
     and substring(c.body from 'mention:([0-9a-f-]{36})')::uuid <> c.author_id`,
 ];
 
-async function seed(pool: Pool) {
+/**
+ * M5 fields on top of SEED_SQL (needs the M5 migration): due dates on 30% of open tasks from 10
+ * days ago to 20 days ahead, eight labels per project (names shared across projects, mixed case)
+ * on 40% of tasks, one blocker on 5% of tasks and a parent on 10% (one level: parents are the
+ * first 100 tasks of a project, children the rest), all inside the task's project.
+ */
+const HOME_SEED_SQL = [
+  `select setseed(0.43)`,
+  `update task set due_date = current_date + floor(random() * 30)::int - 10
+    where status in ('backlog', 'todo', 'in_progress', 'in_review') and random() < 0.3`,
+  `insert into label (workspace_id, project_id, name, color)
+    select p.workspace_id, p.id, case when k % 2 = 0 then 'Label ' || k else 'label ' || k end, 1 + k % 9
+    from project p, generate_series(1, 8) k`,
+  `create temp table lbl as
+    select l.project_id, row_number() over (partition by l.project_id order by l.name)::int as k, l.id
+    from label l`,
+  `insert into task_label (task_id, label_id)
+    select distinct x.id, lbl.id
+    from (select id, project_id, random() as r, floor(random() * 8)::int as a, floor(random() * 8)::int as b
+      from task) x
+    join lbl on lbl.project_id = x.project_id and (lbl.k = 1 + x.a or (x.r < 0.15 and lbl.k = 1 + x.b))
+    where x.r < 0.4`,
+  `insert into task_dependency (task_id, blocker_id)
+    select t.id, b.id
+    from task t
+    join task b on b.project_id = t.project_id
+      and b.number = 1 + (t.number + 1 + floor(random() * 50)::int) % ${TASKS_PER_PROJECT}
+    where random() < 0.05 and b.id <> t.id
+    on conflict do nothing`,
+  `update task t set parent_id = parent.id
+    from task parent
+    where parent.project_id = t.project_id and t.number > 100 and random() < 0.1
+      and parent.number = 1 + t.number % 100`,
+];
+
+async function seed(pool: Pool, home = false) {
   const client = await pool.connect();
   try {
     for (const statement of SEED_SQL) await client.query(statement);
+    if (home) for (const statement of HOME_SEED_SQL) await client.query(statement);
   } finally {
     client.release();
   }
@@ -186,7 +232,13 @@ async function counts(pool: Pool) {
     (select count(*) from project) as projects, (select count(*) from task) as tasks,
     (select count(*) from activity) as activity, (select count(*) from comment) as comments,
     (select count(*) from comment_mention) as mentions, (select count(*) from milestone) as milestones,
-    (select count(*) from cycle) as cycles, (select count(*) from "user") as users`);
+    (select count(*) from cycle) as cycles, (select count(*) from "user") as users${
+      suite === 'home'
+        ? `, (select count(*) from task where due_date is not null) as due,
+    (select count(*) from task_label) as task_labels, (select count(*) from task_dependency) as dependencies,
+    (select count(*) from task where parent_id is not null) as subtasks`
+        : ''
+    }`);
   return rows[0] ?? {};
 }
 
@@ -221,6 +273,91 @@ async function captureQueries(pool: Pool, actor: Actor, now: Date): Promise<Capt
   });
   await getDashboard({ db, now: () => now }, actor, { scope });
   return captured.filter((query) => query.name !== 'readableProjects');
+}
+
+/** Names a query of getHome or getHomeCounts by what it reads. */
+function homeQueryName(text: string): string {
+  const tab = text.includes(`then 'creator'`)
+    ? 'mine'
+    : text.includes('with bl as')
+      ? 'everyone'
+      : text.includes('with agents as')
+        ? 'waiting'
+        : null;
+  if (tab && text.includes('row_number() over (partition by c.g')) return `${tab} groups`;
+  if (tab && text.includes('group by c.g')) return `${tab} totals`;
+  if (text.includes('"kindRank"')) return 'deadlines';
+  if (text.includes('as assigned')) return 'agent cards';
+  if (text.includes('group by x.actor_id')) return 'agent changes today';
+  if (text.includes(`'activity' as kind`)) return 'agent recent actions';
+  if (text.includes('from task_label tl')) return 'row labels';
+  if (text.includes('d.blocker_id as "taskId"')) return 'row blocks';
+  if (text.includes('from task_dependency d')) return 'row blockers';
+  if (text.includes('s.parent_id')) return 'row subtasks';
+  if (text.includes('from label l')) return 'label filter ids';
+  if (text.includes('from milestone where')) return 'row milestones';
+  if (text.includes('from cycle where')) return 'row cycles';
+  if (text.includes('count(*) as n from member')) return 'agent count';
+  if (text.includes('"backlog_source"')) return 'row mirrors';
+  if (text.includes('"activity"') || text.includes('"milestone"') || text.includes('"cycle"')) {
+    return 'activity mapper';
+  }
+  if (text.includes('from "user"')) return 'users';
+  return 'readableProjects';
+}
+
+/** The Home calls the home suite measures, by name. */
+const HOME_CALLS: [
+  string,
+  (db: Parameters<typeof getHome>[0]['db'], actor: Actor, now: Date) => Promise<unknown>,
+][] = [
+  ['mine', (db, actor, now) => getHome({ db, now: () => now }, actor, { tab: 'mine' })],
+  ['everyone', (db, actor, now) => getHome({ db, now: () => now }, actor, { tab: 'everyone' })],
+  ['agents', (db, actor, now) => getHome({ db, now: () => now }, actor, { tab: 'agents' })],
+  [
+    'mine label',
+    (db, actor, now) =>
+      getHome({ db, now: () => now }, actor, { tab: 'mine', label: ['LABEL 2', 'label 3'] }),
+  ],
+  ['counts', (db, actor, now) => getHomeCounts({ db, now: () => now }, actor)],
+];
+
+/** The queries of every Home call, named "<call>: <query>", without duplicates of the same text. */
+async function captureHomeQueries(pool: Pool, actor: Actor, now: Date): Promise<Captured[]> {
+  const captured: Captured[] = [];
+  for (const [call, run] of HOME_CALLS) {
+    const db = drizzle({
+      client: pool,
+      relations,
+      logger: {
+        logQuery: (text, params) => captured.push({ name: `${call}: ${homeQueryName(text)}`, text, params }),
+      },
+    });
+    await run(db, actor, now);
+  }
+  const seen = new Set<string>();
+  return captured.filter((query) => {
+    if (query.name.endsWith('readableProjects') || query.name.endsWith('users')) return false;
+    const id = `${query.name}\n${query.text}\n${JSON.stringify(query.params)}`;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+/** Median wall time of getHome on the three tabs in a row, after one warm-up round. */
+async function homeTime(pool: Pool, actor: Actor, now: Date): Promise<number> {
+  const db = drizzle({ client: pool, relations });
+  const times: number[] = [];
+  for (let run = 0; run <= runs; run++) {
+    const start = performance.now();
+    for (const tab of ['mine', 'everyone', 'agents'] as const) {
+      await getHome({ db, now: () => now }, actor, { tab });
+    }
+    if (run > 0) times.push(performance.now() - start);
+  }
+  times.sort((a, b) => a - b);
+  return times[Math.floor(times.length / 2)] ?? 0;
 }
 
 interface PlanNode {
@@ -295,7 +432,11 @@ async function explain(pool: Pool, query: Captured): Promise<Measure> {
 
 async function measureAll(pool: Pool, queries: Captured[]) {
   const result = new Map<string, Measure>();
-  for (const query of queries) result.set(query.name, await explain(pool, query));
+  for (const query of queries) {
+    let name = query.name;
+    for (let n = 2; result.has(name); n++) name = `${query.name} #${n}`;
+    result.set(name, await explain(pool, query));
+  }
   return result;
 }
 
@@ -314,8 +455,11 @@ async function dashboardTime(pool: Pool, actor: Actor, now: Date): Promise<numbe
 
 const ms = (value: number) => `${value.toFixed(1)} ms`;
 
+/** What the wall time of a phase measures. */
+const wallLabel = () => (suite === 'home' ? 'getHome mine + everyone + agents' : `getDashboard ${scope}`);
+
 function printPhase(title: string, measures: Map<string, Measure>, total: number) {
-  console.log(`\n## ${title} (getDashboard ${scope}: ${ms(total)})`);
+  console.log(`\n## ${title} (${wallLabel()}: ${ms(total)})`);
   for (const [name, measure] of measures) {
     const jit = measure.jitMs > 0 ? ` (JIT ${ms(measure.jitMs)})` : '';
     console.log(`\n${name}: ${ms(measure.ms)}${jit}, ${measure.buffers} buffers`);
@@ -328,7 +472,8 @@ function printPhase(title: string, measures: Map<string, Measure>, total: number
 function printSummary(phases: { title: string; measures: Map<string, Measure>; total: number }[]) {
   const [before, ...later] = phases;
   if (!before) return;
-  console.log(`\n## Summary: ${scope} scope, median of ${runs} runs, EXPLAIN ANALYZE execution time\n`);
+  const what = suite === 'home' ? 'Home' : `${scope} scope`;
+  console.log(`\n## Summary: ${what}, median of ${runs} runs, EXPLAIN ANALYZE execution time\n`);
   console.log(
     `| query | ${phases.map((phase) => phase.title).join(' | ')} | indexes the before plan did not use |`,
   );
@@ -344,7 +489,7 @@ function printSummary(phases: { title: string; measures: Map<string, Measure>; t
     });
     console.log(`| ${name} | ${cells.join(' | ')} | ${added.join('; ')} |`);
   }
-  console.log(`| getDashboard (wall) | ${phases.map((phase) => ms(phase.total)).join(' | ')} | |`);
+  console.log(`| ${wallLabel()} (wall) | ${phases.map((phase) => ms(phase.total)).join(' | ')} | |`);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +505,62 @@ async function migrateFolder(folder: string) {
   }
 }
 
+async function ownerActor(pool: Pool): Promise<Actor> {
+  const { rows } = await pool.query<{ user_id: string; organization_id: string }>(
+    `select m.user_id, m.organization_id from member m where m.role = 'owner'`,
+  );
+  const owner = rows[0];
+  if (!owner) throw new Error('seed has no owner');
+  return {
+    userId: owner.user_id,
+    kind: 'person',
+    workspaceId: owner.organization_id,
+    role: 'owner',
+    onBehalfOfId: null,
+  };
+}
+
+/** --suite home: every migration, the M5 seed, the Home queries now and with each --try-index. */
+async function mainHome() {
+  console.log(`database ${databaseName}; migrating to the latest schema`);
+  await createDatabase(url);
+  const { pool } = createDb(url, { max: 8 });
+  try {
+    await migrateFolder(migrationsFolder);
+    const start = performance.now();
+    await seed(pool, true);
+    console.log(`seeded in ${ms(performance.now() - start)}:`, await counts(pool));
+    const actor = await ownerActor(pool);
+    const now = new Date();
+    const queries = await captureHomeQueries(pool, actor, now);
+
+    const phases: { title: string; measures: Map<string, Measure>; total: number }[] = [];
+    const runPhase = async (title: string) => {
+      const measures = await measureAll(pool, queries);
+      const total = await homeTime(pool, actor, now);
+      phases.push({ title, measures, total });
+      printPhase(title, measures, total);
+    };
+    await runPhase('current');
+    for (const [i, statement] of (options['try-index'] ?? []).entries()) {
+      await pool.query(statement);
+      await pool.query('analyze');
+      await runPhase(`current + try ${i + 1}`);
+      console.log(`  try ${i + 1}: ${statement}`);
+    }
+    printSummary(phases);
+  } finally {
+    await pool.end();
+    if (options.keep) console.log(`\nkept ${url}`);
+    else {
+      await dropDatabase(url);
+      console.log(`\ndropped ${databaseName}`);
+    }
+  }
+}
+
 async function main() {
+  if (suite === 'home') return mainHome();
   const migrations = readdirSync(migrationsFolder).sort();
   const target = migrations.find((name) => name.endsWith(NEW_MIGRATION_SUFFIX));
   if (!target) throw new Error(`no migration ending in ${NEW_MIGRATION_SUFFIX} in ${migrationsFolder}`);
@@ -378,18 +578,7 @@ async function main() {
     await seed(pool);
     console.log(`seeded in ${ms(performance.now() - start)}:`, await counts(pool));
 
-    const { rows } = await pool.query<{ user_id: string; organization_id: string }>(
-      `select m.user_id, m.organization_id from member m where m.role = 'owner'`,
-    );
-    const owner = rows[0];
-    if (!owner) throw new Error('seed has no owner');
-    const actor: Actor = {
-      userId: owner.user_id,
-      kind: 'person',
-      workspaceId: owner.organization_id,
-      role: 'owner',
-      onBehalfOfId: null,
-    };
+    const actor = await ownerActor(pool);
     const now = new Date();
     const queries = await captureQueries(pool, actor, now);
 

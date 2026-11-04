@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./margin.css" />
+<link rel="stylesheet" href="./screens.css" />
+<script src="./data.js"></script>
+<style>
+body{margin:0}a{color:inherit}a:hover{color:inherit}
+.fgl{display:inline-block;width:9px;height:11px;border:1.5px solid currentColor;border-radius:2px;flex:none}
+.bm.link-b{color:var(--text-2)}
+.bm .arr{color:var(--text-3)}
+.tv-title-sm{font-weight:500;color:var(--text-2);font-size:var(--fs-md);max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act-tg{display:flex;gap:2px;margin-left:auto}
+.act-tg .tab{height:24px;font-size:var(--fs-xs);padding:0 8px}
+.cmt.agent{box-shadow:var(--shadow-card), inset 2px 0 0 var(--text-3)}
+.ph-l{color:var(--text-3);font-weight:400}
+.prop.hover .prop-v{color:var(--text)}
+.lock-tip{right:8px;top:36px}
+.props .bar{max-width:64px;min-width:36px}
+.fromfile .prop{grid-template-columns:108px minmax(0,1fr)}
+.ff-tog{display:flex;align-items:center;gap:8px;color:var(--text-2);font-size:var(--fs-sm);font-weight:600;height:30px;margin:0 -6px;padding:0 6px;border-radius:var(--r-sm)}
+.ff-tog .sm{margin-left:auto;color:var(--text-3);font-weight:400;font-size:var(--fs-xs)}
+.ff-k{font-family:var(--code);font-size:11.5px}
+.ff-v{font-family:var(--code);font-size:11.5px;color:var(--text-2);word-break:break-all}
+.mention{color:var(--accent-text);font-weight:500}
+.empty-hint{color:var(--text-3);font-size:var(--fs-sm);line-height:1.5}
+.desc-ph{color:var(--text-3);font-size:14.5px;line-height:1.62;padding:2px 0 6px}
+.sugg{position:absolute;left:200px;top:92px;width:260px}
+</style>
+</helmet>
+<div class="{{ rootClass }}" data-screen-label="Task view">
+<dc-import name="Side" project="{{ projKey }}" view="List" theme="{{ theme }}" hint-size="236px,900px"></dc-import>
+<main class="main">
+<header class="vh">
+<div class="crumb"><span class="{{ tileCls }}">{{ projInitial }}</span><span class="crumb-proj">{{ projName }}</span><span class="crumb-sep">/</span><span class="crumb-key">{{ key }}</span>
+<sc-if value="{{ scrolled }}"><span class="tv-title-sm">{{ title }}</span></sc-if>
+</div>
+<span class="spacer"></span>
+<span class="tv-nav"><span class="btn icon ghost">‹</span><span class="btn icon ghost">›</span><span>{{ navTxt }}</span></span>
+<span class="btn ghost">Copy link</span>
+<span class="btn icon ghost">···</span>
+</header>
+<div class="task">
+<div class="task-main">
+<div class="{{ colCls }}" style="{{ colStyle }}">
+<sc-if value="{{ mirrored }}"><div class="task-src"><span class="bm link-b"><span class="fgl"></span>Backlog.md<span class="arr">↗</span></span></div></sc-if>
+<sc-if value="{{ showTitle }}"><h1 class="task-title">{{ title }}</h1></sc-if>
+
+<sc-if value="{{ isEmpty }}">
+<div class="desc-ph">Add a description…</div>
+<div class="sh"><span>Subtasks</span></div>
+<div class="empty-f"><span class="col-add">+</span>Add subtask<span class="spacer"></span><span class="kbd">⇧S</span></div>
+<div class="sh"><span>Blocked by</span></div>
+<div class="empty-f"><span class="col-add">+</span>Add blocker<span class="spacer"></span><span class="kbd">⇧B</span></div>
+</sc-if>
+
+<sc-if value="{{ showDesc }}">
+<div class="desc">
+<p>Payouts that fail at the provider are dropped today. Retry them on a schedule so merchants are paid without support stepping in.</p>
+<ul>
+<li>Back off from 1 minute up to 6 hours, with jitter.</li>
+<li>Stop after 8 attempts and alert the on-call channel.</li>
+<li>Every attempt reuses the payout’s idempotency key, so a retry can never pay twice. See <code>payouts/retry.ts</code>.</li>
+</ul>
+<sc-if value="{{ isLong }}">
+<h3>Schedule</h3>
+<p>Attempt <i>n</i> waits <code>min(6h, 1m × 2^(n−1))</code> plus up to 20% jitter. Eight attempts cover about 13 hours, which is long enough to ride out a provider outage overnight and short enough that a merchant notices before the next business day.</p>
+<pre>attempt  wait      cumulative
+1        1m        1m
+2        2m        3m
+3        4m        7m
+4        8m        15m
+5        16m       31m
+6        32m       1h 03m
+7        1h 04m    2h 07m
+8        6h        8h 07m</pre>
+<h3>Out of scope</h3>
+<ul>
+<li>Retrying refunds. They go through a different provider endpoint and need their own idempotency rules (PAY-160).</li>
+<li>A merchant-facing retry button. Support can trigger a retry from the admin panel instead.</li>
+<li>Changing the alert routing. On-call keeps the existing <code>#payments-alerts</code> channel.</li>
+</ul>
+<h3>Open questions</h3>
+<p>Should a payout that fails with <code>account_closed</code> retry at all? It never succeeds, so the current plan skips straight to the alert. Tomás wants a single retry in case the provider reports it wrongly, which happened twice in September.</p>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ showRel }}">
+<div class="sh"><span>Subtasks</span><span class="subp"><span class="ring p75"></span>3 of 4 done</span><span class="spacer"></span><span class="muted">1 canceled</span></div>
+<div class="mbox">
+<sc-for list="{{ subs }}" as="s">
+<div class="{{ s.cls }}"><span class="{{ s.st }}"></span><span class="key">{{ s.key }}</span><span class="row-t">{{ s.title }}</span><sc-if value="{{ s.hasAv }}"><span class="{{ s.av }}">{{ s.avI }}</span></sc-if></div>
+</sc-for>
+<div class="add-l"><span class="col-add">+</span>Add subtask<span class="spacer"></span><span class="kbd">⇧S</span></div>
+</div>
+<div class="sh"><span>Blocked by</span><span class="muted">2 open</span><span class="spacer"></span><span class="muted">Blocks PAY-150</span></div>
+<div class="mbox">
+<sc-for list="{{ blockers }}" as="s">
+<div class="{{ s.cls }}"><span class="{{ s.st }}"></span><span class="key">{{ s.key }}</span><span class="row-t">{{ s.title }}</span><sc-if value="{{ s.hasAv }}"><span class="{{ s.av }}">{{ s.avI }}</span></sc-if></div>
+</sc-for>
+<div class="add-l"><span class="col-add">+</span>Add blocker<span class="spacer"></span><span class="kbd">⇧B</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ mirrored }}">
+<div class="desc">
+<p>Inbox sorting reads its group names straight from the English strings file, so every other locale shows “Uncategorised”, “This week” and “Older” in English.</p>
+<ul><li>Move the group names into the shared <code>inbox</code> namespace.</li><li>Add the five missing keys to fr, nl, de, es and it.</li></ul>
+</div>
+<div class="sh"><span>Subtasks</span></div>
+<div class="empty-f">None in the file</div>
+<div class="sh"><span>Blocked by</span></div>
+<div class="mbox"><div class="mrow"><span class="st done"></span><span class="key">HBR-46</span><span class="row-t">Plural forms in German and Dutch notifications</span><span class="av agent av-cd">cd</span></div></div>
+</sc-if>
+
+<div class="sh"><span>Activity</span><sc-if value="{{ showCount }}"><span class="muted">{{ actCount }}</span></sc-if><span class="act-tg"><span class="tab on">All</span><span class="tab">Comments</span></span></div>
+<div class="act">
+<sc-if value="{{ hasMore }}"><div class="ev-more">{{ moreTxt }}</div></sc-if>
+<sc-for list="{{ acts }}" as="a">
+<sc-if value="{{ a.isEv }}"><div class="ev"><span class="{{ a.av }}">{{ a.avI }}</span><span><b>{{ a.who }}</b> {{ a.txt }}</span><span class="spacer"></span><span>{{ a.when }}</span></div></sc-if>
+<sc-if value="{{ a.isCmt }}"><div class="{{ a.cmtCls }}"><div class="cmt-h"><span class="{{ a.av }}">{{ a.avI }}</span><b>{{ a.who }}</b><sc-if value="{{ a.acting }}"><span>{{ a.acting }}</span></sc-if><span class="spacer"></span><span>{{ a.when }}</span></div><div class="cmt-b">{{ a.txt }}</div></div></sc-if>
+</sc-for>
+<sc-if value="{{ composerClosed }}"><div class="composer"><span>{{ composerPh }}</span><span class="spacer"></span><span class="kbd">M</span></div></sc-if>
+<sc-if value="{{ composerOpen }}">
+<div class="composer open" style="position:relative">
+<div class="pop menu sugg">
+<div class="menu-h">Mention</div>
+<div class="menu-i on"><span class="av agent av-cd">cd</span>claude-dev<span class="sm">for Ana</span></div>
+<div class="menu-i"><span class="av agent av-rb">rb</span>review-bot<span class="sm">for Tomás</span></div>
+</div>
+<div class="composer-tabs"><b>Write</b><span>Preview</span></div>
+<div class="composer-b">Holding is right. Once PAY-120 lands, ship the alert with the threshold at 8 attempts and page on-call only between 08:00 and 22:00. <span class="mention">@cl</span><span class="caretbar" style="display:inline-block;width:1.5px;height:16px;background:var(--accent);vertical-align:-3px"></span></div>
+<div class="composer-ft"><span class="muted" style="font-size:var(--fs-xs)">Markdown · @ to mention · drop files to attach</span><span class="spacer"></span><span class="btn ghost">Cancel</span><span class="btn primary">Comment<span class="kbd">⌘↵</span></span></div>
+</div>
+</sc-if>
+</div>
+<div style="height:40px"></div>
+</div>
+</div>
+
+<aside class="props">
+<sc-if value="{{ isFull }}">
+<div class="blkline"><span class="blk">Blocked</span><span>by 2 open tasks</span></div>
+<div class="prop"><span class="prop-k">Status</span><span class="prop-v"><span class="st prog"></span>In progress</span></div>
+<div class="prop"><span class="prop-k">Priority</span><span class="prop-v"><span class="pri h"></span>High</span></div>
+<div class="prop"><span class="prop-k">Assignee</span><span class="prop-v"><span class="av agent av-cd">cd</span>claude-dev<span class="sm">for Ana</span></span></div>
+<div class="prop"><span class="prop-k">Labels</span><span class="prop-v"><sc-for list="{{ labels }}" as="l"><span class="lb"><span class="{{ l.cls }}"></span>{{ l.n }}</span></sc-for></span></div>
+<div class="prop"><span class="prop-k">Due</span><span class="prop-v"><span class="due over">3 days overdue</span><span class="sm">Oct 31</span></span></div>
+<div class="prop"><span class="prop-k">Parent</span><span class="prop-v"><span class="key">PAY-120</span><span style="font-weight:400">Idempotency keys</span></span></div>
+<div class="prop-sep"></div>
+<div class="prop"><span class="prop-k">Milestone</span><span class="prop-v">Payouts v2<span class="bar p64"></span><span class="sm">64%</span></span></div>
+<div class="prop"><span class="prop-k">Cycle</span><span class="prop-v">Cycle 12<span class="sm">Oct 27 – Nov 9</span></span></div>
+<div class="prop-sep"></div>
+<div class="prop"><span class="prop-k">Created</span><span class="prop-v"><span class="sm">Oct 14 by Ana Ruiz</span></span></div>
+<div class="prop"><span class="prop-k">Updated</span><span class="prop-v"><span class="sm">2 h ago by claude-dev</span></span></div>
+</sc-if>
+<sc-if value="{{ isEmpty }}">
+<div class="prop"><span class="prop-k">Status</span><span class="prop-v"><span class="st todo"></span>Todo</span></div>
+<div class="prop hover"><span class="prop-k">Priority</span><span class="prop-v ph"><span class="pri n"></span>Set priority<span class="spacer"></span><span class="kbd">P</span></span></div>
+<div class="prop"><span class="prop-k">Assignee</span><span class="prop-v ph"><span class="av none"></span>Assign</span></div>
+<div class="prop"><span class="prop-k">Labels</span><span class="prop-v ph">Add labels</span></div>
+<div class="prop"><span class="prop-k">Due</span><span class="prop-v ph">Set due date</span></div>
+<div class="prop"><span class="prop-k">Parent</span><span class="prop-v ph">None</span></div>
+<div class="prop-sep"></div>
+<div class="prop"><span class="prop-k">Milestone</span><span class="prop-v ph">Add to milestone</span></div>
+<div class="prop"><span class="prop-k">Cycle</span><span class="prop-v ph">Add to cycle</span></div>
+<div class="prop-sep"></div>
+<div class="prop"><span class="prop-k">Created</span><span class="prop-v"><span class="sm">Just now by Ana Ruiz</span></span></div>
+</sc-if>
+<sc-if value="{{ mirrored }}">
+<div class="prop"><span class="prop-k">Status</span><span class="prop-v"><span class="st prog"></span>In progress</span></div>
+<div class="prop"><span class="prop-k">Priority</span><span class="prop-v"><span class="pri h"></span>High</span></div>
+<div class="prop"><span class="prop-k">Assignee</span><span class="prop-v"><span class="av agent av-cd">cd</span>claude-dev<span class="sm">for Ana</span></span></div>
+<div class="{{ lblPropCls }}"><span class="prop-k">Labels</span><span class="prop-v"><span class="lb"><span class="lbd c6"></span>i18n</span><span class="lb"><span class="lbd c1"></span>frontend</span></span>
+<sc-if value="{{ lockLabels }}"><span class="lock"></span><span class="tip lock-tip">Set in Backlog.md. Edit the file to change it.</span></sc-if>
+</div>
+<div class="prop"><span class="prop-k">Due</span><span class="prop-v ph">None</span></div>
+<div class="prop"><span class="prop-k">Parent</span><span class="prop-v ph">None</span></div>
+<div class="prop-sep"></div>
+<div class="{{ msPropCls }}"><span class="prop-k">Milestone</span><span class="prop-v">Mobile app release<span class="bar p60"></span><span class="sm">60%</span></span><sc-if value="{{ lockMs }}"><span class="lock"></span></sc-if></div>
+<div class="prop"><span class="prop-k">Cycle</span><span class="prop-v">Cycle 12<span class="sm">Oct 27 – Nov 9</span></span></div>
+<div class="prop-sep"></div>
+<div class="prop"><span class="prop-k">Updated</span><span class="prop-v"><span class="sm">From the file, 38 min ago</span></span></div>
+<div class="fromfile">
+<div class="ff-tog"><span class="{{ ffTri }}"></span>From the file<span class="sm">{{ ffCount }}</span></div>
+<sc-if value="{{ ffOpen }}">
+<sc-for list="{{ ffRows }}" as="f"><div class="prop"><span class="prop-k"><span class="ff-k">{{ f.k }}</span></span><span class="prop-v"><span class="ff-v">{{ f.v }}</span></span></div></sc-for>
+</sc-if>
+</div>
+</sc-if>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["full", "full1280", "empty", "mirrored", "fromfile", "long", "comments", "composer"], "default": "full" }
+}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (!window.PM) { const i = setInterval(() => { if (window.PM) { clearInterval(i); this.forceUpdate(); } }, 30); }
+  }
+  renderVals() {
+    const P = window.PM;
+    const theme = this.props.theme ?? 'light';
+    const s = this.props.state ?? 'full';
+    const mirrored = s === 'mirrored' || s === 'fromfile';
+    const isEmpty = s === 'empty';
+    const native = !mirrored && !isEmpty;
+    const scrolled = s === 'comments' || s === 'composer';
+    const LBC = P ? P.LBC : {};
+    const AV = { ana: ['av av-ana', 'AR', 'Ana Ruiz'], tf: ['av av-tf', 'TF', 'Tomás Ferrer'], cd: ['av agent av-cd', 'cd', 'claude-dev'], rb: ['av agent av-rb', 'rb', 'review-bot'] };
+    const ev = (w, txt, when) => ({ isEv: true, isCmt: false, av: AV[w][0], avI: AV[w][1], who: AV[w][2] + (w === 'cd' ? ' for Ana' : w === 'rb' ? ' for Tomás' : ''), txt, when, acting: '', cmtCls: 'cmt' });
+    const cm = (w, txt, when) => ({ isEv: false, isCmt: true, av: AV[w][0], avI: AV[w][1], who: AV[w][2], acting: w === 'cd' ? 'acting for Ana' : w === 'rb' ? 'acting for Tomás' : '', txt, when, cmtCls: (w === 'cd' || w === 'rb') ? 'cmt agent' : 'cmt' });
+    const ALL = [
+      ev('ana', 'created this task', 'Oct 14'),
+      ev('ana', 'added the labels payouts and reliability', 'Oct 14'),
+      ev('ana', 'set priority to High', 'Oct 14'),
+      cm('tf', 'Do we retry on account_closed? It came back wrong from the provider twice in September.', 'Oct 15'),
+      cm('ana', 'Skip it for now and alert straight away. We can add a single retry later if it keeps happening.', 'Oct 15'),
+      ev('ana', 'assigned this to claude-dev', 'Oct 16'),
+      ev('cd', 'moved this to In progress', 'Oct 16'),
+      ev('cd', 'added subtask PAY-143', 'Oct 16'),
+      ev('cd', 'added subtask PAY-144', 'Oct 16'),
+      ev('cd', 'added subtask PAY-145', 'Oct 16'),
+      ev('ana', 'set the due date to Oct 31', 'Oct 20'),
+      cm('cd', 'The backoff schedule is in (PAY-144). Holding the alert until PAY-120 lands: without idempotency keys a retry could pay twice.', 'Oct 28'),
+      ev('ana', 'added blocker PAY-120', 'Oct 28'),
+      ev('cd', 'added blocker PAY-138', 'Oct 28'),
+      ev('rb', 'requested changes on PAY-144', 'Oct 29'),
+      cm('rb', 'Jitter is applied before the cap, so attempt 8 can wait 7h 12m. Apply it after the cap.', 'Oct 29'),
+      ev('cd', 'marked PAY-144 done', 'Oct 30'),
+      ev('ana', 'added the labels backend and customer-facing', 'Nov 1'),
+      cm('tf', 'Support had three merchants asking about missing payouts this week. Can we bump this?', 'Nov 2'),
+      ev('ana', 'moved this to Cycle 12', 'Nov 3'),
+      cm('cd', 'PAY-120 is in review. I’ll pick the alert back up as soon as it merges, ETA tomorrow.', '2 h ago')
+    ];
+    let acts, hasMore = false, moreTxt = '', actCount = '';
+    if (isEmpty) acts = [ev('ana', 'created this task', 'Just now')];
+    else if (mirrored) acts = [ev('ana', 'imported this from backlog/tasks/hbr-71.md', 'Oct 12'), ev('cd', 'moved this to In progress in the file', 'Oct 30'), cm('ana', 'The German strings are longer than the chip allows. Check the inbox header at 320px.', 'Nov 1'), ev('cd', 'changed the labels in the file', '38 min ago')];
+    else if (s === 'comments') { acts = ALL.slice(4); hasMore = true; moreTxt = '23 earlier · Show all'; actCount = '40'; }
+    else if (s === 'composer') { acts = ALL.slice(15); hasMore = true; moreTxt = '29 earlier · Show all'; actCount = '40'; }
+    else acts = [ALL[0], ALL[6], ALL[11], ALL[15], ALL[20]];
+    const sub = (st, key, title, w, extra) => ({ cls: 'mrow' + (extra ? ' ' + extra : ''), st: 'st ' + st, key, title, hasAv: !!w, av: w ? AV[w][0] : '', avI: w ? AV[w][1] : '' });
+    const subs = [sub('done', 'PAY-143', 'Store attempt count and next run on the payout', 'cd'), sub('done', 'PAY-144', 'Backoff schedule with jitter', 'cd'), sub('done', 'PAY-145', 'Reuse the idempotency key on every attempt', 'cd'), sub('prog', 'PAY-146', 'Alert on-call after the 8th attempt', 'cd', s === 'full' || s === 'full1280' ? 'hover' : ''), sub('cancel', 'PAY-147', 'Merchant-facing retry button', 'ana', 'quiet')];
+    const blockers = [sub('rev', 'PAY-120', 'Idempotency keys for payouts', 'cd'), sub('todo', 'PAY-138', 'Provider sandbox returns real error codes', 'tf'), sub('done', 'PAY-131', 'Payout state machine', 'ana', 'quiet')];
+    const labels = ['payouts', 'reliability', 'backend', 'customer-facing'].map((n) => ({ n, cls: 'lbd ' + LBC[n] }));
+    const ffRows = [['type', 'bug'], ['reporter', '@ana'], ['references', 'docs/i18n.md'], ['modified_files', 'apps/mobile/src/inbox/sort.ts, packages/i18n/inbox.json'], ['created_date', '2026-10-12 09:14'], ['ordinal', '3400'], ['effort', 'M']].map(([k, v]) => ({ k, v }));
+    return {
+      rootClass: 'app ' + theme + (s === 'full1280' ? ' w1280' : ''), theme,
+      projKey: mirrored ? 'HBR' : 'PAY', projName: mirrored ? 'Harbor' : 'Payments', projInitial: mirrored ? 'H' : 'P', tileCls: mirrored ? 'tile c1' : 'tile c6',
+      key: mirrored ? 'HBR-71' : isEmpty ? 'PAY-151' : 'PAY-142',
+      title: mirrored ? 'Inbox sorting shows untranslated labels in every locale' : isEmpty ? 'Show payout fees on the merchant statement' : 'Retry failed payouts with exponential backoff',
+      navTxt: mirrored ? '2 of 13 in In progress' : isEmpty ? '40 of 40 in List' : '12 of 40 in List',
+      scrolled, showTitle: !scrolled, mirrored, isEmpty, isFull: native, isLong: s === 'long',
+      showDesc: native && !scrolled, showRel: native && !scrolled && s !== 'long',
+      colCls: 'task-col', colStyle: scrolled ? 'padding-top:0' : '',
+      subs, blockers, labels, acts, hasMore, moreTxt, actCount, showCount: !!actCount,
+      composerClosed: s !== 'composer', composerOpen: s === 'composer',
+      composerPh: mirrored ? 'Leave a comment. It stays in the app and isn’t written to the file.' : 'Leave a comment',
+      lblPropCls: 'prop' + (s === 'mirrored' ? ' hover' : ''), lockLabels: s === 'mirrored',
+      msPropCls: 'prop' + (s === 'fromfile' ? ' hover' : ''), lockMs: s === 'fromfile',
+      ffOpen: s === 'fromfile', ffTri: s === 'fromfile' ? 'tri down' : 'tri', ffCount: '7 fields', ffRows
+    };
+  }
+}
+</script>
+</body>
+</html>

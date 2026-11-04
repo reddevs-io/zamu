@@ -46,11 +46,13 @@ export interface MappingsEditorProps {
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <div className="border border-line bg-surface px-3 py-2.5 text-[12px] text-muted">{children}</div>;
+  return (
+    <div className="rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg-2">{children}</div>
+  );
 }
 
 const Value = ({ children }: { children: ReactNode }) => (
-  <span className="font-mono text-[11px] text-fg">{children}</span>
+  <span className="font-mono text-xs text-fg">{children}</span>
 );
 
 /** "a", "a or b", "a, b or c". */
@@ -65,7 +67,9 @@ function PendingPerson({ name }: { name: string }) {
       aria-hidden
       data-kind="person"
       data-pending
-      className="grid size-[18px] shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-muted text-[8.5px] font-semibold text-muted"
+      className="grid size-4.5 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-fg-3 leading-none font-semibold text-fg-3"
+      // Initials follow the 18px avatar, not the type scale (ui/Avatar.tsx PERSON_FONT).
+      style={{ fontSize: '8.5px' }}
     >
       {initialsFor(name.replace(/^@+/, ''), 'person')}
     </span>
@@ -75,7 +79,7 @@ function PendingPerson({ name }: { name: string }) {
 /** One line of the note: avatar, text, buttons. Buttons wrap under the text when space runs out. */
 function NoteLine({ avatar, text, children }: { avatar: ReactNode; text: ReactNode; children?: ReactNode }) {
   return (
-    <li className="flex min-h-10 flex-wrap items-center gap-x-2.5 gap-y-1.5 border-t border-line-2 px-3 py-1.5 text-[12px] text-muted first:border-t-0">
+    <li className="flex min-h-10 flex-wrap items-center gap-x-2.5 gap-y-1.5 border-t border-line-soft px-3 py-1.5 text-sm text-fg-2 first:border-t-0">
       {avatar}
       <span className="min-w-0 flex-[1_1_13rem] [overflow-wrap:anywhere]">{text}</span>
       {children ? <span className="ml-auto flex flex-wrap justify-end gap-1.5">{children}</span> : null}
@@ -84,12 +88,12 @@ function NoteLine({ avatar, text, children }: { avatar: ReactNode; text: ReactNo
 }
 
 function NoteHeader({ children }: { children: ReactNode }) {
-  return <p className="m-0 px-3 pt-2 pb-1.5 text-[12px] text-muted">{children}</p>;
+  return <p className="m-0 px-3 pt-2 pb-1.5 text-sm text-fg-2">{children}</p>;
 }
 
 /** The lines of one group; under a header they start with a rule. */
 function NoteLines({ ruled, children }: { ruled?: boolean; children: ReactNode }) {
-  return <ul className={cn('m-0 list-none p-0', ruled && 'border-t border-line-2')}>{children}</ul>;
+  return <ul className={cn('m-0 list-none p-0', ruled && 'border-t border-line-soft')}>{children}</ul>;
 }
 
 /** "No one" rows that a member now matches by name (members added after setup). */
@@ -360,7 +364,7 @@ export function MappingsEditor({
             <Empty>No assignees in the files. Tasks come in unassigned.</Empty>
           )}
           {hasNote ? (
-            <div className="flex flex-col border border-line bg-surface [&>section+section]:border-t [&>section+section]:border-line">
+            <div className="flex flex-col overflow-hidden rounded-md border border-line bg-surface [&>section+section]:border-t [&>section+section]:border-line">
               {matches.length ? (
                 <NameMatchLines
                   matches={matches}

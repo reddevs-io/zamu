@@ -1,0 +1,127 @@
+// M5 plan risk "List performance": listTasks on a project with 5,000 tasks that carry labels,
+// blockers, subtasks and due dates. Prints the median time of each listing and fails when one
+// takes longer than a generous bound (the list fields are read for the page, not per row).
+import { schema } from '@pm/db';
+import { sql } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createProject } from './projects';
+import { listTasks } from './tasks';
+import {
+  createWorld,
+  projectRow,
+  randomProjectKey,
+  type TestContext,
+  testContext,
+  type World,
+} from './testing/fixtures';
+
+const TASKS = 5_000;
+const LABELS = 12;
+/** Median per listing, well above what a laptop and CI need (tens of milliseconds). */
+const BOUND_MS = 750;
+
+describe('listTasks on 5,000 tasks', () => {
+  let ctx: TestContext;
+  let world: World;
+  let key: string;
+  let labelIds: string[];
+
+  beforeAll(async () => {
+    ctx = testContext();
+    ctx = { ...ctx, now: () => new Date('2026-11-04T12:00:00Z') };
+    world = await createWorld(ctx.db);
+    key = randomProjectKey();
+    await createProject(ctx, world.ownerActor, { name: 'Big', key });
+    const project = await projectRow(ctx.db, world.workspaceId, key);
+    const { task, label, taskLabel, taskDependency } = schema;
+    await ctx.db.execute(sql`
+      insert into ${task} (project_id, number, title, status, priority, created_by_id, assignee_id, due_date, rank)
+      select ${project.id}, n, 'Task ' || n,
+        (array['backlog','todo','in_progress','in_review','done','canceled'])[1 + n % 6]::task_status,
+        n % 5, ${world.owner.id}, case when n % 2 = 0 then ${world.member.id}::uuid end,
+        case when n % 3 = 0 then null else date '2026-11-04' + (n % 40 - 10) end, n
+      from generate_series(1, ${TASKS}) as n`);
+    await ctx.db.execute(
+      sql`update ${schema.project} set next_task_number = ${TASKS + 1} where id = ${project.id}`,
+    );
+    await ctx.db.execute(sql`
+      insert into ${label} (workspace_id, project_id, name, color)
+      select ${world.workspaceId}, ${project.id}, 'label-' || n, 1 + n % 9 from generate_series(1, ${LABELS}) as n`);
+    // 0 to 3 labels per task.
+    await ctx.db.execute(sql`
+      insert into ${taskLabel} (task_id, label_id)
+      select t.id, l.id from ${task} t
+      cross join lateral (
+        select id from ${label} where project_id = ${project.id} order by name offset (t.number % ${LABELS}) limit (t.number % 4)
+      ) l
+      where t.project_id = ${project.id}`);
+    // Every fourth task waits on the one before, every tenth on the one seven before: no loops.
+    await ctx.db.execute(sql`
+      insert into ${taskDependency} (task_id, blocker_id)
+      select t.id, b.id from ${task} t join ${task} b on b.project_id = t.project_id
+        and (b.number = t.number - 1 and t.number % 4 = 0 or b.number = t.number - 7 and t.number % 10 = 0)
+      where t.project_id = ${project.id}
+      on conflict do nothing`);
+    // Tasks n % 5 = 1 are subtasks of the task before (n % 5 = 0, top level).
+    await ctx.db.execute(sql`
+      update ${task} t set parent_id = p.id from ${task} p
+      where t.project_id = ${project.id} and p.project_id = t.project_id
+        and t.number % 5 = 1 and p.number = t.number - 1`);
+    await ctx.db.execute(sql`analyze ${task}, ${taskLabel}, ${taskDependency}, ${label}`);
+    const rows = await ctx.db.execute<{ id: string }>(
+      sql`select id from ${label} where project_id = ${project.id} order by name limit 2`,
+    );
+    labelIds = rows.rows.map((row) => row.id);
+  }, 120_000);
+  afterAll(async () => {
+    await ctx?.close();
+  });
+
+  async function median(run: () => Promise<unknown>): Promise<number> {
+    await run();
+    const times: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const start = performance.now();
+      await run();
+      times.push(performance.now() - start);
+    }
+    return times.sort((a, b) => a - b)[2] as number;
+  }
+
+  it('lists pages with labels, blockers and progress quickly for every ordering and filter', async () => {
+    const cases: [string, Parameters<typeof listTasks>[2]][] = [
+      ['list order, 50', { project: key }],
+      ['list order, 200', { project: key, limit: 200 }],
+      ['board order, 200', { project: key, order: 'board', limit: 200 }],
+      ['sort=due, 200', { project: key, sort: 'due', limit: 200 }],
+      ['sort=priority', { project: key, sort: 'priority' }],
+      ['sort=updated', { project: key, sort: 'updated' }],
+      ['sort=created', { project: key, sort: 'created' }],
+      ['sort=manual', { project: key, sort: 'manual' }],
+      ['label any of 2', { project: key, label: labelIds }],
+      ['due=overdue', { project: key, due: 'overdue' }],
+      ['due=soon', { project: key, due: 'soon' }],
+      ['blocked=true', { project: key, blocked: true }],
+      ['blocked=false, topLevel', { project: key, blocked: false, topLevel: true }],
+      ['workspace-wide, sort=due', { sort: 'due' }],
+    ];
+    const first = await listTasks(ctx, world.memberActor, { project: key, sort: 'due', limit: 200 });
+    expect(first.items).toHaveLength(200);
+    expect(first.items.some((item) => (item.labels?.length ?? 0) > 0)).toBe(true);
+    expect(first.items.some((item) => item.blocked)).toBe(true);
+    expect(first.items.some((item) => (item.subtaskProgress?.total ?? 0) > 0)).toBe(true);
+    expect(first.items.some((item) => item.parentKey)).toBe(true);
+    cases.push([
+      'sort=due, page 2',
+      { project: key, sort: 'due', limit: 200, cursor: first.nextCursor ?? undefined },
+    ]);
+
+    const timings: Record<string, string> = {};
+    for (const [name, input] of cases) {
+      const ms = await median(() => listTasks(ctx, world.memberActor, input));
+      timings[name] = `${ms.toFixed(1)} ms`;
+      expect(ms, name).toBeLessThan(BOUND_MS);
+    }
+    console.info(`listTasks on ${TASKS} tasks (median of 5):`, timings);
+  }, 120_000);
+});

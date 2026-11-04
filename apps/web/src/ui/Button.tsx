@@ -3,30 +3,44 @@ import { Button as AriaButton, type ButtonProps as AriaButtonProps } from 'react
 import { composeTw, tv, type VariantProps } from './cn';
 import { Kbd } from './Kbd';
 
+/*
+ * Margin buttons (margin.css .btn): 30px, radius md, text-sm 500. Hover, pressed, keyboard focus (the
+ * --focus-ring double ring) and disabled (45%) come from React Aria's data attributes. The hover fills mix the
+ * fill with --fg as in margin.css (no token holds them); the focus ring reads --focus-ring.
+ */
 export const buttonStyles = tv({
   base: [
-    'relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap select-none',
-    'outline-none focus-visible:focus-ring disabled:cursor-default disabled:opacity-50',
+    'relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent whitespace-nowrap select-none',
+    'text-sm font-medium outline-none focus-visible:shadow-[var(--focus-ring)]',
+    'disabled:cursor-default disabled:opacity-45',
   ],
   variants: {
     variant: {
-      /** Filled with --fg: the main action on a screen. */
-      primary: 'bg-fg font-semibold text-bg hover:bg-[color-mix(in_oklch,var(--fg)_86%,var(--bg))]',
-      /** Cobalt fill: Copy, and accent actions. */
+      /** Accent fill: the main action of a screen or dialog (New task, Create task). */
+      primary:
+        'bg-accent font-semibold text-accent-ink hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--fg))] pressed:bg-[color-mix(in_oklch,var(--accent)_82%,var(--fg))]',
+      /** Same as primary. Kept for screens that still ask for it (sign-in). */
       accent:
-        'bg-accent font-semibold text-on-accent hover:bg-[color-mix(in_oklch,var(--accent)_86%,var(--fg))]',
-      /** Hairline border on surface: Cancel, Retry, Invite person. */
-      secondary: 'border border-line bg-surface font-medium text-fg hover:bg-band pressed:bg-band',
-      /** Danger text with hairline border: Revoke. */
-      destructive:
-        'border border-line bg-transparent font-medium text-danger hover:border-danger hover:bg-danger-bg',
-      /** Text-only button: Open as page, row menus. */
-      ghost: 'bg-transparent font-medium text-muted hover:text-fg',
+        'bg-accent font-semibold text-accent-ink hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--fg))] pressed:bg-[color-mix(in_oklch,var(--accent)_82%,var(--fg))]',
+      /** Outlined (design "secondary"): Copy link, Cancel, Try again. */
+      secondary: 'border-line text-fg-2 hover:bg-bg-lane hover:text-fg pressed:bg-bg-lane',
+      /** No border, lane background on hover (design "quiet"): Filter, Display, toolbar actions. */
+      quiet: 'text-fg-2 hover:bg-bg-lane hover:text-fg pressed:bg-bg-lane',
+      /** Danger fill (design "danger"): the confirm button of a destructive dialog. */
+      danger:
+        'bg-danger font-semibold text-accent-ink hover:bg-[color-mix(in_oklch,var(--danger)_88%,var(--fg))] pressed:bg-[color-mix(in_oklch,var(--danger)_82%,var(--fg))]',
+      /** Outlined danger text: Revoke, Remove, row actions that destroy something. */
+      destructive: 'border-line text-danger hover:border-danger hover:bg-danger-soft',
+      /** Text only, no padding change on hover: inline actions (Clear, Open as page, Select all). */
+      ghost: 'text-fg-2 hover:text-fg',
     },
     size: {
-      sm: 'h-7 px-2.5 text-[12px]',
-      md: 'h-8 px-3',
-      lg: 'h-[38px] px-3.5',
+      /** 26px, text-xs. */
+      sm: 'h-6.5 px-2.25 text-xs',
+      /** 30px. */
+      md: 'h-7.5 px-2.75',
+      /** 38px: full-width form buttons (sign-in). */
+      lg: 'h-9.5 px-3.5',
     },
     fullWidth: { true: 'w-full' },
     iconOnly: { true: 'aspect-square px-0' },
@@ -38,7 +52,7 @@ type ButtonStyleProps = VariantProps<typeof buttonStyles>;
 
 export interface ButtonProps extends Omit<AriaButtonProps, 'children'> {
   variant?: ButtonStyleProps['variant'];
-  /** Defaults to `md` (32px), or `sm` (28px) for `destructive`. */
+  /** Defaults to `md` (30px), or `sm` (26px) for `destructive`. */
   size?: ButtonStyleProps['size'];
   fullWidth?: boolean;
   iconOnly?: boolean;
@@ -57,7 +71,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const resolvedSize = size ?? (variant === 'destructive' ? 'sm' : 'md');
-  const kbdVariant = variant === 'primary' || variant === 'accent' ? 'inverse' : 'default';
+  const filled = variant === 'primary' || variant === 'accent' || variant === 'danger';
   return (
     <AriaButton
       {...props}
@@ -69,11 +83,11 @@ export function Button({
       {({ isPending }) => (
         <>
           {isPending ? (
-            <span aria-hidden className="size-2 shrink-0 bg-current motion-safe:animate-pulse" />
+            <span aria-hidden className="size-2 shrink-0 rounded-full bg-current motion-safe:animate-pulse" />
           ) : null}
           {children}
           {kbd ? (
-            <Kbd variant={kbdVariant} aria-hidden>
+            <Kbd variant={filled ? 'inverse' : 'default'} aria-hidden>
               {kbd}
             </Kbd>
           ) : null}

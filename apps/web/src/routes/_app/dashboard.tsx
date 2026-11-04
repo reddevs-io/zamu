@@ -1,19 +1,27 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { DashboardScreen } from '~/features/dashboard/DashboardScreen';
-import { prefetchDashboard } from '~/features/dashboard/queries';
-import { parseDashboardSearch, scopeOf } from '~/features/dashboard/search';
-import { settleOnServer } from '~/features/tasks/prefetch';
+import { safeParseTaskKey } from '@pm/contracts';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-// What needs someone now, across every project: /dashboard?scope=everyone&open=review&task=PAY-140.
+// M4's dashboard is Home (/) since M5. Old links land there: ?scope=everyone opens the Everyone tab, and
+// ?task=PAY-140 (the dashboard's side panel) opens that task's view.
 export const Route = createFileRoute('/_app/dashboard')({
-  validateSearch: parseDashboardSearch,
-  // Only the scope changes what loads: expanding a group or opening a task never reruns the loader.
-  loaderDeps: ({ search }) => ({ scope: scopeOf(search) }),
-  loader: ({ context, deps }) => settleOnServer(prefetchDashboard(context.queryClient, deps.scope)),
-  head: () => ({ meta: [{ title: 'Dashboard · project-management' }] }),
-  component: DashboardRoute,
+  validateSearch: (search: Record<string, unknown>): { scope?: 'everyone'; task?: string } => ({
+    ...(search.scope === 'everyone' ? { scope: 'everyone' } : {}),
+    ...(typeof search.task === 'string' ? { task: search.task } : {}),
+  }),
+  beforeLoad: ({ search }) => {
+    const key = search.task?.trim().toUpperCase();
+    const task = key ? safeParseTaskKey(key) : null;
+    if (key && task) {
+      throw redirect({
+        to: '/p/$projectKey/$taskKey',
+        params: { projectKey: task.projectKey, taskKey: key },
+        replace: true,
+      });
+    }
+    throw redirect({
+      to: '/',
+      search: search.scope === 'everyone' ? { tab: 'everyone' } : {},
+      replace: true,
+    });
+  },
 });
-
-function DashboardRoute() {
-  return <DashboardScreen search={Route.useSearch()} />;
-}

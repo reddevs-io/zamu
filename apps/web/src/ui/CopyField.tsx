@@ -25,11 +25,11 @@ export interface CopyFieldProps {
 }
 
 const button =
-  'box-border inline-flex h-[34px] shrink-0 cursor-pointer items-center gap-1.5 border border-line bg-surface px-3 font-medium text-fg outline-none hover:bg-band focus-visible:focus-ring-inset';
+  'box-border inline-flex h-8.5 shrink-0 cursor-pointer items-center gap-1.5 border border-line bg-surface px-3 font-medium text-fg outline-none hover:bg-bg-grp focus-visible:focus-ring-inset';
 
 /**
- * Read-only value with Copy, and Show for secrets (ledger-m3.css .m3-copy): webhook URL and secret. The box
- * is --band with a mono 11px value cut at the end; the full value is selectable.
+ * Read-only value with Copy, and Show for secrets: webhook URL and secret. The box
+ * is --bg-grp with a mono 11px value cut at the end; the full value is selectable.
  */
 export function CopyField({
   label,
@@ -54,18 +54,18 @@ export function CopyField({
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       {label ? (
-        <span id={labelId} className="text-[12px] font-semibold text-fg">
+        <span id={labelId} className="text-sm font-semibold text-fg">
           {label}
         </span>
       ) : null}
       <fieldset
         aria-labelledby={label ? labelId : undefined}
-        className="m-0 flex min-w-0 items-stretch border-0 p-0"
+        className="m-0 flex min-w-0 items-stretch overflow-hidden rounded-md border-0 p-0"
       >
         <span
           data-masked={isSecret && shown === maskedValue ? true : undefined}
           className={cn(
-            'box-border flex h-[34px] min-w-0 flex-1 items-center border border-line bg-band px-2.5 font-mono text-[11px] whitespace-nowrap text-fg',
+            'box-border flex h-8.5 min-w-0 flex-1 items-center border border-line bg-bg-grp px-2.5 font-mono text-xs whitespace-nowrap text-fg',
             canAct && 'border-r-0',
           )}
         >

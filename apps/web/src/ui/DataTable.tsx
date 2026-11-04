@@ -30,11 +30,11 @@ import {
 import { cn } from './cn';
 import type { TaskStatus } from './meta';
 import { Skeleton } from './Skeleton';
-import { StatusSquare } from './StatusSquare';
+import { StatusGlyph } from './StatusGlyph';
 
 export interface DataColumn<T> {
   id: string;
-  /** Header text, drawn as a 10px caps caption. */
+  /** Header text, drawn as a small --fg-3 caption. */
   header: string;
   /**
    * Content width in px, or a fraction such as `'1fr'` for the column that takes the rest. Cell padding
@@ -52,7 +52,7 @@ export interface DataColumn<T> {
 export interface DataGroup<T> {
   id: string;
   label: string;
-  /** Draws the status square before the label. */
+  /** Draws the status glyph before the label. */
   status?: TaskStatus;
   /** Count after the label. Defaults to the number of items. */
   count?: number;
@@ -639,7 +639,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   }),
             }}
             className={cn(
-              'caps h-7 truncate border-b border-line bg-bg text-left align-middle outline-none focus-visible:focus-ring-inset',
+              'h-7 truncate border-b border-line bg-bg text-left align-middle text-xs font-medium text-fg-3 outline-none focus-visible:focus-ring-inset',
               !isVirtualized && 'sticky top-0 z-10',
               isVirtualized && 'flex items-center',
               column.align === 'end' && 'justify-end text-right',
@@ -661,13 +661,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
           <Row
             id={row.id}
             style={rowStyle}
-            className="cursor-pointer bg-band outline-none focus-visible:focus-ring-inset"
+            className="cursor-pointer bg-bg-grp outline-none focus-visible:focus-ring-inset"
             data-group-row=""
           >
             <Cell
               colSpan={count}
               className={cn(
-                'border-b border-line-2 outline-none focus-visible:focus-ring-inset',
+                'border-b border-line-soft outline-none focus-visible:focus-ring-inset',
                 !isVirtualized && 'align-middle',
               )}
               style={{
@@ -676,10 +676,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
                 paddingRight: EDGE,
               }}
             >
-              <div className="flex h-full items-center gap-2.5 text-[11px] font-semibold tracking-[0.06em] uppercase">
-                {row.status ? <StatusSquare status={row.status} withLabel={false} /> : null}
+              <div className="flex h-full items-center gap-2.25 font-medium">
+                {row.status ? <StatusGlyph status={row.status} decorative /> : null}
                 <span>{row.label}</span>
-                <span className="font-mono text-[10px] tracking-normal text-faint">{row.count}</span>
+                <span className="font-normal text-fg-3 tabular-nums">{row.count}</span>
                 <span className="sr-only">{row.collapsed ? ', collapsed' : ', expanded'}</span>
               </div>
             </Cell>
@@ -693,7 +693,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
           columns={columns}
           style={rowStyle}
           className={cn(
-            'cursor-default outline-none hover:bg-band selected:bg-sel focus-visible:focus-ring-inset',
+            'cursor-default outline-none hover:bg-surface-hover selected:bg-accent-soft focus-visible:focus-ring-inset',
             rowClassName?.(item),
           )}
         >
@@ -702,7 +702,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
             return (
               <Cell
                 className={cn(
-                  'border-b border-line-2 outline-none focus-visible:focus-ring-inset',
+                  'border-b border-line-soft outline-none focus-visible:focus-ring-inset',
                   !isVirtualized && 'align-middle',
                 )}
                 style={{ ...cellPadding(index, count), height: rowHeight }}
@@ -783,7 +783,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
           style={{ gridTemplateColumns: gridTemplate(columns) }}
         >
           {columns.map((column) => (
-            <span key={column.id} className={cn('caps truncate', column.align === 'end' && 'text-right')}>
+            <span
+              key={column.id}
+              className={cn('truncate text-xs font-medium text-fg-3', column.align === 'end' && 'text-right')}
+            >
               {column.header}
             </span>
           ))}
@@ -792,7 +795,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
           <div
             // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows
             key={row}
-            className="grid shrink-0 items-center gap-3 border-b border-line-2 px-6"
+            className="grid shrink-0 items-center gap-3 border-b border-line-soft px-6"
             style={{ gridTemplateColumns: gridTemplate(columns), height: rowHeight }}
           >
             {columns.map((column, index) => (

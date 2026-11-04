@@ -63,7 +63,7 @@ export function CodeBlock({
   if (variant === 'secret') {
     return (
       <div className={cn('flex items-center gap-2', className)}>
-        <code className="flex h-10 min-w-0 flex-1 items-center overflow-hidden border border-accent bg-sel px-3 font-mono text-[12px] whitespace-nowrap text-fg select-all">
+        <code className="flex h-10 min-w-0 flex-1 items-center overflow-hidden rounded-md border border-accent bg-accent-soft px-3 font-mono text-sm whitespace-nowrap text-fg select-all">
           {children}
         </code>
         <Button variant="accent" size="lg" aria-label={copyLabel} onPress={() => copy(children)}>
@@ -75,7 +75,7 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        'flex min-w-0 items-center gap-2 border border-line-2 bg-band py-2 pr-2.5 pl-2.5 font-mono text-[11px] text-fg',
+        'flex min-w-0 items-center gap-2 rounded-md border border-line-soft bg-bg-grp py-2 pr-2.5 pl-2.5 font-mono text-xs text-fg',
         copyable && 'py-1 pr-1',
         className,
       )}
@@ -85,7 +85,7 @@ export function CodeBlock({
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 px-2 font-sans text-[11px]"
+          className="h-6 px-2 font-sans text-xs"
           aria-label={copyLabel}
           onPress={() => copy(children)}
         >
@@ -98,5 +98,7 @@ export function CodeBlock({
 
 /** Inline code inside prose: `30s × 2^n`, request ids. */
 export function InlineCode({ children, className }: { children: ReactNode; className?: string }) {
-  return <code className={cn('bg-band px-1 py-px font-mono text-[11px]', className)}>{children}</code>;
+  return (
+    <code className={cn('rounded-sm bg-bg-grp px-1 py-px font-mono text-xs', className)}>{children}</code>
+  );
 }

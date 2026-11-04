@@ -1,36 +1,40 @@
 import type { ProjectWithCounts } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { retryOnce } from '~/features/tasks/errors';
 import { projectsQuery } from '~/features/tasks/queries';
-import { orpc } from '~/lib/orpc';
-import { FilterBar, PageHeader, ViewTabs } from '~/ui';
+import { ViewHeader } from '~/ui';
 import { MirrorSourceButton } from './MirrorSource';
 import { isMirrored } from './mirror';
-import { type ProjectView, projectTabs } from './tabs';
+import { type ProjectView, projectViewHref } from './tabs';
 
-// Shared header of a project's pages (tasks list and board, milestones, cycles):
+// Shared header of a project's pages (tasks list and board, milestones, cycles, settings), on the M5
+// ViewHeader (frames 003, 011, 029):
 //
-//   Payments                                  [■ Backlog.md 3m ago ▾] [Search /] [New C]
-//   PAY · 12 open · board
-//   Tasks 12   ◇ Milestones 3   ◑ Cycles C12 · 3d left   Settings
-//   Status Any  Priority Any  …                       [List|Board] V   (only when `filters` is given)
+//   [H] Harbor / Milestones   [List|Board]  Filter  Display   ● Backlog.md synced 3m ago  [Search /]  [New C]
 //
-// A project that mirrors Backlog.md gets the source button (and ⇧R) before the page's actions.
+// The sidebar links the project's pages, so there are no tabs. A project that mirrors Backlog.md gets the
+// sync status (and ⇧R) before the search.
 
 export interface ProjectHeaderProps {
   /** Upper-case project key from the route ("PAY"). */
   projectKey: string;
-  /** Tab of the current page. */
+  /** The page: the list and board show only the project in the crumb; the others add their name. */
   current: ProjectView;
-  /** Text after "PAY · " under the title: "12 open · board", "4 open milestones". */
+  /**
+   * Text after "PAY · " in the M4 header ("12 open · board"). The M5 header has no subtitle; it is read
+   * out with the page heading for screen readers only.
+   */
   subtitle?: ReactNode;
-  /** Right side of the 64px header: a SearchField, the primary Button. */
+  /** The page's SearchField (width 200), drawn between the sync status and the actions. */
+  search?: ReactNode;
+  /** Right side: the primary Button and other buttons. */
   actions?: ReactNode;
-  /** Content of the 36px filter bar under the tabs (Selects with variant="filter"). No bar when omitted. */
-  filters?: ReactNode;
-  /** Right end of the filter bar (the List / Board switch). */
-  filtersEnd?: ReactNode;
+  /** Filter button and menu (M5-08). */
+  filter?: ReactNode;
+  /** Display button and popover (M5-08). */
+  display?: ReactNode;
+  /** List / Board switch. */
+  viewSwitch?: ReactNode;
   /**
    * ⇧R refreshes a mirrored project from any page with this header (default true). Turn it off on a
    * page that binds ⇧R itself.
@@ -39,7 +43,7 @@ export interface ProjectHeaderProps {
   className?: string;
 }
 
-/** The project as listed in the rail (name, flags, open count, current cycle), from the cached list. */
+/** The project as listed in the sidebar (name, flags, open count, current cycle), from the cached list. */
 export function useProjectSummary(projectKey: string): ProjectWithCounts | undefined {
   return useQuery({
     ...projectsQuery(),
@@ -47,60 +51,49 @@ export function useProjectSummary(projectKey: string): ProjectWithCounts | undef
   }).data;
 }
 
-/** Milestones of the project that are not completed (the Milestones tab count). */
-function useOpenMilestoneCount(projectKey: string, enabled: boolean): number | undefined {
-  return useQuery({
-    // Same retry policy as the planning screens, so a failing request shows their error banner quickly.
-    ...orpc.milestones.list.queryOptions({ input: { project: projectKey }, retry: retryOnce }),
-    enabled,
-    select: (data) => data.items.filter((milestone) => milestone.status !== 'completed').length,
-  }).data;
-}
+const PAGE_NAMES: Record<ProjectView, string | undefined> = {
+  tasks: undefined,
+  milestones: 'Milestones',
+  cycles: 'Cycles',
+  settings: 'Settings',
+};
 
 export function ProjectHeader({
   projectKey,
   current,
   subtitle,
+  search,
   actions,
-  filters,
-  filtersEnd,
+  filter,
+  display,
+  viewSwitch,
   refreshHotkey = true,
   className,
 }: ProjectHeaderProps) {
   const project = useProjectSummary(projectKey);
   const mirrored = isMirrored(project);
-  const milestoneCount = useOpenMilestoneCount(projectKey, project?.usesMilestones ?? false);
-  const tabs = project ? projectTabs(project, milestoneCount) : [];
+  const name = project?.name ?? projectKey;
 
   return (
     <div className={className}>
-      <PageHeader
-        title={project?.name ?? projectKey}
-        subtitle={
-          <>
-            <span className="font-mono">{projectKey}</span>
-            {subtitle != null ? <> · {subtitle}</> : null}
-          </>
-        }
-        actions={
+      <h1 className="sr-only">
+        {PAGE_NAMES[current] ? `${name} ${PAGE_NAMES[current]}` : name}
+        {subtitle != null ? <> · {subtitle}</> : null}
+      </h1>
+      <ViewHeader
+        project={{ key: projectKey, name, href: projectViewHref(projectKey, 'tasks') }}
+        page={PAGE_NAMES[current]}
+        viewSwitch={viewSwitch}
+        filter={filter}
+        display={display}
+        sync={
           mirrored && project ? (
-            <>
-              <MirrorSourceButton project={project} refreshHotkey={refreshHotkey} />
-              {actions}
-            </>
-          ) : (
-            actions
-          )
+            <MirrorSourceButton project={project} refreshHotkey={refreshHotkey} />
+          ) : undefined
         }
+        search={search}
+        actions={actions}
       />
-      {tabs.length ? (
-        <ViewTabs items={tabs} currentId={current} aria-label={`${project?.name ?? projectKey} views`} />
-      ) : null}
-      {filters ? (
-        <FilterBar end={filtersEnd} className="min-w-0 overflow-x-auto overflow-y-hidden">
-          {filters}
-        </FilterBar>
-      ) : null}
     </div>
   );
 }

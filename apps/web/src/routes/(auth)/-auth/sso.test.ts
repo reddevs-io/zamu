@@ -4,6 +4,8 @@ import { ssoErrorCode, ssoErrorMessage, ssoLabel } from './sso';
 describe('SSO copy', () => {
   it('labels the button with the provider name', () => {
     expect(ssoLabel('Authentik')).toBe('Continue with Authentik');
+    // OIDC_PROVIDER_NAME left at its default.
+    expect(ssoLabel('SSO')).toBe('Continue with single sign-on');
   });
 
   it('explains every refusal in plain words, without exclamation marks', () => {

@@ -9,6 +9,7 @@ import {
   formatAge,
   formatPageTime,
   formatPaneTime,
+  formatRelative,
   toggleCheckbox,
 } from './format';
 import { buildGroups } from './groups';
@@ -21,6 +22,13 @@ const ago = (ms: number) => new Date(NOW.getTime() - ms);
 const MIN = 60_000;
 
 describe('times', () => {
+  it('formats the task view history times', () => {
+    expect(formatRelative(ago(20_000), NOW)).toBe('Just now');
+    expect(formatRelative(ago(38 * MIN), NOW)).toBe('38 min ago');
+    expect(formatRelative(ago(2 * 60 * MIN), NOW)).toBe('2 h ago');
+    expect(formatRelative(new Date(2026, 9, 14, 9, 0), NOW)).toBe('Oct 14');
+  });
+
   it('formats the list age column', () => {
     expect(formatAge(ago(20_000), NOW)).toBe('now');
     expect(formatAge(ago(3 * MIN), NOW)).toBe('3m');
@@ -72,15 +80,14 @@ describe('activity sentences', () => {
   const updated = (changes: Activity['changes']) => describeActivity({ type: 'task.updated', changes });
 
   it('phrases each kind of change', () => {
-    expect(describeActivity({ type: 'task.created', changes: [] })).toBe('created the task');
-    expect(updated([{ field: 'status', from: 'todo', to: 'in_progress' }])).toBe(
-      'moved it from Todo to In progress',
-    );
+    expect(describeActivity({ type: 'task.created', changes: [] })).toBe('created this task');
+    expect(updated([{ field: 'status', from: 'todo', to: 'in_progress' }])).toBe('moved this to In progress');
     expect(updated([{ field: 'priority', from: 'none', to: 'high' }])).toBe('set priority to High');
+    expect(updated([{ field: 'priority', from: 'high', to: 'none' }])).toBe('cleared the priority');
     expect(updated([{ field: 'assignee', from: null, to: user('claude-dev') }])).toBe(
-      'assigned it to claude-dev',
+      'assigned this to claude-dev',
     );
-    expect(updated([{ field: 'assignee', from: user('Ana Ruiz'), to: null }])).toBe('unassigned it');
+    expect(updated([{ field: 'assignee', from: user('Ana Ruiz'), to: null }])).toBe('unassigned this');
     expect(updated([{ field: 'description', from: null, to: 'x' }])).toBe('added a description');
     expect(updated([{ field: 'description', from: 'x', to: 'y' }])).toBe('edited the description');
     expect(
@@ -89,7 +96,7 @@ describe('activity sentences', () => {
         { field: 'priority', from: 'none', to: 'low' },
         { field: 'title', from: 'a', to: 'b' },
       ]),
-    ).toBe('moved it from Todo to Done, set priority to Low and renamed it to “b”');
+    ).toBe('moved this to Done, set priority to Low and renamed this to “b”');
   });
 
   it('phrases milestone and cycle changes', () => {
@@ -99,10 +106,53 @@ describe('activity sentences', () => {
       number,
       name: null,
     });
-    expect(updated([{ field: 'milestone', from: null, to: milestone }])).toBe('set milestone Webhooks v2');
+    expect(updated([{ field: 'milestone', from: null, to: milestone }])).toBe(
+      'set the milestone to Webhooks v2',
+    );
     expect(updated([{ field: 'milestone', from: milestone, to: null }])).toBe('cleared the milestone');
-    expect(updated([{ field: 'cycle', from: cycle(2), to: cycle(3) }])).toBe('moved it to Cycle 3');
-    expect(updated([{ field: 'cycle', from: cycle(2), to: null }])).toBe('removed it from Cycle 2');
+    expect(updated([{ field: 'cycle', from: cycle(2), to: cycle(3) }])).toBe('moved this to Cycle 3');
+    expect(updated([{ field: 'cycle', from: cycle(2), to: null }])).toBe('removed this from Cycle 2');
+  });
+
+  it('phrases labels, due dates, blockers and the parent as the task view does', () => {
+    const label = (name: string) => ({
+      id: `00000000-0000-4000-8000-${name.length.toString().padStart(12, '0')}`,
+      name,
+      color: 1,
+    });
+    const task = (key: string) => ({ key, title: key, removed: false });
+    expect(updated([{ field: 'labels', from: [], to: [label('payouts')] }])).toBe('added the label payouts');
+    expect(
+      updated([
+        {
+          field: 'labels',
+          from: [label('payouts')],
+          to: [label('payouts'), label('backend'), label('customer-facing')],
+        },
+      ]),
+    ).toBe('added the labels backend and customer-facing');
+    expect(updated([{ field: 'labels', from: [label('ui')], to: [label('bug')] }])).toBe(
+      'added the label bug and removed the label ui',
+    );
+    const year = new Date().getFullYear();
+    expect(updated([{ field: 'dueDate', from: null, to: `${year}-10-31` }])).toBe(
+      'set the due date to Oct 31',
+    );
+    expect(updated([{ field: 'dueDate', from: `${year}-10-31`, to: `${year}-11-14` }])).toBe(
+      'moved the due date to Nov 14',
+    );
+    expect(updated([{ field: 'dueDate', from: `${year}-10-31`, to: null }])).toBe('cleared the due date');
+    expect(updated([{ field: 'blockedBy', from: [], to: [task('PAY-120')] }])).toBe('added blocker PAY-120');
+    expect(updated([{ field: 'blockedBy', from: [], to: [task('PAY-120'), task('PAY-138')] }])).toBe(
+      'added blockers PAY-120 and PAY-138',
+    );
+    expect(updated([{ field: 'blockedBy', from: [task('PAY-120')], to: [] }])).toBe(
+      'removed blocker PAY-120',
+    );
+    expect(updated([{ field: 'parent', from: null, to: task('PAY-120') }])).toBe(
+      'made this a subtask of PAY-120',
+    );
+    expect(updated([{ field: 'parent', from: task('PAY-120'), to: null }])).toBe('moved this out of PAY-120');
   });
 });
 
@@ -135,8 +185,8 @@ describe('URL search', () => {
 
   it('remembers the list filters for Back to list', () => {
     rememberListSearch('PAY', { task: 'PAY-1', q: 'refund', status: ['todo'] });
-    expect(listSearchFor('PAY', 'PAY-9')).toEqual({ q: 'refund', status: ['todo'], task: 'PAY-9' });
-    expect(listSearchFor('WEB', 'WEB-1')).toEqual({ task: 'WEB-1' });
+    expect(listSearchFor('PAY', 'PAY-9')).toEqual({ q: 'refund', status: ['todo'], focus: 'PAY-9' });
+    expect(listSearchFor('WEB', 'WEB-1')).toEqual({ focus: 'WEB-1' });
   });
 });
 

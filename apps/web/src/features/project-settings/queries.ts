@@ -85,7 +85,7 @@ export function useSetConnection(projectKey: string) {
 
 /**
  * Deletes the project (DELETE /projects/{project}). On success: the toast is queued, the page goes
- * to /projects, the project leaves the cached list at once, and every query that could show its
+ * to Home (where the shell shows "Deleted {KEY}"), the project leaves the cached list at once, and every query that could show its
  * tasks refetches: projects, tasks (lists, My tasks, boards), the dashboard and planning.
  */
 export function useDeleteProject(projectKey: string) {
@@ -95,7 +95,7 @@ export function useDeleteProject(projectKey: string) {
     mutationFn: (confirmKey: string) => client.projects.delete({ project: projectKey, confirmKey }),
     onSuccess: async () => {
       announceProjectDeleted(projectKey);
-      await navigate({ to: '/projects' });
+      await navigate({ to: '/' });
       queryClient.setQueriesData<ProjectList>({ queryKey: orpc.projects.list.key() }, (data) =>
         data ? { ...data, items: data.items.filter((item) => item.key !== projectKey) } : data,
       );

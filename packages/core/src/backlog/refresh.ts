@@ -24,6 +24,7 @@ import { EncryptionKeyMissing, SecretUnreadable } from '../secrets';
 import { type ApplyResult, applyPlan, type BacklogSourceRow } from './apply';
 import {
   type ExistingFile,
+  type ExistingLabel,
   type ExistingMilestone,
   type ExistingState,
   type ExistingTask,
@@ -31,7 +32,8 @@ import {
 } from './plan';
 import { locateFolder, type PreviousRead, readFolder, repositoryRef } from './reader';
 
-const { backlogFile, backlogSource, member, milestone, project, task } = schema;
+const { backlogFile, backlogSource, label, member, milestone, project, task, taskDependency, taskLabel } =
+  schema;
 
 /** Triggers a person or an agent asked for: queued without the debounce slot. */
 const ASKED_TRIGGERS: ReadonlySet<BacklogTrigger> = new Set(['setup', 'manual', 'cli']);
@@ -201,7 +203,7 @@ export async function loadExisting(
   source: Pick<BacklogSourceRow, 'id' | 'lastReadCommit' | 'warnings'>,
   projectRow: { id: string; nextTaskNumber: number },
 ): Promise<ExistingState> {
-  const [tasks, milestones, files] = await Promise.all([
+  const [rows, milestones, files, labels, taskLabels, dependencies] = await Promise.all([
     db
       .select({
         id: task.id,
@@ -217,9 +219,11 @@ export async function loadExisting(
         createdAt: task.createdAt,
         backlogData: task.backlogData,
         hiddenAt: task.hiddenAt,
+        dueDate: task.dueDate,
+        parentId: task.parentId,
       })
       .from(task)
-      .where(eq(task.projectId, projectRow.id)) as Promise<ExistingTask[]>,
+      .where(eq(task.projectId, projectRow.id)),
     db
       .select({
         id: milestone.id,
@@ -245,8 +249,34 @@ export async function loadExisting(
       })
       .from(backlogFile)
       .where(eq(backlogFile.sourceId, source.id)) as Promise<ExistingFile[]>,
+    db
+      .select({ id: label.id, name: label.name, color: label.color, source: label.source })
+      .from(label)
+      .where(eq(label.projectId, projectRow.id)) as Promise<ExistingLabel[]>,
+    db
+      .select({ taskId: taskLabel.taskId, labelId: taskLabel.labelId })
+      .from(taskLabel)
+      .innerJoin(task, eq(task.id, taskLabel.taskId))
+      .where(eq(task.projectId, projectRow.id)),
+    db
+      .select({ taskId: taskDependency.taskId, blockerId: taskDependency.blockerId })
+      .from(taskDependency)
+      .innerJoin(task, eq(task.id, taskDependency.taskId))
+      .where(eq(task.projectId, projectRow.id)),
   ]);
+  const labelIds = new Map<string, string[]>();
+  for (const row of taskLabels) labelIds.set(row.taskId, [...(labelIds.get(row.taskId) ?? []), row.labelId]);
+  const blockerIds = new Map<string, string[]>();
+  for (const row of dependencies) {
+    blockerIds.set(row.taskId, [...(blockerIds.get(row.taskId) ?? []), row.blockerId]);
+  }
+  const tasks: ExistingTask[] = rows.map((row) => ({
+    ...row,
+    labelIds: labelIds.get(row.id) ?? [],
+    blockerIds: blockerIds.get(row.id) ?? [],
+  }));
   return {
+    labels,
     tasks,
     milestones,
     files,

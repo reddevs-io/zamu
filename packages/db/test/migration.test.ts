@@ -294,3 +294,346 @@ describe('M3 migration on an M2.1 database with data', () => {
     expect(index.rows).toEqual([]);
   });
 });
+
+/** Every migration released in 0.6.0, the last release before M5. */
+const V0_6_0_MIGRATIONS = [
+  '20261022182359_init',
+  '20261023083529_m2_work_views',
+  '20261023144736_m2_1_project_repository',
+  '20261023164304_m3_backlog_md',
+  '20261027182340_dashboard_indexes',
+];
+
+describe('M5 migration on a 0.6.0 database with data', () => {
+  let url: string;
+  let folder: string;
+  let db: Db;
+  let end: () => Promise<void>;
+
+  const OWNER = '0190a1b2-0000-7000-8000-0000000000a1';
+  const AGENT = '0190a1b2-0000-7000-8000-0000000000a2';
+  const WORKSPACE = '0190a1b2-0000-7000-8000-0000000000b1';
+  const PAY = '0190a1b2-0000-7000-8000-0000000000c1';
+  const WEB = '0190a1b2-0000-7000-8000-0000000000c2';
+  const MILESTONE = '0190a1b2-0000-7000-8000-0000000000d1';
+
+  beforeAll(async () => {
+    folder = mkdtempSync(join(tmpdir(), 'pm-0-6-0-migrations-'));
+    for (const name of V0_6_0_MIGRATIONS) {
+      cpSync(join(migrationsFolder, name), join(folder, name), { recursive: true });
+    }
+    url = withDatabase(testServerUrl(), uniqueDatabaseName('pm_test_upgrade_m5'));
+    await createDatabase(url);
+    await migrateFrom(url, folder);
+    const handle = createDb(url);
+    db = handle.db;
+    end = () => handle.pool.end();
+  });
+
+  afterAll(async () => {
+    await end?.();
+    if (url) await dropDatabase(url);
+    if (folder) rmSync(folder, { recursive: true, force: true });
+  });
+
+  /** Every task column 0.6.0 had, as text, so the comparison is exact. */
+  async function taskRows() {
+    const result = await db.execute<Record<string, string | null>>(sql`
+      select id, project_id, number::text, key_suffix, backlog_id, backlog_data::text, hidden_at::text,
+        title, description, status::text, priority::text, assignee_id, created_by_id, milestone_id,
+        cycle_id, cycle_added_at::text, rank::text, created_at::text, updated_at::text
+      from task order by id`);
+    return result.rows;
+  }
+
+  async function count(table: string) {
+    const result = await db.execute<{ count: number }>(
+      sql`select count(*)::int as count from ${sql.identifier(table)}`,
+    );
+    return result.rows[0]?.count ?? -1;
+  }
+
+  async function pgCode(promise: Promise<unknown>): Promise<string | undefined> {
+    try {
+      await promise;
+    } catch (error) {
+      const cause = (error as { cause?: { code?: string } }).cause;
+      return cause?.code ?? (error as { code?: string }).code;
+    }
+    return undefined;
+  }
+
+  it('keeps every task as it was, adds empty fields, and enforces the new rules', async () => {
+    // 0.6.0 data, written with raw SQL against the 0.6.0 schema. Native tasks only: the mirror
+    // backfill that follows this migration has nothing to fill for them.
+    await db.execute(sql`insert into "user" (id, name, email) values
+      (${OWNER}, 'Ana', 'ana@example.com'), (${AGENT}, 'claude-dev', 'claude-dev@agents.invalid')`);
+    await db.execute(
+      sql`update "user" set kind = 'agent', responsible_user_id = ${OWNER} where id = ${AGENT}`,
+    );
+    await db.execute(
+      sql`insert into organization (id, name, slug) values (${WORKSPACE}, 'Reddevs', 'reddevs')`,
+    );
+    await db.execute(sql`insert into member (organization_id, user_id, role) values
+      (${WORKSPACE}, ${OWNER}, 'owner'), (${WORKSPACE}, ${AGENT}, 'member')`);
+    await db.execute(sql`insert into project (id, workspace_id, key, name, next_task_number) values
+      (${PAY}, ${WORKSPACE}, 'PAY', 'Payments', 31), (${WEB}, ${WORKSPACE}, 'WEB', 'Website', 6)`);
+    await db.execute(sql`insert into milestone (id, workspace_id, project_id, name, target_date, created_by_id)
+      values (${MILESTONE}, ${WORKSPACE}, ${PAY}, 'Payouts v2', '2026-11-20', ${OWNER})`);
+    const statuses = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'];
+    for (let number = 1; number <= 30; number++) {
+      await db.execute(sql`
+        insert into task (project_id, number, title, status, priority, assignee_id, created_by_id,
+          milestone_id, rank, updated_at)
+        values (${PAY}, ${number}, ${`Task ${number}`}, ${statuses[number % 6]}::task_status, ${number % 5},
+          ${number % 2 === 0 ? AGENT : null}, ${OWNER}, ${number % 3 === 0 ? MILESTONE : null}, ${number},
+          ${`2026-10-${10 + (number % 9)}T08:00:00.654321Z`}::timestamptz)`);
+    }
+    for (let number = 1; number <= 5; number++) {
+      await db.execute(sql`insert into task (project_id, number, title, created_by_id)
+        values (${WEB}, ${number}, ${`Page ${number}`}, ${OWNER})`);
+    }
+    await db.execute(sql`
+      insert into activity (workspace_id, project_id, task_id, actor_id, on_behalf_of_id, type, changes)
+      select ${WORKSPACE}, project_id, id, ${AGENT}, ${OWNER}, 'task.updated',
+        '[{"field":"status","from":"todo","to":"in_progress"}]'::jsonb
+      from task`);
+    await db.execute(sql`
+      insert into comment (workspace_id, project_id, task_id, author_id, body)
+      select ${WORKSPACE}, project_id, id, ${OWNER}, 'Looks good' from task where number <= 3`);
+
+    const tasksBefore = await taskRows();
+    const counts = await rowCounts(db);
+    const commentsBefore = await count('comment');
+
+    await migrateFrom(url, migrationsFolder);
+
+    expect(await taskRows()).toEqual(tasksBefore);
+    expect(tasksBefore).toHaveLength(35);
+    expect(await rowCounts(db)).toEqual(counts);
+    expect(await count('comment')).toBe(commentsBefore);
+
+    const empty = await db.execute<{ count: number }>(
+      sql`select count(*)::int as count from task where due_date is null and parent_id is null`,
+    );
+    expect(empty.rows[0]?.count).toBe(35);
+    expect(await count('label')).toBe(0);
+    expect(await count('task_label')).toBe(0);
+    expect(await count('task_dependency')).toBe(0);
+
+    // The new fields work on upgraded rows.
+    const ids = await db.execute<{ id: string; number: number; project_id: string }>(
+      sql`select id, number, project_id from task where number <= 3 order by project_id, number`,
+    );
+    const [pay1, pay2, pay3, web1] = ids.rows;
+    if (!pay1 || !pay2 || !pay3 || !web1) throw new Error('missing upgraded tasks');
+
+    await db.execute(
+      sql`update task set due_date = '2026-11-14', parent_id = ${pay1.id} where id = ${pay2.id}`,
+    );
+    expect(await pgCode(db.execute(sql`update task set parent_id = id where id = ${pay3.id}`))).toBe('23514');
+
+    await db.execute(sql`insert into label (workspace_id, project_id, name, color) values
+      (${WORKSPACE}, ${PAY}, 'payouts', 1), (${WORKSPACE}, ${WEB}, 'payouts', 2)`);
+    expect(
+      await pgCode(
+        db.execute(sql`insert into label (workspace_id, project_id, name, color)
+          values (${WORKSPACE}, ${PAY}, 'PAYOUTS', 3)`),
+      ),
+    ).toBe('23505');
+    await db.execute(sql`insert into task_label (task_id, label_id)
+      select ${pay1.id}, id from label where project_id = ${PAY}`);
+
+    await db.execute(sql`insert into task_dependency (task_id, blocker_id) values (${pay3.id}, ${pay1.id})`);
+    expect(
+      await pgCode(
+        db.execute(sql`insert into task_dependency (task_id, blocker_id) values (${pay3.id}, ${pay3.id})`),
+      ),
+    ).toBe('23514');
+
+    // Deleting the parent and blocker clears both links; the label link goes with the task.
+    await db.execute(sql`delete from task where id = ${pay1.id}`);
+    const child = await db.execute<{ parent_id: string | null; due_date: string | null }>(
+      sql`select parent_id, due_date::text from task where id = ${pay2.id}`,
+    );
+    expect(child.rows).toEqual([{ parent_id: null, due_date: '2026-11-14' }]);
+    expect(await count('task_dependency')).toBe(0);
+    expect(await count('task_label')).toBe(0);
+    expect(await count('label')).toBe(2);
+  });
+});
+
+describe('M5 mirror backfill on a 0.6.0 database with Backlog.md tasks', () => {
+  let url: string;
+  let folder: string;
+  let db: Db;
+  let end: () => Promise<void>;
+
+  const OWNER = '0190a1b2-0000-7000-8000-0000000001a1';
+  const WORKSPACE = '0190a1b2-0000-7000-8000-0000000001b1';
+  const PAY = '0190a1b2-0000-7000-8000-0000000001c1';
+  const OLD = '0190a1b2-0000-7000-8000-0000000001c2';
+  const NAT = '0190a1b2-0000-7000-8000-0000000001c3';
+  const M5_TASK_FIELDS = '20261104104246_m5_task_fields';
+
+  beforeAll(async () => {
+    folder = mkdtempSync(join(tmpdir(), 'pm-0-6-0-backfill-'));
+    for (const name of V0_6_0_MIGRATIONS) {
+      cpSync(join(migrationsFolder, name), join(folder, name), { recursive: true });
+    }
+    url = withDatabase(testServerUrl(), uniqueDatabaseName('pm_test_upgrade_m5_backfill'));
+    await createDatabase(url);
+    await migrateFrom(url, folder);
+    const handle = createDb(url);
+    db = handle.db;
+    end = () => handle.pool.end();
+  });
+
+  afterAll(async () => {
+    await end?.();
+    if (url) await dropDatabase(url);
+    if (folder) rmSync(folder, { recursive: true, force: true });
+  });
+
+  /** Inserts a task with a Backlog.md block; returns its id. */
+  async function mirrored(
+    projectId: string,
+    number: number,
+    suffix: string | null,
+    backlogId: string,
+    block: Record<string, unknown>,
+    hidden = false,
+  ): Promise<string> {
+    const result = await db.execute<{ id: string }>(sql`
+      insert into task (project_id, number, key_suffix, backlog_id, backlog_data, hidden_at, title,
+        created_by_id, updated_at)
+      values (${projectId}, ${number}, ${suffix}, ${backlogId}, ${JSON.stringify(block)}::jsonb,
+        ${hidden ? '2026-10-30T09:00:00Z' : null}::timestamptz, ${backlogId}, ${OWNER},
+        '2026-10-20T08:00:00.123456Z'::timestamptz)
+      returning id`);
+    return result.rows[0]?.id as string;
+  }
+
+  async function rows(query: ReturnType<typeof sql>) {
+    const result = await db.execute<Record<string, unknown>>(query);
+    return result.rows;
+  }
+
+  it('fills labels, due dates, parents and blockers from task.backlog_data, with no activity', async () => {
+    await db.execute(
+      sql`insert into "user" (id, name, email) values (${OWNER}, 'Ana', 'ana-m5@example.com')`,
+    );
+    await db.execute(
+      sql`insert into organization (id, name, slug) values (${WORKSPACE}, 'Reddevs', 'reddevs-m5')`,
+    );
+    await db.execute(
+      sql`insert into member (organization_id, user_id, role) values (${WORKSPACE}, ${OWNER}, 'owner')`,
+    );
+    await db.execute(sql`insert into project (id, workspace_id, key, name, next_task_number) values
+      (${PAY}, ${WORKSPACE}, 'PAY', 'Payments', 6), (${OLD}, ${WORKSPACE}, 'OLD', 'Imported', 2),
+      (${NAT}, ${WORKSPACE}, 'NAT', 'Native', 2)`);
+    // PAY mirrors; OLD was imported (an import detaches after its first read).
+    await db.execute(sql`insert into backlog_source (project_id, mode, state, webhook_id, created_by_id, detached_at)
+      values (${PAY}, 'mirror', 'healthy', 'wh-pay', ${OWNER}, null),
+        (${OLD}, 'import', 'detached', 'wh-old', ${OWNER}, '2026-10-25T10:00:00Z')`);
+
+    const back1 = await mirrored(PAY, 1, null, 'BACK-1', {
+      labels: ['API', 'backend', 'Api', 'x'.repeat(41)],
+      dueDate: '2026-11-20',
+      dependencies: ['BACK-2', 'BACK-99', 'BACK-1', 'BACK-2'],
+      parentId: null,
+    });
+    const back2 = await mirrored(PAY, 2, null, 'BACK-2', { labels: ['api'], dueDate: '2026-02-30' });
+    const back21 = await mirrored(PAY, 2, '1', 'BACK-2.1', {
+      parentId: 'BACK-2',
+      dueDate: '2026-12-01 10:00',
+    });
+    // Hidden (its file is gone): backfilled too.
+    const back3 = await mirrored(
+      PAY,
+      3,
+      null,
+      'BACK-3',
+      { labels: ['ops'], dependencies: ['BACK-1'], parentId: 'BACK-1', dueDate: '2026-11-01' },
+      true,
+    );
+    const back4 = await mirrored(PAY, 4, null, 'BACK-4', { parentId: 'BACK-4', dueDate: '0000-01-01' });
+    const back5 = await mirrored(PAY, 5, null, 'BACK-5', {});
+    const old1 = await mirrored(OLD, 1, null, 'BACK-1', { labels: ['legacy'], dueDate: '2026-10-01' });
+    await db.execute(
+      sql`insert into task (project_id, number, title, created_by_id) values (${NAT}, 1, 'Native', ${OWNER})`,
+    );
+    await db.execute(sql`
+      insert into activity (workspace_id, project_id, task_id, actor_id, type, changes, origin)
+      select ${WORKSPACE}, project_id, id, null, 'task.created', '[]'::jsonb, 'backlog' from task`);
+
+    // Upgrade in two steps, so PAY can have an app label named like a file's label (ignoring case).
+    cpSync(join(migrationsFolder, M5_TASK_FIELDS), join(folder, M5_TASK_FIELDS), { recursive: true });
+    await migrateFrom(url, folder);
+    await db.execute(sql`insert into label (workspace_id, project_id, name, color, source)
+      values (${WORKSPACE}, ${PAY}, 'Backend', 1, 'app')`);
+    const updatedBefore = await rows(sql`select id, updated_at::text from task order by id`);
+    const activityBefore = await rows(sql`select count(*)::int as count from activity`);
+
+    await migrateFrom(url, migrationsFolder);
+
+    expect(await rows(sql`select id, updated_at::text from task order by id`)).toEqual(updatedBefore);
+    expect(await rows(sql`select count(*)::int as count from activity`)).toEqual(activityBefore);
+
+    // Labels: Backend reused (name kept, locked now); API created once with the least used hue,
+    // named after the first spelling in code point order; the 41-character name is left out.
+    // OLD is detached, so its labels are app labels.
+    expect(
+      await rows(sql`select p.key, l.name, l.color, l.source from label l join project p on p.id = l.project_id
+        order by p.key, l.name`),
+    ).toEqual([
+      { key: 'OLD', name: 'legacy', color: 1, source: 'app' },
+      { key: 'PAY', name: 'API', color: 2, source: 'backlog' },
+      { key: 'PAY', name: 'Backend', color: 1, source: 'backlog' },
+      { key: 'PAY', name: 'ops', color: 3, source: 'backlog' },
+    ]);
+    expect(
+      await rows(sql`select t.id as task, l.name from task_label tl join task t on t.id = tl.task_id
+        join label l on l.id = tl.label_id order by t.id, l.name`),
+    ).toEqual(
+      [
+        { task: back1, name: 'API' },
+        { task: back1, name: 'Backend' },
+        { task: back2, name: 'API' },
+        { task: back3, name: 'ops' },
+        { task: old1, name: 'legacy' },
+      ].sort((a, b) => (a.task === b.task ? (a.name < b.name ? -1 : 1) : a.task < b.task ? -1 : 1)),
+    );
+
+    // Due dates: real days only. Parents and blockers: same-project lookups by backlog_id; unknown
+    // ids and the task itself are left out; the hidden task keeps its links.
+    expect(
+      await rows(sql`select id, due_date::text as due, parent_id as parent from task
+        where backlog_id is not null order by id`),
+    ).toEqual(
+      [
+        { id: back1, due: '2026-11-20', parent: null },
+        { id: back2, due: null, parent: null },
+        { id: back21, due: null, parent: back2 },
+        { id: back3, due: '2026-11-01', parent: back1 },
+        { id: back4, due: null, parent: null },
+        { id: back5, due: null, parent: null },
+        { id: old1, due: '2026-10-01', parent: null },
+      ].sort((a, b) => (a.id < b.id ? -1 : 1)),
+    );
+    expect(
+      await rows(
+        sql`select task_id as task, blocker_id as blocker from task_dependency order by task_id, blocker_id`,
+      ),
+    ).toEqual(
+      [
+        { task: back1, blocker: back2 },
+        { task: back3, blocker: back1 },
+      ].sort((a, b) => (a.task < b.task ? -1 : 1)),
+    );
+    expect(
+      await rows(sql`select count(*)::int as count from task where project_id = ${NAT}
+        and (due_date is not null or parent_id is not null)`),
+    ).toEqual([{ count: 0 }]);
+  });
+});

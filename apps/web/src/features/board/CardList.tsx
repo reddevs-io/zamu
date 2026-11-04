@@ -1,4 +1,4 @@
-import type { TaskListItem, TaskStatus } from '@pm/contracts';
+import type { TaskListItem } from '@pm/contracts';
 import { memo, type ReactNode, useMemo } from 'react';
 import {
   DropIndicator,
@@ -8,57 +8,53 @@ import {
   isTextDropItem,
   useDragAndDrop,
 } from 'react-aria-components';
-import {
-  BoardCard,
-  BoardCardContent,
-  Button,
-  boardCardStyles,
-  cn,
-  dropIndicatorClass,
-  isMilestoneFilled,
-} from '~/ui';
+import { Button, boardCardStyles, cn, dropIndicatorClass } from '~/ui';
 
 // The cards of one board cell (a column, or a column inside a swimlane) as a React Aria GridList with
-// drag and drop: reorder inside the cell, drop from another cell between cards or on an empty cell.
+// drag and drop: reorder inside the cell (manual order only), drop from another cell between cards, on a
+// card or on an empty cell.
 
 /** Drag type carrying the task key. */
 export const CARD_DRAG_TYPE = 'application/x-pm-task-key';
 
 export interface CardDrop {
   key: string;
-  /** Card the drop lands next to; null for a drop on the cell itself (empty cell). */
+  /** Card the drop lands next to; null for a drop on the cell itself (or on a card, unordered boards). */
   target: { key: string; position: 'before' | 'after' } | null;
-}
-
-export interface CardFeatures {
-  usesMilestones: boolean;
-  usesCycles: boolean;
-  /** Field the swimlanes already show: left off the cards. */
-  laneField?: 'assignee' | 'milestone' | null;
 }
 
 export interface CardListProps {
   /** "In progress" or "In progress, claude-dev": the GridList's accessible name. */
   label: string;
-  status: TaskStatus;
+  /** Column id (a status or a group key), on data-column. */
+  column: string;
   cards: readonly TaskListItem[];
-  /** Card open in the task panel (drawn selected). */
-  selected: string | null;
+  /** The keyboard cursor (accent ring). */
+  cursor: string | null;
+  isSelected: (key: string) => boolean;
   /** Click or Enter on a card. */
-  onOpen: (key: string) => void;
+  onAction: (key: string) => void;
   onDrop: (drop: CardDrop) => void;
-  features: CardFeatures;
+  /** The inside of a card. */
+  renderCard: (card: TaskListItem) => ReactNode;
+  /** A subtask shown as its own card: tighter. */
+  isChild?: (card: TaskListItem) => boolean;
+  /** Cards keep their place (manual order): drops between cards say where. Otherwise a drop is into the cell. */
+  reorderable?: boolean;
   /** Turns drag and drop off (while loading). */
   isDisabled?: boolean;
-  /**
-   * Refuses every drop (a card whose status comes from Backlog.md is being dragged from another
-   * column). Drags out of the list still work.
-   */
+  /** Refuses every drop (the dragged card can't move here). Drags out of the list still work. */
   refuseDrops?: boolean;
   /** A drag of one of these cards started (keyboard or pointer). */
   onDragStart?: (key: string) => void;
   /** The drag ended, dropped or not. */
   onDragEnd?: () => void;
+  /** A dragged card entered this cell. */
+  onDropEnter?: () => void;
+  /** Re-render the cards when these change. */
+  dependencies?: readonly unknown[];
+  /** Drawn (and droppable) while the cell has no cards. */
+  empty?: ReactNode;
   className?: string;
 }
 
@@ -68,36 +64,24 @@ async function keyOf(items: readonly DropItem[]): Promise<string | null> {
   return (await item.getText(CARD_DRAG_TYPE)) || null;
 }
 
-/** Card fields for the kit's BoardCardContent. */
-export function cardContent(card: TaskListItem, features: CardFeatures) {
-  return {
-    taskKey: card.key,
-    title: card.title,
-    priority: card.priority,
-    milestone:
-      features.usesMilestones && features.laneField !== 'milestone' && card.milestone
-        ? { name: card.milestone.name, filled: isMilestoneFilled(card.milestone.status) }
-        : null,
-    cycle: features.usesCycles && card.cycle ? { label: `C${card.cycle.number}` } : null,
-    assignee:
-      card.assignee && features.laneField !== 'assignee'
-        ? { name: card.assignee.name, kind: card.assignee.kind }
-        : null,
-  };
-}
-
 export const CardList = memo(function CardList({
   label,
-  status,
+  column,
   cards,
-  selected,
-  onOpen,
+  cursor,
+  isSelected,
+  onAction,
   onDrop,
-  features,
+  renderCard,
+  isChild,
+  reorderable = true,
   isDisabled = false,
   refuseDrops = false,
   onDragStart,
   onDragEnd,
+  onDropEnter,
+  dependencies = [],
+  empty,
   className,
 }: CardListProps) {
   const byKey = useMemo(() => new Map(cards.map((card) => [card.key, card])), [cards]);
@@ -107,16 +91,21 @@ export const CardList = memo(function CardList({
     getItems: (keys): Record<string, string>[] =>
       [...keys].map((key) => ({ [CARD_DRAG_TYPE]: String(key), 'text/plain': String(key) })),
     acceptedDragTypes: [CARD_DRAG_TYPE],
-    getDropOperation: (target) =>
-      refuseDrops || (target.type === 'item' && target.dropPosition === 'on') ? 'cancel' : 'move',
+    getDropOperation: (target) => {
+      if (refuseDrops) return 'cancel';
+      // Manual order: between cards only. Otherwise anywhere in the cell, the column's order places it.
+      if (reorderable && target.type === 'item' && target.dropPosition === 'on') return 'cancel';
+      return 'move';
+    },
     onDragStart: (event) => {
       const key = [...event.keys][0];
       if (key != null) onDragStart?.(String(key));
     },
     onDragEnd: () => onDragEnd?.(),
+    onDropEnter: () => onDropEnter?.(),
     onReorder: (event) => {
       const key = [...event.keys][0];
-      if (key == null || event.target.dropPosition === 'on') return;
+      if (!reorderable || key == null || event.target.dropPosition === 'on') return;
       onDrop({
         key: String(key),
         target: { key: String(event.target.key), position: event.target.dropPosition },
@@ -125,18 +114,31 @@ export const CardList = memo(function CardList({
     onInsert: async (event) => {
       const key = await keyOf(event.items);
       if (!key || event.target.dropPosition === 'on') return;
-      onDrop({ key, target: { key: String(event.target.key), position: event.target.dropPosition } });
+      onDrop({
+        key,
+        target: reorderable ? { key: String(event.target.key), position: event.target.dropPosition } : null,
+      });
+    },
+    onItemDrop: async (event) => {
+      if (reorderable || event.isInternal) return;
+      const key = await keyOf(event.items);
+      if (key) onDrop({ key, target: null });
     },
     onRootDrop: async (event) => {
       const key = await keyOf(event.items);
       if (key) onDrop({ key, target: null });
     },
-    renderDropIndicator: (target) => <DropIndicator target={target} className={dropIndicatorClass} />,
+    renderDropIndicator: (target) => (
+      <DropIndicator target={target} className={reorderable ? dropIndicatorClass : 'hidden'} />
+    ),
     renderDragPreview: (items) => {
       const key = items[0]?.[CARD_DRAG_TYPE];
       const card = key ? byKey.get(key) : undefined;
-      if (!card) return <div className="bg-surface px-2 py-1 font-mono text-[11px]">{key}</div>;
-      return <BoardCard state="dragging" className="w-[262px]" {...cardContent(card, features)} />;
+      return (
+        <div className={cn(boardCardStyles({ state: 'dragging' }), 'w-75')}>
+          {card ? renderCard(card) : <span className="text-xs text-fg-3">{key}</span>}
+        </div>
+      );
     },
   });
 
@@ -145,47 +147,36 @@ export const CardList = memo(function CardList({
       aria-label={label}
       items={cards}
       layout="stack"
-      // The panel is the selection: React Aria selection stays off, so a drop never selects a card.
+      // Selection is the board's (X, Shift+click): React Aria selection stays off, so a drop never selects.
       selectionMode="none"
-      onAction={(key) => onOpen(String(key))}
+      onAction={(key) => onAction(String(key))}
       disallowTypeAhead
       escapeKeyBehavior="none"
-      dependencies={[selected, features]}
+      dependencies={[cursor, isSelected, renderCard, ...dependencies]}
       dragAndDropHooks={dragAndDropHooks}
-      data-status={status}
-      renderEmptyState={() => <div className="min-h-16 flex-1" />}
-      className={cn(
-        'flex min-h-16 shrink-0 grow flex-col gap-1.5 outline-none',
-        'drop-target:bg-drop drop-target:outline-[1.5px] drop-target:-outline-offset-2 drop-target:outline-drop-line drop-target:outline-dashed',
-        className,
-      )}
+      data-column={column}
+      renderEmptyState={() => empty ?? <div className="min-h-12 flex-1" />}
+      className={cn('flex min-h-12 shrink-0 grow flex-col gap-2 outline-none', className)}
     >
       {(card) => (
         <GridListItem
           id={card.key}
           textValue={`${card.key} ${card.title}`}
           data-card-key={card.key}
-          data-open={card.key === selected || undefined}
-          className={boardCardStyles({ state: card.key === selected ? 'selected' : 'default' })}
+          data-cursor={card.key === cursor || undefined}
+          data-multi={isSelected(card.key) || undefined}
+          className={boardCardStyles({ child: isChild?.(card) ?? false })}
         >
-          <CardBody card={card} features={features} />
+          {/* React Aria's keyboard and screen reader drag starts from this button; sighted keyboard users
+              have Shift+← / Shift+→. */}
+          <span className="sr-only">
+            <Button slot="drag" variant="ghost">
+              Drag {card.key}
+            </Button>
+          </span>
+          {renderCard(card)}
         </GridListItem>
       )}
     </GridList>
   );
 });
-
-function CardBody({ card, features }: { card: TaskListItem; features: CardFeatures }): ReactNode {
-  return (
-    <>
-      {/* React Aria's keyboard and screen reader drag starts from this button; sighted keyboard users
-          have Shift+H/J/K/L. */}
-      <span className="sr-only">
-        <Button slot="drag" variant="ghost">
-          Drag {card.key}
-        </Button>
-      </span>
-      <BoardCardContent {...cardContent(card, features)} />
-    </>
-  );
-}

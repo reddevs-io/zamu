@@ -19,7 +19,10 @@ export interface ToastProps {
   className?: string;
 }
 
-/** Inverted one-line toast with an optional action and shortcut. Announced politely (role="status"). */
+/**
+ * Margin toast (margin.css .toast): 42px, radius md, --fg with --bg text, --shadow-lift; an underlined action
+ * ("Undo") and its key. Announced politely (role="status").
+ */
 export function Toast({
   children,
   action,
@@ -46,8 +49,8 @@ export function Toast({
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
       className={cn(
-        'flex items-center gap-3 bg-fg py-[9px] pr-3 pl-3.5 text-[12.5px] whitespace-nowrap text-bg shadow-dialog',
-        floating && 'absolute bottom-5 left-1/2 z-[7] -translate-x-1/2',
+        'flex h-10.5 items-center gap-3 rounded-md bg-fg pr-2 pl-3.5 text-sm whitespace-nowrap text-bg shadow-lift',
+        floating && 'absolute bottom-5.5 left-1/2 z-7 -translate-x-1/2',
         className,
       )}
     >
@@ -55,13 +58,13 @@ export function Toast({
       {action ? (
         <AriaButton
           onPress={action.onAction}
-          className="cursor-pointer opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:focus-ring"
+          className="cursor-pointer rounded-sm font-medium underline underline-offset-2 outline-none hover:opacity-80 focus-visible:shadow-[var(--focus-ring)]"
         >
           {action.label}
         </AriaButton>
       ) : null}
       {kbd ? (
-        <Kbd variant="inverse" aria-hidden className="border-[oklch(0.6_0_0/0.5)]">
+        <Kbd variant="inverse" aria-hidden>
           {kbd}
         </Kbd>
       ) : null}

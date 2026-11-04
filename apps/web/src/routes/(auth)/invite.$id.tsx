@@ -4,7 +4,7 @@ import { acceptInvitation, getInvitation, getSignInOptions, guardAuthPage } from
 import { ApiKeyHint, AuthHeading, AuthLayout, PRODUCT_NAME } from './-auth/AuthLayout';
 import { ErrorBanner, type FormError, InviteForm } from './-auth/forms';
 import type { InvitationState } from './-auth/queries';
-import { ssoErrorCode, ssoErrorMessage, ssoLabel } from './-auth/sso';
+import { ssoErrorCode, ssoErrorMessage, ssoLabel, ssoName } from './-auth/sso';
 
 export const Route = createFileRoute('/(auth)/invite/$id')({
   validateSearch: (search: Record<string, unknown>): { error?: string } => {
@@ -35,8 +35,9 @@ const UNUSABLE: Record<Exclude<InvitationState, 'pending'>, string> = {
 
 function pendingSubtitle(inviter: string, providerName: string | null, passwordLogin: boolean): string {
   if (!providerName) return `${inviter} invited you. Choose your name and a password.`;
-  if (!passwordLogin) return `${inviter} invited you. Continue with ${providerName} to join.`;
-  return `${inviter} invited you. Continue with ${providerName}, or choose your name and a password.`;
+  const sso = ssoName(providerName);
+  if (!passwordLogin) return `${inviter} invited you. Continue with ${sso} to join.`;
+  return `${inviter} invited you. Choose your name and a password, or continue with ${sso}.`;
 }
 
 function InvitePage() {

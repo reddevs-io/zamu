@@ -1,9 +1,19 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
-import { DASHBOARD_HREF } from '../../features/shell/paths';
+import { createFileRoute } from '@tanstack/react-router';
+import { HomeScreen } from '~/features/home/HomeScreen';
+import { prefetchHome } from '~/features/home/queries';
+import { homeFilterOf, homeInput, homeTabOf, parseHomeSearch } from '~/features/home/search';
+import { settleOnServer } from '~/features/tasks/prefetch';
 
-// "/" opens the dashboard: the page you land on after signing in.
+// "/" is Home (frames 099–106): the page you land on after signing in. The tab and the filter are in
+// the search (?tab=everyone&project=PAY&label=backend&priority=urgent).
 export const Route = createFileRoute('/_app/')({
-  beforeLoad: () => {
-    throw redirect({ href: DASHBOARD_HREF, replace: true });
-  },
+  validateSearch: parseHomeSearch,
+  loaderDeps: ({ search }) => ({ input: homeInput(homeTabOf(search), homeFilterOf({ ...search })) }),
+  loader: ({ context, deps }) => settleOnServer(prefetchHome(context.queryClient, deps.input)),
+  head: () => ({ meta: [{ title: 'Home · project-management' }] }),
+  component: HomeRoute,
 });
+
+function HomeRoute() {
+  return <HomeScreen search={Route.useSearch()} />;
+}

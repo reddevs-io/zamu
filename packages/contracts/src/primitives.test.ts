@@ -261,6 +261,10 @@ describe('M3 enumerations', () => {
       'assignee',
       'milestone',
       'createdAt',
+      'labels',
+      'dueDate',
+      'blockedBy',
+      'parent',
     ]);
     expect(MILESTONE_OWNED_FIELDS).toEqual(['name', 'description', 'targetDate', 'status']);
     expect(PROJECT_OWNED_FIELDS).toEqual(['key', 'repository', 'usesMilestones']);

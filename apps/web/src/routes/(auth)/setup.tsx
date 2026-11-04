@@ -12,7 +12,7 @@ import {
   SsoButton,
   WorkspaceForm,
 } from './-auth/forms';
-import { ssoErrorCode, ssoErrorMessage, ssoLabel } from './-auth/sso';
+import { ssoErrorCode, ssoErrorMessage, ssoLabel, ssoName } from './-auth/sso';
 
 export const Route = createFileRoute('/(auth)/setup')({
   validateSearch: (search: Record<string, unknown>): { error?: string } => {
@@ -92,14 +92,10 @@ function ResumeSetup({
       <SetupSteps step={2} />
       <AuthHeading
         title="Finish setting up this server"
-        subtitle={`The admin account is ready. Continue with ${providerName ?? 'single sign-on'} as the admin to name the workspace.`}
+        subtitle={`The admin account is ready. Continue with ${providerName ? ssoName(providerName) : 'single sign-on'} as the admin to name the workspace.`}
       />
       {failure ? <ErrorBanner error={failure} /> : null}
-      {sso ? (
-        <div className="flex flex-col gap-3.5">
-          <SsoButton sso={sso} onError={(message) => setFailure({ message })} />
-        </div>
-      ) : null}
+      {sso ? <SsoButton sso={sso} onError={(message) => setFailure({ message })} /> : null}
     </>
   );
 }

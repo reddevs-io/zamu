@@ -3,8 +3,8 @@
 // component state, never kept in the mutation cache.
 import type { BacklogWebhookSecret } from '@pm/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { ConfirmDialog } from '../settings/ConfirmDialog';
-import { unwrap } from '../settings/result';
+import { ConfirmDialog } from '~/ui';
+import { errorMessage, unwrap } from '../settings/result';
 import { webhookInfoQuery } from './queries';
 
 /** Issues a new secret, then refetches the webhook info so the dialog and its poll agree. */
@@ -34,7 +34,16 @@ export function WebhookSecretDialog({ isOpen, onOpenChange, onIssue, onIssued }:
       onOpenChange={onOpenChange}
       title="Issue a new webhook secret?"
       confirmLabel="Issue new secret"
-      onConfirm={async () => onIssued(await onIssue())}
+      onConfirm={async () => {
+        let issued: BacklogWebhookSecret;
+        try {
+          issued = await onIssue();
+        } catch (failure) {
+          // The kit dialog shows the error's message.
+          throw new Error(errorMessage(failure));
+        }
+        onIssued(issued);
+      }}
     >
       The current secret stops working at once. Webhooks fail until you paste the new secret into the git
       host. Mirrors still refresh every hour.

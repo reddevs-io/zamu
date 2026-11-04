@@ -46,7 +46,7 @@ export function createAgentOption(name: string): OptionItem {
     prefix: (
       <span
         aria-hidden
-        className="grid size-[18px] place-items-center border-[1.5px] border-dashed border-muted text-[12px] leading-none text-muted"
+        className="grid size-4.5 place-items-center rounded-[5px] border-[1.5px] border-dashed border-fg-3 text-sm leading-none text-fg-3"
       >
         +
       </span>

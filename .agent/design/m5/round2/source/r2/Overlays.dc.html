@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./margin.css" />
+<link rel="stylesheet" href="./screens.css" />
+<script src="./data.js"></script>
+<style>
+body{margin:0}
+.ov-root{position:relative;width:1440px;height:900px;overflow:hidden}
+.ovl{position:absolute;inset:0;font-family:var(--font);font-size:var(--fs-md);line-height:1.4;color:var(--text);-webkit-font-smoothing:antialiased}
+.ovl *{box-sizing:border-box}
+.ovl .menu-i .x{color:var(--text-3);font-size:14px}
+.ovl .menu-i .ti{overflow:hidden;text-overflow:ellipsis}
+.ovl .menu-i.gone .ti{font-style:italic;color:var(--text-3)}
+.ovl .menu-i.done .ti{color:var(--text-3);text-decoration:line-through;text-decoration-color:var(--line)}
+.ovl .menu-i .key{width:58px;flex:none}
+.menu-tip{margin:4px 2px 2px;padding:8px 10px;border-radius:var(--r-sm);background:var(--bg-lane);color:var(--text-2);font-size:var(--fs-xs);line-height:1.45;white-space:normal}
+.scrollfade{height:26px;margin:-26px -6px 0;background:linear-gradient(transparent,var(--surface-pop));position:relative}
+.sw-row{display:flex;align-items:center;gap:10px;padding:2px 8px 6px;color:var(--text-3);font-size:var(--fs-xs)}
+.sw-row .swatches{padding:0;grid-template-columns:repeat(9,18px);gap:6px}
+.sw-row .sw{width:18px;height:18px}
+.peek .task-title{font-size:24px;margin:0}
+.pal-in .caretbar{width:1.5px;height:20px;background:var(--accent);margin-left:-8px}
+.pal-ctx .pill{max-width:560px;overflow:hidden;text-overflow:ellipsis}
+.pal-i .gi .pri,.pal-i .gi .st{margin:0}
+.pal-i .g{font-size:14px;color:var(--text-3);line-height:1}
+.fgl{display:inline-block;width:9px;height:11px;border:1.5px solid currentColor;border-radius:2px;flex:none}
+.dlg .propbtn .lbd{margin-right:-2px}
+.propbtn.set{display:inline-flex;flex:none}
+.dlg-hd .crumb-sep{margin:0 2px}
+</style>
+</helmet>
+<div class="ov-root" data-screen-label="Overlays">
+<sc-if value="{{ bgBoard }}"><dc-import name="Board" theme="{{ theme }}" state="default" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ bgList }}"><dc-import name="List" theme="{{ theme }}" state="{{ listState }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ bgTask }}"><dc-import name="Task" theme="{{ theme }}" state="full" hint-size="1440px,900px"></dc-import></sc-if>
+<div class="{{ layerCls }}">
+<sc-if value="{{ scrim }}"><div class="scrim"></div></sc-if>
+
+<sc-if value="{{ isPeek }}">
+<div class="peek">
+<div class="peek-hd"><span class="st prog"></span><span class="key">HBR-146</span><span class="bm"><span class="fgl"></span>Backlog.md</span><span class="spacer"></span><span class="btn sm ghost">Open<span class="kbd">↵</span></span><span class="btn icon sm">×</span></div>
+<div class="peek-b">
+<h2 class="task-title">Long French and Spanish labels clip on the home screen, the wallet and search</h2>
+<div class="peek-props"><span class="propbtn set"><span class="st prog"></span>In progress</span><span class="propbtn set"><span class="pri m"></span>Medium</span><span class="propbtn set"><span class="av agent av-cd">cd</span>claude-dev</span><span class="propbtn set"><span class="lbd c6"></span>i18n</span><span class="propbtn set"><span class="lbd c1"></span>frontend</span><span class="propbtn set">Cycle 12</span></div>
+<div class="desc"><p>French and Spanish strings run up to 40% longer than English, and three places cut them off with no ellipsis:</p><ul><li>Home: the “Ce mois-ci” summary chip</li><li>Wallet: account names over 18 characters</li><li>Search: the filter tabs at 360px</li></ul></div>
+<div class="sh" style="margin-top:6px"><span>Latest</span><span class="spacer"></span><span class="muted">6 more in the task</span></div>
+<div class="cmt agent"><div class="cmt-h"><span class="av agent av-cd">cd</span><b>claude-dev</b><span>acting for Ana</span><span class="spacer"></span><span>1 h ago</span></div><div class="cmt-b">Home and wallet are fixed with a two-line chip. Search needs a design call: scroll the tabs, or shorten the Spanish copy?</div></div>
+</div>
+<div class="peek-ft"><span><span class="kbd">Space</span>close</span><span><span class="kbd">↵</span>open</span><span><span class="kbd">J</span><span class="kbd">K</span>next, previous</span><span class="spacer"></span><span>Read-only: Harbor mirrors Backlog.md</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasPop }}">
+<div class="pop menu" style="{{ pop.style }}">
+<div class="menu-in"><sc-if value="{{ pop.hasQ }}"><span>{{ pop.q }}</span><span class="caretbar"></span></sc-if><sc-if value="{{ pop.noQ }}"><span class="ph">{{ pop.ph }}</span></sc-if><span class="spacer"></span><span class="kbd">{{ pop.kbd }}</span></div>
+<sc-for list="{{ pop.secs }}" as="sec">
+<sc-if value="{{ sec.sep }}"><div class="menu-sep"></div></sc-if>
+<sc-if value="{{ sec.hasH }}"><div class="menu-h">{{ sec.h }}</div></sc-if>
+<sc-if value="{{ sec.cal }}">
+<div class="cal-top"><span>November 2026</span><span class="spacer"></span><span class="btn icon sm">‹</span><span class="btn icon sm">›</span></div>
+<div class="cal"><sc-for list="{{ dows }}" as="dw"><span class="cal-h">{{ dw.d }}</span></sc-for><sc-for list="{{ days }}" as="dd"><span class="{{ dd.cls }}">{{ dd.d }}</span></sc-for></div>
+</sc-if>
+<sc-for list="{{ sec.items }}" as="i">
+<div class="{{ i.cls }}">
+<sc-if value="{{ i.hasBox }}"><span class="{{ i.boxCls }}"><sc-if value="{{ i.on }}"><span class="check"></span></sc-if></span></sc-if>
+<sc-if value="{{ i.hasSt }}"><span class="{{ i.stCls }}"></span></sc-if>
+<sc-if value="{{ i.hasPri }}"><span class="{{ i.priCls }}">{{ i.priTxt }}</span></sc-if>
+<sc-if value="{{ i.hasDot }}"><span class="{{ i.dotCls }}"></span></sc-if>
+<sc-if value="{{ i.hasAv }}"><span class="{{ i.avCls }}">{{ i.avI }}</span></sc-if>
+<sc-if value="{{ i.hasPlus }}"><span class="ico ico-plus" style="width:10px;height:10px"></span></sc-if>
+<sc-if value="{{ i.hasKey }}"><span class="key">{{ i.key }}</span></sc-if>
+<span class="ti">{{ i.pre }}<sc-if value="{{ i.hasHl }}"><span class="hl">{{ i.hl }}</span></sc-if>{{ i.post }}</span>
+<sc-if value="{{ i.hasSm }}"><span class="sm">{{ i.sm }}</span></sc-if>
+<span class="spacer"></span>
+<sc-if value="{{ i.hasRt }}"><span class="sm">{{ i.rt }}</span></sc-if>
+<sc-if value="{{ i.hasAvR }}"><span class="{{ i.avRCls }}">{{ i.avRI }}</span></sc-if>
+<sc-if value="{{ i.hasChk }}"><span class="chk"><span class="check"></span></span></sc-if>
+<sc-if value="{{ i.hasKbd }}"><span class="kbd">{{ i.kbd }}</span></sc-if>
+<sc-if value="{{ i.hasX }}"><span class="x">×</span></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{ sec.fade }}"><div class="scrollfade"></div></sc-if>
+<sc-if value="{{ sec.swatch }}"><div class="sw-row"><span>Colour</span><div class="swatches"><sc-for list="{{ swatches }}" as="sw"><span class="{{ sw.cls }}"></span></sc-for></div></div></sc-if>
+<sc-if value="{{ sec.hasNote }}"><div class="menu-note">{{ sec.note }}</div></sc-if>
+<sc-if value="{{ sec.hasTip }}"><div class="menu-tip">{{ sec.tip }}</div></sc-if>
+</sc-for>
+<div class="menu-foot"><sc-for list="{{ pop.foot }}" as="ft"><span><span class="kbd">{{ ft.k }}</span>{{ ft.t }}</span></sc-for><span class="spacer"></span><span>{{ pop.footR }}</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPal }}">
+<div class="pal">
+<sc-if value="{{ pal.hasCtx }}"><div class="pal-ctx"><span class="pill">{{ pal.ctx }}</span></div></sc-if>
+<div class="pal-in"><sc-if value="{{ pal.hasCrumb }}"><span class="pill acc">{{ pal.crumb }}</span></sc-if><sc-if value="{{ pal.hasQ }}"><span>{{ pal.q }}</span><span class="caretbar"></span></sc-if><sc-if value="{{ pal.noQ }}"><span class="ph">{{ pal.ph }}</span></sc-if></div>
+<div class="pal-b">
+<sc-for list="{{ pal.secs }}" as="sec">
+<div class="pal-h">{{ sec.h }}</div>
+<sc-for list="{{ sec.items }}" as="i">
+<div class="{{ i.cls }}">
+<span class="gi"><sc-if value="{{ i.hasSt }}"><span class="{{ i.stCls }}"></span></sc-if><sc-if value="{{ i.hasPri }}"><span class="{{ i.priCls }}">{{ i.priTxt }}</span></sc-if><sc-if value="{{ i.hasTile }}"><span class="{{ i.tileCls }}">{{ i.tileI }}</span></sc-if><sc-if value="{{ i.hasG }}"><span class="g">{{ i.g }}</span></sc-if></span>
+<sc-if value="{{ i.hasKey }}"><span class="key">{{ i.key }}</span></sc-if>
+<span class="row-t">{{ i.pre }}<sc-if value="{{ i.hasHl }}"><span class="hl">{{ i.hl }}</span></sc-if>{{ i.post }}</span>
+<sc-if value="{{ i.hasSm }}"><span class="sm">{{ i.sm }}</span></sc-if>
+<span class="kbds"><sc-if value="{{ i.hasChk }}"><span class="check" style="color:var(--accent-text);margin-right:6px"></span></sc-if><sc-for list="{{ i.kbds }}" as="k"><span class="kbd">{{ k.k }}</span></sc-for></span>
+</div>
+</sc-for>
+</sc-for>
+</div>
+<div class="pal-ft"><span><span class="kbd">↑</span><span class="kbd">↓</span>move</span><span><span class="kbd">↵</span>{{ pal.enter }}</span><sc-if value="{{ pal.hasBack }}"><span><span class="kbd">⌫</span>back</span></sc-if><span><span class="kbd">Esc</span>close</span><span class="spacer"></span><span>{{ pal.ftR }}</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isCreate }}">
+<div class="dlg">
+<div class="dlg-hd"><span class="tile c6">P</span><span>Payments</span><span class="crumb-sep">›</span><span>New task</span><span class="spacer"></span><span class="kbd">Esc</span></div>
+<div class="dlg-b">
+<div class="dlg-t">Show payout fees on the merchant statement</div>
+<div class="dlg-d">One line per payout with its fee, and the month’s total at the bottom.</div>
+<div class="dlg-props">
+<span class="propbtn"><span class="st"></span>Todo</span>
+<span class="propbtn"><span class="pri n"></span>Priority</span>
+<span class="propbtn"><span class="av none"></span>Assignee</span>
+<span class="propbtn set"><span class="lbd c1"></span>billing</span>
+<span class="propbtn set"><span class="lbd c8"></span>customer-facing</span>
+<span class="propbtn set">Due Nov 14</span>
+<span class="propbtn">Milestone</span>
+<span class="propbtn">···</span>
+</div>
+</div>
+<div class="dlg-ft"><span class="tgl"></span><span class="muted" style="font-size:var(--fs-sm)">Create more</span><span class="spacer"></span><span class="btn ghost">Cancel</span><span class="btn primary">Create task<span class="kbd">⌘↵</span></span></div>
+</div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["peekboard", "peeklist", "labels", "labelsearch", "labelcreate", "due", "blocker", "subtask", "assignee", "status", "priority", "palempty", "palsearch", "palstatus", "palmulti", "create"], "default": "peekboard" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const s = this.props.state ?? 'peekboard';
+    const AV = { ana: ['av av-ana', 'AR'], tf: ['av av-tf', 'TF'], cd: ['av agent av-cd', 'cd'], rb: ['av agent av-rb', 'rb'], none: ['av none', ''] };
+    const it = (o) => {
+      const r = Object.assign({ cls: 'menu-i', pre: '', hl: '', post: '', key: '', sm: '', rt: '', kbd: '' }, o);
+      r.hasBox = 'box' in o; r.on = !!o.box; r.boxCls = o.box ? 'box on' : 'box';
+      r.hasSt = !!o.st; r.stCls = 'st ' + (o.st || '');
+      r.hasPri = !!o.pri; r.priCls = 'pri ' + (o.pri || ''); r.priTxt = o.pri === 'u' ? '!' : '';
+      r.hasDot = !!o.dot; r.dotCls = 'lbd ' + (o.dot || '');
+      r.hasAvR = !!o.avR; r.avRCls = o.avR ? AV[o.avR][0] : ''; r.avRI = o.avR ? AV[o.avR][1] : ''; r.hasAv = !!o.av; r.avCls = o.av ? AV[o.av][0] : ''; r.avI = o.av ? AV[o.av][1] : '';
+      r.hasPlus = !!o.plus; r.hasKey = !!o.key; r.hasHl = !!o.hl; r.hasSm = !!o.sm; r.hasRt = !!o.rt; r.hasChk = !!o.chk; r.hasKbd = !!o.kbd; r.hasX = !!o.x;
+      r.hasTile = !!o.tile; r.tileCls = 'tile ' + (o.tile || ''); r.tileI = o.tileI || ''; r.hasG = !!o.g; r.g = o.g || '';
+      r.kbds = (o.kbds || []).map((k) => ({ k }));
+      if (o.t) r.pre = o.t;
+      return r;
+    };
+    const sec = (o) => Object.assign({ sep: false, hasH: !!o.h, h: '', items: [], fade: false, swatch: false, cal: false, hasNote: !!o.note, note: '', hasTip: !!o.tip, tip: '' }, o, { items: (o.items || []).map(it) });
+    const foot = (pairs) => pairs.map(([k, t]) => ({ k, t }));
+    const P30 = [['payouts', 'c6', 34], ['reliability', 'c9', 12], ['backend', 'c2', 22], ['customer-facing', 'c8', 9], ['api', 'c1', 14], ['refunds', 'c4', 7], ['disputes', 'c7', 5], ['fraud', 'c4', 4], ['ledger', 'c5', 11], ['reconciliation', 'c3', 6], ['reporting', 'c5', 8], ['webhooks', 'c1', 9], ['compliance', 'c7', 3], ['kyc', 'c3', 2], ['pci', 'c4', 3], ['sepa', 'c6', 4], ['ach', 'c6', 3], ['fx', 'c9', 2], ['invoices', 'c1', 5], ['statements', 'c8', 4], ['onboarding', 'c2', 6], ['docs', 'c5', 3], ['perf', 'c9', 5], ['security', 'c4', 7], ['infra', 'c5', 6], ['ops', 'c4', 2], ['mobile', 'c3', 4], ['frontend', 'c1', 10], ['design', 'c8', 3], ['needs-owner', 'c7', 1]];
+    let pop = null;
+    const R = 'left:1130px;top:242px;width:292px';
+    if (s === 'labels') pop = { style: R, ph: 'Add labels…', kbd: 'L', secs: [
+      sec({ h: 'On this task', items: P30.slice(0, 4).map(([n, c, k], j) => ({ box: true, dot: c, t: n, rt: String(k), cls: j === 0 ? 'menu-i' : 'menu-i' })) }),
+      sec({ sep: true, h: 'All labels in Payments · 30', items: P30.slice(4, 14).map(([n, c, k], j) => ({ box: false, dot: c, t: n, rt: String(k), cls: j === 1 ? 'menu-i on' : 'menu-i' })), fade: true })
+    ], foot: foot([['↵', 'toggle'], ['Esc', 'done']]), footR: '4 selected' };
+    if (s === 'labelsearch') pop = { style: R, q: 're', kbd: 'L', secs: [
+      sec({ h: '4 matches', items: [
+        { box: true, dot: 'c9', pre: '', hl: 're', post: 'liability', rt: '12', cls: 'menu-i on' },
+        { box: false, dot: 'c4', pre: '', hl: 're', post: 'funds', rt: '7' },
+        { box: false, dot: 'c3', pre: '', hl: 're', post: 'conciliation', rt: '6' },
+        { box: false, dot: 'c5', pre: '', hl: 're', post: 'porting', rt: '8' }] }),
+      sec({ sep: true, items: [{ cls: 'menu-i create', plus: true, t: 'Create label “re”' }] })
+    ], foot: foot([['↵', 'toggle'], ['Esc', 'done']]), footR: '4 selected' };
+    if (s === 'labelcreate') pop = { style: R, q: 'billing', kbd: 'L', secs: [
+      sec({ h: 'No label named “billing” in Payments', items: [{ cls: 'menu-i create on', plus: true, t: 'Create label “billing”', kbd: '↵' }], swatch: true,
+        tip: 'Labels named “billing” in other projects show as one label in workspace filters.' })
+    ], foot: foot([['↵', 'create and add'], ['Tab', 'colour']]), footR: '' };
+    if (s === 'due') pop = { style: 'left:1150px;top:328px;width:264px', ph: 'Type a date: fri, in 2 weeks', kbd: '⇧D', secs: [
+      sec({ items: [{ t: 'Today', rt: 'Tue, Nov 3' }, { t: 'Tomorrow', rt: 'Wed, Nov 4', cls: 'menu-i on' }, { t: 'Next week', rt: 'Mon, Nov 9' }] }),
+      sec({ sep: true, cal: true }),
+      sec({ sep: true, items: [{ t: 'Clear due date', x: true }] })
+    ], foot: foot([['↵', 'set'], ['←→', 'day']]), footR: 'Now: Oct 31' };
+    if (s === 'blocker') pop = { style: 'left:300px;bottom:196px;width:430px', q: '150', kbd: '⇧B', secs: [
+      sec({ h: 'Results', items: [{ cls: 'menu-i dim', st: 'todo', key: 'PAY-150', t: 'Payout status webhooks for merchants' }], note: 'Can’t add: PAY-150 already waits on PAY-142.' }),
+      sec({ sep: true, h: 'Blocked by', items: [
+        { st: 'rev', key: 'PAY-120', t: 'Idempotency keys for payouts', x: true },
+        { st: 'todo', key: 'PAY-138', t: 'Provider sandbox returns real error codes', x: true },
+        { cls: 'menu-i done', st: 'done', key: 'PAY-131', t: 'Payout state machine', x: true },
+        { cls: 'menu-i gone', t: 'Removed task', x: true }] })
+    ], foot: foot([['↵', 'add'], ['⌫', 'remove']]), footR: 'Only tasks in Payments' };
+    if (s === 'subtask') pop = { style: 'left:300px;top:552px;width:420px', q: 'alert', kbd: '⇧S', secs: [
+      sec({ h: 'Add an existing task', items: [
+        { st: 'todo', key: 'PAY-152', pre: '', hl: 'Alert', post: ' copy for the on-call channel', avR: 'ana', cls: 'menu-i on' },
+        { st: 'backlog', key: 'PAY-157', pre: 'Silence duplicate ', hl: 'alert', post: ' pages', avR: 'none' }] }),
+      sec({ sep: true, items: [{ cls: 'menu-i create', plus: true, t: 'Create subtask “alert”', kbd: '⌘↵' }],
+        tip: 'New subtasks are assigned to claude-dev, like PAY-142. You can change it after.' })
+    ], foot: foot([['↵', 'add'], ['⌘↵', 'create']]), footR: '' };
+    if (s === 'assignee') pop = { style: 'left:1136px;top:210px;width:274px', ph: 'Assign to…', kbd: 'A', secs: [
+      sec({ items: [{ av: 'none', t: 'No assignee', kbd: '0' }, { av: 'ana', t: 'Ana Ruiz', sm: 'you' }, { av: 'tf', t: 'Tomás Ferrer' }] }),
+      sec({ sep: true, h: 'Agents', items: [{ av: 'cd', t: 'claude-dev', sm: 'for Ana', chk: true, cls: 'menu-i on' }, { av: 'rb', t: 'review-bot', sm: 'for Tomás' }] })
+    ], foot: foot([['↵', 'assign'], ['Esc', 'close']]), footR: '' };
+    if (s === 'status') pop = { style: 'left:1136px;top:146px;width:262px', ph: 'Change status…', kbd: 'S', secs: [
+      sec({ items: [['backlog', 'Backlog'], ['todo', 'Todo'], ['prog', 'In progress'], ['rev', 'In review'], ['done', 'Done'], ['cancel', 'Canceled']].map(([st, t], j) => ({ st, t, kbd: String(j + 1), chk: st === 'prog', cls: st === 'rev' ? 'menu-i on' : 'menu-i' })) })
+    ], foot: foot([['1–6', 'pick']]), footR: '' };
+    if (s === 'priority') pop = { style: 'left:1136px;top:178px;width:240px', ph: 'Set priority…', kbd: 'P', secs: [
+      sec({ items: [['n', 'No priority'], ['u', 'Urgent'], ['h', 'High'], ['m', 'Medium'], ['l', 'Low']].map(([pri, t], j) => ({ pri, t, kbd: String(j), chk: pri === 'h', cls: pri === 'u' ? 'menu-i on' : 'menu-i' })) })
+    ], foot: foot([['0–4', 'pick']]), footR: '' };
+    if (pop) { pop.hasQ = !!pop.q; pop.noQ = !pop.q; pop.q = pop.q || ''; pop.ph = pop.ph || ''; }
+    const pit = (o) => it(Object.assign({ cls: 'pal-i' }, o));
+    let pal = null;
+    if (s === 'palempty') pal = { ph: 'Type a command, or search tasks and projects…', enter: 'open', ftR: 'Actions apply to the selected task', secs: [
+      { h: 'Recent', items: [pit({ cls: 'pal-i on', st: 'prog', key: 'HBR-146', t: 'Long French and Spanish labels clip on the home screen, the wallet and search', sm: 'Harbor' }), pit({ st: 'prog', key: 'HBR-164', t: 'Savings goals', sm: 'Harbor' }), pit({ st: 'prog', key: 'PAY-142', t: 'Retry failed payouts with exponential backoff', sm: 'Payments' })] },
+      { h: 'Suggested', items: [pit({ g: '+', t: 'Create task', kbds: ['C'] }), pit({ g: '→', t: 'Go to Home', kbds: ['G', 'H'] }), pit({ tile: 'c6', tileI: 'P', t: 'Go to Payments', sm: 'Project' }), pit({ g: '◐', t: 'Switch to dark theme' }), pit({ g: '+', t: 'Create project' })] }
+    ] };
+    if (s === 'palsearch') pal = { q: 'offline', enter: 'open', ftR: '3 tasks · 0 projects', secs: [
+      { h: 'Tasks', items: [pit({ cls: 'pal-i on', st: 'prog', key: 'HBR-166', pre: '', hl: 'Offline', post: ' cache: browse every tab without a connection', sm: 'Harbor' }), pit({ st: 'todo', key: 'HBR-48', pre: 'Cache exchange rates for ', hl: 'offline', post: ' use', sm: 'Harbor' }), pit({ st: 'rev', key: 'HBR-193', pre: 'Store release 1.22.0 with the ', hl: 'offline', post: ' cache', sm: 'Harbor' })] },
+      { h: 'Actions', items: [pit({ g: '+', t: 'Create task “offline”', kbds: ['C'] }), pit({ g: '⌕', t: 'Search all tasks for “offline”', kbds: ['⇧', '↵'] })] }
+    ] };
+    if (s === 'palstatus') pal = { ctx: 'HBR-146 · Long French and Spanish labels clip on the home screen, the wallet and search', crumb: 'Set status', ph: 'Pick a status…', enter: 'set', hasBack: true, ftR: '', secs: [
+      { h: 'Status', items: [['backlog', 'Backlog'], ['todo', 'Todo'], ['prog', 'In progress'], ['rev', 'In review'], ['done', 'Done'], ['cancel', 'Canceled']].map(([st, t], j) => pit({ st, t, kbds: [String(j + 1)], chk: st === 'prog', cls: st === 'rev' ? 'pal-i on' : 'pal-i' })) }
+    ] };
+    if (s === 'palmulti') pal = { ctx: '3 tasks: HBR-71, HBR-166, HBR-173', ph: 'Actions for 3 tasks…', enter: 'run', ftR: '', secs: [
+      { h: 'Change all 3', items: [pit({ cls: 'pal-i on', st: 'prog', t: 'Change status', kbds: ['S'] }), pit({ pri: 'h', t: 'Set priority', kbds: ['P'] }), pit({ g: '@', t: 'Assign', kbds: ['A'] }), pit({ g: '#', t: 'Add labels', kbds: ['L'] }), pit({ g: '◷', t: 'Set due date', kbds: ['⇧', 'D'] }), pit({ g: '◇', t: 'Move to milestone', kbds: ['⇧', 'M'] }), pit({ g: '↻', t: 'Add to cycle', kbds: ['⇧', 'C'] })] },
+      { h: 'Other', items: [pit({ g: '▭', t: 'Copy 3 keys' }), pit({ g: '×', t: 'Clear selection', kbds: ['Esc'] })] }
+    ] };
+    if (pal) { pal.hasCtx = !!pal.ctx; pal.hasCrumb = !!pal.crumb; pal.hasQ = !!pal.q; pal.noQ = !pal.q; pal.q = pal.q || ''; pal.ph = pal.ph || ''; pal.ctx = pal.ctx || ''; pal.crumb = pal.crumb || ''; pal.hasBack = !!pal.hasBack; }
+    const dows = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => ({ d }));
+    const days = [];
+    [26, 27, 28, 29, 30, 31].forEach((d) => days.push({ d, cls: 'cal-d out' + (d === 31 ? ' sel' : '') }));
+    for (let d = 1; d <= 30; d++) days.push({ d, cls: 'cal-d' + (d === 3 ? ' today' : '') + (d === 14 ? ' focus' : '') });
+    [1, 2, 3, 4, 5, 6].forEach((d) => days.push({ d, cls: 'cal-d out' }));
+    const swatches = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].map((c) => ({ cls: 'sw ' + c + (c === 'c1' ? ' on' : '') }));
+    const isPal = !!pal;
+    const bgBoard = s === 'peekboard';
+    const bgList = s === 'peeklist' || s.indexOf('pal') === 0;
+    return {
+      theme, layerCls: 'ovl ' + theme, bgBoard, bgList, bgTask: !bgBoard && !bgList, listState: s === 'palmulti' ? 'multi' : 'default',
+      isPeek: s === 'peekboard' || s === 'peeklist', hasPop: !!pop, pop: pop || { secs: [], foot: [] }, isPal, pal: pal || { secs: [] },
+      isCreate: s === 'create', scrim: isPal || s === 'create', dows, days, swatches
+    };
+  }
+}
+</script>
+</body>
+</html>

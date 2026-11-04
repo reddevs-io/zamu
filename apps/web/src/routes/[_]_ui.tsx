@@ -1,8 +1,7 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { cn } from '~/ui/cn';
+import { cn, UIProvider } from '~/ui';
 import { UIGallery } from '~/ui/gallery/UIGallery';
-import { UIProvider } from '~/ui/UIProvider';
 
 // The UI kit gallery. File name escapes the leading underscore ("[_]_ui") so the URL is /__ui;
 // a plain "__ui.tsx" would be a pathless layout route. Development only: production builds answer 404.

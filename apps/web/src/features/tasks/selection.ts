@@ -61,3 +61,43 @@ export function useUrlSelection(urlValue: string | null, push: (value: string | 
 
   return { selected: value, select, selectedRef, noteWrite };
 }
+
+// ---------------------------------------------------------------------------
+// The M5 list's cursor: the row keys act on, a task row or a group row (PM-3)
+// ---------------------------------------------------------------------------
+
+/** What moveListCursor and the fold keys read of a row. */
+export interface CursorRow {
+  id: string;
+  type: 'group' | 'task';
+  /** Task rows: the row id of their group row; null without groups. */
+  groupRowId?: string | null;
+}
+
+/**
+ * J / K and ↓ / ↑: the next (1) or previous (-1) task row from `fromId`, skipping group rows. From
+ * nothing (or a row that is gone), J goes to the first task row and K to the last. At the ends it stays.
+ */
+export function moveListCursor(
+  rows: readonly CursorRow[],
+  fromId: string | null,
+  step: 1 | -1,
+): string | null {
+  const index = fromId == null ? -1 : rows.findIndex((row) => row.id === fromId);
+  if (index < 0) {
+    const tasks = rows.filter((row) => row.type === 'task');
+    return (step === 1 ? tasks[0]?.id : tasks.at(-1)?.id) ?? null;
+  }
+  for (let i = index + step; i >= 0 && i < rows.length; i += step) {
+    const row = rows[i];
+    if (row?.type === 'task') return row.id;
+  }
+  return fromId;
+}
+
+/** The first task row right under a group row (none while it is folded or still loading). */
+export function firstRowOfGroup(rows: readonly CursorRow[], groupRowId: string): string | null {
+  const index = rows.findIndex((row) => row.id === groupRowId);
+  const next = index < 0 ? undefined : rows[index + 1];
+  return next?.type === 'task' && next.groupRowId === groupRowId ? next.id : null;
+}

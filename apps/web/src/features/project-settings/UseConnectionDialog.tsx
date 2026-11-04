@@ -75,7 +75,7 @@ function Content({
         <DialogHeader title="Use another connection" />
         <DialogBody>
           {error ? <Banner>{error}</Banner> : null}
-          <p className="m-0 leading-[1.55]">
+          <p className="m-0 leading-prose text-fg-2">
             The mirror reads{' '}
             {status.repository
               ? (parseRepositoryUrl(status.repository)?.short ?? status.repository)
@@ -93,11 +93,11 @@ function Content({
               onChange={(key) => setPicked(key == null ? null : String(key))}
             />
           ) : (
-            <p className="m-0 text-muted">
+            <p className="m-0 text-fg-2">
               The workspace has no git connections.{' '}
               <Link
                 href="/settings/connections"
-                className="text-accent outline-none focus-visible:focus-ring"
+                className="text-accent-text outline-none hover:underline focus-visible:focus-ring"
               >
                 Add one in Settings
               </Link>

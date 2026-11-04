@@ -28,7 +28,7 @@ function Stage({
 }) {
   return (
     <li
-      className={`grid h-[34px] grid-cols-[18px_minmax(0,1fr)_160px] items-center gap-2.5 border-b border-line-2 text-[12.5px] ${state === 'todo' ? 'text-faint' : ''}`}
+      className={`grid h-8.5 grid-cols-[18px_minmax(0,1fr)_160px] items-center gap-2.5 border-b border-line-soft text-sm ${state === 'todo' ? 'text-fg-3' : ''}`}
     >
       {state === 'current' ? (
         <SourceStatusDot state="reading" label="In progress" className="justify-self-center" />
@@ -36,7 +36,7 @@ function Stage({
         <StepMarker state={state} number={number} size="sm" />
       )}
       {state === 'current' ? <b className="font-semibold">{children}</b> : <span>{children}</span>}
-      <span className="text-right font-mono text-[10.5px] text-muted">{aside}</span>
+      <span className="text-right tabular-nums text-xs text-fg-2">{aside}</span>
     </li>
   );
 }
@@ -68,11 +68,11 @@ export function ReadStep({ status, projectName, settingsHref, webhookHref, expec
             role="progressbar"
             aria-label="First read"
             aria-valuetext="Reading"
-            className="relative h-1.5 overflow-hidden bg-line-2"
+            className="relative h-1.5 overflow-hidden bg-line-soft"
           >
             <span className="absolute inset-y-0 left-0 w-2/5 bg-accent motion-safe:animate-pulse" />
           </div>
-          <span className="text-[12.5px] text-muted">
+          <span className="text-sm text-fg-2">
             {expected.tasks ? `${plural(expected.tasks, 'task', 'tasks')} to read · ` : ''}
             about a minute for 1,000 files
           </span>
@@ -94,7 +94,7 @@ export function ReadStep({ status, projectName, settingsHref, webhookHref, expec
             Creating tasks and the history entry
           </Stage>
         </ol>
-        <p className="m-0 text-[11.5px] text-muted">
+        <p className="m-0 text-xs text-fg-2">
           You can leave this page. Tasks appear in {projectName} all at once when the read finishes; nothing
           shows half-done.
         </p>
@@ -141,12 +141,12 @@ export function ReadStep({ status, projectName, settingsHref, webhookHref, expec
     <>
       <DetailBox tone="ok" className="p-4">
         <div className="flex flex-col gap-1">
-          <b className="text-[15px] font-semibold">
+          <b className="text-lg font-semibold">
             {isImport
               ? `${projectName} imported ${repository ?? 'the Backlog.md files'}`
               : `${projectName} now mirrors ${repository ?? 'the repository'}`}
           </b>
-          <span className="text-muted">
+          <span className="text-fg-2">
             {plural(total, 'task', 'tasks')} and {plural(status.counts.milestones, 'milestone', 'milestones')}
             {status.lastRead ? `, read from commit ${status.lastRead.commit.slice(0, 7)}` : ''}
             {duration ? ` in ${duration}` : ''}.
@@ -163,9 +163,9 @@ export function ReadStep({ status, projectName, settingsHref, webhookHref, expec
       </DetailBox>
       <div className="grid grid-cols-2 gap-2.5">
         {isImport ? null : (
-          <div className="flex flex-col gap-1.5 border border-line bg-surface px-4 py-3.5">
+          <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface px-4 py-3.5">
             <b className="font-semibold">Refresh on every push</b>
-            <span className="text-[12.5px] leading-normal text-muted">
+            <span className="text-sm leading-normal text-fg-2">
               Add a webhook in {provider} so changes show up within seconds. Without it, the mirror checks
               every hour.
             </span>
@@ -176,9 +176,9 @@ export function ReadStep({ status, projectName, settingsHref, webhookHref, expec
             </span>
           </div>
         )}
-        <div className="flex flex-col gap-1.5 border border-line bg-surface px-4 py-3.5">
+        <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface px-4 py-3.5">
           <b className="font-semibold">Tell your agents</b>
-          <span className="text-[12.5px] leading-normal text-muted">
+          <span className="text-sm leading-normal text-fg-2">
             {isImport ? (
               <>
                 The tasks live here now. <InlineCode>pm</InlineCode> reads, creates and updates them; edits to{' '}

@@ -13,11 +13,11 @@ export function AppearancePage() {
   return (
     <>
       <PageHeader title="Appearance" />
-      <div className="flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto px-10 py-7">
+      <div className="flex min-h-0 flex-1 flex-col gap-5.5 overflow-y-auto px-10 py-7">
         <RadioGroup
           value={theme.value}
           onChange={(value) => theme.change(value as Theme)}
-          className="flex max-w-[760px] flex-col gap-3.5"
+          className="flex max-w-190 flex-col gap-3.5"
         >
           <div className="flex flex-col gap-1">
             <Label>Theme</Label>
@@ -38,7 +38,7 @@ export function AppearancePage() {
         </RadioGroup>
         {theme.error ? (
           <Banner
-            className="max-w-[760px]"
+            className="max-w-190"
             action={
               <Button variant="secondary" size="sm" onPress={theme.dismissError}>
                 Dismiss
@@ -59,8 +59,8 @@ function ThemeCard({ theme, note }: { theme: Theme; note?: string }) {
       value={theme}
       className={({ isSelected, isFocusVisible }) =>
         cn(
-          'flex cursor-pointer flex-col gap-2.5 border p-2.5 outline-none',
-          isSelected ? 'border-accent bg-sel' : 'border-line hover:bg-band',
+          'flex cursor-pointer flex-col gap-2.5 rounded-md border p-2.5 outline-none',
+          isSelected ? 'border-accent bg-accent-soft' : 'border-line hover:bg-bg-lane',
           isFocusVisible && 'focus-ring',
         )
       }
@@ -71,7 +71,7 @@ function ThemeCard({ theme, note }: { theme: Theme; note?: string }) {
           <span className="flex items-center gap-2">
             <RadioDot selected={isSelected} />
             <span className="font-semibold">{THEME_LABELS[theme]}</span>
-            {note ? <span className="text-[11.5px] text-muted">{note}</span> : null}
+            {note ? <span className="text-xs text-fg-3">{note}</span> : null}
           </span>
         </>
       )}
@@ -86,14 +86,14 @@ function ThemeCard({ theme, note }: { theme: Theme; note?: string }) {
 function ThemePreview({ theme }: { theme: Theme }) {
   if (theme === 'system') {
     return (
-      <span aria-hidden className="relative block h-[88px] overflow-hidden border border-line">
+      <span aria-hidden className="relative block h-22 overflow-hidden rounded-sm border border-line">
         <span className="light absolute inset-y-0 left-0 w-1/2 bg-bg" />
         <span className="dark absolute inset-y-0 right-0 w-1/2 bg-bg" />
-        <span className="light absolute inset-y-0 left-0 w-[18px] bg-rail" />
-        <span className="absolute inset-y-0 right-0 left-[18px] flex flex-col gap-1.5 p-2.5">
-          <span className="h-1.5 w-[60%] bg-muted" />
-          <span className="h-1.5 w-[85%] bg-faint" />
-          <span className="h-1.5 w-[40%] bg-faint" />
+        <span className="light absolute inset-y-0 left-0 w-4.5 bg-bg-side" />
+        <span className="absolute inset-y-0 right-0 left-4.5 flex flex-col gap-1.5 p-2.5">
+          <span className="h-1.5 w-[60%] bg-fg-2" />
+          <span className="h-1.5 w-[85%] bg-fg-3" />
+          <span className="h-1.5 w-[40%] bg-fg-3" />
         </span>
       </span>
     );
@@ -101,9 +101,12 @@ function ThemePreview({ theme }: { theme: Theme }) {
   return (
     <span
       aria-hidden
-      className={cn(theme, 'grid h-[88px] grid-cols-[18px_minmax(0,1fr)] border border-line bg-bg')}
+      className={cn(
+        theme,
+        'grid h-22 grid-cols-[18px_minmax(0,1fr)] overflow-hidden rounded-sm border border-line bg-bg',
+      )}
     >
-      <span className="bg-rail" />
+      <span className="bg-bg-side" />
       <span className="flex flex-col gap-1.5 p-2.5">
         <span className="h-1.5 w-[60%] bg-fg" />
         <span className="h-1.5 w-[85%] bg-line" />

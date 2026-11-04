@@ -1,90 +1,152 @@
-import type { TaskStatus } from '@pm/contracts';
-import { useEffect, useRef } from 'react';
-import { isTextDropItem, useDrop } from 'react-aria-components';
+import type { TaskListItem, TaskStatus } from '@pm/contracts';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { Button as AriaButton, isTextDropItem, useDrop } from 'react-aria-components';
+import type { TaskGroupValue } from '~/features/views';
 import {
   Avatar,
   BoardCardSkeleton,
   BoardColumn,
+  BoardColumnEmpty,
   BoardColumnHeader,
+  BoardFoldedColumn,
+  CycleGlyph,
   cn,
   isMilestoneFilled,
-  lockedHatch,
+  LabelDot,
   MilestoneGlyph,
-  Skeleton,
-  STATUS_LABELS,
+  PriorityGlyph,
+  StatusGlyph,
   SwimlaneHeader,
+  UnassignedAvatar,
 } from '~/ui';
-import { CARD_DRAG_TYPE, type CardDrop, type CardFeatures, CardList } from './CardList';
-import type { ColumnState } from './data';
+import { CARD_DRAG_TYPE, type CardDrop, CardList, type CardListProps } from './CardList';
 import type { Lane } from './lanes';
 
-// Board bodies: plain columns, or swimlanes (a header row, then one row of cells per lane).
+// Board bodies (frames 029–044): plain columns, or swimlanes (a header row, then one row of cells per
+// lane, each cell capped at a few cards with "+ N more").
 
-export interface BoardBodyProps {
-  /** Every board status in order (folded ones included). */
-  statuses: readonly TaskStatus[];
-  isFolded: (status: TaskStatus) => boolean;
-  onFoldChange: (status: TaskStatus, folded: boolean) => void;
-  columns: Partial<Record<TaskStatus, ColumnState>>;
-  /** Column counts under the filters. */
-  countOf: (status: TaskStatus) => number;
-  selected: string | null;
-  /** Opens a card in the task panel. */
-  onOpen: (key: string) => void;
-  /** A card dropped into a cell (lane null without swimlanes). */
-  onDrop: (drop: CardDrop, status: TaskStatus, lane: string | null) => void;
-  onAdd?: (status: TaskStatus) => void;
-  features: CardFeatures;
-  /**
-   * Mirrored projects: while a card whose status comes from Backlog.md is dragged, its status. Every
-   * other column hatches, dims its cards, shows the refusal band and refuses the drop.
-   */
-  refuseFrom?: TaskStatus | null;
-  /** A card drag started (any column). */
-  onCardDragStart?: (key: string) => void;
-  onCardDragEnd?: () => void;
+/** One column as the board draws it: a status, or a group of another field. */
+export interface BoardColumnModel {
+  /** A status, or the group key (a priority, a user id, a milestone id, "none"). */
+  id: string;
+  label: string;
+  value: TaskGroupValue;
+  /** Tasks in the column, including those not loaded yet. */
+  count: number;
+  /** Loaded cards, in the column's order. */
+  cards: TaskListItem[];
+  folded: boolean;
+  isLoading: boolean;
+  /** Status columns load 50 cards at a time. */
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  fetchMore?: () => Promise<unknown>;
+  /** Cards loaded so far (before "Hide done tasks after"), for "N more". */
+  loaded?: number;
 }
 
-const COLUMN_MIN = 'min-w-[220px]';
+/** What every cell's CardList gets from the board. */
+export type CellProps = Pick<
+  CardListProps,
+  | 'cursor'
+  | 'isSelected'
+  | 'onAction'
+  | 'renderCard'
+  | 'isChild'
+  | 'reorderable'
+  | 'onDragEnd'
+  | 'dependencies'
+> & { onDragStart: (key: string) => void };
+
+export interface BoardBodyProps {
+  /** Every column in order, folded ones included. */
+  columns: readonly BoardColumnModel[];
+  onFoldChange: (column: string, folded: boolean) => void;
+  /** A card dropped into a cell (lane null without swimlanes). */
+  onDrop: (drop: CardDrop, column: string, lane: string | null) => void;
+  /** "+" in a column header. */
+  onAdd?: (column: BoardColumnModel) => void;
+  cell: CellProps;
+  /** While a card is dragged: columns that refuse it (a mirrored card's status, a label column). */
+  refused?: ReadonlySet<string> | null;
+  /** A dragged card entered a column. */
+  onDragOver?: (column: string) => void;
+  /** The column a dragged card would land in (outlined), when it isn't the card's own. */
+  dropTarget?: string | null;
+  /** Text of an empty open column. */
+  emptyText: (column: BoardColumnModel) => ReactNode;
+}
+
+/** The header glyph of a group: status ring, priority bars, avatar, milestone diamond, cycle, label dot. */
+export function groupGlyph(value: TaskGroupValue): ReactNode {
+  switch (value.field) {
+    case 'status':
+      return <StatusGlyph status={value.status} decorative />;
+    case 'priority':
+      return <PriorityGlyph priority={value.priority} decorative />;
+    case 'assignee':
+      return value.assignee ? (
+        <Avatar name={value.assignee.name} kind={value.assignee.kind} decorative />
+      ) : (
+        <UnassignedAvatar decorative />
+      );
+    case 'milestone':
+      return (
+        <MilestoneGlyph
+          filled={value.milestone ? isMilestoneFilled(value.milestone.status) : false}
+          className="text-fg-3"
+        />
+      );
+    case 'cycle':
+      return <CycleGlyph className="text-fg-3" />;
+    case 'label':
+      return value.label ? <LabelDot color={value.label.color} size={9} /> : null;
+    default:
+      return null;
+  }
+}
+
+const statusOf = (column: BoardColumnModel): TaskStatus | undefined =>
+  column.value.field === 'status' ? column.value.status : undefined;
 
 /** Fetches the next page when the "N more" footer scrolls into view. */
-function MoreFooter({ column, count }: { column: ColumnState; count: number }) {
+function MoreFooter({ column }: { column: BoardColumnModel }) {
   const ref = useRef<HTMLSpanElement>(null);
   const fetchMore = useRef(column.fetchMore);
   fetchMore.current = column.fetchMore;
-  const busy = column.isFetchingMore;
+  const busy = column.isFetchingMore ?? false;
   useEffect(() => {
     const node = ref.current;
     if (!node || busy || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void fetchMore.current();
+      if (entries.some((entry) => entry.isIntersecting)) void fetchMore.current?.();
     });
     observer.observe(node);
     return () => observer.disconnect();
   }, [busy]);
-  const left = Math.max(0, count - column.cards.length);
+  const left = Math.max(0, column.count - (column.loaded ?? column.cards.length));
   return <span ref={ref}>{busy ? 'Loading…' : `${left} more · scroll or press J`}</span>;
 }
 
-/** Folded column strip that also takes dropped cards (they go to the top of that status). */
+/** Collapsed column strip that also takes dropped cards (they go to the top of that column). */
 function FoldedColumn({
-  status,
-  count,
+  column,
   onExpand,
   onDropCard,
+  onDragOver,
   isRefused = false,
 }: {
-  status: TaskStatus;
-  count: number;
+  column: BoardColumnModel;
   onExpand: () => void;
   onDropCard: (key: string) => void;
-  /** A mirrored card is dragged from another column: no drop here. */
+  onDragOver?: () => void;
   isRefused?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const { dropProps, isDropTarget } = useDrop({
     ref,
     getDropOperation: (types) => (!isRefused && types.has(CARD_DRAG_TYPE) ? 'move' : 'cancel'),
+    onDropEnter: () => onDragOver?.(),
     onDrop: async (event) => {
       const item = event.items.find(
         (candidate) => isTextDropItem(candidate) && candidate.types.has(CARD_DRAG_TYPE),
@@ -95,82 +157,72 @@ function FoldedColumn({
     },
   });
   return (
-    <div ref={ref} {...dropProps} className={cn('flex shrink-0', isRefused && lockedHatch)}>
-      <BoardColumn
-        status={status}
-        count={count}
-        isFolded
+    <div ref={ref} {...dropProps} className={cn('flex shrink-0', isRefused && 'opacity-50')}>
+      <BoardFoldedColumn
+        status={statusOf(column)}
+        label={column.label}
+        glyph={groupGlyph(column.value)}
+        count={column.count}
         isDropTarget={isDropTarget}
-        onFoldChange={(folded) => {
-          if (!folded) onExpand();
-        }}
+        onExpand={onExpand}
       />
     </div>
   );
 }
 
 export function BoardColumns({
-  statuses,
-  isFolded,
-  onFoldChange,
   columns,
-  countOf,
-  selected,
-  onOpen,
+  onFoldChange,
   onDrop,
   onAdd,
-  features,
-  refuseFrom = null,
-  onCardDragStart,
-  onCardDragEnd,
+  cell,
+  refused = null,
+  onDragOver,
+  dropTarget = null,
+  emptyText,
 }: BoardBodyProps) {
   return (
-    <div className="flex min-h-0 flex-1 overflow-x-auto">
-      {statuses.map((status) => {
-        const count = countOf(status);
-        const refused = refuseFrom != null && status !== refuseFrom;
-        if (isFolded(status)) {
+    <div className="flex min-h-0 flex-1 gap-3.5 overflow-x-auto pt-3 pr-3.5 pl-4.5">
+      {columns.map((column) => {
+        const isRefused = refused?.has(column.id) ?? false;
+        if (column.folded) {
           return (
             <FoldedColumn
-              key={status}
-              status={status}
-              count={count}
-              onExpand={() => onFoldChange(status, false)}
-              onDropCard={(key) => onDrop({ key, target: null }, status, null)}
-              isRefused={refused}
+              key={column.id}
+              column={column}
+              onExpand={() => onFoldChange(column.id, false)}
+              onDropCard={(key) => onDrop({ key, target: null }, column.id, null)}
+              onDragOver={() => onDragOver?.(column.id)}
+              isRefused={isRefused}
             />
           );
         }
-        const column = columns[status];
         return (
           <BoardColumn
-            key={status}
-            status={status}
-            count={count}
-            refusal={refused || undefined}
-            onFoldChange={(folded) => onFoldChange(status, folded)}
-            onAdd={onAdd ? () => onAdd(status) : undefined}
-            more={column?.hasMore ? <MoreFooter column={column} count={count} /> : undefined}
-            className={cn(
-              COLUMN_MIN,
-              'has-[[data-drop-target]]:bg-drop has-[[data-drop-target]]:outline-[1.5px] has-[[data-drop-target]]:-outline-offset-2 has-[[data-drop-target]]:outline-drop-line has-[[data-drop-target]]:outline-dashed',
-            )}
+            key={column.id}
+            status={statusOf(column)}
+            label={column.label}
+            glyph={groupGlyph(column.value)}
+            count={column.count}
+            isDropTarget={dropTarget === column.id && !isRefused}
+            refusal={isRefused && column.value.field === 'status' ? true : undefined}
+            onFoldChange={(folded) => onFoldChange(column.id, folded)}
+            onAdd={onAdd ? () => onAdd(column) : undefined}
+            more={column.hasMore ? <MoreFooter column={column} /> : undefined}
           >
-            {column && !column.isLoading ? (
-              <CardList
-                label={STATUS_LABELS[status]}
-                status={status}
-                cards={column.cards}
-                selected={selected}
-                onOpen={onOpen}
-                onDrop={(drop) => onDrop(drop, status, null)}
-                features={features}
-                refuseDrops={refused}
-                onDragStart={onCardDragStart}
-                onDragEnd={onCardDragEnd}
-              />
+            {column.isLoading ? (
+              <ColumnSkeleton cards={Math.min(Math.max(column.count, 1), 3)} />
             ) : (
-              <ColumnSkeleton cards={Math.min(Math.max(count, 1), 3)} />
+              <CardList
+                {...cell}
+                label={column.label}
+                column={column.id}
+                cards={column.cards}
+                onDrop={(drop) => onDrop(drop, column.id, null)}
+                refuseDrops={isRefused}
+                onDropEnter={() => onDragOver?.(column.id)}
+                empty={<BoardColumnEmpty className="mx-0">{emptyText(column)}</BoardColumnEmpty>}
+              />
             )}
           </BoardColumn>
         );
@@ -191,19 +243,21 @@ function ColumnSkeleton({ cards }: { cards: number }) {
   );
 }
 
-/** Loading board (frame 12): a header bar and a few placeholder cards per column. */
+/** Loading board: column headers and a few placeholder cards per column. */
 export function BoardSkeleton({ columns }: { columns: number }) {
   const shapes = [['70%', '50%'], ['80%', '60%', '40%'], ['55%'], ['75%', '65%']];
   return (
-    <div aria-busy className="flex min-h-0 flex-1">
+    <div aria-busy className="flex min-h-0 flex-1 gap-3.5 pt-3 pr-3.5 pl-4.5">
       <span className="sr-only">Loading the board</span>
       {Array.from({ length: Math.max(columns, 1) }, (_, index) => (
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
           key={index}
-          className={cn('flex flex-[1_1_0] flex-col gap-1.5 border-r border-line-2 p-2', COLUMN_MIN)}
+          className="flex min-w-60 max-w-100 flex-1 flex-col gap-2 rounded-t-lg bg-bg-lane px-2"
         >
-          <Skeleton width={90} className="mx-1 mt-1.5 mb-2" />
+          <div className="flex h-9.5 items-center px-1">
+            <span className="h-2.5 w-22 rounded-sm bg-line-soft" />
+          </div>
           {(shapes[index % shapes.length] ?? []).map((width, card) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
             <BoardCardSkeleton key={card} titleWidth={width} />
@@ -216,102 +270,121 @@ export function BoardSkeleton({ columns }: { columns: number }) {
 
 export interface BoardLanesProps extends BoardBodyProps {
   lanes: readonly Lane[];
+  /** Collapsed lanes. */
   collapsed: ReadonlySet<string>;
-  onCollapsedChange: (laneId: string, collapsed: boolean) => void;
+  onCollapsedChange: (lane: string, collapsed: boolean) => void;
+  /** Cells shown in full ("+ N more" pressed), as `${lane}:${column}`. */
+  expandedCells: ReadonlySet<string>;
+  onExpandCell: (lane: string, column: string) => void;
+  /** Cards a cell shows before "+ N more". */
+  cap: number;
 }
 
-/** Swimlanes (frame 09). Folded columns collapse into one "+N" strip at the right. */
+export const cellId = (lane: string, column: string) => `${lane}:${column}`;
+
+/** Lane header glyph: the assignee's avatar, or the group's glyph. */
+function laneLead(lane: Lane): ReactNode {
+  return groupGlyph(lane.value);
+}
+
+/** Swimlanes (frame 031): column headers, then per lane a header and one cell per open column. */
 export function BoardLanes({
-  statuses,
-  isFolded,
+  columns,
   onFoldChange,
-  countOf,
-  selected,
-  onOpen,
   onDrop,
-  onAdd,
-  features,
+  cell,
+  refused = null,
+  onDragOver,
   lanes,
   collapsed,
   onCollapsedChange,
-  refuseFrom = null,
-  onCardDragStart,
-  onCardDragEnd,
+  expandedCells,
+  onExpandCell,
+  cap,
 }: BoardLanesProps) {
-  const open = statuses.filter((status) => !isFolded(status));
-  const folded = statuses.filter((status) => isFolded(status));
+  const open = columns.filter((column) => !column.folded);
+  const folded = columns.filter((column) => column.folded);
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-      <div className="sticky top-0 z-[2] flex min-w-fit bg-bg">
-        {open.map((status) => (
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto pr-3.5 pl-4.5">
+      <div className="sticky top-0 z-2 flex min-w-fit gap-3.5 bg-bg pt-3">
+        {open.map((column) => (
           <BoardColumnHeader
-            key={status}
-            status={status}
-            count={countOf(status)}
-            onAdd={onAdd ? () => onAdd(status) : undefined}
-            onFold={() => onFoldChange(status, true)}
-            className={cn('flex-[1_1_0] border-r', COLUMN_MIN)}
+            key={column.id}
+            status={statusOf(column)}
+            label={column.label}
+            glyph={groupGlyph(column.value)}
+            count={column.count}
+            onFold={() => onFoldChange(column.id, true)}
+            className="min-w-60 max-w-100 flex-1 rounded-t-lg bg-bg-lane"
           />
         ))}
-        {folded.length ? (
-          <button
-            type="button"
-            onClick={() => {
-              for (const status of folded) onFoldChange(status, false);
-            }}
-            aria-label={`Show ${folded.map((status) => STATUS_LABELS[status]).join(' and ')}`}
-            title={folded.map((status) => `${STATUS_LABELS[status]} ${countOf(status)}`).join(', ')}
-            className="flex h-[34px] w-10 shrink-0 cursor-pointer items-center justify-center border-b border-line-2 bg-band font-mono text-[10px] text-faint outline-none hover:bg-sel focus-visible:focus-ring-inset"
+        {folded.map((column) => (
+          <AriaButton
+            key={column.id}
+            onPress={() => onFoldChange(column.id, false)}
+            aria-label={`Expand ${column.label}, ${column.count} tasks`}
+            className="grid h-9.5 w-9.5 shrink-0 cursor-pointer place-items-center rounded-t-lg bg-bg-grp outline-none hover:text-fg focus-visible:focus-ring-inset"
           >
-            +{folded.length}
-          </button>
-        ) : null}
+            {groupGlyph(column.value)}
+          </AriaButton>
+        ))}
       </div>
-      {lanes.map((lane) => {
+      {lanes.map((lane, laneIndex) => {
         const isOpen = !collapsed.has(lane.id);
+        const last = laneIndex === lanes.length - 1;
         return (
           <section key={lane.id} aria-label={`${lane.title}, ${lane.count} tasks`} className="min-w-fit">
             <SwimlaneHeader
               title={lane.title}
               lead={laneLead(lane)}
-              sub={lane.assignee?.responsible ? `for ${lane.assignee.responsible.name}` : undefined}
               count={lane.count}
               isOpen={isOpen}
               onOpenChange={(next) => onCollapsedChange(lane.id, !next)}
-              className="border-t-0"
             />
             {isOpen ? (
-              <div className="flex">
-                {open.map((status) => {
-                  const refused = refuseFrom != null && status !== refuseFrom;
+              <div className="flex gap-3.5">
+                {open.map((column) => {
+                  const isRefused = refused?.has(column.id) ?? false;
+                  const cards = lane.cells[column.id] ?? [];
+                  const id = cellId(lane.id, column.id);
+                  const shown = expandedCells.has(id) ? cards : cards.slice(0, cap);
+                  const hidden = cards.length - shown.length;
                   return (
                     <div
-                      key={status}
-                      data-refused={refused || undefined}
+                      key={column.id}
+                      data-refused={isRefused || undefined}
                       className={cn(
-                        'flex flex-[1_1_0] flex-col border-r border-line-2 p-2',
-                        COLUMN_MIN,
-                        'has-[[data-drop-target]]:bg-drop',
-                        refused && lockedHatch,
+                        'flex min-w-60 max-w-100 flex-1 flex-col gap-2 bg-bg-lane p-2',
+                        last && 'rounded-b-lg',
+                        isRefused && 'opacity-50',
                       )}
                     >
                       <CardList
-                        label={`${STATUS_LABELS[status]}, ${lane.title}`}
-                        status={status}
-                        cards={lane.cells[status] ?? []}
-                        selected={selected}
-                        onOpen={onOpen}
-                        onDrop={(drop) => onDrop(drop, status, lane.id)}
-                        features={features}
-                        refuseDrops={refused}
-                        onDragStart={onCardDragStart}
-                        onDragEnd={onCardDragEnd}
-                        className={cn('min-h-12', refused && 'opacity-50')}
+                        {...cell}
+                        label={`${column.label}, ${lane.title}`}
+                        column={column.id}
+                        cards={shown}
+                        onDrop={(drop) => onDrop(drop, column.id, lane.id)}
+                        refuseDrops={isRefused}
+                        onDropEnter={() => onDragOver?.(column.id)}
+                        empty={<span className="px-1 py-0.5 text-xs text-fg-3">None</span>}
+                        className="min-h-6 grow-0"
                       />
+                      {hidden > 0 ? (
+                        <AriaButton
+                          onPress={() => onExpandCell(lane.id, column.id)}
+                          aria-label={`Show ${hidden} more in ${column.label}, ${lane.title}`}
+                          className="cursor-pointer self-start rounded-sm px-1 pb-0.5 text-xs text-fg-3 outline-none hover:text-fg focus-visible:focus-ring"
+                        >
+                          + {hidden} more
+                        </AriaButton>
+                      ) : null}
                     </div>
                   );
                 })}
-                {folded.length ? <div aria-hidden className="w-10 shrink-0 bg-band" /> : null}
+                {folded.map((column) => (
+                  <div key={column.id} aria-hidden className="w-9.5 shrink-0" />
+                ))}
               </div>
             ) : null}
           </section>
@@ -319,10 +392,4 @@ export function BoardLanes({
       })}
     </div>
   );
-}
-
-function laneLead(lane: Lane) {
-  if (lane.assignee) return <Avatar name={lane.assignee.name} kind={lane.assignee.kind} />;
-  if (lane.milestone) return <MilestoneGlyph filled={isMilestoneFilled(lane.milestone.status)} />;
-  return null;
 }

@@ -1,4 +1,4 @@
-import type { Cycle, TaskListItem } from '@pm/contracts';
+import { type Cycle, PRIORITIES, type TaskListItem } from '@pm/contracts';
 import { useState } from 'react';
 import {
   Avatar,
@@ -12,17 +12,35 @@ import {
   Modal,
   RadioCard,
   RadioGroup,
-  StatusSquare,
+  StatusGlyph,
   UnassignedAvatar,
 } from '~/ui';
 import { addDays, formatDay, formatRange, lengthInDays } from './dates';
-import { compareTasks, STATUS_ORDER } from './PlanningTaskTable';
 
-// End cycle (frame 25): where the unfinished tasks go, which tasks those are, then one request.
+// End cycle: where the unfinished tasks go, which tasks those are, then one request.
 // The target is the next upcoming cycle, or a new one of the same length when there is none (core
 // creates it), or no cycle.
 
 export type EndTarget = 'next' | 'none';
+
+/** Active work first, then by priority (highest first) and most recently updated. */
+const STATUS_ORDER: readonly TaskListItem['status'][] = [
+  'in_progress',
+  'in_review',
+  'todo',
+  'backlog',
+  'done',
+  'canceled',
+];
+
+export function compareUnfinished(a: TaskListItem, b: TaskListItem): number {
+  return (
+    STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
+    PRIORITIES.indexOf(b.priority) - PRIORITIES.indexOf(a.priority) ||
+    b.updatedAt.localeCompare(a.updatedAt) ||
+    b.number - a.number
+  );
+}
 
 /** moveTo for POST /cycles/{project}/{number}/end: the next cycle's number, none, or omitted (new cycle). */
 export function moveToFor(
@@ -54,7 +72,7 @@ export function EndCycleDialog({ isOpen, onClose, ...props }: EndCycleDialogProp
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      width={560}
+      width={540}
       top={70}
     >
       <Dialog>
@@ -82,9 +100,7 @@ function EndCycleForm({ onCancel, cycle, next, newNumber, unfinished, onSubmit }
     ? `${formatRange(next.startsOn, next.endsOn)} · ${next.counts.total} ${next.counts.total === 1 ? 'task' : 'tasks'}`
     : `${formatRange(newStart, addDays(newStart, length - 1))} · same length`;
 
-  const sorted = [...unfinished].sort(
-    (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || compareTasks(a, b),
-  );
+  const sorted = [...unfinished].sort(compareUnfinished);
 
   const lead = left
     ? `${done} of ${counted} tasks are done. The other ${left} ${
@@ -113,7 +129,7 @@ function EndCycleForm({ onCancel, cycle, next, newNumber, unfinished, onSubmit }
       <DialogHeader title={`End ${name} now?`} />
       <DialogBody className="gap-3.5">
         {failure ? <Banner>{failure}</Banner> : null}
-        <p className="m-0 leading-[1.55]">
+        <p className="m-0 leading-prose text-fg-2">
           {lead} {name} keeps a record of what moved. It would end on its own on {formatDay(cycle.endsOn)} at
           midnight.
         </p>
@@ -140,20 +156,20 @@ function EndCycleForm({ onCancel, cycle, next, newNumber, unfinished, onSubmit }
               <Label id="end-cycle-unfinished">Unfinished · {left}</Label>
               <ul
                 aria-labelledby="end-cycle-unfinished"
-                className="m-0 flex max-h-[250px] list-none flex-col overflow-auto border border-line p-0"
+                className="m-0 flex max-h-62.5 list-none flex-col overflow-auto rounded-md border border-line-soft p-0"
               >
                 {sorted.map((task) => (
                   <li
                     key={task.key}
-                    className="grid h-8 shrink-0 grid-cols-[14px_64px_minmax(0,1fr)_20px] items-center gap-2.5 border-b border-line-2 px-2.5 text-[12.5px] last:border-b-0"
+                    className="grid h-8.5 shrink-0 grid-cols-[62px_14px_minmax(0,1fr)_18px] items-center gap-2.5 border-b border-line-soft px-3 text-sm last:border-b-0"
                   >
-                    <StatusSquare status={task.status} />
-                    <span className="font-mono text-[10.5px] text-muted">{task.key}</span>
+                    <span className="text-xs font-medium text-fg-3 tabular-nums">{task.key}</span>
+                    <StatusGlyph status={task.status} />
                     <span className="truncate">{task.title}</span>
                     {task.assignee ? (
-                      <Avatar name={task.assignee.name} kind={task.assignee.kind} />
+                      <Avatar name={task.assignee.name} kind={task.assignee.kind} size={18} />
                     ) : (
-                      <UnassignedAvatar />
+                      <UnassignedAvatar size={18} />
                     )}
                   </li>
                 ))}
@@ -163,7 +179,7 @@ function EndCycleForm({ onCancel, cycle, next, newNumber, unfinished, onSubmit }
         ) : null}
       </DialogBody>
       <DialogFooter
-        start={<span className="text-[11.5px] text-muted">Done and canceled tasks stay in {name}.</span>}
+        start={<span className="text-xs text-fg-3">Done and canceled tasks stay in {name}.</span>}
       >
         <Button variant="secondary" onPress={onCancel}>
           Cancel

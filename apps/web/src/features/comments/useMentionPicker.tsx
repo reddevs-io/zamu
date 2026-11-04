@@ -2,6 +2,7 @@ import type { Member } from '@pm/contracts';
 import {
   type KeyboardEvent,
   type ReactNode,
+  type TextareaHTMLAttributes,
   useCallback,
   useEffect,
   useId,
@@ -12,7 +13,6 @@ import {
 } from 'react';
 import {
   Avatar,
-  type ComposerTextAreaAttributes,
   filterPickerItems,
   movePickerActive,
   type PickerItem,
@@ -26,25 +26,31 @@ import { insertMention, mentionAt } from './mentions';
 
 const MAX_MATCHES = 8;
 
+/** What the picker puts on the textarea (combobox wiring). */
+export type ComposerTextAreaAttributes = Pick<
+  TextareaHTMLAttributes<HTMLTextAreaElement>,
+  'aria-activedescendant' | 'aria-controls' | 'aria-expanded' | 'aria-autocomplete' | 'role'
+>;
+
 export const MENTION_FOOTER = 'No notifications yet. A mention links to the member.';
 
 export interface MentionCandidate extends PickerItem {
   name: string;
 }
 
-/** People and agents of the workspace as picker rows: "claude-dev  agent · for Ana Ruiz". */
+/** First name of a person, for "claude-dev for Ana". */
+const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
+
+/** People and agents of the workspace as picker rows (frame 058): "claude-dev  for Ana". */
 export function mentionCandidates(members: readonly Member[]): MentionCandidate[] {
   return members.map((member) => ({
     id: member.id,
     name: member.name,
     label: member.name,
     textValue: member.email ? `${member.name} ${member.email}` : member.name,
-    sub:
-      member.kind === 'agent'
-        ? member.responsible
-          ? `agent · for ${member.responsible.name}`
-          : 'agent'
-        : 'person',
+    ...(member.kind === 'agent' && member.responsible
+      ? { sub: `for ${firstName(member.responsible.name)}` }
+      : {}),
     lead: <Avatar name={member.name} kind={member.kind} decorative />,
   }));
 }
@@ -173,12 +179,11 @@ export function useMentionPicker({
     <PickerList
       id={listId}
       aria-label="Mention"
-      title={`Mention · ${mention.query || '…'}`}
+      title="Mention"
       items={matches}
       activeId={active}
       onActiveChange={setActiveId}
       onSelect={insert}
-      footer={MENTION_FOOTER}
       emptyText="No member matches"
       className={overlayClassName}
     />

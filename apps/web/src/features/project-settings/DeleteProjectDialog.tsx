@@ -1,5 +1,5 @@
-// Delete a project (PM-12): the danger row at the bottom of General settings, the type-the-key
-// dialog (copied from DetachDialog), and the "Deleted {KEY}" toast the projects page shows after it.
+// Delete a project (PM-12): the danger zone at the bottom of General settings (frame 127, screens.css
+// .set-sec and .dz), the type-the-key dialog, and the "Deleted {KEY}" toast the next page shows.
 import { ORPCError } from '@orpc/client';
 import { type FormEvent, useState, useSyncExternalStore } from 'react';
 import {
@@ -13,24 +13,33 @@ import {
   TextField,
   Toast,
 } from '~/ui';
-import { filledDanger } from '../connections/DeleteConnectionDialog';
 import { errorMessage } from '../settings/result';
 
 export const DELETE_PROJECT_TEXT =
   "Deletes its tasks, comments, history, milestones, cycles and Backlog.md mirror. This can't be undone.";
 
-/** The bordered row at the bottom of General settings (owners and admins only). */
+/** Danger zone at the bottom of General settings (owners and admins only). */
 export function DeleteProjectRow({ onDelete }: { onDelete: () => void }) {
   return (
-    <div className="flex items-center gap-4 border border-line px-4 py-3.5">
-      <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-        <b className="font-semibold">Delete this project</b>
-        <span className="text-[12px] leading-normal text-muted">{DELETE_PROJECT_TEXT}</span>
+    <section aria-labelledby="danger-zone" className="flex flex-col gap-3.5 border-t border-line-soft pt-4.5">
+      <h3 id="danger-zone" className="m-0 text-md font-semibold text-fg">
+        Danger zone
+      </h3>
+      <div className="flex items-center gap-3.5 rounded-md border border-[color-mix(in_oklch,var(--danger)_35%,transparent)] p-3.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <b className="font-semibold text-fg">Delete this project</b>
+          <span className="text-sm leading-normal text-fg-3">{DELETE_PROJECT_TEXT}</span>
+        </div>
+        <Button
+          variant="destructive"
+          size="md"
+          className="border-[color-mix(in_oklch,var(--danger)_40%,transparent)]"
+          onPress={onDelete}
+        >
+          Delete project
+        </Button>
       </div>
-      <Button variant="destructive" size="md" onPress={onDelete}>
-        Delete project
-      </Button>
-    </div>
+    </section>
   );
 }
 
@@ -46,7 +55,7 @@ export interface DeleteProjectDialogProps {
 
 export function DeleteProjectDialog({ isOpen, onOpenChange, ...props }: DeleteProjectDialogProps) {
   return (
-    <Modal width={480} top={120} isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Modal width={440} top={160} isOpen={isOpen} onOpenChange={onOpenChange}>
       <DeleteContent {...props} close={() => onOpenChange(false)} />
     </Modal>
   );
@@ -89,10 +98,10 @@ function DeleteContent({
   return (
     <Dialog role="alertdialog">
       <form noValidate onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-        <DialogHeader title={`Delete ${projectKey}?`} showEsc={false} />
+        <DialogHeader title={`Delete ${projectKey}?`} showEsc={false} className="pt-4.5" />
         <DialogBody className="gap-3">
           {error ? <Banner>{error}</Banner> : null}
-          <p className="m-0 leading-[1.55]">
+          <p className="m-0 leading-prose text-fg-2">
             {DELETE_PROJECT_TEXT}
             {mirrored ? ' Remove the webhook on the git host too.' : null}
           </p>
@@ -111,13 +120,7 @@ function DeleteContent({
           <Button variant="secondary" onPress={close}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            variant="destructive"
-            className={filledDanger}
-            isDisabled={!matches}
-            isPending={pending}
-          >
+          <Button type="submit" variant="danger" isDisabled={!matches} isPending={pending}>
             Delete project
           </Button>
         </DialogFooter>
@@ -128,7 +131,7 @@ function DeleteContent({
 
 // ---------------------------------------------------------------------------
 // "Deleted {KEY}": the settings page navigates away right after the delete, so the toast lives in
-// a module store that the projects page reads.
+// a module store that the shell reads (AppShell renders DeletedProjectToast; the delete goes to Home).
 // ---------------------------------------------------------------------------
 
 export const DELETED_TOAST_MS = 6_000;
@@ -159,7 +162,7 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-/** "Deleted PAY", once, for a deletion of the last few seconds. Render it on the projects page. */
+/** "Deleted PAY", once, for a deletion of the last few seconds. The shell renders it on every page. */
 export function DeletedProjectToast() {
   const current = useSyncExternalStore(
     subscribe,

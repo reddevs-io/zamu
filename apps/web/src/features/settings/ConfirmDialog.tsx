@@ -48,7 +48,7 @@ function ConfirmContent({
       <DialogHeader title={title} />
       <DialogBody>
         {error ? <Banner>{error}</Banner> : null}
-        <div className="leading-[1.55] text-muted">{children}</div>
+        <div className="leading-normal text-fg-2">{children}</div>
       </DialogBody>
       <DialogFooter>
         <Button variant="secondary" onPress={close}>

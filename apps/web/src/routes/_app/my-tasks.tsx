@@ -1,19 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { MyTasksScreen } from '~/features/my-tasks/MyTasksScreen';
-import { prefetchMyTasks } from '~/features/my-tasks/prefetch';
-import { filtersOf, parseMyTasksSearch } from '~/features/my-tasks/search';
-import { settleOnServer } from '~/features/tasks/prefetch';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-// Tasks assigned to the caller across every readable project: /my-tasks?task=WEB-88&status=todo.
+// My tasks is gone since M5: Home's Mine tab lists what is assigned to you. Old links land on Home.
 export const Route = createFileRoute('/_app/my-tasks')({
-  validateSearch: parseMyTasksSearch,
-  // The selection is not a loader dependency: moving it never reruns the loader.
-  loaderDeps: ({ search }) => filtersOf(search),
-  loader: ({ context, deps }) => settleOnServer(prefetchMyTasks(context.queryClient, deps)),
-  head: () => ({ meta: [{ title: 'My tasks · project-management' }] }),
-  component: MyTasksRoute,
+  beforeLoad: () => {
+    throw redirect({ to: '/', replace: true });
+  },
 });
-
-function MyTasksRoute() {
-  return <MyTasksScreen search={Route.useSearch()} />;
-}

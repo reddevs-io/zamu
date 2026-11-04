@@ -1,267 +1,388 @@
-import type { TaskListItem, TaskStatus } from '@pm/contracts';
+import { type AssigneeRef, TASK_STATUSES, type TaskListItem, type TaskStatus } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import {
   type FocusEvent,
   type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import { labelsQuery } from '~/features/labels/queries';
+import { closePeek, togglePeek, usePeek } from '~/features/peek/store';
 import {
   DetachedToast,
   DRAG_REFUSAL_TEXT,
-  isDetached,
   isMirrored,
   MirrorCreateButton,
   MirrorEmptyState,
   MirrorFailedBanner,
   ProjectHeader,
   statusRefusalText,
-  TaskFilterBar,
   useProjectSummary,
   ViewSwitch,
 } from '~/features/project-header';
 import { useSearchText } from '~/features/project-header/useSearchText';
 import { usePageSearchRef } from '~/features/shell/page-search';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';
-import { useNow } from '~/features/tasks/clock';
+import { useFieldChange, useTaskFieldKeys } from '~/features/task-fields';
+import { toCycleRef, toMilestoneRef } from '~/features/task-fields/planning';
+import { showFieldToast } from '~/features/task-fields/toast';
 import { describeError } from '~/features/tasks/errors';
-import { formatDay } from '~/features/tasks/format';
+import { formatAge } from '~/features/tasks/format';
 import { rememberListSearch, rememberView } from '~/features/tasks/list-memory';
-import { membersQuery } from '~/features/tasks/queries';
+import { membersQuery, meQuery } from '~/features/tasks/queries';
+import { BOARD_FOLDED, type TaskListSearch, type TaskView } from '~/features/tasks/search';
 import {
-  applyProjectFeatures,
-  BOARD_FOLDED,
-  type BoardLanes as BoardLanesMode,
-  boardStatuses,
-  filtersOf,
-  hasFilters,
-  type TaskListSearch,
-  type TaskView,
-} from '~/features/tasks/search';
-import { useUrlSelection } from '~/features/tasks/selection';
-import { RequestHint, TaskDetailPane } from '~/features/tasks/TaskDetailPane';
+  BOARD_STATUS_ORDER,
+  clearedFilter,
+  DisplayButton,
+  FilterButton,
+  FilterChips,
+  type GroupBy,
+  type GroupContext,
+  groupTasks,
+  hasTaskFilter,
+  rememberTaskNavigation,
+  showsProperty,
+  type TaskProperty,
+  useDisplayOptions,
+  useProjectFilterFields,
+  useTaskSelection,
+  useUrlTaskFilter,
+  useViewCommands,
+} from '~/features/views';
 import { orpc } from '~/lib/orpc';
 import {
   Banner,
+  BoardCardContent,
+  BoardDragHint,
+  BoardSubtaskToggle,
   Button,
-  cn,
   EmptyState,
   isEditableTarget,
-  Kbd,
+  localToday,
   SearchField,
   STATUS_LABELS,
-  Toast,
   useHotkeys,
 } from '~/ui';
-import { BoardColumns, BoardLanes, BoardSkeleton } from './BoardColumns';
-import type { Placement } from './board-cache';
+import {
+  type BoardColumnModel,
+  BoardColumns,
+  BoardLanes,
+  BoardSkeleton,
+  type CellProps,
+  cellId,
+} from './BoardColumns';
+import { type Placement, sortPlacement } from './board-cache';
 import type { CardDrop } from './CardList';
-import { useBoardData } from './data';
-import { describeFilters, emptyBoardText } from './describe';
-import { buildLanes, type Lane, laneOf, NO_LANE } from './lanes';
-import { type Direction, focusTarget, type NavColumn, reorderPlacement, statusStep } from './layout';
-import { type LanePatch, useBoardMoves } from './moves';
+import { useFoldedColumns } from './collapsed';
+import { useBoardData, useGroupedBoardData } from './data';
+import { buildLanes, groupKeysOf, groupPatch, inGroup, type Lane, patchField } from './lanes';
+import {
+  columnStep,
+  type Direction,
+  focusTarget,
+  hasNeighbour,
+  type NavColumn,
+  reorderPlacement,
+} from './layout';
+import { type MovePatch, useBoardMoves } from './moves';
+import { SubtaskRows } from './Subtasks';
 
-// /p/$projectKey?view=board: one column per status, cards in hand-made order, the selected card in the
-// task panel at the right. Keyboard: H/L columns, J/K cards, Shift+H/L change status, Shift+J/K reorder,
-// Enter opens the panel, Esc closes it, Ctrl/Cmd+Z undoes the last move, V switches to the list.
-// Mirrored projects (frames 4f to 4h): a card's status comes from Backlog.md, so while one is dragged
-// the other columns hatch and refuse the drop; Shift+H/L explain instead of moving; Shift+J/K and
-// drops within the column still reorder. Swimlane drops that would change a Backlog.md field refuse too.
+// /p/$projectKey?view=board (frames 029–045): columns by status (or by the display options' field),
+// boxless cards, collapsed columns, swimlanes, subtasks hidden under their parent or as their own cards.
+//
+// Keys (shortcuts.md "Lists and boards"): J / K or ↓ / ↑ move within a column, ← / → between columns,
+// X selects, Shift+↓ / Shift+↑ extend the selection, ⌘A selects all, Space peeks, Enter opens the task
+// view, Esc clears the selection, V switches to the list. Card moves: Shift+← / Shift+→ to the next
+// column, Shift+J / Shift+K reorder (manual order only). The task keys (S, P, A, L, …) act on the
+// selection or the focused card. Undo goes through the shared field toast: one Undo, one ⌘Z.
+// Mirrored projects: a card whose status comes from Backlog.md can't change column; the board says so.
 
 export interface BoardScreenProps {
   projectKey: string;
+  /** The route's search (`focus` puts the keyboard on a card, as Esc in the task view leaves it). */
   search: TaskListSearch;
 }
 
-const TOAST_MS = 6000;
+/** Columns folded on a fresh status board. */
+const FOLDED_BY_DEFAULT: readonly string[] = BOARD_FOLDED;
+/** Cards a swimlane cell shows before "+ N more" (plan call 3). */
+const LANE_CELL_CAP = 2;
 
-/** A toast that explains a refused move (mirrored projects). */
-interface Notice {
-  id: number;
-  text: string;
-  /** Adds "⇧J/K reorders" after the text. */
-  reorderHint?: boolean;
-}
+type Locked = 'status' | 'priority' | 'assignee' | 'milestone';
 
-const isApple = () =>
-  typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
+/** A move the board can't make: the field toast says why. */
+const refuse = (text: string) => showFieldToast({ text, tone: 'error' });
 
 export function BoardScreen({ projectKey, search }: BoardScreenProps) {
   const navigate = useNavigate();
+  const router = useRouter();
   const quickCreate = useOptionalQuickCreate();
   const project = useProjectSummary(projectKey);
   const usesMilestones = project?.usesMilestones ?? false;
   const usesCycles = project?.usesCycles ?? false;
   const mirrored = isMirrored(project);
-  const detached = isDetached(project);
+  const viewerId = useQuery(meQuery()).data?.user.id ?? null;
+  const { apply } = useFieldChange();
+  const peek = usePeek();
+  const peekOpen = peek !== null;
 
-  const searchKey = JSON.stringify(filtersOf(search));
-  // biome-ignore lint/correctness/useExhaustiveDependencies: searchKey stands for the filter values
-  const filters = useMemo(() => applyProjectFeatures(filtersOf(search), project), [searchKey, project]);
-  const lanesMode: BoardLanesMode | null =
-    search.lanes === 'milestone' && !usesMilestones ? null : (search.lanes ?? null);
-  const features = useMemo(
-    () => ({ usesMilestones, usesCycles, laneField: lanesMode }),
-    [usesMilestones, usesCycles, lanesMode],
+  // ---- View state: display options, filter, folded columns --------------------------------------
+  const [options] = useDisplayOptions(projectKey, 'board');
+  const [filter, setFilter] = useUrlTaskFilter();
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  const usable = useCallback(
+    (field: GroupBy): boolean =>
+      !(field === 'milestone' && !usesMilestones) && !(field === 'cycle' && !usesCycles),
+    [usesMilestones, usesCycles],
+  );
+  const groupBy: GroupBy = usable(options.groupBy) ? options.groupBy : 'status';
+  const lanesField: GroupBy | null =
+    options.swimlanes !== 'none' && options.swimlanes !== groupBy && usable(options.swimlanes)
+      ? options.swimlanes
+      : null;
+  const statusMode = groupBy === 'status';
+  const manual = options.orderBy === 'manual';
+  const subtaskCards = options.boardSubtasks === 'cards';
+  const groupChoices = useMemo<GroupBy[]>(
+    () => (['status', 'priority', 'assignee', 'milestone', 'cycle', 'label', 'none'] as const).filter(usable),
+    [usable],
   );
 
   useEffect(() => rememberListSearch(projectKey, search), [projectKey, search]);
 
-  // ---- URL: selection and filters (same rules as the list) ---------------------------------------
-  const writeSearch = (update: (previous: TaskListSearch) => TaskListSearch) =>
-    navigate({ to: '/p/$projectKey', params: { projectKey }, search: update as never, replace: true });
-  const { selected, select, selectedRef, noteWrite } = useUrlSelection(search.task ?? null, (task) =>
-    writeSearch((previous) => ({ ...previous, task: task ?? undefined })),
+  const setView = useCallback(
+    (view: TaskView) => {
+      rememberView(projectKey, view);
+      void navigate({
+        to: '/p/$projectKey',
+        params: { projectKey },
+        search: ((previous: TaskListSearch) => ({
+          ...previous,
+          view: view === 'board' ? 'board' : undefined,
+        })) as never,
+      });
+    },
+    [navigate, projectKey],
   );
-  const setSearch = (update: (previous: TaskListSearch) => TaskListSearch) => {
-    const task = selectedRef.current;
-    noteWrite(task);
-    return writeSearch((previous) => ({ ...update(previous), task: task ?? undefined }));
-  };
-  const setSearchRef = useRef(setSearch);
-  setSearchRef.current = setSearch;
 
-  const [query, setQuery, resetQuery] = useSearchText(search.q, (q) =>
-    setSearchRef.current((previous) => ({ ...previous, q })),
+  const [query, setQuery, resetQuery] = useSearchText(filter.q, (q) =>
+    setFilter({ ...filterRef.current, q }),
   );
   const searchRef = usePageSearchRef();
-
-  const setView = (view: TaskView) => {
-    rememberView(projectKey, view);
-    setSearch((previous) => ({ ...previous, view: view === 'board' ? 'board' : undefined }));
-  };
   const clearFilters = () => {
     resetQuery();
-    setSearch((previous) => ({ view: previous.view, lanes: previous.lanes }));
+    setFilter({ ...clearedFilter(filter), q: undefined });
   };
-  const newTask = () => quickCreate?.open(projectKey);
+  const fields = useProjectFilterFields(projectKey, {
+    ...(project ? { projectName: project.name } : {}),
+    usesMilestones,
+    usesCycles,
+  });
+  useViewCommands({
+    layout: 'board',
+    onLayoutChange: setView,
+    fields,
+    filter,
+    onFilterChange: setFilter,
+    hotkeys: !peekOpen,
+  });
 
-  // ---- Refusals (mirrored projects) ----------------------------------------------------------------
-  const noticeId = useRef(0);
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const showNotice = useCallback((text: string, reorderHint = false) => {
-    noticeId.current++;
-    setNotice({ id: noticeId.current, text, reorderHint });
-  }, []);
-  /** Status of the mirrored card being dragged: the other columns refuse it. */
-  const [refuseFrom, setRefuseFrom] = useState<TaskStatus | null>(null);
-
-  // ---- Columns -----------------------------------------------------------------------------------
-  const statusKey = filters.status?.join(',') ?? '';
-  // biome-ignore lint/correctness/useExhaustiveDependencies: statusKey stands for filters.status
-  const statuses = useMemo(() => boardStatuses(filters), [statusKey]);
-  const panelOpen = selected != null;
-  const [foldOverrides, setFoldOverrides] = useState<Partial<Record<TaskStatus, boolean>>>({});
+  const [foldOverrides, setFolded] = useFoldedColumns(projectKey, groupBy);
+  const statusFiltered = Boolean(filter.status?.length);
   const isFolded = useCallback(
-    (status: TaskStatus) =>
-      foldOverrides[status] ??
-      // Done and Canceled start folded (unless a status filter asks for them); Backlog folds while the
-      // panel is open.
-      ((!statusKey && BOARD_FOLDED.includes(status)) || (panelOpen && status === 'backlog')),
-    [foldOverrides, statusKey, panelOpen],
+    (column: string) =>
+      foldOverrides[column] ?? (statusMode && !statusFiltered && FOLDED_BY_DEFAULT.includes(column)),
+    [foldOverrides, statusMode, statusFiltered],
   );
-  const setFolded = useCallback(
-    (status: TaskStatus, folded: boolean) =>
-      setFoldOverrides((previous) => ({ ...previous, [status]: folded })),
-    [],
+
+  // ---- Data --------------------------------------------------------------------------------------
+  const statuses = useMemo<TaskStatus[]>(
+    () =>
+      filter.status?.length ? TASK_STATUSES.filter((s) => filter.status?.includes(s)) : [...TASK_STATUSES],
+    [filter.status],
   );
   const openKey = statuses.filter((status) => !isFolded(status)).join(',');
   // biome-ignore lint/correctness/useExhaustiveDependencies: openKey stands for the open statuses
-  const open = useMemo(() => new Set(statuses.filter((status) => !isFolded(status))), [openKey]);
-
-  const data = useBoardData(projectKey, filters, open, lanesMode != null);
-  const moves = useBoardMoves(projectKey);
-  const counts = data.counts;
-  const countOf = useCallback(
-    (status: TaskStatus) => Math.max(counts?.[status] ?? 0, data.columns[status]?.cards.length ?? 0),
-    [counts, data.columns],
-  );
+  const openStatuses = useMemo(() => new Set(statuses.filter((status) => !isFolded(status))), [openKey]);
+  const statusData = useBoardData(projectKey, filter, options, openStatuses, lanesField != null, statusMode);
+  const groupedData = useGroupedBoardData(projectKey, filter, options, !statusMode);
+  const moves = useBoardMoves(projectKey, { onUndone: (key) => focusCard(key) });
 
   const members = useQuery(membersQuery()).data?.items;
   const milestones = useQuery({
     ...orpc.milestones.list.queryOptions({ input: { project: projectKey } }),
     enabled: usesMilestones,
   }).data?.items;
+  const cycles = useQuery({
+    ...orpc.cycles.list.queryOptions({ input: { project: projectKey } }),
+    enabled: usesCycles,
+  }).data?.items;
+  const labels = useQuery(labelsQuery(projectKey)).data?.items;
+  const groupContext = useMemo<GroupContext>(
+    () => ({
+      statuses: BOARD_STATUS_ORDER,
+      members: (members ?? []).map(
+        (member): AssigneeRef => ({
+          id: member.id,
+          name: member.name,
+          kind: member.kind,
+          responsible: member.responsible ?? null,
+        }),
+      ),
+      milestones: (milestones ?? []).map(toMilestoneRef),
+      cycles: (cycles ?? []).map(toCycleRef),
+      labels: labels ?? [],
+      viewerId,
+    }),
+    [members, milestones, cycles, labels, viewerId],
+  );
+
+  const counts = statusMode ? statusData.counts : groupedData.counts;
+  const columns = useMemo<BoardColumnModel[]>(() => {
+    if (statusMode) {
+      const known = statusData.counts;
+      return statuses
+        .map((status): BoardColumnModel => {
+          const column = statusData.columns[status];
+          // Done and Canceled cards past "Hide done tasks after" are left out of the count too.
+          const hidden = column ? column.loaded - column.cards.length : 0;
+          const count = Math.max((known?.[status] ?? 0) - hidden, column?.cards.length ?? 0);
+          return {
+            id: status,
+            label: STATUS_LABELS[status],
+            value: { field: 'status', status },
+            count,
+            cards: column?.cards ?? [],
+            folded: isFolded(status),
+            isLoading: column ? column.isLoading : false,
+            hasMore: column?.hasMore ?? false,
+            isFetchingMore: column?.isFetchingMore ?? false,
+            ...(column ? { fetchMore: column.fetchMore, loaded: column.loaded } : {}),
+          };
+        })
+        .filter(
+          (column) =>
+            options.showEmptyGroups ||
+            !known ||
+            (known[column.id as TaskStatus] ?? 0) > 0 ||
+            column.cards.length > 0,
+        );
+    }
+    return groupTasks(groupedData.tasks, groupBy, {
+      ...groupContext,
+      showEmptyGroups: options.showEmptyGroups,
+    }).map((group) => ({
+      id: group.key,
+      label: group.label,
+      value: group.value,
+      count: group.tasks.length,
+      cards: group.tasks,
+      folded: isFolded(group.key),
+      isLoading: false,
+    }));
+  }, [
+    statusMode,
+    statusData,
+    statuses,
+    isFolded,
+    options.showEmptyGroups,
+    groupedData.tasks,
+    groupBy,
+    groupContext,
+  ]);
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
+  const openColumns = useMemo(() => columns.filter((column) => !column.folded), [columns]);
 
   const cardsByKey = useMemo(() => {
     const map = new Map<string, TaskListItem>();
-    for (const column of Object.values(data.columns))
-      for (const card of column?.cards ?? []) map.set(card.key, card);
+    for (const column of columns) for (const card of column.cards) map.set(card.key, card);
     return map;
-  }, [data.columns]);
+  }, [columns]);
   const cardsRef = useRef(cardsByKey);
   cardsRef.current = cardsByKey;
-  /** The card's field comes from Backlog.md (its own lock list, or the project's while mirrored). */
-  const isLocked = useCallback(
-    (card: TaskListItem, field: 'status' | 'assignee' | 'milestone') =>
-      card.locked ? card.locked.includes(field) : mirrored,
-    [mirrored],
-  );
-  const isLockedRef = useRef(isLocked);
-  isLockedRef.current = isLocked;
-  const onCardDragStart = useCallback(
-    (key: string) => {
-      const card = cardsRef.current.get(key);
-      if (!card || !isLockedRef.current(card, 'status')) return;
-      setRefuseFrom(card.status);
-      showNotice(DRAG_REFUSAL_TEXT);
-    },
-    [showNotice],
-  );
-  const onCardDragEnd = useCallback(() => setRefuseFrom(null), []);
 
-  const lanes = useMemo<Lane[] | null>(() => {
-    if (!lanesMode) return null;
-    const columns = statuses
-      .filter((status) => open.has(status))
-      .map((status) => ({ status, cards: data.columns[status]?.cards ?? [] }));
-    return buildLanes(
-      lanesMode,
-      columns,
-      (milestones ?? []).map((milestone) => milestone.id),
-    );
-  }, [lanesMode, statuses, open, data.columns, milestones]);
+  const lanes = useMemo<Lane[] | null>(
+    () =>
+      lanesField
+        ? buildLanes(
+            lanesField,
+            openColumns.map((column) => ({ id: column.id, cards: column.cards })),
+            groupContext,
+          )
+        : null,
+    [lanesField, openColumns, groupContext],
+  );
   const [collapsedLanes, setCollapsedLanes] = useState<ReadonlySet<string>>(() => new Set());
+  const [expandedCells, setExpandedCells] = useState<ReadonlySet<string>>(() => new Set());
 
   /** The keyboard map of the board as drawn. */
   const nav = useMemo<NavColumn[]>(
     () =>
-      statuses
-        .filter((status) => open.has(status))
-        .map((status) => ({
-          status,
-          cells: lanes
-            ? lanes
-                .filter((lane) => !collapsedLanes.has(lane.id))
-                .map((lane) => ({ lane: lane.id, keys: (lane.cells[status] ?? []).map((card) => card.key) }))
-            : [{ lane: null, keys: (data.columns[status]?.cards ?? []).map((card) => card.key) }],
-        })),
-    [statuses, open, lanes, collapsedLanes, data.columns],
+      openColumns.map((column) => ({
+        id: column.id,
+        cells: lanes
+          ? lanes
+              .filter((lane) => !collapsedLanes.has(lane.id))
+              .map((lane) => {
+                const cards = lane.cells[column.id] ?? [];
+                const shown = expandedCells.has(cellId(lane.id, column.id))
+                  ? cards
+                  : cards.slice(0, LANE_CELL_CAP);
+                return { lane: lane.id, keys: shown.map((card) => card.key) };
+              })
+          : [{ lane: null, keys: column.cards.map((card) => card.key) }],
+      })),
+    [openColumns, lanes, collapsedLanes, expandedCells],
   );
   const navRef = useRef(nav);
   navRef.current = nav;
+  const orderedKeys = useMemo(() => {
+    const seen = new Set<string>();
+    const keys: string[] = [];
+    for (const column of nav)
+      for (const cell of column.cells)
+        for (const key of cell.keys) {
+          if (seen.has(key)) continue;
+          seen.add(key);
+          keys.push(key);
+        }
+    return keys;
+  }, [nav]);
+  const orderedRef = useRef(orderedKeys);
+  orderedRef.current = orderedKeys;
 
-  // ---- Focus -------------------------------------------------------------------------------------
+  // ---- Focus and selection -----------------------------------------------------------------------
   const boardRef = useRef<HTMLDivElement>(null);
-  /** The keyboard cursor: the last focused card. */
-  const focusedRef = useRef<string | null>(null);
   const cardElement = useCallback(
     (key: string) => boardRef.current?.querySelector<HTMLElement>(`[data-card-key="${CSS.escape(key)}"]`),
     [],
   );
+  const selection = useTaskSelection(orderedKeys, {
+    hotkeys: false,
+    view: 'Board',
+    initialFocus: search.focus ?? null,
+  });
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  const current = () => selectionRef.current.focusedKey;
+
   /**
-   * Focuses a card. After a move the card renders in another list first: wait two frames (one for the
-   * cache update to render, one for React Aria to register the item). A card already on screen (J/K)
-   * takes focus at once.
+   * Puts the keyboard on a card. After a move the card renders in another list first: wait two frames
+   * (one for the cache update to render, one for React Aria to register the item). A card already on
+   * screen (J/K) takes focus at once.
    */
   const focusCard = useCallback(
     (key: string, { afterRender = true }: { afterRender?: boolean } = {}) => {
-      focusedRef.current = key;
+      selectionRef.current.focus(key);
       const element = afterRender ? null : cardElement(key);
       if (element) {
         element.focus();
@@ -271,110 +392,274 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
     },
     [cardElement],
   );
-  const current = () => focusedRef.current ?? selectedRef.current;
 
+  // The keyboard cursor moved without a DOM focus change (Shift+↓ extends): follow it when the board
+  // (or nothing) has focus.
+  const cursorKey = selection.focusedKey;
+  useEffect(() => {
+    if (!cursorKey) return;
+    const active = document.activeElement;
+    if (active !== document.body && !boardRef.current?.contains(active)) return;
+    const element = cardElement(cursorKey);
+    if (element && element !== active) element.focus();
+  }, [cursorKey, cardElement]);
+
+  // Coming back from the task view (?focus=KEY): the keyboard starts on that card. The param is read once
+  // and dropped, as the list does.
+  const initialTask = useRef(search.focus ?? null);
+  useEffect(() => {
+    if (!search.focus) return;
+    initialTask.current = search.focus;
+    void navigate({
+      to: '.',
+      search: ((previous: TaskListSearch) => ({ ...previous, focus: undefined })) as never,
+      replace: true,
+    });
+  }, [search.focus, navigate]);
+  useEffect(() => {
+    const key = initialTask.current;
+    if (!key || !cardsByKey.has(key)) return;
+    initialTask.current = null;
+    focusCard(key);
+  }, [cardsByKey, focusCard]);
+
+  const pendingDown = useRef<string | null>(null);
   const moveFocus = (direction: Direction) => {
     const target = focusTarget(navRef.current, current(), direction);
     if (!target) return;
     if ('end' in target) {
-      const column = data.columns[target.end];
+      const column = columnsRef.current.find((candidate) => candidate.id === target.end);
       const from = current();
       if (column?.hasMore && from) {
         // J past the last loaded card: load the next page, then move (see the effect below).
         pendingDown.current = from;
-        if (!column.isFetchingMore) void column.fetchMore();
+        if (!column.isFetchingMore) void column.fetchMore?.();
       }
       return;
     }
     pendingDown.current = null;
-    goTo(target.key);
+    focusCard(target.key, { afterRender: false });
   };
-  const pendingDown = useRef<string | null>(null);
   useEffect(() => {
     const from = pendingDown.current;
     if (!from) return;
     const next = focusTarget(nav, from, 'down');
     if (next && 'key' in next) {
       pendingDown.current = null;
-      goTo(next.key);
+      focusCard(next.key, { afterRender: false });
     }
   });
-  const goTo = (key: string) => {
-    focusCard(key, { afterRender: false });
-    if (selectedRef.current) select(key);
-  };
+
+  // ---- Opening -----------------------------------------------------------------------------------
+  const openTask = useCallback(
+    (key: string) => {
+      rememberTaskNavigation(
+        { keys: orderedRef.current, from: 'Board', returnTo: router.state.location.href },
+        key,
+      );
+      closePeek();
+      void navigate({ to: '/p/$projectKey/$taskKey', params: { projectKey, taskKey: key } });
+    },
+    [navigate, projectKey, router],
+  );
+  const peekCard = (key: string) =>
+    togglePeek({
+      key,
+      keys: orderedRef.current,
+      from: 'Board',
+      onMove: (next) => {
+        if (cardsRef.current.has(next)) focusCard(next);
+      },
+    });
 
   // ---- Moves -------------------------------------------------------------------------------------
-  const laneValue = (laneId: string): LanePatch | undefined => {
-    if (!lanesMode || !lanes) return undefined;
-    const lane = lanes.find((candidate) => candidate.id === laneId);
-    if (lanesMode === 'assignee') return { assignee: laneId === NO_LANE ? null : (lane?.assignee ?? null) };
-    return { milestone: laneId === NO_LANE ? null : (lane?.milestone ?? null) };
+  /** The card's field comes from Backlog.md (its own lock list, or the project's while mirrored). */
+  const isLocked = useCallback(
+    (card: TaskListItem, field: Locked) => (card.locked ? card.locked.includes(field) : mirrored),
+    [mirrored],
+  );
+  const fieldWord = (field: GroupBy) => (field === 'assignee' ? 'assignee' : field);
+
+  /** What a move into a lane sets, or a refusal. */
+  const lanePatchFor = (card: TaskListItem, laneId: string | null): MovePatch | 'refused' | undefined => {
+    if (!lanesField || laneId === null || inGroup(lanesField, card, laneId)) return undefined;
+    const lane = lanes?.find((candidate) => candidate.id === laneId);
+    const patch = lane ? groupPatch(lane.value) : null;
+    if (!patch) {
+      refuse(`${card.key} stays in its lane: drop it in another column of the same lane.`);
+      return 'refused';
+    }
+    const locked = patchField(lanesField);
+    if (locked && isLocked(card, locked)) {
+      refuse(`${card.key} keeps its ${fieldWord(lanesField)}: it comes from Backlog.md.`);
+      return 'refused';
+    }
+    return patch;
   };
 
-  const onDrop = (drop: CardDrop, status: TaskStatus, laneId: string | null) => {
-    setRefuseFrom(null);
-    const card = cardsByKey.get(drop.key);
-    if (!card || drop.target?.key === drop.key) return;
-    focusedRef.current = card.key;
-    if (status !== card.status && isLocked(card, 'status')) {
-      showNotice(statusRefusalText(card.key, STATUS_LABELS[card.status]), true);
-      return;
+  /** Moves a card into a column (and lane). `hint` is the manual-order position, when known. */
+  const dropTo = (
+    key: string,
+    columnId: string,
+    laneId: string | null,
+    hint: Placement | null,
+    via: 'drag' | 'keyboard',
+  ): boolean => {
+    const card = cardsRef.current.get(key);
+    const column = columnsRef.current.find((candidate) => candidate.id === columnId);
+    if (!card || !column) return false;
+    const lanePatch = lanePatchFor(card, laneId);
+    if (lanePatch === 'refused') return false;
+    if (statusMode) {
+      const to = columnId as TaskStatus;
+      if (to !== card.status && isLocked(card, 'status')) {
+        refuse(statusRefusalText(card.key, STATUS_LABELS[card.status]));
+        return false;
+      }
+      const target = column.cards.filter((other) => other.key !== card.key);
+      const placement: Placement = manual
+        ? (hint ?? 'top')
+        : sortPlacement(
+            target,
+            { ...card, ...lanePatch, status: to, updatedAt: new Date().toISOString() },
+            options.orderBy,
+          );
+      return moves.move({
+        key: card.key,
+        to,
+        placement,
+        ...(lanePatch ? { patch: lanePatch } : {}),
+        sendPosition: manual,
+        via,
+      });
     }
-    if (laneId !== null && lanesMode && laneOf(lanesMode, card) !== laneId && isLocked(card, lanesMode)) {
-      showNotice(`${card.key} keeps its ${lanesMode}: it comes from Backlog.md.`);
-      return;
+    const sameColumn = inGroup(groupBy, card, columnId);
+    if (sameColumn && !lanePatch) return false;
+    const columnPatch = sameColumn ? {} : groupPatch(column.value);
+    if (columnPatch === null) {
+      refuse(
+        `Cards can't move between ${groupBy === 'label' ? 'label' : 'these'} columns. Change the field instead.`,
+      );
+      return false;
     }
-    setNotice(null);
-    const placement: Placement = drop.target
+    const locked = sameColumn ? null : patchField(groupBy);
+    if (locked && isLocked(card, locked)) {
+      refuse(`${card.key} keeps its ${fieldWord(groupBy)}: it comes from Backlog.md.`);
+      return false;
+    }
+    void apply([card], { ...columnPatch, ...lanePatch });
+    return true;
+  };
+
+  const onDrop = (drop: CardDrop, columnId: string, laneId: string | null) => {
+    setDrag(null);
+    if (drop.target?.key === drop.key) return;
+    const hint: Placement | null = drop.target
       ? drop.target.position === 'before'
         ? { before: drop.target.key }
         : { after: drop.target.key }
-      : 'top';
-    const lane =
-      laneId !== null && lanesMode && laneOf(lanesMode, card) !== laneId ? laneValue(laneId) : undefined;
-    moves.move({ key: card.key, to: status, placement, ...(lane ? { lane } : {}), via: 'drag' });
+      : null;
+    if (dropTo(drop.key, columnId, laneId, hint, 'drag')) selectionRef.current.focus(drop.key);
   };
 
-  const moveStatus = (direction: 'left' | 'right') => {
+  /** Shift+← / Shift+→: the card to the neighbouring column, folded or not. */
+  const moveColumn = (direction: 'left' | 'right') => {
     const key = current();
     const card = key ? cardsByKey.get(key) : undefined;
     if (!card) return;
-    const to = statusStep(statuses, card.status, direction);
+    const from = statusMode ? card.status : (groupKeysOf(groupBy, card)[0] ?? '');
+    const to = columnStep(
+      columnsRef.current.map((column) => column.id),
+      from,
+      direction,
+    );
     if (!to) return;
-    if (isLocked(card, 'status')) {
-      showNotice(statusRefusalText(card.key, STATUS_LABELS[card.status]), true);
+    if (statusMode && to !== card.status && isLocked(card, 'status')) {
+      refuse(statusRefusalText(card.key, STATUS_LABELS[card.status]));
       return;
     }
-    setNotice(null);
     if (isFolded(to)) setFolded(to, false);
-    let placement: Placement = 'top';
-    if (lanesMode && lanes) {
+    let hint: Placement | null = null;
+    if (lanesField && lanes) {
       // Top of the same lane in the next column.
-      const first = lanes.find((lane) => lane.id === laneOf(lanesMode, card))?.cells[to]?.[0];
-      if (first) placement = { before: first.key };
+      const lane = lanes.find((candidate) => inGroup(lanesField, card, candidate.id));
+      const first = lane?.cells[to]?.[0];
+      if (first) hint = { before: first.key };
     }
-    if (moves.move({ key: card.key, to, placement, via: 'keyboard' })) focusCard(card.key);
+    if (dropTo(card.key, to, null, hint, 'keyboard')) focusCard(card.key);
   };
 
+  /** Shift+J / Shift+K: up or down within the cell (manual order, status columns). */
   const reorder = (direction: 'up' | 'down') => {
     const key = current();
     const card = key ? cardsByKey.get(key) : undefined;
-    if (!card) return;
+    if (!card || !statusMode) return;
+    if (!manual) {
+      refuse('Cards keep the board’s order. Choose Manual in Display to move them by hand.');
+      return;
+    }
     const placement = reorderPlacement(navRef.current, card.key, direction);
     if (!placement) return;
-    setNotice(null);
     if (moves.move({ key: card.key, to: card.status, placement, via: 'keyboard' })) focusCard(card.key);
   };
 
-  const undo = () => {
-    const key = moves.undo();
-    if (key) focusCard(key);
-  };
+  // A move that failed put the card back: keep the keyboard on it.
+  const problemKey = moves.problem?.key;
+  useEffect(() => {
+    if (problemKey && selectionRef.current.focusedKey === problemKey) focusCard(problemKey);
+  }, [problemKey, focusCard]);
+
+  // ---- Drag --------------------------------------------------------------------------------------
+  const [drag, setDrag] = useState<{
+    key: string;
+    home: string;
+    over: string;
+    refused: ReadonlySet<string>;
+  } | null>(null);
+  const onCardDragStart = useCallback(
+    (key: string) => {
+      const card = cardsRef.current.get(key);
+      if (!card) return;
+      const home = statusMode ? card.status : (groupKeysOf(groupBy, card)[0] ?? '');
+      const others = columnsRef.current.map((column) => column.id).filter((id) => id !== home);
+      let refused: string[] = [];
+      if (statusMode && isLocked(card, 'status')) {
+        refused = others;
+        refuse(DRAG_REFUSAL_TEXT);
+      } else if (!statusMode) {
+        const field = patchField(groupBy);
+        const fixed = groupBy === 'label' || groupBy === 'none' || (field !== null && isLocked(card, field));
+        if (fixed) refused = others;
+      }
+      setDrag({ key, home, over: home, refused: new Set(refused) });
+    },
+    [statusMode, groupBy, isLocked],
+  );
+  const onCardDragEnd = useCallback(() => setDrag(null), []);
+  const onDragOver = useCallback(
+    (column: string) => setDrag((previous) => (previous ? { ...previous, over: column } : previous)),
+    [],
+  );
+
+  // ---- Task keys and palette ---------------------------------------------------------------------
+  const targets = useMemo(
+    () =>
+      selection.targetKeys
+        .map((key) => cardsByKey.get(key))
+        .filter((card): card is TaskListItem => card !== undefined),
+    [selection.targetKeys, cardsByKey],
+  );
+  const anchorRef = useRef<Element | null>(null);
+  const focusedKey = selection.focusedKey;
+  useEffect(() => {
+    anchorRef.current = (focusedKey ? cardElement(focusedKey) : null) ?? null;
+  });
+  const fieldKeys = useTaskFieldKeys({ targets, enabled: !peekOpen, anchors: anchorRef });
 
   // ---- Keyboard ----------------------------------------------------------------------------------
   /** Board keys. True when the key was handled. */
-  const handleKey = (key: string, shift: boolean, onCard: boolean): boolean => {
+  const handleKey = (key: string, shift: boolean): boolean => {
+    const sel = selectionRef.current;
     switch (key) {
       case 'j':
         if (shift) reorder('down');
@@ -384,27 +669,43 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
         if (shift) reorder('up');
         else moveFocus('up');
         return true;
-      case 'h':
-        if (shift) moveStatus('left');
-        else moveFocus('left');
-        return true;
-      case 'l':
-        if (shift) moveStatus('right');
-        else moveFocus('right');
-        return true;
-      case 'enter': {
-        if (shift) return false;
-        const focused = onCard ? focusedRef.current : current();
-        if (!focused) return false;
-        if (selectedRef.current === focused) openPage(focused);
-        else select(focused);
+      case 'arrowdown':
+      case 'arrowup': {
+        const direction = key === 'arrowdown' ? 'down' : 'up';
+        if (!shift) moveFocus(direction);
+        else {
+          const from = sel.focusedKey;
+          if (!from) moveFocus(direction);
+          // Extend within the column only.
+          else if (hasNeighbour(navRef.current, from, direction)) sel.extend(direction === 'down' ? 1 : -1);
+          else if (!sel.isSelected(from)) sel.toggle(from);
+        }
         return true;
       }
-      case 'escape':
-        if (shift || !selectedRef.current) return false;
-        select(null);
-        if (focusedRef.current) focusCard(focusedRef.current);
+      case 'arrowleft':
+      case 'arrowright':
+        if (shift) moveColumn(key === 'arrowleft' ? 'left' : 'right');
+        else moveFocus(key === 'arrowleft' ? 'left' : 'right');
         return true;
+      case 'x':
+        if (shift || !sel.focusedKey) return false;
+        sel.toggle(sel.focusedKey);
+        return true;
+      case ' ':
+        if (shift || !sel.focusedKey) return false;
+        peekCard(sel.focusedKey);
+        return true;
+      case 'enter':
+        if (shift || !sel.focusedKey) return false;
+        openTask(sel.focusedKey);
+        return true;
+      case 'escape': {
+        if (shift || (!sel.selectedKeys.length && !sel.focusedKey)) return false;
+        const had = sel.selectedKeys.length > 0;
+        sel.escape();
+        if (!had) (document.activeElement as HTMLElement | null)?.blur?.();
+        return true;
+      }
       default:
         return false;
     }
@@ -414,104 +715,247 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
 
   // Keys pressed on a card: handled here before the GridList sees them.
   const onBoardKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (peekOpen || event.ctrlKey || event.metaKey || event.altKey) return;
     if (isEditableTarget(event.target)) return;
     const onCard = (event.target as HTMLElement).closest('[data-card-key]') != null;
-    if (!onCard) return;
-    if (handleKeyRef.current(event.key.toLowerCase(), event.shiftKey, true)) {
+    const onButton = (event.target as HTMLElement).closest('button') != null;
+    if (!onCard || onButton) return;
+    if (handleKeyRef.current(event.key.toLowerCase(), event.shiftKey)) {
       event.preventDefault();
       event.stopPropagation();
     }
   };
   const onBoardFocus = (event: FocusEvent<HTMLDivElement>) => {
     const key = (event.target as HTMLElement).closest<HTMLElement>('[data-card-key]')?.dataset.cardKey;
-    if (key) focusedRef.current = key;
+    if (key && key !== selectionRef.current.focusedKey) selectionRef.current.focus(key);
   };
+  /** Shift and ⌘/Ctrl on the press that opens a card: select instead. */
+  const pressModifiers = useRef({ shiftKey: false, metaKey: false, ctrlKey: false });
+  const onBoardPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    pressModifiers.current = { shiftKey: event.shiftKey, metaKey: event.metaKey, ctrlKey: event.ctrlKey };
+  };
+  const onCardAction = useCallback(
+    (key: string) => {
+      const modifiers = pressModifiers.current;
+      pressModifiers.current = { shiftKey: false, metaKey: false, ctrlKey: false };
+      if (selectionRef.current.handleClick(key, modifiers)) return;
+      openTask(key);
+    },
+    [openTask],
+  );
 
-  const fromAnywhere =
-    (key: string, shift = false) =>
-    () =>
-      handleKeyRef.current(key, shift, false);
-  useHotkeys({
-    j: fromAnywhere('j'),
-    k: fromAnywhere('k'),
-    h: fromAnywhere('h'),
-    l: fromAnywhere('l'),
-    'Shift+j': fromAnywhere('j', true),
-    'Shift+k': fromAnywhere('k', true),
-    'Shift+h': fromAnywhere('h', true),
-    'Shift+l': fromAnywhere('l', true),
-    v: () => setView('list'),
-    Escape: { handler: () => handleKeyRef.current('escape', false, false), enabled: selected != null },
-    Enter: {
-      preventDefault: false,
-      handler: (event) => {
-        if (event.target !== document.body && event.target !== document.documentElement) return;
-        if (handleKeyRef.current('enter', false, false)) event.preventDefault();
+  /** Keys from the page (focus not on a card): only when nothing else has focus. */
+  const fromPage =
+    (key: string, shift = false, needsBody = false) =>
+    (event: globalThis.KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const onBody = target === document.body || target === document.documentElement;
+      if (needsBody && !onBody && !target?.closest('[data-card-key]')) return;
+      handleKeyRef.current(key, shift);
+    };
+  useHotkeys(
+    {
+      j: fromPage('j'),
+      k: fromPage('k'),
+      'Shift+j': fromPage('j', true),
+      'Shift+k': fromPage('k', true),
+      ArrowDown: fromPage('arrowdown', false, true),
+      ArrowUp: fromPage('arrowup', false, true),
+      ArrowLeft: fromPage('arrowleft', false, true),
+      ArrowRight: fromPage('arrowright', false, true),
+      'Shift+ArrowDown': fromPage('arrowdown', true, true),
+      'Shift+ArrowUp': fromPage('arrowup', true, true),
+      'Shift+ArrowLeft': fromPage('arrowleft', true, true),
+      'Shift+ArrowRight': fromPage('arrowright', true, true),
+      x: fromPage('x'),
+      Space: { handler: fromPage(' ', false, true), enabled: selection.focusedKey != null },
+      Enter: { handler: fromPage('enter', false, true), enabled: selection.focusedKey != null },
+      'Mod+a': { handler: () => selectionRef.current.selectAll(), allowInInputs: false },
+      Escape: {
+        preventDefault: false,
+        enabled: selection.focusedKey != null || selection.selectedKeys.length > 0,
+        handler: (event) => {
+          if (handleKeyRef.current('escape', false)) event.preventDefault();
+        },
       },
     },
-    'Mod+z': { handler: undo, enabled: moves.canUndo, allowInInputs: false },
-  });
+    { enabled: !peekOpen },
+  );
 
-  const openPage = (key: string) =>
-    navigate({ to: '/p/$projectKey/$taskKey', params: { projectKey, taskKey: key } });
+  // ---- Cards -------------------------------------------------------------------------------------
+  const today = localToday();
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleExpanded = useCallback(
+    (key: string, open: boolean) =>
+      setExpanded((previous) => {
+        const next = new Set(previous);
+        if (open) next.add(key);
+        else next.delete(key);
+        return next;
+      }),
+    [],
+  );
+  const parentTitle = useCallback((key: string) => cardsRef.current.get(key)?.title ?? null, []);
+  const renderCard = useCallback(
+    (card: TaskListItem): ReactNode => {
+      const shows = (property: TaskProperty) => showsProperty(options, property, card, viewerId);
+      const progress = card.subtaskProgress;
+      const hasSubtasks = shows('subtasks') && progress != null && progress.total > 0;
+      const parentRef = subtaskCards && card.parentKey ? [card.parentKey, parentTitle(card.parentKey)] : null;
+      const isOpen = expanded.has(card.key);
+      const times: string[] = [];
+      if (shows('created')) times.push(`Created ${formatAge(card.createdAt)}`);
+      if (shows('updated')) times.push(`Updated ${formatAge(card.updatedAt)}`);
+      return (
+        <>
+          <BoardCardContent
+            taskKey={card.key}
+            title={card.title}
+            showKey={options.properties.key}
+            priority={
+              shows('priority') && groupBy !== 'priority' && lanesField !== 'priority' ? card.priority : null
+            }
+            labels={shows('labels') ? (card.labels ?? []) : null}
+            subtasks={hasSubtasks && subtaskCards ? progress : null}
+            due={shows('due') && card.dueDate ? { dueDate: card.dueDate, status: card.status, today } : null}
+            blocked={shows('blocked') && card.blocked === true}
+            milestone={
+              shows('milestone') && usesMilestones && card.milestone && groupBy !== 'milestone'
+                ? { name: card.milestone.name, filled: card.milestone.status !== 'planned' }
+                : null
+            }
+            cycle={
+              shows('cycle') && usesCycles && card.cycle && groupBy !== 'cycle'
+                ? { label: `C${card.cycle.number}` }
+                : null
+            }
+            assignee={
+              shows('assignee') && card.assignee && groupBy !== 'assignee' && lanesField !== 'assignee'
+                ? { name: card.assignee.name, kind: card.assignee.kind }
+                : null
+            }
+            parentRef={parentRef ? parentRef.filter(Boolean).join(' ') : null}
+            extra={
+              times.length ? (
+                <span className="text-xs whitespace-nowrap text-fg-3">{times.join(' · ')}</span>
+              ) : null
+            }
+          />
+          {selectionRef.current.isSelected(card.key) ? <span className="sr-only">Selected</span> : null}
+          {hasSubtasks && !subtaskCards ? (
+            <>
+              <BoardSubtaskToggle
+                taskKey={card.key}
+                done={progress.done}
+                total={progress.total}
+                isExpanded={isOpen}
+                onExpandedChange={(open) => toggleExpanded(card.key, open)}
+              />
+              {isOpen ? (
+                <SubtaskRows
+                  projectKey={projectKey}
+                  parentKey={card.key}
+                  viewerId={viewerId}
+                  onOpen={openTask}
+                />
+              ) : null}
+            </>
+          ) : null}
+        </>
+      );
+    },
+    [
+      options,
+      viewerId,
+      subtaskCards,
+      parentTitle,
+      expanded,
+      today,
+      usesMilestones,
+      usesCycles,
+      groupBy,
+      lanesField,
+      toggleExpanded,
+      projectKey,
+      openTask,
+    ],
+  );
+  const isChild = useCallback(
+    (card: TaskListItem) => subtaskCards && Boolean(card.parentKey),
+    [subtaskCards],
+  );
+  const isSelected = selection.isSelected;
 
-  // A move that failed put the card back: keep the keyboard on it.
-  const problemKey = moves.problem?.key;
-  useEffect(() => {
-    if (problemKey && focusedRef.current === problemKey) focusCard(problemKey);
-  }, [problemKey, focusCard]);
-
-  // Keep the cursor on a card that is still on the board.
-  useEffect(() => {
-    if (focusedRef.current && !cardsByKey.has(focusedRef.current)) focusedRef.current = null;
-  }, [cardsByKey]);
+  const cell: CellProps = {
+    cursor: selection.focusedKey,
+    isSelected,
+    onAction: onCardAction,
+    renderCard,
+    isChild,
+    reorderable: manual && statusMode,
+    onDragStart: onCardDragStart,
+    onDragEnd: onCardDragEnd,
+    dependencies: [selection.selectedKeys],
+  };
 
   // ---- Rendering ---------------------------------------------------------------------------------
-  const filtered = hasFilters(search);
-  const total = counts ? statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0) : undefined;
-  const names = useMemo(
-    () => ({
-      members: new Map((members ?? []).map((member) => [member.id, member.name])),
-      milestones: new Map((milestones ?? []).map((milestone) => [milestone.id, milestone.name])),
-    }),
-    [members, milestones],
-  );
-  const now = useNow();
-  const detachedAt = detached ? project?.backlog?.detachedAt : null;
-  const viewNote =
-    detachedAt && now != null
-      ? `detached from Backlog.md on ${formatDay(detachedAt, new Date(now))}`
-      : 'board';
+  const filtered = hasTaskFilter(filter);
+  const total = statusMode
+    ? counts
+      ? statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0)
+      : undefined
+    : groupedData.isLoading
+      ? undefined
+      : groupedData.tasks.length;
+  const isLoading = statusMode ? statusData.isLoading : groupedData.isLoading;
+  const loadError = statusMode ? statusData.error : groupedData.error;
+  const error = loadError ? describeError(loadError) : null;
   const subtitle = filtered
-    ? `filtered: ${describeFilters(filters, names).join(', ')}`
+    ? `${total ?? 0} matching tasks`
     : project
-      ? `${project.openCount} open · ${viewNote}`
+      ? `${project.openCount} open · board`
       : 'board';
-  const loadError = data.error ? describeError(data.error) : null;
+  const newTask = () => quickCreate?.open(projectKey);
+
+  const emptyText = (column: BoardColumnModel): ReactNode => {
+    const closed = column.id === 'done' || column.id === 'canceled';
+    if (statusMode && closed && options.hideDoneAfterDays > 0 && (column.loaded ?? 0) > 0) {
+      return `Nothing ${column.id === 'done' ? 'done' : 'canceled'} in the last ${options.hideDoneAfterDays} days.`;
+    }
+    if (column.value.field !== 'status' || mirrored) return `No tasks in ${column.label}.`;
+    return (
+      <>
+        No tasks in {column.label}.
+        <br />
+        Drag a card here, or press C.
+      </>
+    );
+  };
 
   const renderBody = () => {
-    if (loadError) {
+    if (error) {
       return (
-        <div className="px-6 py-4">
+        <div className="px-4.5 py-4">
           <Banner
             action={
-              <Button variant="secondary" size="sm" onPress={() => data.refetch()}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onPress={() => (statusMode ? statusData : groupedData).refetch()}
+              >
                 Retry
               </Button>
             }
           >
-            Couldn't load tasks. {loadError.message}
+            Couldn't load tasks. {error.message}
           </Banner>
-          {loadError.requestId ? (
-            <RequestHint requestId={loadError.requestId} prefix="Your filters are kept." />
-          ) : (
-            <p className="m-0 mt-2.5 text-[11.5px] text-muted">Your filters are kept.</p>
-          )}
+          <p className="m-0 mt-2.5 text-xs text-fg-3">
+            Your filters are kept.{error.requestId ? ` Request ${error.requestId}.` : ''}
+          </p>
         </div>
       );
     }
-    if (data.isLoading) return <BoardSkeleton columns={open.size} />;
+    if (isLoading) return <BoardSkeleton columns={Math.max(openColumns.length, 3)} />;
     if (total === 0 && !filtered && mirrored && project) return <MirrorEmptyState project={project} />;
     if (total === 0) {
       return (
@@ -519,7 +963,7 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
           {filtered ? (
             <EmptyState
               title="No tasks match these filters"
-              text={emptyBoardText(filters, names)}
+              text="Nothing on the board matches. Clear the filters, or create a task."
               action={
                 <div className="flex gap-2">
                   <Button variant="secondary" onPress={clearFilters}>
@@ -549,26 +993,22 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
       );
     }
     const body = {
-      statuses,
-      isFolded,
+      columns,
       onFoldChange: setFolded,
-      columns: data.columns,
-      countOf,
-      selected,
-      onOpen: (key: string) => {
-        focusedRef.current = key;
-        select(key);
-      },
       onDrop,
       // The column's "+" preselects that column's status. Mirrored projects take no new tasks.
       onAdd:
-        quickCreate && !mirrored
-          ? (status: TaskStatus) => quickCreate.open(projectKey, { status })
+        quickCreate && !mirrored && statusMode
+          ? (column: BoardColumnModel) =>
+              column.value.field === 'status'
+                ? quickCreate.open(projectKey, { status: column.value.status })
+                : undefined
           : undefined,
-      features,
-      refuseFrom,
-      onCardDragStart,
-      onCardDragEnd,
+      cell,
+      refused: drag?.refused ?? null,
+      onDragOver,
+      dropTarget: drag && drag.over !== drag.home ? drag.over : null,
+      emptyText,
     };
     return lanes ? (
       <BoardLanes
@@ -583,136 +1023,104 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
             return next;
           })
         }
+        expandedCells={expandedCells}
+        onExpandCell={(laneId, columnId) =>
+          setExpandedCells((previous) => new Set(previous).add(cellId(laneId, columnId)))
+        }
+        cap={LANE_CELL_CAP}
       />
     ) : (
       <BoardColumns {...body} />
     );
   };
 
-  const toast = moves.toast;
   const problem = moves.problem;
+  const dragTarget = drag ? columns.find((column) => column.id === drag.over) : undefined;
 
   return (
-    <div
-      className={cn(
-        'grid h-dvh min-h-0 flex-1 bg-bg text-fg',
-        panelOpen ? 'grid-cols-[minmax(0,1fr)_440px]' : 'grid-cols-[minmax(0,1fr)]',
-      )}
-    >
-      <section aria-label="Board" className="relative flex min-h-0 min-w-0 flex-col">
-        <ProjectHeader
-          projectKey={projectKey}
-          current="tasks"
-          subtitle={subtitle}
-          actions={
-            <>
-              <SearchField
-                width={150}
-                value={query}
-                onChange={setQuery}
-                inputRef={searchRef}
-                aria-label="Search tasks"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    const first = focusTarget(navRef.current, null, 'down');
-                    if (first && 'key' in first) focusCard(first.key);
-                  } else {
-                    event.continuePropagation();
-                  }
-                }}
-              />
-              {mirrored ? (
-                <MirrorCreateButton
-                  projectName={project?.name ?? projectKey}
-                  onPress={newTask}
-                  aria-keyshortcuts="c"
-                />
-              ) : (
-                <Button kbd="C" onPress={newTask} aria-keyshortcuts="c">
-                  New
-                </Button>
-              )}
-            </>
-          }
-          filters={
-            <TaskFilterBar
-              projectKey={projectKey}
-              search={search}
-              onChange={setSearch}
-              usesMilestones={usesMilestones}
-              usesCycles={usesCycles}
-              showLanes
-            />
-          }
-          filtersEnd={
-            <ViewSwitch view="board" onChange={setView} onClear={filtered ? clearFilters : undefined} />
-          }
-        />
-        <MirrorFailedBanner project={project} />
-        {problem ? (
-          <div className="border-b border-line px-6 py-3">
-            <Banner
-              action={
-                <Button variant="secondary" size="sm" onPress={problem.retry}>
-                  Try again
-                </Button>
-              }
-            >
-              {problem.text}
-            </Banner>
-            {problem.hint ? <p className="m-0 mt-2 text-[11.5px] text-muted">{problem.hint}</p> : null}
-          </div>
-        ) : null}
-        <div
-          ref={boardRef}
-          onKeyDownCapture={onBoardKeyDownCapture}
-          onFocusCapture={onBoardFocus}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          {renderBody()}
-        </div>
-        {notice ? (
-          <Toast key={`notice-${notice.id}`} floating timeout={TOAST_MS} onDismiss={() => setNotice(null)}>
-            {notice.text}
-            {notice.reorderHint ? (
-              <>
-                <Kbd variant="inverse" aria-hidden className="ml-3 border-[oklch(0.6_0_0/0.5)]">
-                  ⇧J/K
-                </Kbd>
-                <span className="ml-2 opacity-75">
-                  <span className="sr-only">Shift J and K </span>reorders
-                </span>
-              </>
-            ) : null}
-          </Toast>
-        ) : toast ? (
-          <Toast
-            key={toast.id}
-            floating
-            timeout={TOAST_MS}
-            onDismiss={moves.dismissToast}
-            action={toast.canUndo && moves.canUndo ? { label: 'Undo', onAction: undo } : undefined}
-            kbd={toast.canUndo && moves.canUndo ? (isApple() ? '⌘Z' : 'Ctrl Z') : undefined}
-          >
-            {toast.text}
-            <span className="sr-only">{toast.detail}</span>
-          </Toast>
-        ) : (
-          <DetachedToast project={project} />
-        )}
-      </section>
-      {selected ? (
-        <section aria-label="Task detail" className="flex min-h-0 min-w-0 flex-col border-l border-line">
-          <TaskDetailPane
-            key={selected}
+    <section aria-label="Board" className="relative flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
+      <ProjectHeader
+        projectKey={projectKey}
+        current="tasks"
+        subtitle={subtitle}
+        viewSwitch={<ViewSwitch view="board" onChange={setView} />}
+        filter={<FilterButton fields={fields} filter={filter} onChange={setFilter} />}
+        display={
+          <DisplayButton
             projectKey={projectKey}
-            taskKey={selected}
-            preview={cardsByKey.get(selected)}
-            onClose={() => select(null)}
+            view="board"
+            onLayoutChange={setView}
+            groupChoices={groupChoices}
           />
-        </section>
+        }
+        search={
+          <SearchField
+            width={200}
+            value={query}
+            onChange={setQuery}
+            inputRef={searchRef}
+            aria-label="Search tasks"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                const first = focusTarget(navRef.current, null, 'down');
+                if (first && 'key' in first) focusCard(first.key, { afterRender: false });
+              } else {
+                event.continuePropagation();
+              }
+            }}
+          />
+        }
+        actions={
+          mirrored ? (
+            <MirrorCreateButton
+              projectName={project?.name ?? projectKey}
+              onPress={newTask}
+              aria-keyshortcuts="c"
+            />
+          ) : (
+            <Button kbd="C" onPress={newTask} aria-keyshortcuts="c">
+              New task
+            </Button>
+          )
+        }
+      />
+      <FilterChips
+        fields={fields}
+        filter={filter}
+        onChange={setFilter}
+        {...(total !== undefined ? { matchCount: total } : {})}
+      />
+      <MirrorFailedBanner project={project} />
+      {problem ? (
+        <div className="border-b border-line-soft px-4.5 py-3">
+          <Banner
+            action={
+              <Button variant="secondary" size="sm" onPress={problem.retry}>
+                Try again
+              </Button>
+            }
+          >
+            {problem.text}
+          </Banner>
+          {problem.hint ? <p className="m-0 mt-2 text-xs text-fg-3">{problem.hint}</p> : null}
+        </div>
       ) : null}
-    </div>
+      <div
+        ref={boardRef}
+        onKeyDownCapture={onBoardKeyDownCapture}
+        onFocusCapture={onBoardFocus}
+        onPointerDownCapture={onBoardPointerDown}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {renderBody()}
+      </div>
+      {drag && dragTarget ? <BoardDragHint target={dragTarget.label} /> : null}
+      <div aria-live="polite" className="sr-only">
+        {moves.announcement?.text}
+      </div>
+      {fieldKeys.pickers}
+      <DetachedToast project={project} />
+    </section>
   );
 }

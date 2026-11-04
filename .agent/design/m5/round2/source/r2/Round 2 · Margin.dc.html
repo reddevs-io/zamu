@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+body{margin:0;background:#ecebe7;font-family:system-ui,sans-serif}
+a{color:#1a1a1a}a:hover{color:#2a78d6}
+.cv-hd{padding:48px 56px 8px}
+.cv-t{font:600 26px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.cv-d{margin-top:10px;max-width:980px;font:14px/1.55 system-ui,sans-serif;color:rgba(0,0,0,.62)}
+.cv-sec{padding:36px 56px 28px;border-bottom:1px solid rgba(0,0,0,.08)}
+.cv-sh{display:flex;align-items:baseline;gap:12px;margin:0 0 18px}
+.cv-n{font:600 12px ui-monospace,Menlo,monospace;padding:4px 8px;background:#1a1a1a;color:#fff;border-radius:4px}
+.cv-st{font:600 20px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.cv-sd{font:14px/1.4 system-ui,sans-serif;color:rgba(0,0,0,.55)}
+.cv-rows{display:flex;flex-direction:column;gap:28px}
+.cv-row{display:flex;gap:28px;align-items:flex-start}
+.fr{display:flex;flex-direction:column;gap:8px;flex:none}
+.fcap{font:500 12px system-ui,sans-serif;color:rgba(0,0,0,.55)}
+.card{background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.w1440{width:1440px;height:900px}.w1280{width:1280px;height:820px}.w1024{width:1024px;height:768px}.wkit{width:1440px;height:1560px}
+</style>
+</helmet>
+<div class="cv-hd" data-screen-label="Round 2 intro">
+<div class="cv-t">Round 2 · Margin, every screen</div>
+<div class="cv-d">Direction 1c Margin, picked in round 1. Light row above dark row in each section. Made-up data: Northwind Labs, the mirrored Harbor project (123 open tasks) and the native Payments project. All 14 sections from the brief. Harbor is mirrored, so its fields are read-only; native-field states use Payments (PAY-142 has every field set). Pickers open where their key would open them: from the task view's properties sidebar or its Subtasks and Blocked by sections.</div>
+</div>
+<sc-for list="{{ sections }}" as="sec">
+<section class="cv-sec" id="{{ sec.id }}">
+<div class="cv-sh"><span class="cv-n">{{ sec.n }}</span><span class="cv-st">{{ sec.title }}</span><span class="cv-sd">{{ sec.sub }}</span></div>
+<div class="cv-rows">
+<sc-for list="{{ themes }}" as="th">
+<div class="cv-row">
+<sc-for list="{{ sec.frames }}" as="f">
+<div class="fr">
+<span class="fcap">{{ f.cap }} · {{ th.id }}</span>
+<div class="{{ f.box }}">
+<sc-if value="{{ f.isKit }}"><dc-import name="Kit" theme="{{ th.id }}" hint-size="1440px,1560px"></dc-import></sc-if>
+<sc-if value="{{ f.isBoard }}"><dc-import name="Board" theme="{{ th.id }}" state="{{ f.state }}" narrow="{{ f.narrow }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ f.isList }}"><dc-import name="List" theme="{{ th.id }}" state="{{ f.state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ f.isTask }}"><dc-import name="Task" theme="{{ th.id }}" state="{{ f.state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ f.isOver }}"><dc-import name="Overlays" theme="{{ th.id }}" state="{{ f.state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ f.isHome }}"><dc-import name="Home" theme="{{ th.id }}" state="{{ f.state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ f.isPlan }}"><dc-import name="Planning" theme="{{ th.id }}" state="{{ f.state }}" hint-size="1440px,900px"></dc-import></sc-if>
+<sc-if value="{{ f.isSet }}"><dc-import name="Settings" theme="{{ th.id }}" state="{{ f.state }}" hint-size="1440px,900px"></dc-import></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</section>
+</sc-for>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    const F = (comp, state, cap, narrow) => ({ state, cap, narrow: !!narrow, box: 'card ' + (comp === 'Kit' ? 'wkit' : narrow ? 'w1024' : /1280$/.test(state) ? 'w1280' : 'w1440'),
+      isKit: comp === 'Kit', isBoard: comp === 'Board', isList: comp === 'List', isTask: comp === 'Task', isOver: comp === 'Overlays', isHome: comp === 'Home', isPlan: comp === 'Planning', isSet: comp === 'Settings' });
+    const sections = [
+      { id: 's1', n: '1', title: 'Kit', sub: 'Every component in default, hover, keyboard focus, selected, disabled, read-only and loading states.', frames: [F('Kit', '', 'Kit')] },
+      { id: 's2', n: '2', title: 'Shell and sidebar', sub: 'Expanded with a project open, collapsed at 1024, workspace switcher, person menu.', frames: [F('Board', 'default', 'Sidebar expanded, Harbor open'), F('Board', 'wsmenu', 'Workspace switcher'), F('Board', 'usermenu', 'Person menu'), F('Board', 'default', 'Collapsed at 1024', true)] },
+      { id: 's3', n: '3', title: 'Project list', sub: 'Grouped by status with subtasks nested, by label, filters as chips, multi-select, long titles, empty project, no results, loading, error.', frames: [F('List', 'default', 'By status, subtasks nested, row selected'), F('List', 'label', 'Grouped by label'), F('List', 'filters', 'Filters active'), F('List', 'multi', 'Three selected, action bar'), F('List', 'long', 'Long titles with every marker'), F('List', 'empty', 'Empty project'), F('List', 'noresults', 'Filter with no results'), F('List', 'loading', 'Loading'), F('List', 'error', 'Error')] },
+      { id: 's4', n: '4', title: 'Board', sub: 'Default, a card with everything, swimlanes by assignee, subtasks expanded in place, subtasks as cards, a collapsed column, drag in progress, an empty column.', frames: [F('Board', 'default', 'Default'), F('Board', 'everything', 'Card with everything set'), F('Board', 'lanes', 'Swimlanes by assignee'), F('Board', 'expanded', 'Subtasks expanded in place'), F('Board', 'subcards', 'Subtasks shown as cards'), F('Board', 'collapsed', 'Todo collapsed'), F('Board', 'drag', 'Drag in progress'), F('Board', 'emptycol', 'Empty column shown')] },
+      { id: 's5', n: '5', title: 'Display and Filter', sub: 'Display options shared by list and board; the filter menu and its label submenu (3 selected).', frames: [F('Board', 'display', 'Display options'), F('List', 'filter', 'Filter menu'), F('List', 'filterlabels', 'Filter › Labels, 3 selected')] },
+      { id: 's6', n: '6', title: 'Task view', sub: 'Native with everything set (also at 1280), native with nothing set, mirrored with the lock on hover, From the file open, a long description, 40 activity items, the open composer.', frames: [F('Task', 'full', 'PAY-142, every field set'), F('Task', 'full1280', 'Same at 1280'), F('Task', 'empty', 'Nothing set'), F('Task', 'mirrored', 'Mirrored, lock on hover'), F('Task', 'fromfile', 'Mirrored, From the file open'), F('Task', 'long', 'Long description'), F('Task', 'comments', '40 items, scrolled'), F('Task', 'composer', 'Composer open, mention')] },
+      { id: 's7', n: '7', title: 'Peek', sub: 'Space on the selected card or row. No scrim; J and K move it to the next task.', frames: [F('Overlays', 'peekboard', 'Over the board'), F('Overlays', 'peeklist', 'Over the list')] },
+      { id: 's8', n: '8', title: 'Pickers', sub: 'Labels (30, search, create), due date, blockers with the loop refusal and a removed task, subtasks, assignee, status, priority.', frames: [F('Overlays', 'labels', 'Labels, 30 in the project'), F('Overlays', 'labelsearch', 'Labels, search'), F('Overlays', 'labelcreate', 'Labels, create “billing”'), F('Overlays', 'due', 'Due date'), F('Overlays', 'blocker', 'Blocker: loop refused, removed task'), F('Overlays', 'subtask', 'Subtask: add existing or create'), F('Overlays', 'assignee', 'Assignee'), F('Overlays', 'status', 'Status'), F('Overlays', 'priority', 'Priority')] },
+      { id: 's9', n: '9', title: 'Command palette', sub: 'Empty with recent and suggested, searching tasks, the Set status step, acting on 3 selected tasks.', frames: [F('Overlays', 'palempty', 'Empty'), F('Overlays', 'palsearch', 'Searching tasks'), F('Overlays', 'palstatus', 'Set status'), F('Overlays', 'palmulti', '3 selected')] },
+      { id: 's10', n: '10', title: 'Quick create', sub: 'C opens a small dialog in the current project. Labels and due date set.', frames: [F('Overlays', 'create', 'Labels and due date set')] },
+      { id: 's11', n: '11', title: 'Home', sub: 'Mine with every group and the deadlines strip (PAY-142 shows several pills), Everyone, Agents, all clear.', frames: [F('Home', 'mine', 'Mine'), F('Home', 'everyone', 'Everyone'), F('Home', 'agents', 'Agents'), F('Home', 'allclear', 'All clear')] },
+      { id: 's12', n: '12', title: 'Milestones and cycles', sub: 'Milestone list and page, cycle list and page.', frames: [F('Planning', 'mslist', 'Milestones'), F('Planning', 'mspage', 'Milestone page'), F('Planning', 'cyclist', 'Cycles'), F('Planning', 'cycpage', 'Cycle page')] },
+      { id: 's13', n: '13', title: 'Project settings, Labels', sub: 'Empty, 12 labels with a row hovered, rename, recolour, delete confirm, a mirrored project.', frames: [F('Settings', 'labelsempty', 'No labels'), F('Settings', 'labels', '12 labels'), F('Settings', 'rename', 'Rename'), F('Settings', 'recolour', 'Recolour'), F('Settings', 'delete', 'Delete confirm'), F('Settings', 'mirrored', 'Mirrored, read-only names')] },
+      { id: 's14', n: '14', title: 'Forms', sub: 'One settings page and sign-in, in the kit: focus, error, read-only and disabled fields.', frames: [F('Settings', 'general', 'Project settings, General'), F('Settings', 'signin', 'Sign in')] }
+    ];
+    return { sections, themes: [{ id: 'light' }, { id: 'dark' }] };
+  }
+}
+</script>
+</body>
+</html>

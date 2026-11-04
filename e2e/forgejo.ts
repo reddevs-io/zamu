@@ -71,8 +71,8 @@ export interface Forgejo {
   stop(): void;
 }
 
-/** Names of the Forgejo containers the Backlog.md specs start (see stack.forgejoAliases). */
-export const forgejoNames = ['mirror', 'import'] as const;
+/** Names of the Forgejo containers the Backlog.md specs and the upgrade test start (see stack.forgejoAliases). */
+export const forgejoNames = ['mirror', 'import', 'upgrade'] as const;
 
 function forgejoProject(name: string): string {
   return `${composeProject}-forgejo-${name}`;

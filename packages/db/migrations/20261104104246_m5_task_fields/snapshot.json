@@ -1,0 +1,862 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0b1b0b62-ca63-4489-8a93-51a60e9aaf21",
+  "prevIds": ["3372f681-0df5-4964-bbca-b0aff21a4326"],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "label"],
+      "writes": [
+        "s|tbl|public.label",
+        "n|tbl|public.label",
+        "e|tbl|public.label",
+        "n|rel|public.label",
+        "n|type|public.label",
+        "n|rel|public.label_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "task_dependency"],
+      "writes": [
+        "s|tbl|public.task_dependency",
+        "n|tbl|public.task_dependency",
+        "e|tbl|public.task_dependency",
+        "n|rel|public.task_dependency",
+        "n|type|public.task_dependency",
+        "n|rel|public.task_dependency_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "task_label"],
+      "writes": [
+        "s|tbl|public.task_label",
+        "n|tbl|public.task_label",
+        "e|tbl|public.task_label",
+        "n|rel|public.task_label",
+        "n|type|public.task_label",
+        "n|rel|public.task_label_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "due_date"],
+      "writes": ["s|col|public.task.due_date", "n|col|public.task.due_date", "e|col|public.task.due_date"],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "task", "parent_id"],
+      "writes": ["s|col|public.task.parent_id", "n|col|public.task.parent_id", "e|col|public.task.parent_id"],
+      "reads": ["n|tbl|public.task", "n|sch|public"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "label", "label_projectId_name_unique"],
+      "writes": [
+        "s|idx|public.label_projectId_name_unique",
+        "n|idx|public.label_projectId_name_unique",
+        "e|idx|public.label_projectId_name_unique",
+        "n|rel|public.label_projectId_name_unique"
+      ],
+      "reads": ["n|tbl|public.label", "n|sch|public", "n|col|public.label.project_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task", "task_projectId_dueDate_idx"],
+      "writes": [
+        "s|idx|public.task_projectId_dueDate_idx",
+        "n|idx|public.task_projectId_dueDate_idx",
+        "e|idx|public.task_projectId_dueDate_idx",
+        "n|rel|public.task_projectId_dueDate_idx"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task.project_id",
+        "n|col|public.task.due_date"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task", "task_parentId_idx"],
+      "writes": [
+        "s|idx|public.task_parentId_idx",
+        "n|idx|public.task_parentId_idx",
+        "e|idx|public.task_parentId_idx",
+        "n|rel|public.task_parentId_idx"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public", "n|col|public.task.parent_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task_dependency", "task_dependency_blockerId_idx"],
+      "writes": [
+        "s|idx|public.task_dependency_blockerId_idx",
+        "n|idx|public.task_dependency_blockerId_idx",
+        "e|idx|public.task_dependency_blockerId_idx",
+        "n|rel|public.task_dependency_blockerId_idx"
+      ],
+      "reads": ["n|tbl|public.task_dependency", "n|sch|public", "n|col|public.task_dependency.blocker_id"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": ["index", "public", "task_label", "task_label_labelId_idx"],
+      "writes": [
+        "s|idx|public.task_label_labelId_idx",
+        "n|idx|public.task_label_labelId_idx",
+        "e|idx|public.task_label_labelId_idx",
+        "n|rel|public.task_label_labelId_idx"
+      ],
+      "reads": ["n|tbl|public.task_label", "n|sch|public", "n|col|public.task_label.label_id"]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "label"],
+      "writes": [
+        "s|fk|public.label.label_workspace_id_organization_id_fkey",
+        "n|fk|public.label.label_workspace_id_organization_id_fkey",
+        "e|fk|public.label.label_workspace_id_organization_id_fkey",
+        "n|con|public.label.label_workspace_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.label",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.label.workspace_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "label"],
+      "writes": [
+        "s|fk|public.label.label_project_id_project_id_fkey",
+        "n|fk|public.label.label_project_id_project_id_fkey",
+        "e|fk|public.label.label_project_id_project_id_fkey",
+        "n|con|public.label.label_project_id_project_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.label",
+        "n|sch|public",
+        "n|tbl|public.project",
+        "n|sch|public",
+        "n|col|public.label.project_id",
+        "n|col|public.project.id",
+        "e|uniqueness|public.project.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "task"],
+      "writes": [
+        "s|fk|public.task.task_parent_id_task_id_fkey",
+        "n|fk|public.task.task_parent_id_task_id_fkey",
+        "e|fk|public.task.task_parent_id_task_id_fkey",
+        "n|con|public.task.task_parent_id_task_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task.parent_id",
+        "n|col|public.task.id",
+        "e|uniqueness|public.task.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "task_dependency"],
+      "writes": [
+        "s|fk|public.task_dependency.task_dependency_task_id_task_id_fkey",
+        "n|fk|public.task_dependency.task_dependency_task_id_task_id_fkey",
+        "e|fk|public.task_dependency.task_dependency_task_id_task_id_fkey",
+        "n|con|public.task_dependency.task_dependency_task_id_task_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.task_dependency",
+        "n|sch|public",
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task_dependency.task_id",
+        "n|col|public.task.id",
+        "e|uniqueness|public.task.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "task_dependency"],
+      "writes": [
+        "s|fk|public.task_dependency.task_dependency_blocker_id_task_id_fkey",
+        "n|fk|public.task_dependency.task_dependency_blocker_id_task_id_fkey",
+        "e|fk|public.task_dependency.task_dependency_blocker_id_task_id_fkey",
+        "n|con|public.task_dependency.task_dependency_blocker_id_task_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.task_dependency",
+        "n|sch|public",
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task_dependency.blocker_id",
+        "n|col|public.task.id",
+        "e|uniqueness|public.task.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "task_label"],
+      "writes": [
+        "s|fk|public.task_label.task_label_task_id_task_id_fkey",
+        "n|fk|public.task_label.task_label_task_id_task_id_fkey",
+        "e|fk|public.task_label.task_label_task_id_task_id_fkey",
+        "n|con|public.task_label.task_label_task_id_task_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.task_label",
+        "n|sch|public",
+        "n|tbl|public.task",
+        "n|sch|public",
+        "n|col|public.task_label.task_id",
+        "n|col|public.task.id",
+        "e|uniqueness|public.task.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "task_label"],
+      "writes": [
+        "s|fk|public.task_label.task_label_label_id_label_id_fkey",
+        "n|fk|public.task_label.task_label_label_id_label_id_fkey",
+        "e|fk|public.task_label.task_label_label_id_label_id_fkey",
+        "n|con|public.task_label.task_label_label_id_label_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.task_label",
+        "n|sch|public",
+        "n|tbl|public.label",
+        "n|sch|public",
+        "n|col|public.task_label.label_id",
+        "n|col|public.label.id",
+        "e|uniqueness|public.label.id"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "task"],
+      "writes": [
+        "s|ck|public.task.task_parent_check",
+        "n|ck|public.task.task_parent_check",
+        "e|ck|public.task.task_parent_check",
+        "n|con|public.task.task_parent_check"
+      ],
+      "reads": ["n|tbl|public.task", "n|sch|public", "n|col|public.task.parent_id", "n|col|public.task.id"]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "label",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "task_dependency",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "task_label",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "uuidv7()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "workspace_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "project_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "color",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "source",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'app'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "due_date",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "parent_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "task_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "blocker_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_label",
+        "name": "task_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_label",
+        "name": "label_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "label_projectId_name_unique",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "lower(\"name\")",
+            "isExpression": true,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_projectId_dueDate_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "project_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "due_date",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"due_date\" is not null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_parentId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "parent_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "task_dependency_blockerId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "blocker_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_label",
+        "name": "task_label_labelId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "label_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "label_workspace_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": ["workspace_id"],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "label_project_id_project_id_fkey",
+        "nameExplicit": false,
+        "columns": ["project_id"],
+        "schemaTo": "public",
+        "tableTo": "project",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_parent_id_task_id_fkey",
+        "nameExplicit": false,
+        "columns": ["parent_id"],
+        "schemaTo": "public",
+        "tableTo": "task",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "task_dependency_task_id_task_id_fkey",
+        "nameExplicit": false,
+        "columns": ["task_id"],
+        "schemaTo": "public",
+        "tableTo": "task",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "task_dependency_blocker_id_task_id_fkey",
+        "nameExplicit": false,
+        "columns": ["blocker_id"],
+        "schemaTo": "public",
+        "tableTo": "task",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_label",
+        "name": "task_label_task_id_task_id_fkey",
+        "nameExplicit": false,
+        "columns": ["task_id"],
+        "schemaTo": "public",
+        "tableTo": "task",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_label",
+        "name": "task_label_label_id_label_id_fkey",
+        "nameExplicit": false,
+        "columns": ["label_id"],
+        "schemaTo": "public",
+        "tableTo": "label",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "task_dependency_pkey",
+        "columns": ["task_id", "blocker_id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_label",
+        "name": "task_label_pkey",
+        "columns": ["task_id", "label_id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "label_pkey",
+        "columns": ["id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "label_name_check",
+        "value": "char_length(\"name\") between 1 and 40",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "label_color_check",
+        "value": "\"color\" between 1 and 9",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "label",
+        "name": "label_source_check",
+        "value": "\"source\" in ('app', 'backlog')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task",
+        "name": "task_parent_check",
+        "value": "\"parent_id\" <> \"id\"",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_dependency",
+        "name": "task_dependency_self_check",
+        "value": "\"task_id\" <> \"blocker_id\"",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

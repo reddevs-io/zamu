@@ -24,15 +24,15 @@ export interface ProviderBadgeProps {
   className?: string;
 }
 
-/** Letters in a hairline square, no logos: GH, GL, FJ (ledger-m3.css .m3-prov). */
+/** Letters in a hairline rounded square, no logos: GH, GL, FJ. */
 export function ProviderBadge({ provider, size = 'md', decorative = false, className }: ProviderBadgeProps) {
   return (
     <span
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': PROVIDER_LABELS[provider] })}
       data-provider={provider}
       className={cn(
-        'box-border grid shrink-0 place-items-center border border-line bg-surface font-mono font-medium text-fg',
-        size === 'md' ? 'size-[26px] text-[9.5px]' : 'size-5 text-[8.5px]',
+        'box-border grid shrink-0 place-items-center rounded-sm border border-line bg-surface text-xs font-semibold text-fg',
+        size === 'md' ? 'size-6.5' : 'size-5 tracking-tight',
         className,
       )}
     >
@@ -47,8 +47,8 @@ export type StateTagTone = 'ok' | 'warn' | 'danger';
 
 const TAG_TONE: Record<StateTagTone, string> = {
   ok: 'border border-line text-fg',
-  warn: 'bg-warn-bg font-semibold text-warn',
-  danger: 'bg-danger-bg font-semibold text-danger',
+  warn: 'bg-danger-soft font-semibold text-danger',
+  danger: 'bg-danger-soft font-semibold text-danger',
 };
 
 export interface StateTagProps {
@@ -59,13 +59,13 @@ export interface StateTagProps {
   className?: string;
 }
 
-/** 20px tag with a state colour (ledger-m3.css .m3-tagok, .m3-tagwn, .m3-tager). */
+/** 20px pill with a state colour. */
 export function StateTag({ tone, dot, children, className }: StateTagProps) {
   return (
     <span
       data-tone={tone}
       className={cn(
-        'box-border inline-flex h-5 shrink-0 items-center gap-1.5 px-1.5 text-[11px] whitespace-nowrap',
+        'box-border inline-flex h-5 shrink-0 items-center gap-1.5 rounded-pill px-2 text-xs whitespace-nowrap',
         TAG_TONE[tone],
         className,
       )}

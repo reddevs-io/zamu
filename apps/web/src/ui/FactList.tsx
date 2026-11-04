@@ -27,13 +27,13 @@ export function FactList({ items, labelWidth = 140, size = 'md', className }: Fa
       style={{ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }}
       className={cn(
         'm-0 grid items-baseline',
-        size === 'md' ? 'gap-x-4 gap-y-2 text-[12.5px]' : 'gap-x-2.5 gap-y-1.5 text-[12px]',
+        size === 'md' ? 'gap-x-4 gap-y-2 text-sm' : 'gap-x-2.5 gap-y-1.5 text-sm',
         className,
       )}
     >
       {items.map((fact) => (
         <div key={fact.id} className="contents">
-          <dt className={cn('text-muted', size === 'md' && 'text-[12px]')}>{fact.label}</dt>
+          <dt className={cn('text-fg-2', size === 'md' && 'text-sm')}>{fact.label}</dt>
           <dd className="m-0 min-w-0">{fact.value}</dd>
         </div>
       ))}

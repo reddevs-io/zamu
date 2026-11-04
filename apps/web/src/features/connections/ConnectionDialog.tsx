@@ -292,7 +292,7 @@ function ConnectionForm({
               <span className="flex items-baseline">
                 <span>Access token</span>
                 {preview ? (
-                  <span aria-hidden className="ml-auto text-[11.5px] font-normal text-faint">
+                  <span aria-hidden className="ml-auto text-xs font-normal text-fg-3">
                     {preview}
                   </span>
                 ) : null}
@@ -319,7 +319,7 @@ function ConnectionForm({
                 {scope.code.map((code, index) => (
                   <span key={code}>
                     {index > 0 ? ' and ' : null}
-                    <InlineCode className="text-[11px] text-fg">{code}</InlineCode>
+                    <InlineCode className="text-xs text-fg">{code}</InlineCode>
                   </span>
                 ))}{' '}
                 {scope.after}
@@ -334,9 +334,7 @@ function ConnectionForm({
           {check ? <CheckResult check={check} adding={editing === null} /> : null}
         </DialogBody>
         <DialogFooter
-          start={
-            <span className="text-[11.5px] text-muted">The token is encrypted and never shown again.</span>
-          }
+          start={<span className="text-xs text-fg-2">The token is encrypted and never shown again.</span>}
         >
           <Button variant="secondary" onPress={() => void test()} isDisabled={testing || saving}>
             {testing ? 'Testing…' : 'Test'}
@@ -361,7 +359,7 @@ function CheckResult({ check, adding }: { check: Check; adding: boolean }) {
         : ` and can read ${check.repoCount} ${check.repoCount === 1 ? 'repository' : 'repositories'}`;
     body = check.login ? (
       <>
-        <b>Working.</b> Signed in as <span className="font-mono text-[11.5px] text-fg">{check.login}</span>
+        <b>Working.</b> Signed in as <span className="font-medium text-fg">{check.login}</span>
         {repos}.
       </>
     ) : (
@@ -392,11 +390,11 @@ function CheckResult({ check, adding }: { check: Check; adding: boolean }) {
     <div
       role={check.state === 'testing' ? 'status' : isError ? 'alert' : 'status'}
       className={cn(
-        'flex items-start gap-2.5 border px-3 py-2.5 text-[12.5px] leading-normal [&_b]:font-semibold',
-        isError ? 'border-danger bg-danger-bg' : 'border-line bg-band',
+        'flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-sm leading-normal [&_b]:font-semibold',
+        isError ? 'border-danger bg-danger-soft' : 'border-line bg-bg-grp',
       )}
     >
-      <SourceStatusDot state={dot} decorative className="mt-[5px]" />
+      <SourceStatusDot state={dot} decorative className="mt-1.25" />
       <span className="min-w-0">{body}</span>
     </div>
   );

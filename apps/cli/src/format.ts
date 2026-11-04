@@ -211,6 +211,18 @@ function quote(text: string | null): string {
   return text === null ? 'nothing' : `"${text}"`;
 }
 
+/** "added label ui and removed label bug": what changed between two lists of names. */
+function listChange(noun: string, from: readonly string[], to: readonly string[]): string {
+  const added = to.filter((name) => !from.includes(name));
+  const removed = from.filter((name) => !to.includes(name));
+  const phrase = (verb: string, names: string[]) =>
+    `${verb} ${noun}${names.length === 1 ? '' : 's'} ${names.join(', ')}`;
+  const parts = [
+    added.length ? phrase('added', added) : null,
+    removed.length ? phrase('removed', removed) : null,
+  ];
+  return parts.filter(Boolean).join(' and ') || `changed the ${noun}s`;
+}
 /** One change as the activity feed phrases it: "moved it from Todo to In progress". */
 export function changeSentence(change: ActivityChange): string {
   switch (change.field) {
@@ -236,6 +248,30 @@ export function changeSentence(change: ActivityChange): string {
     case 'cycle':
       if (change.to) return `moved it to Cycle ${change.to.number}`;
       return change.from ? `removed it from Cycle ${change.from.number}` : 'removed it from the cycle';
+    case 'labels':
+      return listChange(
+        'label',
+        change.from.map((l) => l.name),
+        change.to.map((l) => l.name),
+      );
+    case 'dueDate':
+      if (change.to === null) return 'cleared the due date';
+      return change.from === null
+        ? `set the due date to ${change.to}`
+        : `moved the due date from ${change.from} to ${change.to}`;
+    case 'blockedBy':
+      return listChange(
+        'blocker',
+        change.from.map((t) => t.key),
+        change.to.map((t) => t.key),
+      );
+    case 'parent':
+      if (change.to) {
+        return change.from
+          ? `moved it from ${change.from.key} to ${change.to.key}`
+          : `made it a subtask of ${change.to.key}`;
+      }
+      return change.from ? `took it out of ${change.from.key}` : 'made it a top-level task';
   }
 }
 

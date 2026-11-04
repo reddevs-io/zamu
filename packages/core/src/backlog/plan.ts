@@ -23,6 +23,7 @@ import {
   type BacklogTaskKind,
   formatTaskKey,
   isOpenStatus,
+  MAX_LABEL_NAME_LENGTH,
   type MilestoneStatus,
   PRIORITY_LABELS,
   type Priority,
@@ -33,6 +34,15 @@ import {
   type TaskStatus,
 } from '@pm/contracts';
 import type { z } from 'zod';
+import { compareLabelNames, compareTaskKeys } from '../activity';
+import {
+  backlogDueDate,
+  backlogLabelNames,
+  compareCodePoints,
+  FIELD_WARNING_PATTERN,
+  labelKey,
+  leastUsedLabelColor,
+} from './fields';
 import { emptySeenValues, MappingIndex, type SeenValues, valueKey } from './mappings';
 
 // ---------------------------------------------------------------------------
@@ -59,6 +69,20 @@ export interface ExistingTask {
   createdAt: Date;
   backlogData: Record<string, unknown> | null;
   hiddenAt: Date | null;
+  /** M5: native fields as stored (task.due_date, task.parent_id, task_label, task_dependency). */
+  dueDate: string | null;
+  parentId: string | null;
+  labelIds: string[];
+  blockerIds: string[];
+}
+
+/** M5: a label of the project. */
+export interface ExistingLabel {
+  id: string;
+  name: string;
+  /** 1 to 9. */
+  color: number;
+  source: 'app' | 'backlog';
 }
 
 export interface ExistingMilestone {
@@ -121,6 +145,8 @@ export interface ExistingState {
   firstRead: boolean;
   /** File warnings of the last read, carried for unchanged files. */
   problems: BacklogProblem[];
+  /** M5: the project's labels. */
+  labels: ExistingLabel[];
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +155,31 @@ export interface ExistingState {
 
 /** A milestone a task points at: an existing row, or one this plan creates (by Backlog.md id). */
 export type MilestoneTarget = { id: string } | { backlogId: string };
+
+/** M5: a task a native field points at: an existing row, or one this plan creates (by Backlog.md id). */
+export type TaskTarget = { id: string } | { backlogId: string };
+
+/** M5: a label of the project, or one this plan creates (by name, matched ignoring case). */
+export type LabelTarget = { id: string } | { name: string };
+
+/** M5: a label inside a planned change, with the name to record. */
+export interface PlannedLabelRef {
+  label: LabelTarget;
+  name: string;
+}
+
+/** M5: a task inside a planned change, with the key and title to record. */
+export interface PlannedTaskRef {
+  task: TaskTarget;
+  key: string;
+  title: string;
+}
+
+/** M5: a label the apply creates (source backlog; colour picked here, never changed by a refresh). */
+export interface LabelCreate {
+  name: string;
+  color: number;
+}
 
 /** task.backlog_data as stored: BacklogBlock input with JSON values only. */
 export type StoredBlock = z.input<typeof BacklogBlock>;
@@ -146,6 +197,11 @@ export interface TaskValues {
   milestone: MilestoneTarget | null;
   createdAt: Date;
   backlogData: StoredBlock;
+  /** M5: native fields filled from the file. */
+  dueDate: string | null;
+  parent: TaskTarget | null;
+  labels: LabelTarget[];
+  blockers: TaskTarget[];
 }
 
 export interface TaskCreate extends TaskValues {
@@ -162,6 +218,11 @@ export type PlannedChange =
   | { field: 'priority'; from: Priority; to: Priority }
   | { field: 'assignee'; from: string | null; to: string | null }
   | { field: 'milestone'; from: string | null; to: MilestoneTarget | null }
+  // M5: whole lists before and after, labels sorted by name and blockers by key.
+  | { field: 'labels'; from: PlannedLabelRef[]; to: PlannedLabelRef[] }
+  | { field: 'dueDate'; from: string | null; to: string | null }
+  | { field: 'blockedBy'; from: PlannedTaskRef[]; to: PlannedTaskRef[] }
+  | { field: 'parent'; from: PlannedTaskRef | null; to: PlannedTaskRef | null }
   | { field: 'backlog'; from: null; to: string[] };
 
 export interface TaskUpdate {
@@ -207,6 +268,11 @@ export interface BacklogPlan {
   firstRead: boolean;
   tasks: { creates: TaskCreate[]; updates: TaskUpdate[]; hides: { id: string }[] };
   milestones: { creates: MilestoneValues[]; updates: MilestoneUpdate[]; hides: { id: string }[] };
+  /**
+   * M5: labels to create, and app labels the files now use (they turn into backlog labels, so
+   * their names lock). Existing labels keep their colour.
+   */
+  labels: { creates: LabelCreate[]; adopt: { id: string }[] };
   files: FileRow[];
   /** Files first (by path), then values. Skipped files have `skipped: true`. */
   problems: BacklogProblem[];
@@ -217,6 +283,15 @@ export interface BacklogPlan {
   /** Values seen (drafts' statuses left out), for mapping views. */
   seen: SeenValues;
 }
+
+/** Block keys that M5 maps to native fields (or derives from one): never listed as block-only changes. */
+const NATIVE_BLOCK_KEYS: ReadonlySet<string> = new Set([
+  'labels',
+  'dependencies',
+  'parentId',
+  'subtasks',
+  'dueDate',
+]);
 
 /** Rows in the preview sample. */
 export const SAMPLE_SIZE = 8;
@@ -484,6 +559,8 @@ export function planRefresh(input: PlanInput): BacklogPlan {
   const previousWarnings = new Map<string, BacklogProblem[]>();
   for (const problem of existing.problems) {
     if (problem.kind !== 'file' || problem.skipped) continue;
+    // Field warnings depend on the whole read; this plan works them out again.
+    if (FIELD_WARNING_PATTERN.test(problem.message)) continue;
     const list = previousWarnings.get(problem.path) ?? [];
     list.push(problem);
     previousWarnings.set(problem.path, list);
@@ -821,7 +898,151 @@ export function planRefresh(input: PlanInput): BacklogPlan {
       return compareText(x.prefix, y.prefix) || x.number - y.number || compareSuffix(x.suffix, y.suffix);
     });
 
-  // 4. Desired values, problems ----------------------------------------------------------------
+  // 4. Native fields (M5): labels, due date, parent and blockers ---------------------------------
+  // A task id names a task of this read (its row, or the one this plan creates), else a row of the
+  // project with that Backlog.md id that no file of this read took (hidden tasks: "Removed task"),
+  // visible rows first, then the lowest id. The backfill migration uses the same lookup.
+  const snapshotByBacklogId = new Map(all.map((snapshot) => [snapshot.backlogId, snapshot]));
+  const otherRows = new Map<string, ExistingTask>();
+  for (const row of existing.tasks) {
+    if (!row.backlogId || used.has(row.id)) continue;
+    const current = otherRows.get(row.backlogId);
+    if (!current) {
+      otherRows.set(row.backlogId, row);
+      continue;
+    }
+    const visible = row.hiddenAt === null;
+    const better = visible !== (current.hiddenAt === null) ? visible : row.id < current.id;
+    if (better) otherRows.set(row.backlogId, row);
+  }
+  const targetOf = (snapshot: TaskSnapshot): TaskTarget => {
+    const row = matchOf.get(snapshot);
+    return row ? { id: row.id } : { backlogId: snapshot.backlogId };
+  };
+  const rowRef = (row: ExistingTask): PlannedTaskRef => ({
+    task: { id: row.id },
+    key: formatTaskKey(input.projectKey, row.number, row.keySuffix),
+    title: row.title,
+  });
+  const taskRef = (backlogId: string): PlannedTaskRef | null => {
+    const snapshot = snapshotByBacklogId.get(backlogId);
+    if (snapshot) {
+      const key = appKey.get(snapshot) as { number: number; suffix: string | null };
+      return {
+        task: targetOf(snapshot),
+        key: formatTaskKey(input.projectKey, key.number, key.suffix),
+        title: snapshot.title,
+      };
+    }
+    const row = otherRows.get(backlogId);
+    return row ? rowRef(row) : null;
+  };
+  const targetId = (target: TaskTarget | LabelTarget) =>
+    'id' in target
+      ? `id:${target.id}`
+      : 'backlogId' in target
+        ? `task:${target.backlogId}`
+        : `label:${labelKey(target.name)}`;
+
+  // Labels: reuse the project's label with the same name (ignoring case), else create one. New
+  // labels take the least used hue, in name order; the first spelling in code point order names it.
+  const labelByKey = new Map(existing.labels.map((row) => [labelKey(row.name), row]));
+  const labelById = new Map(existing.labels.map((row) => [row.id, row]));
+  const fileLabels = new Map<TaskSnapshot, string[]>();
+  const newLabelNames = new Map<string, string>();
+  for (const snapshot of all) {
+    const { names, tooLong } = backlogLabelNames(snapshot.rest.labels);
+    for (const name of tooLong) {
+      fileProblem(
+        snapshot.path,
+        snapshot.backlogId,
+        false,
+        `labels: "${name}" is longer than ${MAX_LABEL_NAME_LENGTH} characters and was left out`,
+      );
+    }
+    fileLabels.set(snapshot, names);
+    for (const name of names) {
+      const key = labelKey(name);
+      if (labelByKey.has(key)) continue;
+      const current = newLabelNames.get(key);
+      if (current === undefined || compareCodePoints(name, current) < 0) newLabelNames.set(key, name);
+    }
+  }
+  const colorCounts = new Map<number, number>();
+  for (const row of existing.labels) colorCounts.set(row.color, (colorCounts.get(row.color) ?? 0) + 1);
+  const labelCreates: LabelCreate[] = [];
+  for (const key of [...newLabelNames.keys()].sort(compareCodePoints)) {
+    const color = leastUsedLabelColor(colorCounts);
+    colorCounts.set(color, (colorCounts.get(color) ?? 0) + 1);
+    labelCreates.push({ name: newLabelNames.get(key) as string, color });
+  }
+  const adopt = new Set<string>();
+  const labelRef = (name: string): PlannedLabelRef => {
+    const row = labelByKey.get(labelKey(name));
+    if (row) {
+      if (row.source !== 'backlog') adopt.add(row.id);
+      return { label: { id: row.id }, name: row.name };
+    }
+    const created = newLabelNames.get(labelKey(name)) as string;
+    return { label: { name: created }, name: created };
+  };
+  // The orders stored changes use (activity.ts).
+  const byName = compareLabelNames;
+  const byKey = (a: PlannedTaskRef, b: PlannedTaskRef) => compareTaskKeys(a.key, b.key);
+
+  interface NativeValues {
+    dueDate: string | null;
+    parent: PlannedTaskRef | null;
+    labels: PlannedLabelRef[];
+    blockers: PlannedTaskRef[];
+  }
+  const native = new Map<TaskSnapshot, NativeValues>();
+  for (const snapshot of all) {
+    const self = targetId(targetOf(snapshot));
+    const parentId = parentOf(snapshot);
+    let parent = parentId ? taskRef(parentId) : null;
+    if (parent && targetId(parent.task) === self) {
+      fileProblem(
+        snapshot.path,
+        snapshot.backlogId,
+        false,
+        `parent_task_id: ${parentId} is this task and was ignored`,
+      );
+      parent = null;
+    }
+    const blockers = new Map<string, PlannedTaskRef>();
+    for (const id of snapshot.rest.dependencies) {
+      const ref = taskRef(id);
+      if (!ref) {
+        fileProblem(
+          snapshot.path,
+          snapshot.backlogId,
+          false,
+          `dependencies: ${id} matches no task in this project; the link is left out`,
+        );
+        continue;
+      }
+      const target = targetId(ref.task);
+      if (target === self) {
+        fileProblem(
+          snapshot.path,
+          snapshot.backlogId,
+          false,
+          `dependencies: ${id} is this task; the link is left out`,
+        );
+        continue;
+      }
+      if (!blockers.has(target)) blockers.set(target, ref);
+    }
+    native.set(snapshot, {
+      dueDate: backlogDueDate(snapshot.rest.dueDate),
+      parent,
+      labels: (fileLabels.get(snapshot) ?? []).map(labelRef).sort(byName),
+      blockers: [...blockers.values()].sort(byKey),
+    });
+  }
+
+  // 5. Desired values, problems ----------------------------------------------------------------
   const values = new Map<string, Extract<BacklogProblem, { kind: 'value' }>>();
   const valueProblem = (
     field: 'status' | 'priority' | 'assignee' | 'milestone',
@@ -901,6 +1122,7 @@ export function planRefresh(input: PlanInput): BacklogPlan {
 
     const key = appKey.get(snapshot) as { number: number; suffix: string | null };
     const row = matchOf.get(snapshot);
+    const fields = native.get(snapshot) as NativeValues;
     const block: StoredBlock = {
       kind: snapshot.kind as BacklogTaskKind,
       status: raw.status,
@@ -934,14 +1156,23 @@ export function planRefresh(input: PlanInput): BacklogPlan {
       milestone,
       createdAt: snapshot.createdAt ?? row?.createdAt ?? now,
       backlogData: toJson(block),
+      dueDate: fields.dueDate,
+      parent: fields.parent?.task ?? null,
+      labels: fields.labels.map((ref) => ref.label),
+      blockers: fields.blockers.map((ref) => ref.task),
     });
   }
 
-  // 5. Task diff ------------------------------------------------------------------------------
+  // 6. Task diff ------------------------------------------------------------------------------
   const creates: TaskCreate[] = [];
   const updates: TaskUpdate[] = [];
   const sameTarget = (current: string | null, target: MilestoneTarget | null) =>
     target === null ? current === null : 'id' in target ? target.id === current : false;
+  const sameSet = (current: string[], targets: (TaskTarget | LabelTarget)[]) => {
+    const want = new Set(targets.map(targetId));
+    const have = new Set(current.map((id) => `id:${id}`));
+    return want.size === have.size && [...want].every((id) => have.has(id));
+  };
   for (const snapshot of all) {
     const want = desired.get(snapshot) as TaskValues;
     const row = matchOf.get(snapshot);
@@ -988,6 +1219,35 @@ export function planRefresh(input: PlanInput): BacklogPlan {
       set.milestone = want.milestone;
       changes.push({ field: 'milestone', from: row.milestoneId, to: want.milestone });
     }
+    const fields = native.get(snapshot) as NativeValues;
+    if (!sameSet(row.labelIds, want.labels)) {
+      set.labels = want.labels;
+      const from = row.labelIds.map(
+        (id): PlannedLabelRef => ({
+          label: { id },
+          name: labelById.get(id)?.name ?? '',
+        }),
+      );
+      changes.push({ field: 'labels', from: from.sort(byName), to: fields.labels });
+    }
+    if (want.dueDate !== row.dueDate) {
+      set.dueDate = want.dueDate;
+      changes.push({ field: 'dueDate', from: row.dueDate, to: want.dueDate });
+    }
+    if (!sameSet(row.blockerIds, want.blockers)) {
+      set.blockers = want.blockers;
+      const from = row.blockerIds.flatMap((id) => {
+        const blocker = existingTaskById.get(id);
+        return blocker ? [rowRef(blocker)] : [];
+      });
+      changes.push({ field: 'blockedBy', from: from.sort(byKey), to: fields.blockers });
+    }
+    const wantParent = want.parent;
+    if (wantParent === null ? row.parentId !== null : targetId(wantParent) !== `id:${row.parentId}`) {
+      set.parent = wantParent;
+      const current = row.parentId ? existingTaskById.get(row.parentId) : undefined;
+      changes.push({ field: 'parent', from: current ? rowRef(current) : null, to: fields.parent });
+    }
     if (want.createdAt.getTime() !== row.createdAt.getTime()) {
       set.createdAt = want.createdAt;
       backlogFields.push('createdAt');
@@ -1009,9 +1269,13 @@ export function planRefresh(input: PlanInput): BacklogPlan {
     if (changedKeys.length > 0 || !row.backlogData) {
       set.backlogData = want.backlogData;
       // Raw values of mapped fields show through their own change; list the block-only ones.
+      // M5: labels, dependencies, the parent and the due date are native fields with their own
+      // changes, and subtasks are the other side of the parent: none of them is listed.
       backlogFields.push(
         ...changedKeys.filter(
-          (key) => !['status', 'priority', 'milestone', 'assignees'].includes(key) || !before,
+          (key) =>
+            !NATIVE_BLOCK_KEYS.has(key) &&
+            (!['status', 'priority', 'milestone', 'assignees'].includes(key) || !before),
         ),
       );
     }
@@ -1027,7 +1291,7 @@ export function planRefresh(input: PlanInput): BacklogPlan {
     hides.push({ id: task.id });
   }
 
-  // 6. Milestone diff -------------------------------------------------------------------------
+  // 7. Milestone diff -------------------------------------------------------------------------
   // M2's rule: a Planned milestone turns Active when one of its tasks is in progress or in review.
   const startedMilestones = new Set<string>();
   for (const want of desired.values()) {
@@ -1087,7 +1351,7 @@ export function planRefresh(input: PlanInput): BacklogPlan {
     .filter((row) => row.backlogId && !milestoneUsed.has(row.id) && !row.hiddenAt)
     .map((row) => ({ id: row.id }));
 
-  // 7. Counts, sample, next number --------------------------------------------------------------
+  // 8. Counts, sample, next number --------------------------------------------------------------
   const counts = emptyCounts();
   const completedPrefix = `${input.folder.replace(/\/+$/, '')}/completed/`;
   for (const snapshot of all) {
@@ -1135,6 +1399,7 @@ export function planRefresh(input: PlanInput): BacklogPlan {
     firstRead: existing.firstRead,
     tasks: { creates, updates, hides },
     milestones: { creates: milestoneCreates, updates: milestoneUpdates, hides: milestoneHides },
+    labels: { creates: labelCreates, adopt: [...adopt].sort().map((id) => ({ id })) },
     files: fileRows.sort((a, b) => compareText(a.path, b.path)),
     problems: [...fileProblems, ...values.values()],
     counts,

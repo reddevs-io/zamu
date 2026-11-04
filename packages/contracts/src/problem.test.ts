@@ -163,6 +163,23 @@ describe('encodeProblem / decodeProblem', () => {
     expect(decoded?.message).toBe('No task PAY-9');
   });
 
+  it('carries both ends of a DEPENDENCY_LOOP through encode and decode', () => {
+    const loop = { task: 'PAY-142', blocker: 'PAY-150' };
+    const error = new ORPCError('DEPENDENCY_LOOP', {
+      status: 409,
+      message: "Can't add: PAY-150 already waits on PAY-142.",
+      data: {
+        loop,
+        issues: [{ path: 'addBlockers', message: "Can't add: PAY-150 already waits on PAY-142." }],
+      },
+    });
+    const body = encodeProblem(error);
+    expect(body).toMatchObject({ code: 'DEPENDENCY_LOOP', status: 409, title: 'Blockers would loop', loop });
+    const decoded = decodeProblem(JSON.parse(JSON.stringify(body)));
+    expect(decoded?.data).toMatchObject({ loop });
+    expect(encodeProblem(new ORPCError('CONFLICT', { status: 409 }))).not.toHaveProperty('loop');
+  });
+
   it('carries the current task through a TASK_CHANGED conflict', () => {
     const error = new ORPCError('TASK_CHANGED', {
       status: 409,

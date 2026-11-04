@@ -29,6 +29,20 @@ export const PROBLEM_CODES = [
   'BACKLOG_PAUSED',
   /** Refreshing or changing a source that was detached. */
   'BACKLOG_DETACHED',
+  // M5: task fields.
+  /** A label name the project has already, ignoring case (409). */
+  'LABEL_EXISTS',
+  /** Renaming or deleting a label that comes from Backlog.md files (409). Its colour can change. */
+  'LABEL_MIRRORED',
+  /**
+   * A blocker that would close a loop (409): "Can't add: PAY-150 already waits on PAY-142." The
+   * detail carries that sentence.
+   */
+  'DEPENDENCY_LOOP',
+  /** A parent that is a subtask, or a subtask target that has subtasks: one level only (409). */
+  'SUBTASK_DEPTH',
+  /** A blocker, parent, label or bulk milestone and cycle across projects (422). */
+  'NOT_SAME_PROJECT',
 ] as const;
 export const ProblemCode = z.enum(PROBLEM_CODES);
 export type ProblemCode = z.infer<typeof ProblemCode>;
@@ -48,6 +62,11 @@ export const PROBLEM_STATUS: Record<ProblemCode, number> = {
   PROJECT_NOT_EMPTY: 409,
   BACKLOG_PAUSED: 409,
   BACKLOG_DETACHED: 409,
+  LABEL_EXISTS: 409,
+  LABEL_MIRRORED: 409,
+  DEPENDENCY_LOOP: 409,
+  SUBTASK_DEPTH: 409,
+  NOT_SAME_PROJECT: 422,
 };
 
 export const PROBLEM_TITLES: Record<ProblemCode, string> = {
@@ -65,6 +84,11 @@ export const PROBLEM_TITLES: Record<ProblemCode, string> = {
   PROJECT_NOT_EMPTY: 'Project is not empty',
   BACKLOG_PAUSED: 'Backlog.md mirror is paused',
   BACKLOG_DETACHED: 'Backlog.md source is detached',
+  LABEL_EXISTS: 'Label exists',
+  LABEL_MIRRORED: 'Label comes from Backlog.md',
+  DEPENDENCY_LOOP: 'Blockers would loop',
+  SUBTASK_DEPTH: 'Subtasks go one level deep',
+  NOT_SAME_PROJECT: 'Tasks are in different projects',
 };
 
 /** The codes of the Backlog.md mirror rules, for clients that treat them alike. */
@@ -98,20 +122,34 @@ export const ProblemIssue = z.object({
 });
 export type ProblemIssue = z.infer<typeof ProblemIssue>;
 
+/**
+ * M5, DEPENDENCY_LOOP only: the two ends of the refused link, as task keys. `blocker` already waits
+ * on `task` (directly or through other tasks), so `task` can't wait on `blocker`: "Can't add:
+ * {blocker} already waits on {task}."
+ */
+export const ProblemLoop = z.object({
+  task: z.string(),
+  blocker: z.string(),
+});
+export type ProblemLoop = z.infer<typeof ProblemLoop>;
+
 /** Extra data carried by contract errors (the `data` of an ORPCError). */
 export const ProblemData = z.object({
   requestId: z.string().optional(),
   issues: z.array(ProblemIssue).optional(),
   /** TASK_CHANGED only: the task as it is now. */
   task: Task.optional(),
+  /** DEPENDENCY_LOOP only: the ends of the loop. */
+  loop: ProblemLoop.optional(),
   ...MirroredProblemExtensions.shape,
 });
 export type ProblemData = z.infer<typeof ProblemData>;
 
 /**
  * Error body of every /api/v1 response with a 4xx or 5xx status, after RFC 9457 (problem details)
- * with these extensions: `code`, `requestId`, `issues`, `task` for TASK_CHANGED, and `field`,
- * `file`, `backlogId`, `hint` for the *_MIRRORED codes (M3). The CLI prints it under `pm.v1.error`.
+ * with these extensions: `code`, `requestId`, `issues`, `task` for TASK_CHANGED, `field`, `file`,
+ * `backlogId`, `hint` for the *_MIRRORED codes (M3), and `loop` for DEPENDENCY_LOOP (M5). The CLI
+ * prints it under `pm.v1.error`.
  */
 export const Problem = z.object({
   type: z.string().default('about:blank'),
@@ -124,6 +162,8 @@ export const Problem = z.object({
   issues: z.array(ProblemIssue).optional(),
   /** TASK_CHANGED only: the task as it is now, so the client can roll back to it. */
   task: Task.optional(),
+  /** DEPENDENCY_LOOP only: the two task keys, so clients can phrase the refusal. */
+  loop: ProblemLoop.optional(),
   ...MirroredProblemExtensions.shape,
 });
 export type Problem = z.output<typeof Problem>;

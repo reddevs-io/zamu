@@ -23,7 +23,7 @@ export interface PickerItem {
   sub?: string;
   /** Trailing mono text: "Nov 14", "–". */
   meta?: string;
-  /** `warn` draws the meta in --warn (overdue target date). */
+  /** `warn` draws the meta in --danger (overdue target date). */
   metaTone?: 'default' | 'warn';
   /** Text matched by the search. Defaults to the label. */
   textValue?: string;
@@ -33,7 +33,7 @@ export interface PickerItem {
 /** Key of the "none" item in the menu. onChange receives null for it. */
 export const PICKER_NONE = '__none__';
 
-const rowClass = 'flex h-8 min-w-0 items-center gap-2 px-2.5 text-[12.5px] text-fg';
+const rowClass = 'flex h-8 min-w-0 items-center gap-2.25 rounded-sm px-2 text-sm text-fg';
 
 function PickerRowContent({
   item,
@@ -47,23 +47,23 @@ function PickerRowContent({
   return (
     <>
       {item.lead ? (
-        <span className="flex w-[18px] shrink-0 items-center justify-center">{item.lead}</span>
+        <span className="flex w-4.5 shrink-0 items-center justify-center">{item.lead}</span>
       ) : null}
-      <span className={cn('min-w-0 truncate', hint && 'font-semibold')}>{item.label}</span>
-      {item.sub ? <span className="shrink-0 truncate text-[11.5px] text-muted">{item.sub}</span> : null}
+      <span className={cn('min-w-0 truncate', hint && 'font-medium')}>{item.label}</span>
+      {item.sub ? <span className="shrink-0 truncate text-xs text-fg-3">{item.sub}</span> : null}
       <span className="flex-1" />
       {item.meta ? (
         <span
           className={cn(
-            'shrink-0 font-mono text-[10.5px] whitespace-nowrap',
-            item.metaTone === 'warn' ? 'text-warn' : 'text-muted',
+            'shrink-0 text-xs whitespace-nowrap tabular-nums',
+            item.metaTone === 'warn' ? 'font-semibold text-danger' : 'text-fg-3',
           )}
         >
           {item.meta}
         </span>
       ) : null}
       {isCurrent ? (
-        <span aria-hidden className="w-3 shrink-0 text-center text-accent">
+        <span aria-hidden className="w-3 shrink-0 text-center text-accent-text">
           ✓
         </span>
       ) : null}
@@ -103,7 +103,8 @@ export interface PickerPopoverProps {
 }
 
 /**
- * Searchable menu (React Aria Autocomplete + Menu) for milestone and cycle pickers: search field with an
+ * Ledger picker kept for the milestone and cycle fields until M5-09 moves them to PickerMenu; restyled to
+ * Margin. Searchable menu (React Aria Autocomplete + Menu) for milestone and cycle pickers: search field with an
  * optional shortcut hint, an optional "none" item first, a check on the current value, trailing meta text.
  * Type to filter; arrow keys move; Enter picks.
  */
@@ -152,11 +153,11 @@ export function PickerPopover({
               // The search field eats Escape; the first one clears the text, the next one closes.
               if (event.key === 'Escape' && (event.target as HTMLInputElement).value === '') setOpen(false);
             }}
-            className="flex items-center gap-2 border-b border-line-2 px-2.5 py-2"
+            className="flex h-9 items-center gap-2 border-b border-line-soft px-3"
           >
             <Input
               placeholder={searchPlaceholder}
-              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12.5px] text-fg outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-md text-fg caret-accent outline-none placeholder:text-fg-3 [&::-webkit-search-cancel-button]:hidden"
             />
             {kbd ? <Kbd aria-hidden>{kbd}</Kbd> : null}
           </SearchField>
@@ -166,8 +167,8 @@ export function PickerPopover({
             selectionMode="single"
             selectedKeys={current != null ? [current] : []}
             onAction={(key) => onChange(key === PICKER_NONE ? null : String(key))}
-            renderEmptyState={() => <div className="px-2.5 py-2 text-[12px] text-faint">{emptyText}</div>}
-            className="max-h-72 overflow-auto outline-none"
+            renderEmptyState={() => <div className="px-2 py-1.5 text-sm text-fg-3">{emptyText}</div>}
+            className="flex max-h-72 flex-col gap-px overflow-auto p-1.5 outline-none"
           >
             {(item) => (
               <MenuItem
@@ -176,7 +177,7 @@ export function PickerPopover({
                 isDisabled={item.isDisabled}
                 className={cn(
                   rowClass,
-                  'cursor-pointer outline-none select-none focus:bg-sel selected:bg-sel disabled:opacity-50',
+                  'cursor-pointer outline-none select-none focus:bg-bg-lane disabled:text-fg-3',
                 )}
               >
                 <PickerRowContent item={item} isCurrent={item.id === current} />
@@ -185,7 +186,7 @@ export function PickerPopover({
           </Menu>
         </Autocomplete>
         {footer ? (
-          <div className="border-t border-line-2 px-2.5 pt-1 pb-2 text-[11px] text-faint">{footer}</div>
+          <div className="border-t border-line-soft px-3 py-2 text-xs text-fg-3">{footer}</div>
         ) : null}
       </Popover>
     </MenuTrigger>
@@ -241,15 +242,20 @@ export function PickerList({
   const fallbackId = useId();
   const listId = id ?? fallbackId;
   return (
-    <div className={cn('z-10 flex flex-col border border-line bg-surface text-fg shadow-dialog', className)}>
+    <div className={cn('z-10 flex flex-col rounded-lg bg-surface-pop text-sm text-fg shadow-pop', className)}>
       {title ? (
-        <div aria-hidden className="caps border-b border-line-2 px-2.5 py-[7px]">
+        <div aria-hidden className="border-b border-line-soft px-3 py-2 text-xs font-medium text-fg-3">
           {title}
         </div>
       ) : null}
-      <div id={listId} role="listbox" aria-label={props['aria-label']} className="max-h-72 overflow-auto">
+      <div
+        id={listId}
+        role="listbox"
+        aria-label={props['aria-label']}
+        className="flex max-h-72 flex-col gap-px overflow-auto p-1.5"
+      >
         {items.length === 0 ? (
-          <div className="px-2.5 py-2 text-[12px] text-faint">{emptyText}</div>
+          <div className="px-2 py-1.5 text-sm text-fg-3">{emptyText}</div>
         ) : (
           items.map((item) => {
             const isActive = item.id === activeId;
@@ -272,8 +278,8 @@ export function PickerList({
                 className={cn(
                   rowClass,
                   'cursor-pointer',
-                  isActive && 'bg-sel',
-                  item.isDisabled && 'opacity-50',
+                  isActive && 'bg-bg-lane',
+                  item.isDisabled && 'text-fg-3',
                 )}
               >
                 <PickerRowContent item={item} hint={isActive ? activeHint : undefined} />
@@ -282,9 +288,7 @@ export function PickerList({
           })
         )}
       </div>
-      {footer ? (
-        <div className="mt-1 border-t border-line-2 px-2.5 pt-1 pb-2 text-[11px] text-faint">{footer}</div>
-      ) : null}
+      {footer ? <div className="border-t border-line-soft px-3 py-2 text-xs text-fg-3">{footer}</div> : null}
     </div>
   );
 }

@@ -1,11 +1,11 @@
-// Deleting a project end to end: an admin deletes one from its General settings (type the key, toast on
-// /projects, its tasks gone), then another with `pm projects delete`: no --confirm or the wrong key sends
+// Deleting a project end to end: an admin deletes one from its General settings (type the key, toast on Home,
+// its tasks gone), then another with `pm projects delete`: no --confirm or the wrong key sends
 // nothing, an agent's key is refused, a person's workspace key deletes it. The agent's key covered both
 // projects; it stays, with no projects left. The tests build on each other, so they share one page and run
 // in order. The spec signs in as the admin of the other specs, or sets the server up when it runs alone.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createCli, parseJson } from './cli';
-import { addAgent, api, collectPageErrors, settle, signInAsAdmin } from './session';
+import { addAgent, api, collectPageErrors, homeURL, settle, signInAsAdmin } from './session';
 import { baseURL } from './stack';
 
 const inSettings = { name: 'Old website', key: 'OLD' };
@@ -85,7 +85,7 @@ test('seed two projects with tasks, an agent key for both and a person key', asy
   expect(personLogin.code, personLogin.stdout + personLogin.stderr).toBe(0);
 });
 
-test('General settings: Delete this project, type the key, "Deleted OLD" on the projects page', async () => {
+test('General settings: Delete this project, type the key, "Deleted OLD" on Home', async () => {
   await page.goto(`/p/${inSettings.key}/settings`);
   await settle(page);
   await expect(page.getByText('Delete this project', { exact: true })).toBeVisible();
@@ -106,9 +106,15 @@ test('General settings: Delete this project, type the key, "Deleted OLD" on the 
   await expect(confirm).toBeEnabled();
   await confirm.click();
 
-  await expect(page).toHaveURL(/\/projects$/, { timeout: 15_000 });
+  // The project page is gone, so the delete lands on Home (0.6.0 went to the projects page).
+  await expect(page).toHaveURL(homeURL, { timeout: 15_000 });
   await expect(page.getByRole('status').filter({ hasText: `Deleted ${inSettings.key}` })).toBeVisible();
-  await expect(page.getByRole('link', { name: new RegExp(inSettings.name) })).toHaveCount(0);
+  // The sidebar no longer lists it.
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: new RegExp(`^${inSettings.name},`) }),
+  ).toHaveCount(0);
 
   expect(await projectKeys()).not.toContain(inSettings.key);
   const task = await page.request.get(`/api/v1/tasks/${inSettings.key}-1`);

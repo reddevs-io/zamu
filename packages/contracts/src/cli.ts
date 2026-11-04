@@ -9,6 +9,9 @@ import {
   CycleDetail,
   CycleList,
   Dashboard,
+  Label,
+  LabelList,
+  LabelWithUsage,
   Me,
   MilestoneList,
   MilestoneWithProgress,
@@ -143,6 +146,17 @@ export const cliDataSchemas = {
   }),
   /** pm dashboard [--everyone] */
   dashboard: Dashboard,
+  /** pm labels list (M5) */
+  'labels.list': LabelList,
+  /** pm labels create (M5) */
+  'labels.create': LabelWithUsage,
+  /** pm labels update (M5) */
+  'labels.update': LabelWithUsage,
+  /** pm labels delete <name> --confirm (M5): the label as it was, and how many tasks lost it. */
+  'labels.delete': z.object({
+    deleted: Label,
+    usageCount: z.number().int().nonnegative(),
+  }),
   /** Any command that fails while --json is set (printed to stdout, exit code still non-zero). */
   error: Problem,
 } as const;

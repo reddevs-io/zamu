@@ -15,9 +15,9 @@ export interface StatTileProps {
 
 const TONE: Record<NonNullable<StatTileProps['tone']>, string> = {
   default: 'text-fg',
-  done: 'text-done',
-  warn: 'text-warn',
-  muted: 'text-muted',
+  done: 'text-status-done',
+  warn: 'text-danger',
+  muted: 'text-fg-2',
 };
 
 /** One cell of a StatStrip: caption, 20px number, sub line. */
@@ -25,20 +25,17 @@ export function StatTile({ label, value, sub, tone = 'default', className }: Sta
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col gap-[3px] border-r border-[var(--stat-line)] px-4 py-3 last:border-r-0',
+        'flex min-w-0 flex-col gap-0.75 border-r border-[var(--stat-line)] px-4 py-3 last:border-r-0',
         className,
       )}
     >
-      <dt className="caps">{label}</dt>
+      <dt className="text-xs font-medium text-fg-3">{label}</dt>
       <dd
-        className={cn(
-          'm-0 text-[20px] leading-tight font-semibold tracking-[-0.01em] tabular-nums',
-          TONE[tone],
-        )}
+        className={cn('m-0 text-xl leading-tight font-semibold tracking-[-0.01em] tabular-nums', TONE[tone])}
       >
         {value}
       </dd>
-      {sub != null ? <dd className="m-0 truncate text-[11.5px] text-muted">{sub}</dd> : null}
+      {sub != null ? <dd className="m-0 truncate text-xs text-fg-2">{sub}</dd> : null}
     </div>
   );
 }
@@ -50,7 +47,7 @@ export interface StatStripProps {
   columns?: number;
   /**
    * `boxed`: hairline --line border around and between tiles (completed cycle page).
-   * `inset`: no outer border and --line-2 dividers, for use inside a card (current cycle card).
+   * `inset`: no outer border and --line-soft dividers, for use inside a card (current cycle card).
    */
   variant?: 'boxed' | 'inset';
   'aria-label'?: string;
@@ -66,7 +63,9 @@ export function StatStrip({ children, columns, variant = 'boxed', className, ...
       style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}
       className={cn(
         'm-0 grid',
-        variant === 'boxed' ? 'border border-line [--stat-line:var(--line)]' : '[--stat-line:var(--line-2)]',
+        variant === 'boxed'
+          ? 'border border-line [--stat-line:var(--line)]'
+          : '[--stat-line:var(--line-soft)]',
         className,
       )}
     >

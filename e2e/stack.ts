@@ -28,8 +28,15 @@ export const baseURL = (process.env.E2E_BASE_URL ?? `http://localhost:${port}`).
 /** Image built and run by the stack. Shares the tag with nothing else, so a run never replaces another image. */
 export const image = process.env.PM_IMAGE ?? 'project-management:e2e';
 
-/** Network alias of each Backlog.md spec's Forgejo on the stack network (see forgejo.ts). */
-export const forgejoAliases = { mirror: 'forgejo-mirror', import: 'forgejo-import' } as const;
+/**
+ * Network alias of each Forgejo on a stack network (see forgejo.ts): one per Backlog.md spec, and the upgrade
+ * test's, which feeds the mirror it backfills.
+ */
+export const forgejoAliases = {
+  mirror: 'forgejo-mirror',
+  import: 'forgejo-import',
+  upgrade: 'forgejo-upgrade',
+} as const;
 
 /**
  * Compose files: the production docker-compose.yml, which passes the M3 variables (APP_ENCRYPTION_KEY,

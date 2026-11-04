@@ -3,12 +3,12 @@ import { useEffect } from 'react';
 import { BoardScreen } from '~/features/board/BoardScreen';
 import { rememberedView } from '~/features/tasks/list-memory';
 import { prefetchTaskList, settleOnServer } from '~/features/tasks/prefetch';
-import { parseTaskListSearch } from '~/features/tasks/search';
+import { parseTaskListSearch, taskLinkRedirect } from '~/features/tasks/search';
 import { TaskListScreen } from '~/features/tasks/TaskListScreen';
 
-// Tasks of one project, as the list (/p/PAY?task=PAY-142) or the board (/p/PAY?view=board).
-// Selection, filters and the view are search params. Opening a project without ?view shows the view
-// it was last left in (remembered in local storage).
+// Tasks of one project, as the list (/p/PAY) or the board (/p/PAY?view=board). Filters and the view are
+// search params. Opening a project without ?view shows the view it was last left in (remembered in local
+// storage). M1–M4 links to a selected task (/p/PAY?task=PAY-142) open that task's view.
 export const Route = createFileRoute('/_app/p/$projectKey/')({
   validateSearch: parseTaskListSearch,
   beforeLoad: ({ params, search }) => {
@@ -16,6 +16,9 @@ export const Route = createFileRoute('/_app/p/$projectKey/')({
     if (upper !== params.projectKey) {
       throw redirect({ to: '/p/$projectKey', params: { projectKey: upper }, search, replace: true });
     }
+    // The list and the board have no detail pane any more: ?task= opens the task view.
+    const taskLink = taskLinkRedirect(upper, search);
+    if (taskLink) throw redirect({ ...taskLink, replace: true });
     if (search.view === undefined && rememberedView(upper) === 'board') {
       throw redirect({
         to: '/p/$projectKey',

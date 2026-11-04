@@ -14,7 +14,7 @@ function procedures(router: unknown, path: string[] = []): [string, AnyContractP
 const all = procedures(contract);
 
 describe('contract', () => {
-  it('exposes exactly the M1 to M4 and 0.6.0 routes under /api/v1', () => {
+  it('exposes exactly the M1 to M5 routes under /api/v1', () => {
     const routes = Object.fromEntries(
       all.map(([name, procedure]) => {
         const { method, path } = procedure['~orpc'].route;
@@ -32,6 +32,7 @@ describe('contract', () => {
       'tasks.get': 'GET /api/v1/tasks/{key}',
       'tasks.create': 'POST /api/v1/tasks',
       'tasks.update': 'PATCH /api/v1/tasks/{key}',
+      'tasks.bulkUpdate': 'POST /api/v1/tasks/bulk',
       'tasks.activity': 'GET /api/v1/tasks/{key}/activity',
       'tasks.timeline': 'GET /api/v1/tasks/{key}/timeline',
       'comments.list': 'GET /api/v1/tasks/{key}/comments',
@@ -48,10 +49,16 @@ describe('contract', () => {
       'cycles.get': 'GET /api/v1/cycles/{project}/{number}',
       'cycles.update': 'PATCH /api/v1/cycles/{project}/{number}',
       'cycles.end': 'POST /api/v1/cycles/{project}/{number}/end',
+      'labels.list': 'GET /api/v1/projects/{project}/labels',
+      'labels.create': 'POST /api/v1/projects/{project}/labels',
+      'labels.update': 'PATCH /api/v1/projects/{project}/labels/{id}',
+      'labels.delete': 'DELETE /api/v1/projects/{project}/labels/{id}',
       'backlog.status': 'GET /api/v1/projects/{project}/backlog',
       'backlog.refresh': 'POST /api/v1/projects/{project}/backlog/refresh',
       'dashboard.get': 'GET /api/v1/dashboard',
       'dashboard.counts': 'GET /api/v1/dashboard/counts',
+      'home.get': 'GET /api/v1/home',
+      'home.counts': 'GET /api/v1/home/counts',
       'members.list': 'GET /api/v1/members',
     });
     expect(API_PREFIX).toBe('/api/v1');
@@ -76,6 +83,11 @@ describe('contract', () => {
         'PROJECT_NOT_EMPTY',
         'BACKLOG_PAUSED',
         'BACKLOG_DETACHED',
+        'LABEL_EXISTS',
+        'LABEL_MIRRORED',
+        'DEPENDENCY_LOOP',
+        'SUBTASK_DEPTH',
+        'NOT_SAME_PROJECT',
       ]),
     );
   });
@@ -92,13 +104,14 @@ describe('contract', () => {
     }
   });
 
-  it('returns 201 from creates, 202 from backlog refreshes, 204 from milestone and project deletes, else 200', () => {
+  it('returns 201 from creates, 202 from backlog refreshes, 204 from milestone, label and project deletes, else 200', () => {
     const created = all
       .filter(([, procedure]) => procedure['~orpc'].route.successStatus === 201)
       .map(([name]) => name);
     expect(created.sort()).toEqual([
       'comments.create',
       'cycles.create',
+      'labels.create',
       'milestones.create',
       'projects.create',
       'tasks.create',
@@ -106,7 +119,7 @@ describe('contract', () => {
     const noContent = all
       .filter(([, procedure]) => procedure['~orpc'].route.successStatus === 204)
       .map(([name]) => name);
-    expect(noContent.sort()).toEqual(['milestones.delete', 'projects.delete']);
+    expect(noContent.sort()).toEqual(['labels.delete', 'milestones.delete', 'projects.delete']);
     expect(contract.backlog.refresh['~orpc'].route.successStatus).toBe(202);
     // Comment deletes are soft and return the comment, so the CLI can print it.
     expect(contract.comments.delete['~orpc'].route.successStatus).toBeUndefined();

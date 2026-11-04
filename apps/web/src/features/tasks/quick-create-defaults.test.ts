@@ -64,7 +64,7 @@ describe('cycle wording', () => {
       'Cycle 12 ended. Taken out of the cycle.',
     );
     expect(describeActivity({ type: 'cycle.ended', changes })).toBe(
-      'ended Cycle 12 and moved it to Cycle 13',
+      'ended Cycle 12 and moved this to Cycle 13',
     );
   });
 

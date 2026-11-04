@@ -1,5 +1,6 @@
 // Activity: one row per task change, written in the transaction of the change. M3 adds the
-// origin (app or a Backlog.md refresh), the commit a refresh read, and project-level rows.
+// origin (app or a Backlog.md refresh), the commit a refresh read, and project-level rows. M5 adds
+// labels, dueDate, blockedBy and parent changes.
 import {
   type Activity,
   type ActivityChange,
@@ -15,7 +16,7 @@ import {
   type TaskStatus,
 } from '@pm/contracts';
 import { type DbOrTx, schema, type Tx } from '@pm/db';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from './authz';
 import type { DbContext } from './context';
@@ -23,19 +24,47 @@ import { parseInput } from './errors';
 import { findTask, loadUsers, userRef } from './internal';
 
 /**
+ * M5: a label inside a stored change: its id and the name it had when the change was recorded.
+ * Reads keep that name (renames don't rewrite history) and add the label's current colour.
+ */
+export interface StoredLabelRef {
+  id: string;
+  name: string;
+}
+
+/**
+ * M5: a task inside a stored change (blockers, parent): its id with the key and title it had then.
+ * Reads return the current key and title while the task exists, and mark it removed once it is
+ * deleted or hidden.
+ */
+export interface StoredTaskRef {
+  id: string;
+  key: string;
+  title: string;
+}
+
+/**
  * A change as stored in activity.changes: priority by name; assignee, milestone and cycle by id.
  * listTaskActivity resolves the ids to references.
  *
  * M3: `backlog` lists the Backlog.md-only fields a refresh changed (BacklogBlock keys such as
- * labels or dependencies, and createdAt); reads return them as Activity.backlogFields. Write at
- * most one per row.
+ * references, and createdAt); reads return them as Activity.backlogFields. Write at most one per
+ * row.
+ *
+ * M5: labels and blockedBy store the whole list before and after (labels sorted by name, ignoring
+ * case; blockers by key, see compareTaskRefs); dueDate stores YYYY-MM-DD; parent a task reference.
+ * task.created rows start from [] and null.
  */
 export type StoredChange =
   | { field: 'title' | 'description'; from: string | null; to: string | null }
   | { field: 'status'; from: TaskStatus | null; to: TaskStatus | null }
   | { field: 'priority'; from: Priority | null; to: Priority | null }
   | { field: 'assignee' | 'milestone' | 'cycle'; from: string | null; to: string | null }
-  | { field: 'backlog'; from: null; to: string[] };
+  | { field: 'backlog'; from: null; to: string[] }
+  | { field: 'labels'; from: StoredLabelRef[]; to: StoredLabelRef[] }
+  | { field: 'dueDate'; from: string | null; to: string | null }
+  | { field: 'blockedBy'; from: StoredTaskRef[]; to: StoredTaskRef[] }
+  | { field: 'parent'; from: StoredTaskRef | null; to: StoredTaskRef | null };
 
 /** Fields of StoredChange that map to an ActivityChange of the contract. */
 const CONTRACT_FIELDS = new Set<string>([
@@ -46,7 +75,41 @@ const CONTRACT_FIELDS = new Set<string>([
   'assignee',
   'milestone',
   'cycle',
+  'labels',
+  'dueDate',
+  'blockedBy',
+  'parent',
 ]);
+
+/** Orders labels as stored changes and task shapes list them: by name ignoring case, then by name. */
+export function compareLabelNames(a: { name: string }, b: { name: string }): number {
+  const folded = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  return folded !== 0 ? folded : a.name.localeCompare(b.name);
+}
+
+/** Orders task references by key: project key, then number, then suffix part by part (PAY-9 < PAY-10). */
+export function compareTaskKeys(a: string, b: string): number {
+  const split = (key: string) => {
+    const dash = key.lastIndexOf('-');
+    return {
+      project: key.slice(0, dash),
+      parts: key
+        .slice(dash + 1)
+        .split('.')
+        .map(Number),
+    };
+  };
+  const left = split(a);
+  const right = split(b);
+  if (left.project !== right.project) return left.project < right.project ? -1 : 1;
+  const length = Math.max(left.parts.length, right.parts.length);
+  for (let i = 0; i < length; i++) {
+    const x = left.parts[i] ?? -1;
+    const y = right.parts[i] ?? -1;
+    if (x !== y) return x - y;
+  }
+  return 0;
+}
 
 /** Where a row comes from. Defaults to the app; a Backlog.md refresh passes its commit. */
 export interface ActivityOriginFields {
@@ -156,6 +219,42 @@ export async function recordActivities(
 /** Name shown for a milestone that was deleted after the change was recorded. */
 export const DELETED_MILESTONE_NAME = 'Deleted milestone';
 
+/** M5: current colours of the labels in `ids` (deleted ones are left out). */
+async function labelColors(db: DbOrTx, ids: Set<string>): Promise<Map<string, number>> {
+  if (ids.size === 0) return new Map();
+  const rows = await db
+    .select({ id: schema.label.id, color: schema.label.color })
+    .from(schema.label)
+    .where(inArray(schema.label.id, [...ids]));
+  return new Map(rows.map((row) => [row.id, row.color]));
+}
+
+/** M5: current key, title and visibility of the tasks in `ids` (deleted ones are left out). */
+async function currentTaskRefs(
+  db: DbOrTx,
+  ids: Set<string>,
+): Promise<Map<string, { key: string; title: string; hidden: boolean }>> {
+  if (ids.size === 0) return new Map();
+  const rows = await db
+    .select({
+      id: schema.task.id,
+      projectKey: schema.project.key,
+      number: schema.task.number,
+      keySuffix: schema.task.keySuffix,
+      title: schema.task.title,
+      hidden: sql<boolean>`${schema.task.hiddenAt} is not null`,
+    })
+    .from(schema.task)
+    .innerJoin(schema.project, eq(schema.project.id, schema.task.projectId))
+    .where(inArray(schema.task.id, [...ids]));
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      { key: formatTaskKey(row.projectKey, row.number, row.keySuffix), title: row.title, hidden: row.hidden },
+    ]),
+  );
+}
+
 /** Actor and on-behalf-of references of activity rows, resolved in one query. */
 async function loadActors(db: DbOrTx, rows: ActivityRow[], extraUserIds: Iterable<string> = []) {
   const userIds = new Set<string>(extraUserIds);
@@ -182,16 +281,39 @@ export async function toActivities(db: DbOrTx, taskKey: string, rows: ActivityRo
   const userIds = new Set<string>();
   const milestoneIds = new Set<string>();
   const cycleIds = new Set<string>();
+  const labelIds = new Set<string>();
+  const taskIds = new Set<string>();
   for (const row of rows) {
     for (const change of row.changes as StoredChange[]) {
-      if (change.field !== 'assignee' && change.field !== 'milestone' && change.field !== 'cycle') continue;
-      const ids =
-        change.field === 'assignee' ? userIds : change.field === 'milestone' ? milestoneIds : cycleIds;
-      if (change.from) ids.add(change.from);
-      if (change.to) ids.add(change.to);
+      switch (change.field) {
+        case 'labels':
+          for (const ref of [...(change.from ?? []), ...(change.to ?? [])]) labelIds.add(ref.id);
+          continue;
+        case 'blockedBy':
+          for (const ref of [...(change.from ?? []), ...(change.to ?? [])]) taskIds.add(ref.id);
+          continue;
+        case 'parent':
+          if (change.from) taskIds.add(change.from.id);
+          if (change.to) taskIds.add(change.to.id);
+          continue;
+        case 'assignee':
+        case 'milestone':
+        case 'cycle': {
+          const ids =
+            change.field === 'assignee' ? userIds : change.field === 'milestone' ? milestoneIds : cycleIds;
+          if (change.from) ids.add(change.from);
+          if (change.to) ids.add(change.to);
+          continue;
+        }
+        default:
+          continue;
+      }
     }
   }
 
+  // Sequential: `db` may be a transaction, whose queries share one connection.
+  const colors = await labelColors(db, labelIds);
+  const tasks = await currentTaskRefs(db, taskIds);
   const [{ user, actor }, milestones, cycles] = await Promise.all([
     loadActors(db, rows, userIds),
     milestoneIds.size === 0
@@ -214,6 +336,13 @@ export async function toActivities(db: DbOrTx, taskKey: string, rows: ActivityRo
     id ? (milestoneById.get(id) ?? { id, name: DELETED_MILESTONE_NAME }) : null;
   // Cycles are never deleted on their own (only with their project, which takes the task along).
   const cycle = (id: string | null) => (id ? (cycleById.get(id) ?? null) : null);
+  const label = (ref: StoredLabelRef) => ({ id: ref.id, name: ref.name, color: colors.get(ref.id) ?? null });
+  const taskRef = (ref: StoredTaskRef) => {
+    const now = tasks.get(ref.id);
+    return now
+      ? { key: now.key, title: now.title, removed: now.hidden }
+      : { key: ref.key, title: ref.title, removed: true };
+  };
 
   const resolve = (change: StoredChange): z.input<typeof ActivityChange> => {
     switch (change.field) {
@@ -223,6 +352,20 @@ export async function toActivities(db: DbOrTx, taskKey: string, rows: ActivityRo
         return { field: 'milestone', from: milestone(change.from), to: milestone(change.to) };
       case 'cycle':
         return { field: 'cycle', from: cycle(change.from), to: cycle(change.to) };
+      case 'labels':
+        return { field: 'labels', from: (change.from ?? []).map(label), to: (change.to ?? []).map(label) };
+      case 'blockedBy':
+        return {
+          field: 'blockedBy',
+          from: (change.from ?? []).map(taskRef),
+          to: (change.to ?? []).map(taskRef),
+        };
+      case 'parent':
+        return {
+          field: 'parent',
+          from: change.from ? taskRef(change.from) : null,
+          to: change.to ? taskRef(change.to) : null,
+        };
       default:
         return change as z.input<typeof ActivityChange>;
     }
@@ -286,7 +429,10 @@ export async function loadProjectActivityRows(db: DbOrTx, projectId: string): Pr
     .orderBy(asc(schema.activity.createdAt), asc(schema.activity.id));
 }
 
-/** The activity of a task, oldest first, with user, milestone and cycle ids resolved to references. */
+/**
+ * The activity of a task, oldest first, with user, milestone and cycle ids resolved to references,
+ * labels to their recorded name and current colour, and blockers and parents to their current key.
+ */
 export async function listTaskActivity(
   { db }: DbContext,
   actor: Actor,

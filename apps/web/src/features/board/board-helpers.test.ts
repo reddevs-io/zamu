@@ -1,18 +1,24 @@
 import type { TaskListItem, TaskListPage, TaskStatus } from '@pm/contracts';
 import { describe, expect, it } from 'vitest';
-import { cycleElapsed, cycleNote, projectTabs, projectViewHref } from '~/features/project-header/tabs';
+import { cycleElapsed, cycleNote, projectViewHref } from '~/features/project-header/tabs';
 import {
-  applyProjectFeatures,
-  boardInput,
-  boardStatuses,
-  filtersOf,
-  hasFilters,
-  parseTaskListSearch,
-} from '~/features/tasks/search';
-import { cardsOf, insertCard, rankFor, removeCard, shiftCounts } from './board-cache';
-import { describeFilters, emptyBoardText } from './describe';
-import { buildLanes, NO_LANE } from './lanes';
-import { focusTarget, type NavColumn, placementBetween, reorderPlacement, statusStep } from './layout';
+  cardsOf,
+  compareBySort,
+  insertCard,
+  rankFor,
+  removeCard,
+  shiftCounts,
+  sortPlacement,
+} from './board-cache';
+import { buildLanes, groupKeysOf, groupPatch, NO_LANE } from './lanes';
+import {
+  columnStep,
+  focusTarget,
+  hasNeighbour,
+  type NavColumn,
+  placementBetween,
+  reorderPlacement,
+} from './layout';
 import type { BoardColumnData } from './queries';
 
 const card = (key: string, rank: number, extra: Partial<TaskListItem> = {}): TaskListItem => ({
@@ -91,9 +97,9 @@ describe('board cache', () => {
 
 describe('board keyboard geometry', () => {
   const nav: NavColumn[] = [
-    { status: 'backlog', cells: [{ lane: null, keys: ['A1'] }] },
-    { status: 'todo', cells: [{ lane: null, keys: [] }] },
-    { status: 'in_progress', cells: [{ lane: null, keys: ['C1', 'C2', 'C3'] }] },
+    { id: 'backlog', cells: [{ lane: null, keys: ['A1'] }] },
+    { id: 'todo', cells: [{ lane: null, keys: [] }] },
+    { id: 'in_progress', cells: [{ lane: null, keys: ['C1', 'C2', 'C3'] }] },
   ];
 
   it('starts on the first card and stops at the ends', () => {
@@ -101,6 +107,9 @@ describe('board keyboard geometry', () => {
     expect(focusTarget(nav, 'C1', 'up')).toEqual({ key: 'C1' });
     expect(focusTarget(nav, 'C3', 'down')).toEqual({ end: 'in_progress' });
     expect(focusTarget(nav, 'C2', 'down')).toEqual({ key: 'C3' });
+    expect(hasNeighbour(nav, 'C2', 'down')).toBe(true);
+    expect(hasNeighbour(nav, 'C3', 'down')).toBe(false);
+    expect(hasNeighbour(nav, 'C1', 'up')).toBe(false);
   });
 
   it('skips empty columns and keeps the row between columns', () => {
@@ -112,14 +121,14 @@ describe('board keyboard geometry', () => {
   it('keeps the lane between columns on a swimlane board', () => {
     const lanes: NavColumn[] = [
       {
-        status: 'todo',
+        id: 'todo',
         cells: [
           { lane: 'ana', keys: ['T1'] },
           { lane: 'tomas', keys: ['T2', 'T3'] },
         ],
       },
       {
-        status: 'in_progress',
+        id: 'in_progress',
         cells: [
           { lane: 'ana', keys: ['P1', 'P2'] },
           { lane: 'tomas', keys: ['P3'] },
@@ -135,134 +144,139 @@ describe('board keyboard geometry', () => {
     expect(reorderPlacement(lanes, 'T3', 'up')).toEqual({ before: 'T2' });
   });
 
-  it('steps statuses and puts cards back between their neighbours', () => {
+  it('steps columns and puts cards back between their neighbours', () => {
     const statuses: TaskStatus[] = ['backlog', 'todo', 'in_progress'];
-    expect(statusStep(statuses, 'todo', 'right')).toBe('in_progress');
-    expect(statusStep(statuses, 'backlog', 'left')).toBeNull();
+    expect(columnStep(statuses, 'todo', 'right')).toBe('in_progress');
+    expect(columnStep(statuses, 'backlog', 'left')).toBeNull();
+    expect(columnStep(['urgent', 'high'], 'urgent', 'right')).toBe('high');
     expect(placementBetween('A', 'B')).toEqual({ after: 'A' });
     expect(placementBetween(null, 'B')).toEqual({ before: 'B' });
     expect(placementBetween(null, null)).toBe('top');
   });
 });
 
-describe('swimlanes', () => {
+describe('column order', () => {
+  const at = (minute: number) => `2026-10-20T10:${String(minute).padStart(2, '0')}:00.000Z`;
+
+  it('sorts as tasks.list does: priority, then the newest update', () => {
+    const cards = [
+      card('PAY-1', 3, { priority: 'urgent', updatedAt: at(1) }),
+      card('PAY-2', 2, { priority: 'high', updatedAt: at(5) }),
+      card('PAY-3', 1, { priority: 'high', updatedAt: at(2) }),
+    ];
+    const sorted = [...cards].sort((a, b) => compareBySort('priority', a, b)).map((item) => item.key);
+    expect(sorted).toEqual(['PAY-1', 'PAY-2', 'PAY-3']);
+    expect([...cards].sort((a, b) => compareBySort('manual', a, b)).map((item) => item.key)).toEqual([
+      'PAY-3',
+      'PAY-2',
+      'PAY-1',
+    ]);
+  });
+
+  it('sorts due dates soonest first with no date last', () => {
+    const cards = [
+      card('PAY-1', 1),
+      card('PAY-2', 2, { dueDate: '2026-11-02' }),
+      card('PAY-3', 3, { dueDate: '2026-10-30' }),
+    ];
+    expect([...cards].sort((a, b) => compareBySort('due', a, b)).map((item) => item.key)).toEqual([
+      'PAY-3',
+      'PAY-2',
+      'PAY-1',
+    ]);
+  });
+
+  it('places a moved card where the order puts it', () => {
+    const cards = [
+      card('PAY-1', 1, { priority: 'urgent', updatedAt: at(1) }),
+      card('PAY-2', 2, { priority: 'low', updatedAt: at(1) }),
+    ];
+    expect(
+      sortPlacement(cards, card('PAY-9', 0, { priority: 'high', updatedAt: at(9) }), 'priority'),
+    ).toEqual({
+      before: 'PAY-2',
+    });
+    expect(sortPlacement(cards, card('PAY-9', 0, { priority: 'none' }), 'priority')).toEqual({
+      after: 'PAY-2',
+    });
+    expect(sortPlacement([], card('PAY-9', 0), 'priority')).toBe('top');
+  });
+});
+
+describe('groups and swimlanes', () => {
   const ana = { id: '00000000-0000-4000-8000-0000000000a1', name: 'Ana Ruiz', kind: 'person' as const };
   const bot = { id: '00000000-0000-4000-8000-0000000000b1', name: 'claude-dev', kind: 'agent' as const };
-  it('puts agents first, then people, then the unassigned', () => {
-    const lanes = buildLanes('assignee', [
-      {
-        status: 'todo',
-        cards: [
-          card('PAY-1', 1, { assignee: { ...ana, responsible: null } }),
-          card('PAY-2', 2),
-          card('PAY-3', 3, { assignee: { ...bot, responsible: ana } }),
-        ],
-      },
-      {
-        status: 'in_progress',
-        cards: [card('PAY-4', 1, { status: 'in_progress', assignee: { ...ana, responsible: null } })],
-      },
-    ]);
+
+  it('puts the viewer first, then people, then agents, then the unassigned', () => {
+    const lanes = buildLanes(
+      'assignee',
+      [
+        {
+          id: 'todo',
+          cards: [
+            card('PAY-1', 1, { assignee: { ...ana, responsible: null } }),
+            card('PAY-2', 2),
+            card('PAY-3', 3, { assignee: { ...bot, responsible: ana } }),
+          ],
+        },
+        {
+          id: 'in_progress',
+          cards: [card('PAY-4', 1, { status: 'in_progress', assignee: { ...ana, responsible: null } })],
+        },
+      ],
+      { viewerId: ana.id },
+    );
     expect(lanes.map((lane) => [lane.title, lane.count])).toEqual([
-      ['claude-dev', 1],
       ['Ana Ruiz', 2],
+      ['claude-dev', 1],
       ['No assignee', 1],
     ]);
-    expect(lanes[1]?.cells.in_progress?.map((item) => item.key)).toEqual(['PAY-4']);
+    expect(lanes[0]?.cells.in_progress?.map((item) => item.key)).toEqual(['PAY-4']);
+    expect(lanes[0]?.cells.todo?.map((item) => item.key)).toEqual(['PAY-1']);
     expect(lanes[2]?.id).toBe(NO_LANE);
   });
 
-  it('orders milestone lanes like the milestone list', () => {
+  it('orders milestone lanes by target date', () => {
     const m1 = {
       id: '00000000-0000-4000-8000-0000000000c1',
       name: 'Zeta',
       status: 'planned' as const,
-      targetDate: null,
+      targetDate: '2026-11-01',
     };
     const m2 = {
       id: '00000000-0000-4000-8000-0000000000c2',
       name: 'Alpha',
       status: 'active' as const,
-      targetDate: null,
+      targetDate: '2026-12-01',
     };
-    const lanes = buildLanes(
-      'milestone',
-      [
-        {
-          status: 'todo',
-          cards: [card('PAY-1', 1, { milestone: m2 }), card('PAY-2', 2, { milestone: m1 }), card('PAY-3', 3)],
-        },
-      ],
-      [m1.id, m2.id],
-    );
+    const lanes = buildLanes('milestone', [
+      {
+        id: 'todo',
+        cards: [card('PAY-1', 1, { milestone: m2 }), card('PAY-2', 2, { milestone: m1 }), card('PAY-3', 3)],
+      },
+    ]);
     expect(lanes.map((lane) => lane.title)).toEqual(['Zeta', 'Alpha', 'No milestone']);
   });
-});
 
-describe('board search params', () => {
-  it('parses view, lanes, milestone and cycle', () => {
-    expect(
-      parseTaskListSearch({
-        view: 'board',
-        lanes: 'milestone',
-        milestone: 'NONE',
-        cycle: '12',
-      }),
-    ).toEqual({ view: 'board', lanes: 'milestone', cycle: 12 });
-    expect(parseTaskListSearch({ cycle: 'current', milestone: 'none' })).toEqual({
-      cycle: 'current',
-      milestone: 'none',
+  it('knows which group a card is in and what a drop into a group sets', () => {
+    const labelled = card('PAY-1', 1, {
+      priority: 'high',
+      labels: [
+        { id: 'l1', name: 'api', color: 1, source: 'app' },
+        { id: 'l2', name: 'web', color: 2, source: 'app' },
+      ],
     });
-    expect(parseTaskListSearch({ view: 'grid', lanes: 'status', cycle: '0', milestone: 'x' })).toEqual({});
-  });
-
-  it('keeps view and lanes out of the query filters', () => {
-    const search = parseTaskListSearch({ view: 'board', lanes: 'assignee', task: 'PAY-1', cycle: 3 });
-    expect(filtersOf(search)).toEqual({ cycle: 3 });
-    expect(hasFilters({ view: 'board', lanes: 'assignee' })).toBe(false);
-    expect(hasFilters({ milestone: 'none' })).toBe(true);
-    expect(boardInput('PAY', { cycle: 3, q: ' x ' }, 'todo')).toEqual({
-      project: ['PAY'],
-      order: 'board',
-      status: ['todo'],
-      q: 'x',
-      cycle: 3,
-    });
-  });
-
-  it('drops filters of features the project turned off and orders board columns', () => {
-    expect(
-      applyProjectFeatures(
-        { milestone: 'none', cycle: 'next', q: 'a' },
-        { usesMilestones: false, usesCycles: true },
-      ),
-    ).toEqual({ q: 'a', cycle: 'next' });
-    expect(boardStatuses({})).toEqual(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
-    expect(boardStatuses({ status: ['done', 'todo'] })).toEqual(['todo', 'done']);
+    expect(groupKeysOf('priority', labelled)).toEqual(['high']);
+    expect(groupKeysOf('label', labelled)).toEqual(['l1', 'l2']);
+    expect(groupKeysOf('assignee', labelled)).toEqual([NO_LANE]);
+    expect(groupPatch({ field: 'priority', priority: 'urgent' })).toEqual({ priority: 'urgent' });
+    expect(groupPatch({ field: 'assignee', assignee: null })).toEqual({ assignee: null });
+    expect(groupPatch({ field: 'label', label: null })).toBeNull();
+    expect(groupPatch({ field: 'none' })).toBeNull();
   });
 });
 
-describe('filter words', () => {
-  it('describes the filters for the subtitle and the empty board', () => {
-    const names = { members: new Map([['u1', 'Tomás Berg']]) };
-    expect(describeFilters({ cycle: 12, assignee: 'agents' }, names)).toEqual([
-      'Cycle 12',
-      'assigned to agents',
-    ]);
-    expect(describeFilters({ assignee: 'u1', priority: ['low', 'urgent'] }, names)).toEqual([
-      'assigned to Tomás Berg',
-      'priority Urgent or Low',
-    ]);
-    expect(emptyBoardText({ cycle: 12, assignee: 'agents' })).toBe(
-      'Cycle 12 has no tasks assigned to agents. Clear the filters, or add tasks to the cycle from the list.',
-    );
-    expect(emptyBoardText({ q: 'refund' })).toBe(
-      'Nothing matches: matching "refund". Clear the filters, or create a task.',
-    );
-  });
-});
-
-describe('project header tabs', () => {
+describe('project page links', () => {
   const project = {
     key: 'PAY',
     openCount: 12,
@@ -278,28 +292,12 @@ describe('project header tabs', () => {
     },
   };
 
-  it('shows Tasks, Milestones, Cycles with their notes, then Settings', () => {
-    const tabs = projectTabs(project, 3);
-    expect(tabs.map((tab) => [tab.id, tab.href, tab.count ?? tab.note])).toEqual([
-      ['tasks', '/p/PAY', 12],
-      ['milestones', '/p/PAY/milestones', 3],
-      ['cycles', '/p/PAY/cycles', 'C12 · 3d left'],
-      ['settings', '/p/PAY/settings', undefined],
-    ]);
+  it('links the project pages and notes the current cycle', () => {
+    expect(cycleNote(project.currentCycle)).toBe('C12 · 3d left');
     expect(cycleNote(null)).toBeUndefined();
     expect(cycleElapsed(project.currentCycle)).toBeCloseTo(11 / 14);
+    expect(projectViewHref('PAY', 'tasks')).toBe('/p/PAY');
     expect(projectViewHref('PAY', 'cycles')).toBe('/p/PAY/cycles');
-  });
-
-  it('leaves out turned-off features; Tasks and Settings always stay', () => {
-    expect(projectTabs({ ...project, usesCycles: false }).map((tab) => tab.id)).toEqual([
-      'tasks',
-      'milestones',
-      'settings',
-    ]);
-    expect(
-      projectTabs({ ...project, usesMilestones: false, usesCycles: false }).map((tab) => tab.id),
-    ).toEqual(['tasks', 'settings']);
     expect(projectViewHref('PAY', 'settings')).toBe('/p/PAY/settings');
   });
 });

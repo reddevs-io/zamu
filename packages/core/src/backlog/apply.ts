@@ -1,14 +1,34 @@
-// Applies a refresh plan (./plan) in the caller's transaction: milestone and task rows, the
-// project's next task number, backlog_file rows, activity from the Backlog.md actor (origin backlog,
-// origin_ref = commit) and the source state. Rows are written directly with Drizzle; services'
-// owned-field locks do not apply to the refresh itself.
+// Applies a refresh plan (./plan) in the caller's transaction: milestone, label and task rows, the
+// tasks' labels, parents and blockers (M5), the project's next task number, backlog_file rows,
+// activity from the Backlog.md actor (origin backlog, origin_ref = commit) and the source state.
+// Rows are written directly with Drizzle; services' owned-field locks do not apply to the refresh
+// itself.
 import type { BacklogMode, BacklogTrigger } from '@pm/contracts';
 import { schema, type Tx } from '@pm/db';
-import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
-import { recordActivities, recordActivity, type StoredChange, type SystemActivityEntry } from '../activity';
-import type { BacklogPlan, ExistingFile, FileRow, MilestoneTarget, PlannedChange, TaskValues } from './plan';
+import { and, eq, inArray, notInArray, type SQL, sql } from 'drizzle-orm';
+import {
+  recordActivities,
+  recordActivity,
+  type StoredChange,
+  type StoredLabelRef,
+  type StoredTaskRef,
+  type SystemActivityEntry,
+} from '../activity';
+import { labelKey } from './fields';
+import type {
+  BacklogPlan,
+  ExistingFile,
+  FileRow,
+  LabelTarget,
+  MilestoneTarget,
+  PlannedChange,
+  PlannedLabelRef,
+  PlannedTaskRef,
+  TaskTarget,
+  TaskValues,
+} from './plan';
 
-const { backlogFile, backlogSource, milestone, project, task } = schema;
+const { backlogFile, backlogSource, label, milestone, project, task, taskDependency, taskLabel } = schema;
 
 export type BacklogSourceRow = typeof backlogSource.$inferSelect;
 export type ProjectRow = typeof project.$inferSelect;
@@ -22,6 +42,17 @@ function chunks<T>(items: T[], size = CHUNK): T[][] {
   const out: T[][] = [];
   for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
   return out;
+}
+
+/**
+ * M5: the project's Backlog.md labels become app labels (names editable). Detach and imports call
+ * it; the labels stay on their tasks.
+ */
+export async function releaseBacklogLabels(tx: Tx, projectId: string): Promise<void> {
+  await tx
+    .update(label)
+    .set({ source: 'app' })
+    .where(and(eq(label.projectId, projectId), eq(label.source, 'backlog')));
 }
 
 export interface ApplyInput {
@@ -111,9 +142,64 @@ export async function applyPlan(tx: Tx, input: ApplyInput): Promise<ApplyResult>
     return id;
   };
 
+  // Labels (M5) -------------------------------------------------------------------------------------
+  // Created on use with source backlog; a label someone created meanwhile with the same name wins
+  // (and keeps its colour). App labels the files use turn into backlog labels.
+  if (plan.labels.creates.length > 0) {
+    await tx
+      .insert(label)
+      .values(
+        plan.labels.creates.map((values) => ({
+          workspaceId: input.project.workspaceId,
+          projectId: input.project.id,
+          name: values.name,
+          color: values.color,
+          source: 'backlog' as const,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+  const labelIds = new Map<string, string>();
+  const adopt = new Set(plan.labels.adopt.map((row) => row.id));
+  const createdNames = new Set(plan.labels.creates.map((values) => labelKey(values.name)));
+  if (createdNames.size > 0) {
+    const rows = await tx
+      .select({ id: label.id, name: label.name, source: label.source })
+      .from(label)
+      .where(eq(label.projectId, input.project.id));
+    for (const row of rows) {
+      const key = labelKey(row.name);
+      if (!createdNames.has(key)) continue;
+      labelIds.set(key, row.id);
+      if (row.source !== 'backlog') adopt.add(row.id);
+    }
+  }
+  if (adopt.size > 0) {
+    await tx
+      .update(label)
+      .set({ source: 'backlog' })
+      .where(inArray(label.id, [...adopt]));
+  }
+  const labelIdOf = async (target: LabelTarget): Promise<string> => {
+    if ('id' in target) return target.id;
+    const key = labelKey(target.name);
+    const known = labelIds.get(key);
+    if (known) return known;
+    // JavaScript and Postgres may fold case differently for a few letters: ask Postgres.
+    const [row] = await tx
+      .select({ id: label.id })
+      .from(label)
+      .where(and(eq(label.projectId, input.project.id), sql`lower(${label.name}) = lower(${target.name})`))
+      .limit(1);
+    if (!row) throw new Error(`label ${target.name} was not created`);
+    labelIds.set(key, row.id);
+    return row.id;
+  };
+
   // Tasks -------------------------------------------------------------------------------------------
+  // Rows first; parents, labels and blockers once every row exists.
   const taskColumns = (values: Partial<TaskValues>) => {
-    const { milestone: target, ...rest } = values;
+    const { milestone: target, labels: _labels, blockers: _blockers, parent: _parent, ...rest } = values;
     return { ...rest, ...(target !== undefined ? { milestoneId: milestoneId(target) } : {}) };
   };
   // Number changes go through temporary numbers so two moves never collide on the unique key.
@@ -127,9 +213,11 @@ export async function applyPlan(tx: Tx, input: ApplyInput): Promise<ApplyResult>
   let restored = 0;
   for (const update of plan.tasks.updates) {
     if (update.restore) restored += 1;
+    const columns = { ...taskColumns(update.set), ...(update.restore ? { hiddenAt: null } : {}) };
     await tx
       .update(task)
-      .set({ ...taskColumns(update.set), ...(update.restore ? { hiddenAt: null } : {}) })
+      // A change of labels, blockers or parent alone still counts as an update of the task.
+      .set(Object.keys(columns).length > 0 ? columns : { updatedAt: new Date() })
       .where(eq(task.id, update.id));
   }
   if (plan.tasks.hides.length > 0) {
@@ -163,10 +251,60 @@ export async function applyPlan(tx: Tx, input: ApplyInput): Promise<ApplyResult>
           createdAt: values.createdAt,
           backlogData: values.backlogData as Record<string, unknown>,
           rank: values.rank,
+          dueDate: values.dueDate,
         })),
       )
       .returning({ id: task.id, backlogId: task.backlogId });
     for (const row of rows) if (row.backlogId) taskIds.set(row.backlogId, row.id);
+  }
+
+  // Parents, labels and blockers (M5) ----------------------------------------------------------------
+  const taskIdOf = (target: TaskTarget): string => {
+    if ('id' in target) return target.id;
+    const id = taskIds.get(target.backlogId);
+    if (!id) throw new Error(`task ${target.backlogId} was not created`);
+    return id;
+  };
+  const relations: { taskId: string; values: Partial<TaskValues>; created: boolean }[] = [
+    ...plan.tasks.updates.map((update) => ({ taskId: update.id, values: update.set, created: false })),
+    ...plan.tasks.creates.map((values) => ({
+      taskId: taskIdOf({ backlogId: values.backlogId }),
+      values,
+      created: true,
+    })),
+  ];
+  const parents: SQL[] = [];
+  const labelRows: { taskId: string; labelId: string }[] = [];
+  const blockerRows: { taskId: string; blockerId: string }[] = [];
+  const relabelled: string[] = [];
+  const reblocked: string[] = [];
+  for (const { taskId, values, created } of relations) {
+    if (values.parent !== undefined && (values.parent !== null || !created)) {
+      const parentId = values.parent ? taskIdOf(values.parent) : null;
+      parents.push(sql`(${taskId}::uuid, ${parentId}::uuid)`);
+    }
+    if (values.labels !== undefined) {
+      if (!created) relabelled.push(taskId);
+      for (const target of values.labels) labelRows.push({ taskId, labelId: await labelIdOf(target) });
+    }
+    if (values.blockers !== undefined) {
+      if (!created) reblocked.push(taskId);
+      for (const target of values.blockers) blockerRows.push({ taskId, blockerId: taskIdOf(target) });
+    }
+  }
+  for (const batch of chunks(parents)) {
+    await tx.execute(sql`
+      update ${task} set parent_id = v.parent_id
+      from (values ${sql.join(batch, sql`, `)}) as v(id, parent_id)
+      where ${task.id} = v.id`);
+  }
+  for (const batch of chunks(relabelled)) await tx.delete(taskLabel).where(inArray(taskLabel.taskId, batch));
+  for (const batch of chunks(labelRows)) await tx.insert(taskLabel).values(batch).onConflictDoNothing();
+  for (const batch of chunks(reblocked)) {
+    await tx.delete(taskDependency).where(inArray(taskDependency.taskId, batch));
+  }
+  for (const batch of chunks(blockerRows)) {
+    await tx.insert(taskDependency).values(batch).onConflictDoNothing();
   }
 
   // Activity --------------------------------------------------------------------------------------------
@@ -191,12 +329,40 @@ export async function applyPlan(tx: Tx, input: ApplyInput): Promise<ApplyResult>
     }
   } else {
     const entries: SystemActivityEntry[] = [];
-    const stored = (change: PlannedChange): StoredChange =>
-      change.field === 'milestone'
-        ? { field: 'milestone', from: change.from, to: milestoneId(change.to) }
-        : change;
+    const storedLabel = async (ref: PlannedLabelRef): Promise<StoredLabelRef> => ({
+      id: await labelIdOf(ref.label),
+      name: ref.name,
+    });
+    const storedTask = (ref: PlannedTaskRef): StoredTaskRef => ({
+      id: taskIdOf(ref.task),
+      key: ref.key,
+      title: ref.title,
+    });
+    const stored = async (change: PlannedChange): Promise<StoredChange> => {
+      switch (change.field) {
+        case 'milestone':
+          return { field: 'milestone', from: change.from, to: milestoneId(change.to) };
+        case 'labels':
+          return {
+            field: 'labels',
+            from: await Promise.all(change.from.map(storedLabel)),
+            to: await Promise.all(change.to.map(storedLabel)),
+          };
+        case 'blockedBy':
+          return { field: 'blockedBy', from: change.from.map(storedTask), to: change.to.map(storedTask) };
+        case 'parent':
+          return {
+            field: 'parent',
+            from: change.from ? storedTask(change.from) : null,
+            to: change.to ? storedTask(change.to) : null,
+          };
+        default:
+          return change;
+      }
+    };
     for (const update of plan.tasks.updates) {
-      const changes = update.changes.map(stored);
+      const changes: StoredChange[] = [];
+      for (const change of update.changes) changes.push(await stored(change));
       if (update.restore) {
         entries.push({
           ...origin,
@@ -307,6 +473,7 @@ export async function applyPlan(tx: Tx, input: ApplyInput): Promise<ApplyResult>
       ...(detach ? { detachedAt: now, detachedById: source.createdById, webhookSecretCiphertext: null } : {}),
     })
     .where(eq(backlogSource.id, source.id));
+  if (detach) await releaseBacklogLabels(tx, input.project.id);
 
   return {
     created: plan.tasks.creates.length,

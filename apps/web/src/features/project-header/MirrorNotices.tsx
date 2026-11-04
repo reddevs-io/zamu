@@ -87,9 +87,9 @@ export function HiddenTasksStrip({ count, branch }: { count: number; branch: str
       <NoticeStrip marker={<SourceStatusDot state="paused" decorative />}>
         <span className="leading-normal">
           {plural(count, 'task')} whose files are gone from{' '}
-          <span className="font-mono text-[11px] text-fg">{branch ?? 'the default branch'}</span>. They're
-          hidden from lists, the board, My tasks and the dashboard, and come back if their file returns.
-          Comments are kept.
+          <span className="font-mono text-xs text-fg">{branch ?? 'the default branch'}</span>. They're hidden
+          from lists, the board, My tasks and the dashboard, and come back if their file returns. Comments are
+          kept.
         </span>
       </NoticeStrip>
     </div>
@@ -110,13 +110,11 @@ export function MirrorEmptyState({ project }: { project: ProjectWithCounts }) {
   if (summary && !summary.lastReadAt) {
     return (
       <div className="flex px-6 py-12">
-        <div className="flex max-w-[520px] flex-col items-start gap-3">
-          <h2 className="m-0 text-[22px] leading-tight font-semibold tracking-[-0.015em]">
-            Reading {folder} for the first time
-          </h2>
-          <p className="m-0 leading-[1.55] text-muted">
-            The mirror reads <span className="font-mono text-[11.5px] text-fg">{repository}</span>. Tasks show
-            up here when the first read finishes.
+        <div className="flex max-w-130 flex-col items-start gap-3">
+          <h2 className="m-0 font-serif text-2xl font-medium">Reading {folder} for the first time</h2>
+          <p className="m-0 leading-prose text-fg-2">
+            The mirror reads <span className="font-mono text-xs text-fg">{repository}</span>. Tasks show up
+            here when the first read finishes.
           </p>
         </div>
       </div>
@@ -125,19 +123,17 @@ export function MirrorEmptyState({ project }: { project: ProjectWithCounts }) {
   const checked = ago(status?.lastAttemptAt ?? summary?.lastReadAt, now);
   return (
     <div className="flex px-6 py-12">
-      <div className="flex w-full max-w-[520px] flex-col items-start gap-3">
-        <h2 className="m-0 text-[22px] leading-tight font-semibold tracking-[-0.015em]">
-          No tasks in {folder} yet
-        </h2>
-        <p className="m-0 leading-[1.55] text-muted">
-          The mirror is set up and reads <span className="font-mono text-[11.5px] text-fg">{repository}</span>
-          , but the folder has no task files on {branch}. Create one, push it, and it shows up here.
+      <div className="flex w-full max-w-130 flex-col items-start gap-3">
+        <h2 className="m-0 font-serif text-2xl font-medium">No tasks in {folder} yet</h2>
+        <p className="m-0 leading-prose text-fg-2">
+          The mirror is set up and reads <span className="font-mono text-xs text-fg">{repository}</span>, but
+          the folder has no task files on {branch}. Create one, push it, and it shows up here.
         </p>
         <CodeBlock copyable copyLabel="Copy command" className="w-full">
           {'backlog task create "Retry failed webhook deliveries" && git push'}
         </CodeBlock>
         {checked || summary?.lastReadCommit ? (
-          <span className="text-[11.5px] text-muted">
+          <span className="text-xs text-fg-3">
             {[
               checked ? `Last checked ${checked}` : null,
               summary?.lastReadCommit ? `commit ${summary.lastReadCommit.slice(0, 7)}` : null,

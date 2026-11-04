@@ -220,7 +220,7 @@ Open `BETTER_AUTH_URL` in a browser. A new server sends you to the setup page:
    {name}" when [single sign-on](#single-sign-on-oidc) is configured.
 2. Name the workspace, usually your team or company.
 
-You land on the dashboard, signed in. Setup runs once; afterwards `/setup` sends visitors to sign in.
+You land on Home, signed in. Setup runs once; afterwards `/setup` sends visitors to sign in.
 
 Nobody can sign up on their own. To add people, go to Settings > Members > Invite person, pick a role and copy
 the invitation link. No email is sent: share the link yourself. It works once and expires after a week.
@@ -401,8 +401,15 @@ migration before the new `web` serves traffic, or the dashboard is slow on large
 Compose does this already (`migrate` finishes before `web` and `worker` start). On Kubernetes, run the
 migrate job before you roll out `web` and `worker`.
 
-The end-to-end suite checks both paths: it starts 0.1.1 and adds data, switches to 0.3.0 and adds more, then
-switches to the new image.
+Upgrading from 0.6 to 0.7 (M5) adds labels, due dates, blockers and subtasks. The schema migration only adds
+tables and columns. A second migration copies the labels, due dates, dependencies and parents of every task
+mirrored or imported from Backlog.md out of its stored Backlog.md data into the new fields. It reads nothing
+from git and writes no history lines, and the next refresh of each mirror changes nothing for files that
+did not change. Display options and the sidebar state are kept in each browser, so people start on the
+defaults.
+
+The end-to-end suite checks these paths: it starts 0.1.1 and adds data, switches to 0.3.0 and adds more, to
+0.6.0 and sets up a Backlog.md mirror, then switches to the new image and checks the mirror's backfill.
 
 ## The CLI in the image
 

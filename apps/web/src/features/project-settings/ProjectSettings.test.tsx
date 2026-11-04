@@ -70,9 +70,22 @@ describe('General settings', () => {
     await user.clear(key);
     await user.type(key, 'opx');
     await user.click(screen.getByRole('switch', { name: 'Cycles' }));
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(onSubmit).toHaveBeenCalledWith({ key: 'OPX', usesCycles: false });
     expect(await screen.findByText('Saved.')).toBeVisible();
+  });
+
+  it('Discard puts the saved values back', async () => {
+    const user = userEvent.setup();
+    render(<GeneralForm project={PROJECT} hasTasks onSubmit={vi.fn()} />);
+    const discard = screen.getByRole('button', { name: 'Discard' });
+    expect(discard).toBeDisabled();
+    await user.clear(screen.getByLabelText('Name'));
+    await user.type(screen.getByLabelText('Name'), 'Ops');
+    expect(discard).toBeEnabled();
+    await user.click(discard);
+    expect(screen.getByLabelText('Name')).toHaveValue('Operations');
+    expect(discard).toBeDisabled();
   });
 
   it('locks the key and the milestones switch of a mirrored project, saying why', () => {
@@ -97,13 +110,13 @@ describe('General settings', () => {
       .mockResolvedValue({ field: 'repository', message: 'PAY reads Backlog.md from …' });
     render(<GeneralForm project={MIRRORED} hasTasks onSubmit={onSubmit} />);
     await user.clear(screen.getByLabelText('Name'));
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(screen.getByText('Enter a project name.')).toBeVisible();
     expect(onSubmit).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText('Name'), 'Payments');
     await user.clear(screen.getByLabelText(/Repository/));
     await user.type(screen.getByLabelText(/Repository/), 'https://gitlab.com/x/y.git');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(onSubmit).toHaveBeenCalledWith({ repository: 'https://gitlab.com/x/y.git' });
     expect(await screen.findByText('PAY reads Backlog.md from …')).toBeVisible();
   });
@@ -317,7 +330,7 @@ describe('Webhook steps', () => {
   });
 });
 
-/** General settings until the delete navigates away; then the projects page, where the toast shows. */
+/** General settings until the delete navigates away; then Home, where the shell shows the toast. */
 function DeleteHarness() {
   const [onProjects, setOnProjects] = useState(false);
   api.navigate.mockImplementation(async () => setOnProjects(true));
@@ -421,7 +434,7 @@ describe('Delete project', () => {
     expect(screen.getByText(TEXT)).toBeVisible();
   });
 
-  it('deletes, goes to the projects page, drops the project from the cache and shows the toast', async () => {
+  it('deletes, goes to Home, drops the project from the cache and shows the toast', async () => {
     const user = userEvent.setup();
     api.deleteProject.mockResolvedValue(undefined);
     api.navigate.mockResolvedValue(undefined);
@@ -439,7 +452,7 @@ describe('Delete project', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Deleted OPS');
     expect(api.deleteProject).toHaveBeenCalledWith({ project: 'OPS', confirmKey: 'ops' });
-    expect(api.navigate).toHaveBeenCalledWith({ to: '/projects' });
+    expect(api.navigate).toHaveBeenCalledWith({ to: '/' });
     const cached = queryClient.getQueryData(projectsQuery().queryKey) as { items: { key: string }[] };
     expect(cached.items.map((item) => item.key)).toEqual(['WEB']);
     await waitFor(() => {

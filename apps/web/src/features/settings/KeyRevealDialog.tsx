@@ -49,10 +49,10 @@ function RevealContent({
           {key.key}
         </CodeBlock>
         <div className="flex flex-col gap-1.5">
-          <span className="caps">Use it from the CLI</span>
+          <span className="text-xs font-medium text-fg-3">Use it from the CLI</span>
           <CodeBlock>{login}</CodeBlock>
         </div>
-        <p className="m-0 text-[11.5px] text-muted">
+        <p className="m-0 text-xs text-fg-2">
           {scopeSentence(key.scope)}
           {actsFor ? ` Acts for ${actsFor}.` : ''}
         </p>

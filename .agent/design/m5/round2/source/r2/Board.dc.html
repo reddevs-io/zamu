@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./margin.css" />
+<script src="./data.js"></script>
+<style>
+body{margin:0}a{color:inherit}a:hover{color:inherit}
+.pref{display:flex;align-items:center;gap:5px;color:var(--text-3);font-size:var(--fs-xs);font-weight:500}
+.dropline{height:2px;border-radius:1px;background:var(--accent);margin:-5px 4px}
+.hint{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:5;display:flex;gap:6px;align-items:center;height:34px;padding:0 8px 0 14px;border-radius:999px;background:var(--surface-pop);box-shadow:var(--shadow-pop);color:var(--text-2);font-size:var(--fs-sm);white-space:nowrap}
+.hint b{color:var(--text);font-weight:600}
+</style>
+</helmet>
+<div class="{{ rootClass }}" data-screen-label="Board">
+<dc-import name="Side" project="HBR" view="Board" menu="{{ menu }}" theme="{{ theme }}" hint-size="236px,900px"></dc-import>
+<main class="main">
+<header class="vh">
+<div class="crumb"><span class="tile c1">H</span><span class="crumb-proj">Harbor</span></div>
+<div class="seg"><span class="seg-i">List</span><span class="seg-i on">Board</span></div>
+<span class="btn"><span class="filters-glyph"></span>Filter</span>
+<div class="anchor">
+<span class="{{ displayCls }}">Display</span>
+<sc-if value="{{ isDisplay }}">
+<div class="pop below" style="width:356px">
+<div class="pop-sec">
+<div class="pop-row"><span>Layout</span><div class="seg"><span class="seg-i">List</span><span class="seg-i on">Board</span></div></div>
+<div class="pop-row"><span>Columns</span><span class="selb"><span>Status</span><span class="caret">▾</span></span></div>
+<div class="pop-row"><span>Swimlanes</span><span class="selb"><span>None</span><span class="caret">▾</span></span></div>
+<div class="pop-row"><span>Order by</span><span class="selb"><span>Priority</span><span class="caret">▾</span></span></div>
+</div>
+<div class="pop-sec">
+<div class="pop-row"><span>Show subtasks as cards</span><span class="tgl"></span></div>
+<div class="pop-row"><span>Show empty columns</span><span class="tgl"></span></div>
+<div class="pop-row"><span>Hide done tasks after</span><span class="selb"><span>14 days</span><span class="caret">▾</span></span></div>
+</div>
+<div class="pop-sec">
+<div class="pop-h">Shown on cards</div>
+<div class="chips"><sc-for list="{{ props }}" as="pr"><span class="{{ pr.cls }}">{{ pr.n }}</span></sc-for></div>
+</div>
+<div class="pop-foot"><span>Saved for you on this board</span><span class="link">Reset to default</span></div>
+</div>
+</sc-if>
+</div>
+<span class="spacer"></span>
+<sc-if value="{{ wide }}"><span class="sync"><span class="dot"></span><b>Backlog.md</b>synced 38 min ago</span></sc-if>
+<span class="search"><span class="ico ico-search"></span><span class="nav-l search-l">Search</span><span class="nav-l kbd">/</span></span>
+<span class="btn primary">New task<span class="kbd">C</span></span>
+</header>
+<sc-if value="{{ isCols }}">
+<div class="board">
+<sc-for list="{{ before }}" as="cc"><div class="colc"><span class="{{ cc.st }}"></span><span class="colc-name"><span>{{ cc.name }}</span><span class="col-count">{{ cc.count }}</span></span></div></sc-for>
+<sc-for list="{{ cols }}" as="col" hint-placeholder-count="3">
+<section class="col">
+<div class="col-hd"><span class="{{ col.st }}"></span><span>{{ col.name }}</span><span class="col-count">{{ col.count }}</span><span class="spacer"></span><span class="col-add">+</span></div>
+<div class="cards">
+<sc-if value="{{ col.empty }}"><div class="col-empty">No tasks in Backlog.<br />Drag a card here, or press C.</div></sc-if>
+<sc-for list="{{ col.cards }}" as="c" hint-placeholder-count="8">
+<sc-if value="{{ c.dropBefore }}"><div class="dropline"></div></sc-if>
+<div class="{{ c.cls }}">
+<sc-if value="{{ c.showAv }}"><span class="{{ c.avTop }}">{{ c.avI }}</span></sc-if>
+<sc-if value="{{ c.hasParentRef }}"><span class="pref">↳ {{ c.parentRef }}</span></sc-if>
+<div class="{{ c.tCls }}">{{ c.title }}</div>
+<div class="card-m">
+<sc-if value="{{ c.pu }}"><span class="pri u">!</span></sc-if>
+<sc-if value="{{ c.ph }}"><span class="pri h"></span></sc-if>
+<span class="key">{{ c.key }}</span>
+<sc-for list="{{ c.labels }}" as="l"><span class="lb"><span class="{{ l.cls }}"></span>{{ l.n }}</span></sc-for>
+<sc-if value="{{ c.hasMore }}"><span class="more">{{ c.more }}</span></sc-if>
+<span class="spacer"></span>
+<sc-if value="{{ c.blocked }}"><span class="blk">Blocked</span></sc-if>
+<sc-if value="{{ c.showSub }}"><span class="subp"><span class="{{ c.ringCls }}"></span>{{ c.subTxt }}</span></sc-if>
+<sc-if value="{{ c.showDue }}"><span class="{{ c.dueCls }}">{{ c.dueTxt }}</span></sc-if>
+</div>
+<sc-if value="{{ c.isParent }}"><div class="card-sub"><span class="{{ c.triCls }}"></span><span>{{ c.parentTxt }}</span><span class="spacer"></span><span class="{{ c.ringCls }}"></span></div></sc-if>
+<sc-if value="{{ c.showKids }}"><div class="card-kids"><sc-for list="{{ c.kids }}" as="k"><div class="kid"><span class="{{ k.stCls }}"></span><span class="key">{{ k.key }}</span><span class="row-t">{{ k.title }}</span><sc-if value="{{ k.showAv }}"><span class="{{ k.avCls }}">{{ k.avI }}</span></sc-if></div></sc-for></div></sc-if>
+</div>
+</sc-for>
+</div>
+</section>
+</sc-for>
+<sc-for list="{{ collapsed }}" as="cc"><div class="colc"><span class="{{ cc.st }}"></span><span class="colc-name"><span>{{ cc.name }}</span><span class="col-count">{{ cc.count }}</span></span></div></sc-for>
+<sc-if value="{{ isDrag }}">
+<div class="card drag" style="position:absolute;left:752px;top:226px;width:322px">
+<span class="av agent av-cd card-av">cd</span>
+<div class="card-t has-av">Inbox sorting shows untranslated labels in every locale</div>
+<div class="card-m"><span class="pri h"></span><span class="key">HBR-71</span><span class="lb"><span class="lbd c6"></span>i18n</span></div>
+</div>
+<div class="hint"><span>Moving to</span><b>In review</b><span class="kbd">Esc</span><span>cancels</span></div>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ isLanes }}">
+<div class="lanes">
+<div class="lane-hd-row"><sc-for list="{{ laneCols }}" as="lc"><div class="col-hd"><span class="{{ lc.st }}"></span><span>{{ lc.name }}</span><span class="col-count">{{ lc.count }}</span></div></sc-for></div>
+<sc-for list="{{ lanes }}" as="ln">
+<div class="lane">
+<div class="lane-t"><span class="tri down" style="color:var(--text-3)"></span><span class="{{ ln.avCls }}">{{ ln.avI }}</span><span>{{ ln.name }}</span><span class="col-count">{{ ln.count }}</span></div>
+<div class="lane-cells">
+<sc-for list="{{ ln.cells }}" as="cell">
+<div class="lane-cell">
+<sc-for list="{{ cell.cards }}" as="c">
+<div class="{{ c.cls }}">
+<div class="card-t">{{ c.title }}</div>
+<div class="card-m">
+<sc-if value="{{ c.pu }}"><span class="pri u">!</span></sc-if>
+<sc-if value="{{ c.ph }}"><span class="pri h"></span></sc-if>
+<span class="key">{{ c.key }}</span>
+<sc-for list="{{ c.labels }}" as="l"><span class="lb"><span class="{{ l.cls }}"></span>{{ l.n }}</span></sc-for>
+<span class="spacer"></span>
+<sc-if value="{{ c.blocked }}"><span class="blk">Blocked</span></sc-if>
+<sc-if value="{{ c.showDue }}"><span class="{{ c.dueCls }}">{{ c.dueTxt }}</span></sc-if>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{ cell.more }}"><span class="more" style="padding:0 4px 2px">{{ cell.moreTxt }}</span></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" },
+  "state": { "editor": "enum", "options": ["default", "everything", "lanes", "expanded", "subcards", "collapsed", "drag", "emptycol", "display", "wsmenu", "usermenu"], "default": "default" },
+  "narrow": { "editor": "boolean", "default": false }
+}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (!window.PM) { const i = setInterval(() => { if (window.PM) { clearInterval(i); this.forceUpdate(); } }, 30); }
+  }
+  renderVals() {
+    const P = window.PM;
+    const theme = this.props.theme ?? 'light';
+    const s = this.props.state ?? 'default';
+    const narrow = this.props.narrow === true || this.props.narrow === 'true';
+    const rootClass = 'app ' + theme + (narrow ? ' narrow' : '');
+    const menu = s === 'wsmenu' ? 'ws' : s === 'usermenu' ? 'user' : '';
+    const props = [['Priority', 1], ['Key', 1], ['Labels', 1], ['Subtasks', 1], ['Due date', 1], ['Blocked', 1], ['Assignee', 1], ['Milestone', 0], ['Cycle', 0], ['Created', 0], ['Updated', 0]].map(([n, on]) => ({ n, cls: on ? 'tg on' : 'tg' }));
+    const base = { rootClass, theme, menu, props, isDisplay: s === 'display', displayCls: s === 'display' ? 'btn on' : 'btn', wide: !narrow, isCols: s !== 'lanes', isLanes: s === 'lanes', isDrag: s === 'drag', before: [], cols: [], collapsed: [], laneCols: [], lanes: [] };
+    if (!P) return base;
+    const dec = (c, extra) => Object.assign(c, { triCls: 'tri', showKids: false, kids: [], dropBefore: false }, extra || {});
+    const mk = (t, cls, i) => dec(P.card(t, cls, i));
+    let todo = P.TODO.map((t, i) => mk(t, i === 2 && s === 'default' && !narrow ? 'hover' : '', i));
+    let prog = P.PROG.map((t, i) => mk(t, i === 2 && (s === 'default' || s === 'collapsed') ? 'sel' : '', i));
+    let rev = P.REVIEW.map((t, i) => mk(t, '', i));
+    let revCount = 27;
+    if (s === 'everything') {
+      const all = dec(P.card(P.LONG[0], 'sel', 0, { full: true }));
+      todo = [all].concat(todo);
+    }
+    if (s === 'expanded') {
+      prog[0].triCls = 'tri down'; prog[0].showKids = true;
+      prog[0].kids = P.SUBS.map((k) => { const c = P.card(k, '', 0); return { key: c.key, title: c.title, stCls: c.stCls, showAv: c.showAv, avCls: c.avCls, avI: c.avI }; });
+    }
+    if (s === 'subcards') {
+      const kids = P.SUBS.filter((k) => (k[5] || {}).st === 'rev').map((k, i) => { const c = dec(P.card(k, 'child', i)); c.hasParentRef = true; c.parentRef = 'HBR-164 Savings goals'; return c; });
+      rev = kids.concat(rev); revCount = 32;
+    }
+    if (s === 'drag') {
+      prog = prog.filter((c) => c.key !== 'HBR-71');
+      const ghost = dec(P.card(P.PROG[1], 'ghost', 0));
+      rev = rev.slice(0, 2).concat([ghost], rev.slice(2));
+    }
+    const cols = [];
+    if (s === 'emptycol') cols.push({ name: 'Backlog', st: 'st backlog', count: 0, cards: [], empty: true });
+    if (s !== 'collapsed') cols.push({ name: 'Todo', st: 'st todo', count: s === 'everything' ? 79 : 78, cards: todo, empty: false });
+    cols.push({ name: 'In progress', st: 'st prog', count: s === 'drag' ? 12 : 13, cards: prog, empty: false });
+    cols.push({ name: 'In review', st: 'st rev', count: s === 'drag' ? 28 : revCount, cards: rev, empty: false });
+    const before = s === 'collapsed' ? [{ name: 'Todo', st: 'st todo', count: 78 }] : [];
+    const collapsed = [{ name: 'Done', st: 'st done', count: 235 }, { name: 'Canceled', st: 'st cancel', count: 6 }];
+    let laneCols = [], lanes = [];
+    if (s === 'lanes') {
+      laneCols = [{ name: 'Todo', st: 'st todo', count: 78 }, { name: 'In progress', st: 'st prog', count: 13 }, { name: 'In review', st: 'st rev', count: 27 }];
+      const who = [['ana', 'Ana Ruiz', 38, 2], ['cd', 'claude-dev', 62, 2], ['tf', 'Tomás Ferrer', 12, 1], ['rb', 'review-bot', 4, 1], [null, 'No assignee', 7, 1]];
+      lanes = who.map(([id, name, count, max]) => {
+        const p = id ? P.PEOPLE[id] : null;
+        const pick = (arr, n) => arr.filter((t) => t[4] === id).slice(0, max);
+        const lists = [P.TODO, P.PROG, P.REVIEW].map((arr) => pick(arr));
+        return { name, count, avCls: p ? p.cls : 'av none', avI: p ? p.i : '',
+          cells: lists.map((l, ci) => ({ cards: l.map((t, i) => dec(P.card(t, '', i))), more: true, moreTxt: l.length ? '+ ' + Math.max(1, Math.round(count / 3) - l.length) + ' more' : 'None' })) };
+      });
+      lanes[lanes.length - 1].cells.forEach((c) => {});
+    }
+    return Object.assign(base, { before, cols, collapsed, laneCols, lanes });
+  }
+}
+</script>
+</body>
+</html>

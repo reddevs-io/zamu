@@ -1,78 +1,96 @@
-import type { AssigneeRef, MilestoneRef, TaskListItem, TaskStatus } from '@pm/contracts';
-import type { BoardLanes } from '~/features/tasks/search';
+import type { TaskListItem } from '@pm/contracts';
+import {
+  type GroupBy,
+  type GroupContext,
+  groupTasks,
+  NO_VALUE_GROUP,
+  type TaskGroup,
+  type TaskGroupValue,
+} from '~/features/views';
+import type { MovePatch } from './moves';
 
-// Swimlanes: the board's cards grouped by assignee or by milestone, one row of cells per lane.
+// Columns and swimlanes of the board grouped by one field (display options "Columns" and "Swimlanes"):
+// the group keys of a card, the cards of each lane per column, and the patch a drop into a group means.
 
-export const NO_LANE = 'none';
+export { NO_VALUE_GROUP as NO_LANE };
 
-export interface Lane {
-  /** User id, milestone id, or NO_LANE. */
-  id: string;
-  title: string;
-  /** The lane's assignee (assignee lanes); null for "No assignee". */
-  assignee?: AssigneeRef | null;
-  /** The lane's milestone (milestone lanes); null for "No milestone". */
-  milestone?: MilestoneRef | null;
-  /** Cards per status, in board order. */
-  cells: Partial<Record<TaskStatus, TaskListItem[]>>;
-  count: number;
+/** The group keys a card belongs to under `field` (a card with several labels is in each label group). */
+export function groupKeysOf(field: GroupBy, card: TaskListItem): string[] {
+  switch (field) {
+    case 'status':
+      return [card.status];
+    case 'priority':
+      return [card.priority];
+    case 'assignee':
+      return [card.assignee?.id ?? NO_VALUE_GROUP];
+    case 'milestone':
+      return [card.milestone?.id ?? NO_VALUE_GROUP];
+    case 'cycle':
+      return [card.cycle?.id ?? NO_VALUE_GROUP];
+    case 'label':
+      return card.labels?.length ? card.labels.map((label) => label.id) : [NO_VALUE_GROUP];
+    default:
+      return ['all'];
+  }
 }
 
-/** Lane id of a card. */
-export function laneOf(mode: BoardLanes, card: TaskListItem): string {
-  if (mode === 'assignee') return card.assignee?.id ?? NO_LANE;
-  return card.milestone?.id ?? NO_LANE;
+/** True when the card is in the group `key` of `field`. */
+export function inGroup(field: GroupBy, card: TaskListItem, key: string): boolean {
+  return groupKeysOf(field, card).includes(key);
 }
 
 /**
- * Groups the cards of each column into lanes. Assignee lanes: agents, then people, by name, then
- * "No assignee". Milestone lanes: in `milestoneOrder` (the milestone list, by target date), unknown ones
- * by name, then "No milestone". Only lanes with cards are returned.
+ * What dropping a card into a group sets: its priority, assignee, milestone or cycle. Null for
+ * groupings a drop can't express (labels, none) and for status (the board's own moves handle it).
+ */
+export function groupPatch(value: TaskGroupValue): MovePatch | null {
+  switch (value.field) {
+    case 'priority':
+      return { priority: value.priority };
+    case 'assignee':
+      return { assignee: value.assignee };
+    case 'milestone':
+      return { milestone: value.milestone };
+    case 'cycle':
+      return { cycle: value.cycle };
+    default:
+      return null;
+  }
+}
+
+/** The owned field a group patch writes, for the Backlog.md lock check. */
+export function patchField(field: GroupBy): 'status' | 'priority' | 'assignee' | 'milestone' | null {
+  if (field === 'status' || field === 'priority' || field === 'assignee' || field === 'milestone')
+    return field;
+  return null;
+}
+
+export interface Lane {
+  /** The group key: a user id, a priority, a milestone id, or NO_LANE. */
+  id: string;
+  title: string;
+  value: TaskGroupValue;
+  /** Cards per column id, in board order. */
+  cells: Record<string, TaskListItem[]>;
+  count: number;
+}
+
+/**
+ * Groups the cards of each column into lanes by `field`, in groupTasks' order (the viewer first for
+ * assignees, milestones by target date, "No …" last). Lanes without cards are left out unless
+ * `context.showEmptyGroups` is set.
  */
 export function buildLanes(
-  mode: BoardLanes,
-  columns: readonly { status: TaskStatus; cards: readonly TaskListItem[] }[],
-  milestoneOrder: readonly string[] = [],
+  field: GroupBy,
+  columns: readonly { id: string; cards: readonly TaskListItem[] }[],
+  context: GroupContext = {},
 ): Lane[] {
-  const lanes = new Map<string, Lane>();
-  for (const { status, cards } of columns) {
-    for (const card of cards) {
-      const id = laneOf(mode, card);
-      let lane = lanes.get(id);
-      if (!lane) {
-        lane =
-          mode === 'assignee'
-            ? {
-                id,
-                title: card.assignee?.name ?? 'No assignee',
-                assignee: card.assignee,
-                cells: {},
-                count: 0,
-              }
-            : {
-                id,
-                title: card.milestone?.name ?? 'No milestone',
-                milestone: card.milestone,
-                cells: {},
-                count: 0,
-              };
-        lanes.set(id, lane);
-      }
-      const cell = lane.cells[status];
-      if (cell) cell.push(card);
-      else lane.cells[status] = [card];
-      lane.count++;
-    }
-  }
-  const sortKey = (lane: Lane): [number, number, string] => {
-    if (lane.id === NO_LANE) return [9, 0, ''];
-    if (mode === 'assignee') return [lane.assignee?.kind === 'agent' ? 0 : 1, 0, lane.title.toLowerCase()];
-    const index = milestoneOrder.indexOf(lane.id);
-    return index >= 0 ? [0, index, ''] : [1, 0, lane.title.toLowerCase()];
-  };
-  return [...lanes.values()].sort((a, b) => {
-    const [ga, ia, na] = sortKey(a);
-    const [gb, ib, nb] = sortKey(b);
-    return ga - gb || ia - ib || na.localeCompare(nb);
+  const all = columns.flatMap((column) => column.cards);
+  const groups: TaskGroup<TaskListItem>[] = groupTasks(all, field, context);
+  return groups.map((group) => {
+    const keys = new Set(group.tasks.map((task) => task.key));
+    const cells: Record<string, TaskListItem[]> = {};
+    for (const column of columns) cells[column.id] = column.cards.filter((card) => keys.has(card.key));
+    return { id: group.key, title: group.label, value: group.value, cells, count: group.tasks.length };
   });
 }

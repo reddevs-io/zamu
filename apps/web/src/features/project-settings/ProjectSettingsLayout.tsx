@@ -1,46 +1,48 @@
-// Project settings frame (frames 2a to 2o): the project header with its tabs, a 200px section nav
-// (General, Backlog.md with the source dot) and the current section.
+// Project settings (frames 115 to 127): the project header ("Payments / Settings"), the Margin settings
+// nav (Project: General, Labels, Backlog.md) and the current section in a 720px column.
+import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import { Link } from 'react-aria-components';
 import { ProjectHeader, useProjectSummary } from '~/features/project-header';
-import { cn, SourceStatusDot } from '~/ui';
+import { cn, SettingsNav, SourceStatusDot } from '~/ui';
 import { sourceDot } from './format';
+import { hasTasksQuery } from './queries';
 
-export type ProjectSettingsSection = 'general' | 'backlog';
+export type ProjectSettingsSection = 'general' | 'labels' | 'backlog';
 
-/** /p/PAY/settings and /p/PAY/settings/backlog. */
+/** /p/PAY/settings, /p/PAY/settings/labels and /p/PAY/settings/backlog. */
 export function projectSettingsHref(projectKey: string, section: ProjectSettingsSection = 'general'): string {
   const base = `/p/${encodeURIComponent(projectKey)}/settings`;
-  return section === 'general' ? base : `${base}/backlog`;
+  return section === 'general' ? base : `${base}/${section}`;
+}
+
+/** The section a settings path shows. */
+export function settingsSection(pathname: string): ProjectSettingsSection {
+  const path = pathname.replace(/\/+$/, '');
+  if (path.endsWith('/settings/backlog')) return 'backlog';
+  if (path.endsWith('/settings/labels')) return 'labels';
+  return 'general';
 }
 
 export function ProjectSettingsLayout({ projectKey, children }: { projectKey: string; children: ReactNode }) {
   const project = useProjectSummary(projectKey);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const section: ProjectSettingsSection = pathname.replace(/\/+$/, '').endsWith('/settings/backlog')
-    ? 'backlog'
-    : 'general';
+  const section = settingsSection(pathname);
   const backlog = project?.backlog ?? null;
+  // Backlog.md shows while the project has a source, or could get one (no tasks yet).
+  const hasTasks = useQuery({
+    ...hasTasksQuery(projectKey),
+    enabled: project !== undefined && !backlog,
+  }).data;
+  const showBacklog = backlog !== null || hasTasks !== true || section === 'backlog';
 
-  const item = (id: ProjectSettingsSection, label: string, trailing?: ReactNode) => {
-    const current = section === id;
-    return (
-      <Link
-        href={projectSettingsHref(projectKey, id)}
-        aria-current={current ? 'page' : undefined}
-        className={cn(
-          'flex h-[30px] items-center gap-2 px-3 outline-none focus-visible:focus-ring-inset',
-          current
-            ? 'bg-surface font-semibold text-fg shadow-[inset_2px_0_0_var(--accent)]'
-            : 'text-muted hover:text-fg',
-        )}
-      >
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        {trailing}
-      </Link>
-    );
-  };
+  const item = (id: ProjectSettingsSection, label: string, trailing?: ReactNode) => ({
+    id,
+    label,
+    href: projectSettingsHref(projectKey, id),
+    isCurrent: section === id,
+    trailing,
+  });
 
   return (
     <section
@@ -54,22 +56,59 @@ export function ProjectSettingsLayout({ projectKey, children }: { projectKey: st
         refreshHotkey={section !== 'backlog'}
         subtitle={project ? (project.openCount ? `${project.openCount} open` : 'no tasks yet') : undefined}
       />
-      <div className="grid min-h-0 flex-1 grid-cols-[200px_minmax(0,1fr)]">
-        <nav
-          aria-label="Settings sections"
-          className="flex flex-col gap-0.5 border-r border-line bg-band px-2.5 py-4"
-        >
-          {item('general', 'General')}
-          {item(
-            'backlog',
-            'Backlog.md',
-            backlog ? <SourceStatusDot state={sourceDot(backlog.state)} className="mr-1" /> : undefined,
-          )}
-        </nav>
+      <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)]">
+        <SettingsNav
+          title="Settings sections"
+          hideTitle
+          sections={[
+            {
+              label: 'Project',
+              items: [
+                item('general', 'General'),
+                item('labels', 'Labels'),
+                ...(showBacklog
+                  ? [
+                      item(
+                        'backlog',
+                        'Backlog.md',
+                        backlog ? <SourceStatusDot state={sourceDot(backlog.state)} /> : undefined,
+                      ),
+                    ]
+                  : []),
+              ],
+            },
+          ]}
+        />
         <div className="min-h-0 overflow-auto">
-          <div className="flex max-w-[956px] flex-col gap-4 px-7 pt-5 pb-8">{children}</div>
+          <div className="px-12 pt-8 pb-12 max-[1199px]:px-8">{children}</div>
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * One settings page (screens.css .set-col, .set-t, .set-d): the serif title, a sentence under it, then the
+ * page, 22px apart in a 720px column.
+ */
+export function SettingsPage({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex max-w-180 flex-col gap-5.5', className)}>
+      <div className="flex flex-col gap-2.5">
+        <h2 className="m-0 font-serif text-2xl leading-tight font-medium text-fg">{title}</h2>
+        {description ? <p className="m-0 leading-prose text-pretty text-fg-2">{description}</p> : null}
+      </div>
+      {children}
+    </div>
   );
 }

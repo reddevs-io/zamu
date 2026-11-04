@@ -12,7 +12,7 @@ import {
   listProjects,
   revokeApiKey,
 } from '@pm/core';
-import { createWorld } from '@pm/core/testing/fixtures';
+import { createLabelRow, createWorld, projectRow, scopeOf } from '@pm/core/testing/fixtures';
 import { createTestDatabase, type TestDatabase } from '@pm/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedDevData } from '../seed';
@@ -142,6 +142,8 @@ describe('OpenAPI document', () => {
       '/api/v1/cycles/{project}/{number}/end',
       '/api/v1/dashboard',
       '/api/v1/dashboard/counts',
+      '/api/v1/home',
+      '/api/v1/home/counts',
       '/api/v1/me',
       '/api/v1/members',
       '/api/v1/milestones/{id}',
@@ -150,8 +152,11 @@ describe('OpenAPI document', () => {
       '/api/v1/projects/{project}/backlog',
       '/api/v1/projects/{project}/backlog/refresh',
       '/api/v1/projects/{project}/cycles',
+      '/api/v1/projects/{project}/labels',
+      '/api/v1/projects/{project}/labels/{id}',
       '/api/v1/projects/{project}/milestones',
       '/api/v1/tasks',
+      '/api/v1/tasks/bulk',
       '/api/v1/tasks/{key}',
       '/api/v1/tasks/{key}/activity',
       '/api/v1/tasks/{key}/comments',
@@ -159,13 +164,23 @@ describe('OpenAPI document', () => {
     ]);
     // Every operation has an id, a summary and a tag; ids are unique.
     const operations = Object.values(result.body.paths).flatMap((item) => Object.values(item as object));
-    expect(operations).toHaveLength(31);
+    expect(operations).toHaveLength(38);
     const ids = operations.map((op: { operationId: string }) => op.operationId);
     expect(new Set(ids).size).toBe(ids.length);
     for (const op of operations) {
       expect(op.summary, op.operationId).toEqual(expect.any(String));
       expect(op.tags, op.operationId).toHaveLength(1);
     }
+    // Assignee, milestone and cycle take one value or several, like status and priority (M5).
+    const listParameters = result.body.paths['/api/v1/tasks'].get.parameters as {
+      name: string;
+      schema: unknown;
+    }[];
+    for (const name of ['status', 'assignee', 'milestone', 'cycle', 'label']) {
+      const parameter = listParameters.find((p) => p.name === name);
+      expect(JSON.stringify(parameter?.schema), name).toContain('"type":"array"');
+    }
+    expect(JSON.stringify(listParameters.find((p) => p.name === 'assignee')?.schema)).toContain('"none"');
     expect(result.body.paths['/api/v1/me'].patch).toBeDefined();
     // The dashboard scope is a query parameter; the counts take no input.
     const dashboard = result.body.paths['/api/v1/dashboard'].get;
@@ -1386,5 +1401,331 @@ describe('0.6.0: deleting a project', () => {
 
     const deleted = await call('DELETE', '/api/v1/projects/KEPT', { auth: key('admin'), body });
     expect(deleted.status).toBe(204);
+  });
+});
+
+describe('M5: labels, due dates, blockers and subtasks', () => {
+  const project = 'MFIVE';
+
+  beforeAll(async () => {
+    const created = await call('POST', '/api/v1/projects', {
+      auth: session(),
+      body: { name: 'Native fields', key: project },
+    });
+    expect(created.status).toBe(201);
+  });
+
+  async function newTask(body: Record<string, unknown>) {
+    const result = await call('POST', '/api/v1/tasks', { auth: session(), body: { project, ...body } });
+    expect(result.status, JSON.stringify(result.body)).toBe(201);
+    return result.body;
+  }
+
+  it('creates and reads tasks with labels, a due date, a parent and blockers', async () => {
+    const parent = await newTask({ title: 'Parent', assignee: agentId, labels: ['Backend'] });
+    const blocker = await newTask({ title: 'Blocker' });
+    const child = await newTask({
+      title: 'Child',
+      parent: parent.key.toLowerCase(),
+      blockedBy: [blocker.key],
+      dueDate: '2026-11-20',
+      labels: ['backend', 'payouts'],
+    });
+    expect(child).toMatchObject({
+      dueDate: '2026-11-20',
+      parent: { key: parent.key, title: 'Parent' },
+      assignee: { id: agentId },
+      blocked: true,
+      blockedBy: [{ key: blocker.key, title: 'Blocker', status: 'todo' }],
+      labels: [
+        { name: 'Backend', source: 'app' },
+        { name: 'payouts', source: 'app' },
+      ],
+    });
+    const fetched = await call('GET', `/api/v1/tasks/${parent.key}`, { auth: key('agent') });
+    expect(fetched.body).toMatchObject({
+      subtasks: [{ key: child.key }],
+      subtaskProgress: { done: 0, total: 1 },
+      blocks: [],
+    });
+    const activity = await call('GET', `/api/v1/tasks/${child.key}/activity`, { auth: session() });
+    expect(activity.body.items[0].changes.map((change: { field: string }) => change.field)).toEqual(
+      expect.arrayContaining(['labels', 'dueDate', 'parent', 'blockedBy']),
+    );
+  });
+
+  it('answers loops, deep subtasks and other projects with their problem codes', async () => {
+    const a = await newTask({ title: 'Loop A' });
+    const b = await newTask({ title: 'Loop B', blockedBy: [a.key] });
+    const loop = await call('PATCH', `/api/v1/tasks/${a.key}`, {
+      auth: session(),
+      body: { addBlockers: [b.key] },
+    });
+    expectProblem(loop, 409, 'DEPENDENCY_LOOP');
+    expect(loop.body.detail).toBe(`Can't add: ${b.key} already waits on ${a.key}.`);
+    expect(loop.body.issues).toEqual([{ path: 'addBlockers', message: loop.body.detail }]);
+    expect(loop.body.loop).toEqual({ task: a.key, blocker: b.key });
+
+    const top = await newTask({ title: 'Top' });
+    const sub = await newTask({ title: 'Sub', parent: top.key });
+    expectProblem(
+      await call('POST', '/api/v1/tasks', {
+        auth: session(),
+        body: { project, title: 'Deep', parent: sub.key },
+      }),
+      409,
+      'SUBTASK_DEPTH',
+    );
+    const pay = await call('GET', '/api/v1/tasks?project=PAY&limit=1', { auth: session() });
+    expectProblem(
+      await call('PATCH', `/api/v1/tasks/${a.key}`, {
+        auth: session(),
+        body: { addBlockers: [pay.body.items[0].key] },
+      }),
+      422,
+      'NOT_SAME_PROJECT',
+    );
+    expectProblem(
+      await call('PATCH', `/api/v1/tasks/${a.key}`, {
+        auth: session(),
+        body: { labels: ['x'], addLabels: ['y'] },
+      }),
+      400,
+      'BAD_REQUEST',
+    );
+  });
+
+  it('filters and sorts lists from the query string, with cursors', async () => {
+    await newTask({ title: 'Due early', dueDate: '2020-01-01', labels: ['filters'] });
+    await newTask({ title: 'Due late', dueDate: '2099-01-01', labels: ['filters'] });
+    const labels = await call('GET', `/api/v1/projects/${project}/labels`, { auth: session() });
+    const filters = labels.body.items.find((label: { name: string }) => label.name === 'filters');
+    expect(filters).toMatchObject({ usageCount: 2, source: 'app' });
+
+    const byLabel = await call('GET', `/api/v1/tasks?project=${project}&label=${filters.id}&sort=due`, {
+      auth: session(),
+    });
+    expect(byLabel.body.items.map((item: { title: string }) => item.title)).toEqual([
+      'Due early',
+      'Due late',
+    ]);
+    const overdue = await call('GET', `/api/v1/tasks?project=${project}&due=overdue`, { auth: session() });
+    expect(overdue.body.items.map((item: { title: string }) => item.title)).toEqual(['Due early']);
+    const blocked = await call('GET', `/api/v1/tasks?project=${project}&blocked=true&topLevel=true`, {
+      auth: session(),
+    });
+    expect(
+      blocked.body.items.every(
+        (item: { blocked: boolean; parentKey: string | null }) => item.blocked && !item.parentKey,
+      ),
+    ).toBe(true);
+    expectProblem(
+      await call('GET', `/api/v1/tasks?project=${project}&blocked=yes`, { auth: session() }),
+      400,
+      'BAD_REQUEST',
+    );
+
+    const all = await call('GET', `/api/v1/tasks?project=${project}&sort=created&limit=200`, {
+      auth: session(),
+    });
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const query = `/api/v1/tasks?project=${project}&sort=created&limit=3${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+      const page = await call('GET', query, { auth: session() });
+      expect(page.status).toBe(200);
+      seen.push(...page.body.items.map((item: { key: string }) => item.key));
+      cursor = page.body.nextCursor;
+    } while (cursor);
+    expect(seen).toEqual(all.body.items.map((item: { key: string }) => item.key));
+  });
+
+  it('filters by several assignees, milestones and cycles from the query string, with none', async () => {
+    await newTask({ title: 'Many: mine', assignee: 'me' });
+    await newTask({ title: 'Many: agent', assignee: agentId });
+    await newTask({ title: 'Many: nobody' });
+    const titles = async (query: string) => {
+      const result = await call('GET', `/api/v1/tasks?project=${project}&q=Many&limit=200&${query}`, {
+        auth: session(),
+      });
+      expect(result.status, JSON.stringify(result.body)).toBe(200);
+      return result.body.items.map((item: { title: string }) => item.title).sort();
+    };
+    await expect(titles('assignee=none')).resolves.toEqual(['Many: nobody']);
+    await expect(titles('assignee=me&assignee=none')).resolves.toEqual(['Many: mine', 'Many: nobody']);
+    await expect(titles(`assignee[]=agents&assignee[]=none`)).resolves.toEqual([
+      'Many: agent',
+      'Many: nobody',
+    ]);
+    await expect(titles('milestone=none&cycle=none&cycle=current')).resolves.toEqual([
+      'Many: agent',
+      'Many: mine',
+      'Many: nobody',
+    ]);
+    const counts = await call('GET', `/api/v1/tasks?project=${project}&q=Many&assignee=me&assignee=agents`, {
+      auth: session(),
+    });
+    expect(counts.body.counts.todo).toBe(2);
+    expectProblem(
+      await call('GET', `/api/v1/tasks?project=${project}&assignee=me&assignee=ana`, { auth: session() }),
+      400,
+      'BAD_REQUEST',
+    );
+  });
+
+  it('changes several tasks at once and refuses read-only keys', async () => {
+    const one = await newTask({ title: 'Bulk one' });
+    const two = await newTask({ title: 'Bulk two' });
+    const result = await call('POST', '/api/v1/tasks/bulk', {
+      auth: key('agent'),
+      body: { keys: [two.key, one.key], status: 'in_review', addLabels: ['bulk'], dueDate: '2026-12-01' },
+    });
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    expect(result.body.items.map((item: { key: string }) => item.key)).toEqual([two.key, one.key]);
+    expect(result.body.items[0]).toMatchObject({
+      status: 'in_review',
+      dueDate: '2026-12-01',
+      labels: [{ name: 'bulk' }],
+    });
+    expectProblem(
+      await call('POST', '/api/v1/tasks/bulk', {
+        auth: key('adminRead'),
+        body: { keys: [one.key], status: 'done' },
+      }),
+      403,
+      'FORBIDDEN',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/tasks/bulk', { auth: session(), body: { keys: [one.key] } }),
+      400,
+      'BAD_REQUEST',
+    );
+    expectProblem(
+      await call('POST', '/api/v1/tasks/bulk', {
+        auth: session(),
+        body: { keys: Array.from({ length: 101 }, (_, i) => `${project}-${i + 1}`), status: 'done' },
+      }),
+      400,
+      'BAD_REQUEST',
+    );
+  });
+
+  it('GET /home: Mine by default, Everyone and Agents on request, with label filters', async () => {
+    const review = await newTask({
+      title: 'Home review',
+      status: 'in_review',
+      assignee: 'me',
+      labels: ['home'],
+    });
+    const overdue = await newTask({ title: 'Home overdue', assignee: 'me', dueDate: '2020-02-02' });
+    const mine = await call('GET', '/api/v1/home', { auth: session() });
+    expect(mine.status, JSON.stringify(mine.body)).toBe(200);
+    expect(mine.body).toMatchObject({ tab: 'mine', generatedAt: expect.any(String), agents: [] });
+    expect(mine.body.groups.map((group: { key: string }) => group.key)).toEqual([
+      'review',
+      'mentions',
+      'blocked',
+      'overdue',
+      'assigned',
+    ]);
+    const keysOf = (body: { groups: { key: string; items: { task: { key: string } }[] }[] }, group: string) =>
+      body.groups.find((g) => g.key === group)?.items.map((item) => item.task.key) ?? [];
+    expect(keysOf(mine.body, 'review')).toContain(review.key);
+    expect(keysOf(mine.body, 'overdue')).toContain(overdue.key);
+
+    const filtered = await call('GET', '/api/v1/home?label=HOME', { auth: session() });
+    expect(filtered.status).toBe(200);
+    expect(
+      filtered.body.groups.flatMap((g: { items: { task: { key: string } }[] }) =>
+        g.items.map((i) => i.task.key),
+      ),
+    ).toEqual([review.key]);
+
+    const everyone = await call('GET', '/api/v1/home?tab=everyone', { auth: key('agent') });
+    expect(everyone.status).toBe(200);
+    expect(everyone.body.groups.map((group: { key: string }) => group.key)).toEqual([
+      'review',
+      'blocked',
+      'overdue',
+      'dueThisWeek',
+    ]);
+    const agents = await call('GET', '/api/v1/home?tab=agents', { auth: session() });
+    expect(agents.status).toBe(200);
+    expect(agents.body.agents.map((card: { agent: { id: string } }) => card.agent.id)).toContain(agentId);
+
+    expectProblem(await call('GET', '/api/v1/home?tab=nope', { auth: session() }), 400, 'BAD_REQUEST');
+    expectProblem(await call('GET', '/api/v1/home'), 401, 'UNAUTHORIZED');
+  });
+
+  it('GET /home/counts: the Mine count the sidebar shows', async () => {
+    const counts = await call('GET', '/api/v1/home/counts', { auth: session() });
+    expect(counts.status, JSON.stringify(counts.body)).toBe(200);
+    const { review, mentions, blocked, overdue, total } = counts.body;
+    expect(total).toBe(review + mentions + blocked + overdue);
+    expect(review).toBeGreaterThan(0);
+    const mine = await call('GET', '/api/v1/home', { auth: session() });
+    expect(mine.body.counts.mine).toBe(total);
+    expectProblem(await call('GET', '/api/v1/home/counts'), 401, 'UNAUTHORIZED');
+  });
+
+  it('manages labels: create, clash, rename, recolour, delete, and locked Backlog.md names', async () => {
+    const created = await call('POST', `/api/v1/projects/${project}/labels`, {
+      auth: session(),
+      body: { name: 'Docs' },
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({
+      name: 'Docs',
+      source: 'app',
+      usageCount: 0,
+      color: expect.any(Number),
+    });
+    expectProblem(
+      await call('POST', `/api/v1/projects/${project}/labels`, { auth: session(), body: { name: 'docs' } }),
+      409,
+      'LABEL_EXISTS',
+    );
+    const renamed = await call('PATCH', `/api/v1/projects/${project}/labels/${created.body.id}`, {
+      auth: session(),
+      body: { name: 'Guides', color: 9 },
+    });
+    expect(renamed.body).toMatchObject({ name: 'Guides', color: 9 });
+    expectProblem(
+      await call('POST', `/api/v1/projects/${project}/labels`, {
+        auth: key('adminRead'),
+        body: { name: 'ro' },
+      }),
+      403,
+      'FORBIDDEN',
+    );
+    const deleted = await call('DELETE', `/api/v1/projects/${project}/labels/${created.body.id}`, {
+      auth: session(),
+    });
+    expect(deleted.status).toBe(204);
+    expectProblem(
+      await call('DELETE', `/api/v1/projects/${project}/labels/${created.body.id}`, { auth: session() }),
+      404,
+      'NOT_FOUND',
+    );
+
+    // A label read from Backlog.md files keeps its name.
+    const row = await projectRow(database.db, admin.workspaceId, project);
+    const mirrored = await createLabelRow(database.db, scopeOf(row), {
+      name: 'from-file',
+      color: 2,
+      source: 'backlog',
+    });
+    const path = `/api/v1/projects/${project}/labels/${mirrored.id}`;
+    expectProblem(
+      await call('PATCH', path, { auth: session(), body: { name: 'renamed' } }),
+      409,
+      'LABEL_MIRRORED',
+    );
+    expectProblem(await call('DELETE', path, { auth: session() }), 409, 'LABEL_MIRRORED');
+    expect((await call('PATCH', path, { auth: session(), body: { color: 4 } })).body).toMatchObject({
+      name: 'from-file',
+      color: 4,
+      source: 'backlog',
+    });
   });
 });

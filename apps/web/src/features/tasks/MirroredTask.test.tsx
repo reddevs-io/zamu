@@ -1,4 +1,3 @@
-import { ORPCError } from '@orpc/client';
 import type { Activity, Task } from '@pm/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -16,11 +15,12 @@ import { clearCommentDrafts } from '~/features/comments/CommentComposer';
 import { resetTimelinePreferences } from '~/features/comments/TaskTimeline';
 import { UIProvider } from '~/ui';
 import { createFakeApi, FAKE_MILESTONES, FAKE_PEOPLE, type FakeApi } from './fake-api';
+import { resetFromFile } from './MirroredTask';
 import { canonicalTaskPath } from './prefetch';
-import { TaskDetailPane } from './TaskDetailPane';
 import { TaskPage } from './TaskPage';
 
-// Mirrored tasks (frames 5a to 5k): the panel and the page against the in-memory /api/v1 client.
+// Mirrored tasks in the task view (frames 054, 055): the Backlog.md badge, locks on hover or on an edit
+// attempt, "From the file", the history from the file, against the in-memory /api/v1 client.
 
 configure({ asyncUtilTimeout: 5000 });
 vi.setConfig({ testTimeout: 30_000 });
@@ -190,15 +190,7 @@ function renderApp(url: string) {
   const list = createRoute({
     getParentRoute: () => root,
     path: '/p/$projectKey/',
-    component: function ListRoute() {
-      const { projectKey } = list.useParams();
-      const search = list.useSearch() as { task?: string };
-      return (
-        <section aria-label="Task detail" className="flex flex-col">
-          <TaskDetailPane projectKey={projectKey} taskKey={search.task ?? 'PAY-1'} onClose={() => {}} />
-        </section>
-      );
-    },
+    component: () => <p>List</p>,
   });
   const page = createRoute({
     getParentRoute: () => root,
@@ -220,183 +212,118 @@ function renderApp(url: string) {
   return { router, queryClient };
 }
 
-const pane = () => screen.getByRole('region', { name: 'Task detail' });
-const historyRegion = () => screen.getByRole('region', { name: 'Activity and comments' });
-const cell = (id: string) => pane().querySelector(`[data-cell="${id}"]`) as HTMLElement;
+const historyRegion = () => screen.getByRole('region', { name: 'Activity' });
+const properties = () => screen.getByRole('complementary', { name: 'Properties' });
 
 beforeEach(() => {
   api.current = createFakeApi();
+  resetFromFile();
   clearCommentDrafts();
   resetTimelinePreferences();
 });
 
-describe('mirrored task in the panel', () => {
-  it('shows the Backlog.md ID, the source strip and hatched owned fields', async () => {
+describe('mirrored task in the task view', () => {
+  it('shows one Backlog.md badge to the file, no banners, and the comment note', async () => {
     mirrorPay1();
-    renderApp('/p/PAY');
-    await screen.findByText('BACK-1', { selector: '[title="Backlog.md ID"]' });
-    expect(within(pane()).getByText('Fields with a hatch come from')).toBeTruthy();
-    expect(within(pane()).getByRole('link', { name: 'Open file' }).getAttribute('href')).toBe(FILE_URL);
-    for (const id of ['status', 'priority', 'assignee', 'milestone', 'created']) {
-      await waitFor(() => expect(cell(id)?.dataset.locked).toBe('true'));
-      expect(within(cell(id)).getByText('· file')).toBeTruthy();
-    }
-    // Cycle stays editable and keeps its shortcut.
-    expect(cell('cycle').dataset.locked).toBeUndefined();
-    expect(within(cell('cycle')).getByRole('button', { name: /Cycle:/ })).toBeTruthy();
-    // No pickers for owned fields, and the title is not editable.
-    expect(within(pane()).queryByTitle('Edit title')).toBeNull();
-    expect(within(cell('assignee')).getByText('+2 in Backlog.md')).toBeTruthy();
-    expect(within(cell('milestone')).getByText('m-3')).toBeTruthy();
-    expect(within(cell('created')).getByText('@ana')).toBeTruthy();
+    renderApp('/p/PAY/PAY-1');
+    const badge = await screen.findByRole('link', { name: /Backlog\.md/ });
+    expect(badge).toHaveAttribute('href', FILE_URL);
+    expect(screen.queryByText(/Fields with a hatch/)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-locked] .locked-hatch')).toBeNull();
+    expect(
+      await screen.findByRole('button', {
+        name: 'Leave a comment. It stays in the app and isn’t written to the file.',
+      }),
+    ).toBeInTheDocument();
   });
 
-  it('opens the owned-field note on click and on Shift+M; Shift+C still sets the cycle', async () => {
-    mirrorPay1();
+  it('marks owned fields and says where to change them on an edit attempt', async () => {
     const user = userEvent.setup();
-    renderApp('/p/PAY');
-    await waitFor(() => expect(cell('status')?.dataset.locked).toBe('true'));
-    await user.click(within(cell('status')).getByRole('button'));
-    const note = await screen.findByRole('dialog', { name: 'Status comes from Backlog.md' });
-    expect(within(note).getByText('backlog task edit 1 -s Done')).toBeTruthy();
-    expect(within(note).getByText('status:')).toBeTruthy();
-    expect(within(note).getByText('main')).toBeTruthy();
-    expect(within(note).getByRole('button', { name: 'Copy path' })).toBeTruthy();
-    expect(within(note).getByRole('link', { name: 'Open file' }).getAttribute('href')).toBe(FILE_URL);
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-
-    await user.keyboard('{Shift>}M{/Shift}');
-    const milestoneNote = await screen.findByRole('dialog', { name: 'Milestone comes from Backlog.md' });
-    expect(within(milestoneNote).getByText(/^backlog task edit 1 -m /)).toBeTruthy();
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-
-    await user.keyboard('{Shift>}C{/Shift}');
-    expect(await screen.findByRole('searchbox', { name: /cycle/i })).toBeTruthy();
-    expect(fake().calls.update).toEqual([]);
-  });
-
-  it('shows the description built from the sections, read-only', async () => {
     mirrorPay1();
-    const user = userEvent.setup();
-    renderApp('/p/PAY');
-    await screen.findByRole('region', { name: 'Task detail' });
-    const fold = await within(pane()).findByRole('button', { name: /Description/ });
-    expect(fold.textContent).toContain('3 sections from Backlog.md, 1 of 2 checklist items done');
-    await user.click(fold);
-    expect(fold.textContent).toContain('built from 3 Backlog.md sections');
-    expect(within(pane()).getByText('#1 Retries follow 30s, 1m, 2m')).toBeTruthy();
-    expect(within(pane()).getAllByRole('img', { name: 'Done' }).length).toBeGreaterThan(0);
-    expect(within(pane()).queryByRole('checkbox')).toBeNull();
-    expect(within(pane()).queryByText('Add a description. Markdown works.')).toBeNull();
-  });
-
-  it('lists the Backlog.md block: labels, also assigned, links and missing IDs', async () => {
-    mirrorPay1();
-    renderApp('/p/PAY');
-    const block = await screen.findByRole('region', { name: 'Backlog.md BACK-1' });
-    expect(within(block).getByText('read-only · fields this app doesn’t have')).toBeTruthy();
-    expect(within(block).getByText('webhooks')).toBeTruthy();
-    expect(within(block).getByText('is Tomás Berg')).toBeTruthy();
-    expect(within(block).getByText('matches no member')).toBeTruthy();
-    expect(within(block).getByRole('link', { name: /PAY-2/ }).getAttribute('href')).toBe('/p/PAY/PAY-2');
-    expect(within(block).getAllByText('no task with this ID')).toHaveLength(2);
-    expect(within(block).getByText('Nov 14, 2026 · feature')).toBeTruthy();
-    expect(within(block).getByText('estimate: 5')).toBeTruthy();
-  });
-
-  it('shows Backlog.md history with commits and the first read', async () => {
-    mirrorPay1();
-    renderApp('/p/PAY');
-    await screen.findByRole('region', { name: 'Activity and comments' });
-    const imported = await within(historyRegion()).findByText(/imported the task with 411 others/);
-    const importedLine = imported.closest('[data-activity]') as HTMLElement;
-    expect(importedLine.dataset.origin).toBe('backlog');
-    expect(within(importedLine).getByText('Backlog.md')).toBeTruthy();
-    expect(within(importedLine).getByText('a1b2c3d')).toBeTruthy();
-    const moved = within(historyRegion()).getByText(/moved it from Todo to In progress/);
-    expect(within(moved.closest('[data-activity]') as HTMLElement).getByText('3f2a1c9')).toBeTruthy();
-    expect(within(historyRegion()).getByText(/changed the labels/)).toBeTruthy();
-    // The first read comes first.
-    const lines = within(historyRegion()).getAllByText('Backlog.md');
-    expect(lines[0]?.closest('[data-activity]')?.getAttribute('data-activity')).toBe(
-      'project.backlog_imported',
+    renderApp('/p/PAY/PAY-1');
+    const status = await within(await screen.findByRole('complementary', { name: 'Properties' })).findByRole(
+      'button',
+      { name: 'Status, set in Backlog.md' },
     );
+    expect(status).toHaveAttribute('data-locked');
+    // Cycles are the app's, even in mirrored projects.
+    expect(within(properties()).getByRole('button', { name: 'Cycle' })).not.toHaveAttribute('data-locked');
+
+    await user.click(status);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Set in Backlog.md. Edit the file to change it.',
+    );
+    expect(screen.queryByRole('dialog', { name: 'Status' })).not.toBeInTheDocument();
+    expect(fake().calls.update).toHaveLength(0);
+
+    // E on the title does the same.
+    await user.click(document.body);
+    await user.keyboard('e');
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument());
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
   });
 
-  it('opens the note with the server hint when a write is refused with TASK_MIRRORED', async () => {
+  it('shows the description from the file, read-only', async () => {
     mirrorPay1();
-    // Stale data: the panel thinks nothing is locked.
-    (fake().tasks[0] as Task).locked = [];
-    fake().client.tasks.update = async () => {
-      throw new ORPCError('TASK_MIRRORED', {
-        status: 409,
-        message: "PAY-1 is mirrored from Backlog.md, so its status can't change here",
-        data: {
-          field: 'status',
-          file: FILE,
-          backlogId: 'BACK-1',
-          hint: 'backlog task edit 1 -s "In Review"',
-        },
-      });
-    };
+    renderApp('/p/PAY/PAY-1');
+    expect(await screen.findByText(/Retries follow 30s, 1m, 2m/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add a description…' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the fields with no native home in "From the file", collapsed at first', async () => {
     const user = userEvent.setup();
-    renderApp('/p/PAY');
-    await screen.findByRole('region', { name: 'Task detail' });
-    const status = await within(pane()).findByRole('button', { name: /Status/ });
-    await user.click(status);
-    await user.click(await screen.findByRole('option', { name: /In review/ }));
-    const note = await screen.findByRole('dialog', { name: 'Status comes from Backlog.md' });
-    expect(within(note).getByText('backlog task edit 1 -s "In Review"')).toBeTruthy();
-    expect(within(note).getByRole('alert').textContent).toContain("so its status can't change here");
-    expect(screen.queryByText(/Couldn't save your change/)).toBeNull();
+    mirrorPay1();
+    renderApp('/p/PAY/PAY-1');
+    const section = await screen.findByRole('region', { name: 'From the file' });
+    const toggle = within(section).getByRole('button', { name: /From the file/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('6 fields');
+    await user.click(toggle);
+    const keys = within(section)
+      .getAllByRole('term')
+      .map((term) => term.textContent);
+    expect(keys).toEqual(['type', 'reporter', 'assignee', 'references', 'created_date', 'estimate']);
+    expect(keys).not.toContain('labels');
+    expect(keys).not.toContain('due_date');
+    expect(within(section).getByText('feature')).toBeInTheDocument();
+    expect(within(section).getByText('2026-10-02 09:14')).toBeInTheDocument();
+  });
+
+  it('shows Backlog.md history "in the file" with commits, and the import', async () => {
+    mirrorPay1();
+    renderApp('/p/PAY/PAY-1');
+    const region = await screen.findByRole('region', { name: 'Activity' });
+    const moved = await within(region).findByText(/moved this to In progress in the file/);
+    expect(moved.closest('[data-origin]')).toHaveAttribute('data-origin', 'backlog');
+    expect(within(region).getByText('3f2a1c9')).toBeInTheDocument();
+    expect(within(region).getByText(/changed the labels in the file/)).toBeInTheDocument();
+    expect(within(region).getByText(`imported this from ${FILE}`)).toBeInTheDocument();
   });
 });
 
 describe('hidden and detached tasks', () => {
   it('shows the removed banner on a hidden task and keeps comments', async () => {
     mirrorPay1({ hidden: true });
-    renderApp('/p/PAY');
-    await screen.findByRole('region', { name: 'Task detail' });
-    const banner = await within(pane()).findByRole('status');
-    expect(banner.textContent).toContain('Removed from Backlog.md');
-    await waitFor(() => expect(banner.textContent).toContain('(last seen at commit 77ab210)'));
-    expect(within(pane()).queryByText('Fields with a hatch come from')).toBeNull();
-    expect(await within(historyRegion()).findByText(/hid the task: its file is gone from main/)).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'Comment' })).toBeTruthy();
-  });
-
-  it('unlocks every field after detach and keeps the block as a record', async () => {
-    mirrorPay1({ detached: true });
-    renderApp('/p/PAY');
-    const block = await screen.findByRole('region', { name: 'Backlog.md BACK-1' });
-    expect(within(block).getByText('kept from the import · read-only')).toBeTruthy();
-    expect(within(pane()).getByText('Was mirrored from Backlog.md as')).toBeTruthy();
-    expect(cell('status').dataset.locked).toBeUndefined();
-    expect(within(pane()).getByTitle('Edit title')).toBeTruthy();
-    expect(
-      await within(historyRegion()).findByText(
-        /detached Payments from Backlog.md. Every field is editable now./,
-      ),
-    ).toBeTruthy();
-  });
-});
-
-describe('mirrored task on its page', () => {
-  it('uses the same pieces in the page layout', async () => {
-    mirrorPay1();
-    const user = userEvent.setup();
     renderApp('/p/PAY/PAY-1');
-    await screen.findByText('BACK-1', { selector: '[title="Backlog.md ID"]' });
-    expect(screen.getByText('Fields with a hatch come from')).toBeTruthy();
-    expect(await screen.findByRole('region', { name: 'Backlog.md BACK-1' })).toBeTruthy();
-    const properties = screen.getByRole('complementary', { name: 'Properties' });
-    expect(within(properties).getAllByText('· file').length).toBe(5);
-    const priorityRow = within(properties).getByText('Priority').closest('[data-locked]') as HTMLElement;
-    await user.click(within(priorityRow).getByRole('button'));
-    const note = await screen.findByRole('dialog', { name: 'Priority comes from Backlog.md' });
-    expect(within(note).getByText(/^backlog task edit 1 --priority /)).toBeTruthy();
+    expect(await screen.findByText(/Removed from Backlog\.md/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Comments still work on hidden tasks.' }),
+    ).toBeInTheDocument();
+    expect(historyRegion()).toBeInTheDocument();
+  });
+
+  it('unlocks every field after detach', async () => {
+    mirrorPay1({ detached: true });
+    renderApp('/p/PAY/PAY-1');
+    const status = await within(await screen.findByRole('complementary', { name: 'Properties' })).findByRole(
+      'button',
+      { name: 'Status' },
+    );
+    expect(status).not.toHaveAttribute('data-locked');
+    expect(
+      await within(historyRegion()).findByText(/detached Payments from Backlog\.md/),
+    ).toBeInTheDocument();
   });
 });
 

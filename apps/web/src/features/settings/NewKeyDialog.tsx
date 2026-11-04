@@ -108,7 +108,7 @@ function NewKeyForm({
         </DialogBody>
         <DialogFooter
           start={
-            <span className="text-[11.5px] text-muted">
+            <span className="text-xs text-fg-2">
               {agent ? `The key acts as ${agent.name}.` : 'The key acts as you.'}
             </span>
           }

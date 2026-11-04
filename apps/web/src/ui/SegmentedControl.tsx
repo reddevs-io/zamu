@@ -21,7 +21,8 @@ export interface SegmentedControlProps<K extends string = string> {
 }
 
 /**
- * One-of-n switch, 26px tall: List / Board, Light / Dark / System. React Aria ToggleButtonGroup with
+ * One-of-n switch (margin.css .seg): List / Board, Light / Dark / System. A --bg-grp track with the chosen
+ * segment raised on --surface-pop. React Aria ToggleButtonGroup with
  * single selection: arrow keys move between segments, Space or Enter picks one, a selection is required.
  */
 export function SegmentedControl<K extends string = string>({
@@ -45,8 +46,8 @@ export function SegmentedControl<K extends string = string>({
         if (next != null && next !== value) onChange(String(next) as K);
       }}
       className={cn(
-        'h-[26px] shrink-0 border border-line',
-        fullWidth ? 'flex w-full divide-x divide-line' : 'inline-flex',
+        'shrink-0 gap-0.5 rounded-md border border-line-soft bg-bg-grp p-0.5',
+        fullWidth ? 'flex w-full' : 'inline-flex',
         className,
       )}
     >
@@ -56,10 +57,10 @@ export function SegmentedControl<K extends string = string>({
           id={item.id}
           className={({ isSelected }) =>
             cn(
-              'inline-flex cursor-pointer items-center justify-center gap-1.5 px-[9px] text-[12px] outline-none select-none',
-              'focus-visible:focus-ring-inset disabled:cursor-default disabled:opacity-50',
+              'inline-flex h-6.5 cursor-pointer items-center justify-center gap-1.5 rounded-[calc(var(--radius-md)-2px)] px-2.75 text-sm font-medium outline-none select-none',
+              'focus-visible:shadow-[var(--focus-ring)] disabled:cursor-default disabled:opacity-45',
               fullWidth && 'flex-1',
-              isSelected ? 'bg-sel font-semibold text-fg' : 'text-muted hover:text-fg',
+              isSelected ? 'bg-surface-pop text-fg shadow-card' : 'text-fg-2 hover:text-fg',
             )
           }
         >

@@ -8,6 +8,7 @@ import { backlogRefresh, backlogStatus } from './commands/backlog';
 import { addComment, deleteComment, editComment, listComments } from './commands/comments';
 import { createCycle, currentCycle, endCycle, listCycles } from './commands/cycles';
 import { showDashboard } from './commands/dashboard';
+import { createLabel, deleteLabel, listLabels, updateLabel } from './commands/labels';
 import { link } from './commands/link';
 import { createMilestone, listMilestones, updateMilestone } from './commands/milestones';
 import { deleteProject, listProjects } from './commands/projects';
@@ -21,6 +22,11 @@ import { describeFailure } from './mirrored';
 const STATUS_HELP = 'backlog, todo, in_progress, in_review, done, canceled';
 const PRIORITY_HELP = 'none, low, medium, high, urgent';
 const MILESTONE_STATUS_HELP = 'planned, active, completed';
+const DUE_FILTER_HELP = 'overdue, soon (open, due today to 2 days out), none, set';
+const SORT_HELP = 'priority, due (soonest first), updated, created (newest first) or manual (board order)';
+const LABEL_HELP = 'label name; repeatable or comma-separated, missing labels are created';
+const BLOCKER_HELP = 'task key of the same project it waits on; repeatable or comma-separated';
+const COLOR_HELP = 'palette colour, 1 to 9';
 const PROJECT_HELP = "project key, e.g. PAY (default: PM_PROJECT, .pm.json or this clone's linked project)";
 const TASK_KEY_HELP = 'e.g. PAY-142, a subtask key like PAY-786.1, or a Backlog.md id like BACK-786.1';
 const TASK_PROJECT_HELP =
@@ -65,6 +71,9 @@ the project linked to this clone's git remote (pm link). pm whoami shows which o
 
 Tasks: a task key is PAY-142, or PAY-786.1 for a subtask. In a project mirrored from Backlog.md, its
 Backlog.md id (BACK-786.1) works too, and the fields Backlog.md owns change in the files, not here.
+Subtasks, blockers and parents are tasks of the same project; subtasks go one level deep.
+
+Labels: per project, by name (case-insensitive). pm tasks create and update create missing ones.
 
 Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog.md conflict.`,
     );
@@ -153,6 +162,18 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
         "milestone name (in one --project, else this clone's project) or id; none for tasks without one",
       )
       .option('--cycle <cycle>', 'cycle number, current, next, or none for tasks without one')
+      .option(
+        '--label <name>',
+        "tasks with any of these labels, by name (in --project, else this clone's project); " +
+          'repeatable or comma-separated',
+        collectKeys,
+      )
+      .option('--due <state>', `due date: ${DUE_FILTER_HELP}`)
+      .option('--blocked', 'only tasks with an open blocker')
+      .option('--no-blocked', 'only tasks without an open blocker')
+      .option('--top-level', 'leave subtasks out')
+      .option('--parent <TASK-KEY>', 'only the subtasks of this task')
+      .option('--sort <order>', `one order for the whole list: ${SORT_HELP} (default: status, then priority)`)
       .option('--limit <n>', 'tasks per page, 1 to 200 (default 50)')
       .option('--cursor <cursor>', 'next page, from the previous result'),
   ).action((options) => listTasks(context, options));
@@ -176,7 +197,14 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
       .option('--assignee <who>', 'me, or a member name, email or id')
       .option('--status <status>', `${STATUS_HELP} (default todo)`)
       .option('--milestone <name>', 'milestone of the project, by name or id')
-      .option('--cycle <cycle>', 'cycle number, current or next'),
+      .option('--cycle <cycle>', 'cycle number, current or next')
+      .option('--label <name>', LABEL_HELP, collectKeys)
+      .option('--due <date>', 'due date, YYYY-MM-DD')
+      .option(
+        '--parent <TASK-KEY>',
+        "make it a subtask of this task (same project, one level); it takes the parent's assignee unless --assignee is given",
+      )
+      .option('--blocked-by <TASK-KEY>', BLOCKER_HELP, collectKeys),
   ).action((title: string[], options) => createTask(context, title, options));
 
   leaf(
@@ -194,8 +222,55 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
       .option('--title <title>', 'new title')
       .option('--description <text>', 'new Markdown description; "-" reads it from stdin')
       .option('--milestone <name>', "milestone of the task's project, by name or id; none clears it")
-      .option('--cycle <cycle>', 'cycle number, current or next; none clears it'),
+      .option('--cycle <cycle>', 'cycle number, current or next; none clears it')
+      .option('--label <name>', `add a label: ${LABEL_HELP}`, collectKeys)
+      .option('--remove-label <name>', 'take a label off; repeatable or comma-separated', collectKeys)
+      .option('--due <date>', 'due date, YYYY-MM-DD; none clears it')
+      .option(
+        '--parent <TASK-KEY>',
+        'make it a subtask of this task (same project, one level); none makes it top level',
+      )
+      .option('--blocked-by <TASK-KEY>', `add a blocker: ${BLOCKER_HELP}`, collectKeys)
+      .option('--unblock <TASK-KEY>', 'remove a blocker; repeatable or comma-separated', collectKeys),
   ).action((key: string, options) => updateTask(context, key, options));
+
+  const labels = program
+    .command('labels')
+    .description('list, create, rename, recolour and delete project labels');
+  leaf(
+    labels
+      .command('list')
+      .description('list the labels of a project with the number of tasks using each')
+      .option('--project <KEY>', PROJECT_HELP),
+  ).action((options) => listLabels(context, options));
+
+  leaf(
+    labels
+      .command('create')
+      .description('create a label (tasks create missing labels too: pm tasks update KEY --label name)')
+      .argument('<name...>', 'label name, up to 40 characters, unique in the project ignoring case')
+      .option('--project <KEY>', PROJECT_HELP)
+      .option('--color <n>', `${COLOR_HELP} (default: the least used one)`),
+  ).action((name: string[], options) => createLabel(context, name, options));
+
+  leaf(
+    labels
+      .command('update')
+      .description('rename or recolour a label; labels from Backlog.md keep their name')
+      .argument('<name>', 'label name (ignoring case) or id')
+      .option('--project <KEY>', PROJECT_HELP)
+      .option('--name <name>', 'new name')
+      .option('--color <n>', COLOR_HELP),
+  ).action((name: string, options) => updateLabel(context, name, options));
+
+  leaf(
+    labels
+      .command('delete')
+      .description('delete a label and take it off every task (task history keeps the name)')
+      .argument('<name>', 'label name (ignoring case) or id')
+      .option('--project <KEY>', PROJECT_HELP)
+      .option('--confirm <name>', 'the label name again; nothing is deleted without it'),
+  ).action((name: string, options) => deleteLabel(context, name, options));
 
   const comments = program.command('comments').description('list, add, edit and delete task comments');
   leaf(

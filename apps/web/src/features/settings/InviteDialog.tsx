@@ -134,9 +134,7 @@ export function InviteContent({ onSubmit, close, hint, onCreated }: InviteConten
           />
         </DialogBody>
         <DialogFooter
-          start={
-            <span className="text-[11.5px] text-muted">You get a link to send. It expires in 7 days.</span>
-          }
+          start={<span className="text-xs text-fg-2">You get a link to send. It expires in 7 days.</span>}
         >
           <Button variant="secondary" onPress={close}>
             Cancel

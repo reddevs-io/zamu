@@ -1,4 +1,10 @@
-import type { StatusCounts, TaskListItem, TaskStatus } from '@pm/contracts';
+import {
+  PRIORITIES,
+  type StatusCounts,
+  type TaskListItem,
+  type TaskSort,
+  type TaskStatus,
+} from '@pm/contracts';
 import type { BoardColumnData } from './queries';
 
 // Pure edits of one cached board column (an infinite query: pages of cards in rank order). Moves are
@@ -123,4 +129,46 @@ export function rankFor(cards: readonly TaskListItem[], placement: Placement, fa
   const neighbour = 'before' in placement ? cards[index - 1] : cards[index + 1];
   if (!neighbour) return 'before' in placement ? anchor.rank - 1 : anchor.rank + 1;
   return (anchor.rank + neighbour.rank) / 2;
+}
+
+/** Newest first, then the id (descending), as the server breaks ties. */
+const byUpdated = (a: TaskListItem, b: TaskListItem) =>
+  b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id);
+
+/**
+ * The order tasks.list `sort` gives (packages/core SORT_PARTS): priority highest first, due soonest first
+ * (no date last), last updated or created newest first, manual by rank; ties by last update, then id.
+ */
+export function compareBySort(sort: TaskSort, a: TaskListItem, b: TaskListItem): number {
+  switch (sort) {
+    case 'priority':
+      return PRIORITIES.indexOf(b.priority) - PRIORITIES.indexOf(a.priority) || byUpdated(a, b);
+    case 'due': {
+      const x = a.dueDate ?? null;
+      const y = b.dueDate ?? null;
+      if (x !== y) {
+        if (x === null) return 1;
+        if (y === null) return -1;
+        return x.localeCompare(y);
+      }
+      return byUpdated(a, b);
+    }
+    case 'created':
+      return b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+    case 'manual':
+      return a.rank - b.rank || byUpdated(a, b);
+    default:
+      return byUpdated(a, b);
+  }
+}
+
+/**
+ * Where a card lands in a column ordered by `sort` (not manual): before the first card that sorts after
+ * it, else after the last one. `cards` is the column without the moving card.
+ */
+export function sortPlacement(cards: readonly TaskListItem[], card: TaskListItem, sort: TaskSort): Placement {
+  const next = cards.find((other) => other.key !== card.key && compareBySort(sort, card, other) < 0);
+  if (next) return { before: next.key };
+  const last = cards.filter((other) => other.key !== card.key).at(-1);
+  return last ? { after: last.key } : 'top';
 }

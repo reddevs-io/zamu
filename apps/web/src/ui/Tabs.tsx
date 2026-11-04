@@ -16,29 +16,29 @@ export function Tabs(props: TabsProps) {
 }
 
 export function TabList<T extends object>(props: TabListProps<T>) {
-  return <AriaTabList {...props} className={composeTw(props.className, 'flex items-center gap-[18px]')} />;
+  return <AriaTabList {...props} className={composeTw(props.className, 'flex items-center gap-0.5')} />;
 }
 
 export interface TabProps extends Omit<AriaTabProps, 'children'> {
   children: ReactNode;
-  /** Count drawn in mono after the label: "All 7". */
+  /** Count after the label in --fg-3: "Mine 7". */
   count?: number;
 }
 
-/** Text tab, 36px tall; the selected tab is bold with a 2px --fg underline. */
+/** Margin tab (screens.css .tab): 30px pill, --fg-2; the selected tab sits on --bg-lane in --fg. */
 export function Tab({ children, count, ...props }: TabProps) {
   return (
     <AriaTab
       {...props}
       className={composeTw(props.className, ({ isSelected }) =>
         cn(
-          'flex h-9 cursor-pointer items-center gap-1.5 outline-none focus-visible:focus-ring-inset',
-          isSelected ? 'font-semibold text-fg shadow-[inset_0_-2px_0_var(--fg)]' : 'text-muted hover:text-fg',
+          'flex h-7.5 cursor-pointer items-center gap-1.5 rounded-md px-2.75 text-sm font-medium outline-none focus-visible:shadow-[var(--focus-ring)]',
+          isSelected ? 'bg-bg-lane text-fg' : 'text-fg-2 hover:text-fg',
         ),
       )}
     >
       {children}
-      {count != null ? <span className="font-mono text-[10px] font-normal text-faint">{count}</span> : null}
+      {count != null ? <span className="text-xs font-normal text-fg-3 tabular-nums">{count}</span> : null}
     </AriaTab>
   );
 }

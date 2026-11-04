@@ -1,350 +1,142 @@
-import type { TaskOwnedField } from '@pm/contracts';
+import type { Task } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
-import { type ReactNode, type RefObject, useRef, useState } from 'react';
+import { useRouter } from '@tanstack/react-router';
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Button as AriaButton,
+  TextArea as AriaTextArea,
+  TextField as AriaTextField,
+  MenuTrigger,
+} from 'react-aria-components';
 import { CommentComposer } from '~/features/comments/CommentComposer';
 import { TaskTimeline } from '~/features/comments/TaskTimeline';
+import {
+  type TaskFieldKey,
+  useFieldChange,
+  useProjectPlanning,
+  useTaskFieldKeys,
+} from '~/features/task-fields';
+import { useTaskNavigation } from '~/features/views';
 import {
   Banner,
   Button,
   cn,
-  Kbd,
-  lockedHatch,
-  OwnedFieldCaption,
-  PageHeader,
-  PriorityGlyph,
+  Menu,
+  MenuItem,
+  MenuSeparator,
   Skeleton,
-  StatusSquare,
+  Tooltip,
+  TooltipTrigger,
   useCopy,
   useHotkeys,
+  ViewHeader,
 } from '~/ui';
 import { useNow } from './clock';
 import { describeError } from './errors';
-import { atTime, formatDayTime, formatPageTime } from './format';
+import { atTime, formatRelative, toggleCheckbox } from './format';
 import { listSearchFor } from './list-memory';
-import {
-  BacklogIdTag,
-  backlogHistoryQuery,
-  extraAssignees,
-  LockedValue,
-  MirroredCreated,
-  MirroredDescription,
-  OwnedFieldNote,
-  RemovedBanner,
-  TaskBacklogBlock,
-  TaskSourceStrip,
-  useBacklogSummary,
-} from './MirroredTask';
-import { commentPlaceholder, milestoneBacklogId, mirroredProblem, mirrorOf } from './mirror';
-import {
-  CyclePicker,
-  CycleValue,
-  MilestonePicker,
-  MilestoneValue,
-  useProjectPlanning,
-} from './PlanningFields';
-import { membersQuery, projectsQuery, type TaskPatch, taskQuery, useUpdateTask } from './queries';
-import { createdSub, forLine, RequestHint, useOwnedFieldNote } from './TaskDetailPane';
-import {
-  AssigneeLabel,
-  AssigneePicker,
-  EditableDescription,
-  EditableTitle,
-  PriorityPicker,
-  StatusPicker,
-} from './TaskFields';
+import { Markdown } from './Markdown';
+import { backlogHistoryQuery, RemovedBanner, TaskFileBadge, useBacklogSummary } from './MirroredTask';
+import { commentPlaceholder, mirrorOf } from './mirror';
+import { membersQuery, taskQuery, timelineQuery } from './queries';
+import { LockTooltip, type PropertyAnchors, TaskProperties } from './TaskPageProperties';
+import { BlockedBySection, projectOfKey, SubtasksSection } from './TaskPageRelations';
 
-// /p/$projectKey/$taskKey: one task on the whole page (frame 05). Esc goes back to the list with the
-// task selected. The history (activity and comments) follows the description, with the comment box
-// pinned under it; the right column holds the properties, milestone and cycle included.
+// /p/$projectKey/$taskKey: the task view (frames 051–066). The header holds the crumb (the title joins
+// it once the big title scrolls away), ‹ › with "12 of 40 in List", Copy link and more. The content
+// column has the serif title (E edits), the description (D edits), Subtasks, Blocked by and the
+// history with the comment box; the properties sit on the right. J / K walk the list the task was
+// opened from; Esc goes back to it with the task selected. The task keys (S, P, A, I, L, ⇧D, ⇧M, ⇧C,
+// ⇧B, ⇧S, ⌘C, ⌘⇧C) open their pickers over the property rows.
 
 export interface TaskPageProps {
   projectKey: string;
   taskKey: string;
 }
 
-export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
-  const navigate = useNavigate();
-  const taskResult = useQuery(taskQuery(taskKey));
-  const members = useQuery(membersQuery()).data?.items ?? [];
-  const projectName = useQuery({
-    ...projectsQuery(),
-    select: (data) => data.items.find((item) => item.key === projectKey)?.name,
-  }).data;
-  const update = useUpdateTask();
-  const planning = useProjectPlanning(projectKey);
-  const { copied, copy } = useCopy();
-  const now = useNow();
-  const pageTime = atTime(formatPageTime, now);
-  const [openPicker, setOpenPicker] = useState<'milestone' | 'cycle' | null>(null);
-  const [revealId, setRevealId] = useState<string | null>(null);
-  const milestoneRow = useRef<HTMLDivElement>(null);
-  const cycleRow = useRef<HTMLDivElement>(null);
-  const statusRow = useRef<HTMLDivElement>(null);
-  const priorityRow = useRef<HTMLDivElement>(null);
-  const assigneeRow = useRef<HTMLDivElement>(null);
-  const createdRow = useRef<HTMLDivElement>(null);
-  const noteRefs: Record<TaskOwnedField, RefObject<HTMLDivElement | null>> = {
-    status: statusRow,
-    priority: priorityRow,
-    assignee: assigneeRow,
-    milestone: milestoneRow,
-    createdAt: createdRow,
-    title: statusRow,
-    description: statusRow,
-  };
-  const { summary } = useBacklogSummary(projectKey);
-  const { note, setNote } = useOwnedFieldNote(update.error, update.reset);
+/**
+ * The view the task came from (its URL with the filters), with the task focused: ?focus=, which the list
+ * and the board read once (?task= would open the task view again).
+ */
+export function backHref(projectKey: string, taskKey: string, returnTo: string | null): string {
+  const url = new URL(returnTo ?? `/p/${encodeURIComponent(projectKey)}`, 'http://local');
+  url.searchParams.delete('task');
+  url.searchParams.set('focus', taskKey);
+  return `${url.pathname}${url.search}`;
+}
 
-  const backToList = () =>
-    navigate({
+export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
+  const router = useRouter();
+  const taskResult = useQuery(taskQuery(taskKey));
+  const task = taskResult.data;
+  const { projectName } = useBacklogSummary(projectKey);
+  const nav = useTaskNavigation(taskKey);
+  const [titleAway, setTitleAway] = useState(false);
+  const { copied, copy } = useCopy();
+  // Esc: back to the view the task came from; without one, the list with its last filters.
+  const back = () => {
+    if (nav.returnTo) return void router.navigate({ href: backHref(projectKey, taskKey, nav.returnTo) });
+    void router.navigate({
       to: '/p/$projectKey',
       params: { projectKey },
       search: listSearchFor(projectKey, taskKey) as never,
     });
-  const task = taskResult.data;
-  const mirror = mirrorOf(task);
-  const isLocked = (field: TaskOwnedField) => mirror.locked.has(field);
-  const history = useQuery({ ...backlogHistoryQuery(projectKey), enabled: task?.backlog != null }).data;
-  const openNote = (field: TaskOwnedField) => {
-    setOpenPicker(null);
-    setNote({ field });
   };
-  useHotkeys({
-    // The owned-field note handles Esc itself while it is open.
-    Escape: note ? null : backToList,
-    'Shift+M':
-      task && planning.usesMilestones
-        ? isLocked('milestone')
-          ? () => openNote('milestone')
-          : () => setOpenPicker('milestone')
-        : null,
-    'Shift+C': task && planning.usesCycles ? () => setOpenPicker('cycle') : null,
-  });
-  const locked = (field: TaskOwnedField) =>
-    isLocked(field)
-      ? { locked: true, dim: mirror.isHidden, rowRef: noteRefs[field], isActive: note?.field === field }
-      : {};
 
-  const save = (patch: TaskPatch) => update.mutate({ key: taskKey, patch });
-  const pickerOpenChange = (picker: 'milestone' | 'cycle') => (isOpen: boolean) =>
-    setOpenPicker((current) => (isOpen ? picker : current === picker ? null : current));
+  const go = (key: string | null) => {
+    if (!key) return;
+    void router.navigate({
+      to: '/p/$projectKey/$taskKey',
+      params: { projectKey: projectOfKey(key), taskKey: key },
+    });
+  };
+  const mirror = mirrorOf(task);
 
   return (
     <div className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
-      <PageHeader
+      <ViewHeader
+        project={{
+          key: projectKey,
+          name: task?.project.name ?? projectName ?? projectKey,
+          href: backHref(projectKey, taskKey, nav.returnTo),
+        }}
+        taskKey={taskKey}
         actions={
           <>
-            <Button variant="secondary" onPress={() => copy(window.location.href)}>
+            {nav.label ? (
+              <span className="flex items-center gap-1 text-sm text-fg-3 tabular-nums">
+                <NavButton label="Previous task" kbd="K" isDisabled={!nav.prev} onPress={() => go(nav.prev)}>
+                  ‹
+                </NavButton>
+                <NavButton label="Next task" kbd="J" isDisabled={!nav.next} onPress={() => go(nav.next)}>
+                  ›
+                </NavButton>
+                <span className="ml-0.5 whitespace-nowrap">{nav.label}</span>
+              </span>
+            ) : null}
+            <Button variant="secondary" onPress={() => void copy(window.location.href)}>
               {copied ? 'Copied' : 'Copy link'}
             </Button>
-            <Button variant="secondary" kbd="Esc" onPress={backToList}>
-              Back to list
-            </Button>
+            <MoreMenu onCopyKey={() => void copy(taskKey)} fileUrl={task?.backlog?.fileUrl ?? null} />
           </>
         }
       >
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-muted">
-          <Link
-            to="/p/$projectKey"
-            params={{ projectKey }}
-            search={listSearchFor(projectKey, taskKey) as never}
-            className="truncate outline-none hover:text-fg focus-visible:focus-ring"
-          >
-            {projectName ?? projectKey}
-          </Link>
-          <span aria-hidden>/</span>
-          <span aria-current="page" className="font-mono text-fg">
-            {taskKey}
-          </span>
-          {mirror.backlogId ? <BacklogIdTag backlogId={mirror.backlogId} /> : null}
-        </nav>
-      </PageHeader>
+        {titleAway && task ? (
+          <span className="max-w-130 min-w-0 truncate text-md font-medium text-fg-2">{task.title}</span>
+        ) : null}
+      </ViewHeader>
       {task ? (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
-          <div className="flex min-h-0 min-w-0 flex-col">
-            <article className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-12 pt-7 pb-6">
-              {mirror.isHidden ? (
-                <RemovedBanner task={task} branch={summary?.defaultBranch} className="max-w-[720px]" />
-              ) : (
-                <TaskSourceStrip task={task} mirror={mirror} summary={summary} className="max-w-[720px]" />
-              )}
-              <EditableTitle
-                key={`${taskKey}:title`}
-                as="h1"
-                size="page"
-                value={task.title}
-                onSave={isLocked('title') ? undefined : (title) => save({ title })}
-              />
-              {update.isError && !mirroredProblem(update.error) ? (
-                <Banner
-                  className="max-w-[720px]"
-                  action={
-                    <Button variant="secondary" size="sm" onPress={() => update.reset()}>
-                      Dismiss
-                    </Button>
-                  }
-                >
-                  Couldn't save your change, so it was undone. {describeError(update.error).message}
-                </Banner>
-              ) : null}
-              {isLocked('description') ? (
-                <MirroredDescription key={`${taskKey}:description`} source={task.description} size="page" />
-              ) : (
-                <EditableDescription
-                  key={`${taskKey}:description`}
-                  size="page"
-                  value={task.description}
-                  onSave={(description) => save({ description })}
-                />
-              )}
-              {task.backlog ? (
-                <TaskBacklogBlock
-                  task={task}
-                  projectKey={projectKey}
-                  mirror={mirror}
-                  className="max-w-[720px]"
-                />
-              ) : null}
-              <TaskTimeline
-                taskKey={taskKey}
-                members={members}
-                size="page"
-                revealId={revealId}
-                projectHistory={task.backlog ? history : undefined}
-                projectName={projectName ?? projectKey}
-                branch={summary?.defaultBranch}
-                className="mt-2 max-w-[720px]"
-              />
-            </article>
-            <div className="shrink-0 border-t border-line px-12 pt-3 pb-4">
-              <CommentComposer
-                taskKey={taskKey}
-                members={members}
-                onSent={setRevealId}
-                placeholder={commentPlaceholder(mirror)}
-                className="max-w-[720px]"
-              />
-            </div>
-          </div>
-          <aside
-            aria-label="Properties"
-            className="flex min-h-0 flex-col overflow-y-auto border-l border-line"
-          >
-            <PropertyRow label="Status" {...locked('status')}>
-              {isLocked('status') ? (
-                <LockedValue field="status" onOpen={openNote}>
-                  <StatusSquare status={task.status} withLabel />
-                </LockedValue>
-              ) : (
-                <StatusPicker value={task.status} onChange={(status) => save({ status })} />
-              )}
-            </PropertyRow>
-            <PropertyRow label="Priority" {...locked('priority')}>
-              {isLocked('priority') ? (
-                <LockedValue field="priority" onOpen={openNote}>
-                  <PriorityGlyph priority={task.priority} withLabel />
-                </LockedValue>
-              ) : (
-                <PriorityPicker value={task.priority} onChange={(priority) => save({ priority })} />
-              )}
-            </PropertyRow>
-            <PropertyRow
-              label="Assignee"
-              sub={extraAssignees(task) ?? forLine(task.assignee)}
-              {...locked('assignee')}
-            >
-              {isLocked('assignee') ? (
-                <LockedValue field="assignee" onOpen={openNote}>
-                  {task.assignee ? (
-                    <AssigneeLabel assignee={task.assignee} className="min-w-0" />
-                  ) : (
-                    <span className="font-normal text-faint">No assignee</span>
-                  )}
-                </LockedValue>
-              ) : (
-                <AssigneePicker
-                  value={task.assignee}
-                  members={members}
-                  onChange={(assignee) => save({ assignee })}
-                />
-              )}
-            </PropertyRow>
-            {planning.usesMilestones && isLocked('milestone') ? (
-              <PropertyRow
-                label="Milestone"
-                sub={milestoneBacklogId(task.milestone, planning.milestones) ?? undefined}
-                {...locked('milestone')}
-              >
-                <LockedValue field="milestone" onOpen={openNote}>
-                  <MilestoneValue value={task.milestone} milestones={undefined} />
-                </LockedValue>
-              </PropertyRow>
-            ) : planning.usesMilestones ? (
-              <PropertyRow
-                label="Milestone"
-                kbd="⇧M"
-                rowRef={milestoneRow}
-                isActive={openPicker === 'milestone'}
-              >
-                <MilestonePicker
-                  value={task.milestone}
-                  milestones={planning.milestones}
-                  onChange={(milestone) => save({ milestone })}
-                  isOpen={openPicker === 'milestone'}
-                  onOpenChange={pickerOpenChange('milestone')}
-                  triggerRef={milestoneRow}
-                >
-                  <MilestoneValue value={task.milestone} milestones={planning.milestones} />
-                </MilestonePicker>
-              </PropertyRow>
-            ) : null}
-            {planning.usesCycles ? (
-              <PropertyRow label="Cycle" kbd="⇧C" rowRef={cycleRow} isActive={openPicker === 'cycle'}>
-                <CyclePicker
-                  value={task.cycle}
-                  cycles={planning.cycles}
-                  onChange={(cycle) => save({ cycle })}
-                  isOpen={openPicker === 'cycle'}
-                  onOpenChange={pickerOpenChange('cycle')}
-                  triggerRef={cycleRow}
-                >
-                  <CycleValue value={task.cycle} cycles={planning.cycles} />
-                </CyclePicker>
-              </PropertyRow>
-            ) : null}
-            {isLocked('createdAt') ? (
-              <PropertyRow label="Created" {...locked('createdAt')}>
-                <LockedValue field="createdAt" onOpen={openNote}>
-                  <MirroredCreated task={task} />
-                </LockedValue>
-              </PropertyRow>
-            ) : task.backlog ? (
-              // Detached or imported: the file's reporter and date, not who set up the mirror.
-              <PropertyRow label="Created">
-                <MirroredCreated task={task} />
-              </PropertyRow>
-            ) : (
-              <PropertyRow label="Created" sub={createdSub(task, atTime(formatDayTime, now))}>
-                <span className="truncate">{task.createdBy.name}</span>
-              </PropertyRow>
-            )}
-            <PropertyRow label="Updated">
-              <time dateTime={task.updatedAt}>{pageTime(task.updatedAt)}</time>
-            </PropertyRow>
-            <OwnedFieldNote
-              field={note?.field ?? null}
-              problem={note?.problem}
-              task={task}
-              milestones={planning.milestones}
-              branch={summary?.defaultBranch}
-              triggerRef={note ? noteRefs[note.field] : statusRow}
-              onClose={() => setNote(null)}
-              milestoneShortcut={planning.usesMilestones && isLocked('milestone')}
-              placement="left top"
-            />
-          </aside>
-        </div>
+        <TaskView
+          key={task.key}
+          task={task}
+          projectKey={projectKey}
+          isMirrored={mirror.isMirrored}
+          isHidden={mirror.isHidden}
+          onTitleAway={setTitleAway}
+          onBack={back}
+          onPrev={nav.prev ? () => go(nav.prev) : null}
+          onNext={nav.next ? () => go(nav.next) : null}
+        />
       ) : taskResult.isError ? (
         <TaskPageError error={taskResult.error} onRetry={() => taskResult.refetch()} taskKey={taskKey} />
       ) : (
@@ -354,56 +146,473 @@ export function TaskPage({ projectKey, taskKey }: TaskPageProps) {
   );
 }
 
-function PropertyRow({
+function NavButton({
   label,
-  sub,
   kbd,
-  rowRef,
-  isActive,
-  locked,
-  dim,
+  isDisabled,
+  onPress,
   children,
 }: {
   label: string;
-  sub?: string;
-  /** Shortcut after the caption: "⇧M". */
-  kbd?: string;
-  /** Anchor for a picker popover. */
-  rowRef?: RefObject<HTMLDivElement | null>;
-  /** The row's picker is open. */
-  isActive?: boolean;
-  /** Backlog.md owns the value: hatched ground and "· file" after the caption. */
-  locked?: boolean;
-  /** Faded (a hidden task's owned values). */
-  dim?: boolean;
+  kbd: string;
+  isDisabled: boolean;
+  onPress: () => void;
   children: ReactNode;
 }) {
   return (
-    <div
-      ref={rowRef}
-      data-locked={locked || undefined}
-      className={cn(
-        'grid min-h-11 shrink-0 grid-cols-[96px_minmax(0,1fr)] items-center gap-2.5 border-b border-line-2 px-5 py-1.5',
-        locked && lockedHatch,
-        isActive && !locked && 'bg-sel',
-        isActive && 'outline-2 -outline-offset-2 outline-focus',
-        dim && 'opacity-60',
-      )}
-    >
-      <span className="caps flex flex-wrap items-center gap-x-1.5">
-        {label}
-        {locked ? <OwnedFieldCaption /> : null}
-        {kbd ? (
-          <Kbd aria-hidden className="tracking-normal">
-            {kbd}
-          </Kbd>
+    <TooltipTrigger>
+      <Button
+        variant="secondary"
+        iconOnly
+        aria-label={label}
+        aria-keyshortcuts={kbd.toLowerCase()}
+        isDisabled={isDisabled}
+        onPress={onPress}
+        className="h-7 text-md"
+      >
+        {children}
+      </Button>
+      <Tooltip kbd={kbd}>{label}</Tooltip>
+    </TooltipTrigger>
+  );
+}
+
+function MoreMenu({ onCopyKey, fileUrl }: { onCopyKey: () => void; fileUrl: string | null }) {
+  return (
+    <MenuTrigger>
+      <Button variant="secondary" iconOnly aria-label="More" className="h-7 text-md">
+        ···
+      </Button>
+      <Menu
+        aria-label="More"
+        onAction={(id) => {
+          if (id === 'copy-key') onCopyKey();
+          else if (id === 'file' && fileUrl) window.open(fileUrl, '_blank', 'noreferrer');
+        }}
+      >
+        <MenuItem id="copy-key" kbd="⌘C">
+          Copy key
+        </MenuItem>
+        {fileUrl ? (
+          <>
+            <MenuSeparator />
+            <MenuItem id="file">Open the file in Backlog.md</MenuItem>
+          </>
         ) : null}
-      </span>
-      <div className="flex min-w-0 flex-col gap-0.5 font-medium">
-        <div className="flex min-w-0 items-center gap-[7px]">{children}</div>
-        {sub ? <span className="truncate text-[11.5px] font-normal text-muted">{sub}</span> : null}
+      </Menu>
+    </MenuTrigger>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The view
+// ---------------------------------------------------------------------------
+
+interface TaskViewProps {
+  task: Task;
+  projectKey: string;
+  isMirrored: boolean;
+  isHidden: boolean;
+  onTitleAway: (away: boolean) => void;
+  onBack: () => void;
+  onPrev: (() => void) | null;
+  onNext: (() => void) | null;
+}
+
+function TaskView({
+  task,
+  projectKey,
+  isMirrored,
+  isHidden,
+  onTitleAway,
+  onBack,
+  onPrev,
+  onNext,
+}: TaskViewProps) {
+  const members = useQuery(membersQuery()).data?.items ?? [];
+  const planning = useProjectPlanning(projectKey);
+  const { summary, projectName } = useBacklogSummary(projectKey);
+  const history = useQuery({ ...backlogHistoryQuery(projectKey), enabled: task.backlog != null }).data;
+  const timeline = useQuery(timelineQuery(task.key)).data;
+  const now = useNow();
+  const time = atTime(formatRelative, now);
+  const { apply } = useFieldChange();
+  const [editing, setEditing] = useState<'title' | 'description' | null>(null);
+  const [lockTip, setLockTip] = useState<string | null>(null);
+  const [revealId, setRevealId] = useState<string | null>(null);
+  const locked = new Set(task.locked ?? []);
+
+  const statusRow = useRef<HTMLButtonElement>(null);
+  const priorityRow = useRef<HTMLButtonElement>(null);
+  const assigneeRow = useRef<HTMLButtonElement>(null);
+  const labelsRow = useRef<HTMLButtonElement>(null);
+  const dueRow = useRef<HTMLButtonElement>(null);
+  const milestoneRow = useRef<HTMLButtonElement>(null);
+  const cycleRow = useRef<HTMLButtonElement>(null);
+  const parentRow = useRef<HTMLButtonElement>(null);
+  const addSubtask = useRef<HTMLButtonElement>(null);
+  const addBlocker = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const descriptionRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const anchors = useMemo<PropertyAnchors>(
+    () => ({
+      status: statusRow,
+      priority: priorityRow,
+      assignee: assigneeRow,
+      labels: labelsRow,
+      dueDate: dueRow,
+      parent: parentRow,
+      milestone: milestoneRow,
+      cycle: cycleRow,
+    }),
+    [],
+  );
+  const fieldAnchors = useMemo(
+    () => ({ ...anchors, subtasks: addSubtask, blockedBy: addBlocker }),
+    [anchors],
+  );
+
+  const ownedBy = (field: TaskFieldKey): boolean => {
+    if (field === 'cycle') return false;
+    if (field === 'subtasks') return locked.has('parent');
+    return locked.has(field as never);
+  };
+
+  const keys = useTaskFieldKeys({
+    targets: task,
+    anchors: fieldAnchors,
+    enabled: editing === null,
+    // Fields Backlog.md owns answer with the lock tooltip instead of a read-only picker.
+    onOpenField: (field) => {
+      if (!ownedBy(field)) return false;
+      setLockTip(field);
+      return true;
+    },
+  });
+
+  const startEditing = (part: 'title' | 'description') => {
+    if (locked.has(part)) setLockTip(part);
+    else setEditing(part);
+  };
+
+  useHotkeys(
+    {
+      Escape: onBack,
+      j: onNext,
+      k: onPrev,
+      e: () => startEditing('title'),
+      d: () => startEditing('description'),
+    },
+    { enabled: editing === null && keys.open === null },
+  );
+
+  // The header shows the title once the big one has scrolled away (frame 057).
+  useEffect(() => {
+    const title = titleRef.current;
+    const root = scrollRef.current;
+    if (!title || !root || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => onTitleAway(entry != null && !entry.isIntersecting),
+      { root, threshold: 0 },
+    );
+    observer.observe(title);
+    return () => {
+      observer.disconnect();
+      onTitleAway(false);
+    };
+  }, [onTitleAway]);
+
+  const lastActor = (() => {
+    const items = timeline?.items ?? [];
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index];
+      if (item?.kind === 'activity' && item.actor) return item.actor.name;
+    }
+    return null;
+  })();
+
+  const mirrorInfo = mirrorOf(task);
+
+  return (
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
+      <div ref={scrollRef} className="min-h-0 min-w-0 overflow-y-auto px-14 pt-8.5 max-[1199px]:px-9">
+        <article className="mx-0 flex max-w-180 flex-col pb-10">
+          {isHidden ? <RemovedBanner task={task} branch={summary?.defaultBranch} className="mb-3" /> : null}
+          {task.backlog && !isHidden ? (
+            <div className="mb-2.5 flex items-center gap-2">
+              <TaskFileBadge task={task} />
+            </div>
+          ) : null}
+          <TaskTitle
+            task={task}
+            headingRef={titleRef}
+            isEditing={editing === 'title'}
+            onEdit={() => startEditing('title')}
+            onDone={() => setEditing(null)}
+            onSave={(title) => void apply([task], { title })}
+          />
+          {lockTip === 'title' ? (
+            <LockTooltip
+              triggerRef={titleRef}
+              isOpen
+              onClose={() => setLockTip(null)}
+              placement="bottom start"
+            />
+          ) : null}
+          <TaskDescription
+            task={task}
+            boxRef={descriptionRef}
+            isLocked={locked.has('description')}
+            isEditing={editing === 'description'}
+            onEdit={() => startEditing('description')}
+            onDone={() => setEditing(null)}
+            onSave={(description) => apply([task], { description })}
+          />
+          {lockTip === 'description' ? (
+            <LockTooltip
+              triggerRef={descriptionRef}
+              isOpen
+              onClose={() => setLockTip(null)}
+              placement="bottom start"
+            />
+          ) : null}
+          <SubtasksSection
+            task={task}
+            readOnly={locked.has('parent')}
+            onAdd={() => keys.openField('subtasks')}
+            addRef={addSubtask}
+          />
+          <BlockedBySection
+            task={task}
+            readOnly={locked.has('blockedBy')}
+            onAdd={() => keys.openField('blockedBy')}
+            addRef={addBlocker}
+          />
+          <TaskTimeline
+            taskKey={task.key}
+            members={members}
+            revealId={revealId}
+            projectHistory={task.backlog ? history : undefined}
+            projectName={projectName ?? projectKey}
+            branch={summary?.defaultBranch}
+            file={task.backlog?.file ?? null}
+            composer={
+              <CommentComposer
+                taskKey={task.key}
+                members={members}
+                onSent={setRevealId}
+                placeholder={commentPlaceholder(mirrorInfo)}
+                hotkey={editing === null}
+              />
+            }
+          />
+        </article>
       </div>
+      <TaskProperties
+        task={task}
+        planning={planning}
+        anchors={anchors}
+        openField={keys.open}
+        onOpenField={keys.openField}
+        lockTip={lockTip && lockTip in anchors ? (lockTip as TaskFieldKey) : null}
+        onLockTipClose={() => setLockTip(null)}
+        updatedBy={isMirrored ? null : lastActor}
+        time={time}
+        now={now}
+      />
+      {keys.pickers}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Title and description
+// ---------------------------------------------------------------------------
+
+const titleClass = 'm-0 font-serif text-2xl leading-tight font-medium text-balance text-fg';
+
+function TaskTitle({
+  task,
+  headingRef,
+  isEditing,
+  onEdit,
+  onDone,
+  onSave,
+}: {
+  task: Task;
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  isEditing: boolean;
+  onEdit: () => void;
+  onDone: () => void;
+  onSave: (title: string) => void;
+}) {
+  const [draft, setDraft] = useState(task.title);
+  useEffect(() => {
+    if (isEditing) setDraft(task.title);
+  }, [isEditing, task.title]);
+  const finish = (save: boolean) => {
+    const next = draft.trim();
+    if (save && next && next !== task.title) onSave(next);
+    onDone();
+  };
+  return (
+    <h1 ref={headingRef} className={cn(titleClass, 'mb-3.5')}>
+      {isEditing ? (
+        <AriaTextField aria-label="Title" value={draft} onChange={setDraft} className="flex">
+          <AriaTextArea
+            autoFocus
+            rows={1}
+            onFocus={(event) => event.currentTarget.select()}
+            onBlur={() => finish(true)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                finish(true);
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                finish(false);
+              }
+            }}
+            className={cn(
+              titleClass,
+              '-mx-1.5 w-[calc(100%+12px)] resize-none rounded-sm bg-transparent px-1.5 outline-none [field-sizing:content] focus:shadow-[var(--focus-ring)]',
+            )}
+          />
+        </AriaTextField>
+      ) : (
+        <AriaButton
+          onPress={onEdit}
+          aria-keyshortcuts="e"
+          aria-label={`${task.title}. Edit the title`}
+          className="w-full cursor-text rounded-sm text-left outline-none focus-visible:focus-ring"
+        >
+          {task.title}
+        </AriaButton>
+      )}
+    </h1>
+  );
+}
+
+function TaskDescription({
+  task,
+  boxRef,
+  isLocked,
+  isEditing,
+  onEdit,
+  onDone,
+  onSave,
+}: {
+  task: Task;
+  boxRef: RefObject<HTMLDivElement | null>;
+  isLocked: boolean;
+  isEditing: boolean;
+  onEdit: () => void;
+  onDone: () => void;
+  onSave: (description: string | null) => Promise<boolean>;
+}) {
+  const source = task.description ?? '';
+  const [draft, setDraft] = useState(source);
+  useEffect(() => {
+    if (isEditing) setDraft(task.description ?? '');
+  }, [isEditing, task.description]);
+  const save = () => {
+    const next = draft.trim() ? draft : null;
+    if (next !== (task.description || null)) void onSave(next);
+    onDone();
+  };
+
+  if (isEditing) {
+    return (
+      <div ref={boxRef} className="halo flex flex-col gap-2 rounded-md border bg-surface px-3.25 py-2.75">
+        <AriaTextField aria-label="Description" value={draft} onChange={setDraft} className="flex">
+          <AriaTextArea
+            autoFocus
+            rows={4}
+            placeholder="Add a description…"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                save();
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                onDone();
+              }
+            }}
+            className="max-h-[60dvh] min-h-24 w-full resize-none border-0 bg-transparent p-0 text-lg leading-prose text-fg outline-none [field-sizing:content] placeholder:text-fg-3"
+          />
+        </AriaTextField>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-fg-3">Markdown</span>
+          <span className="flex-1" />
+          <Button variant="secondary" onPress={onDone}>
+            Cancel
+          </Button>
+          <Button kbd="⌘↵" onPress={save}>
+            Save
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!source.trim()) {
+    return (
+      <div ref={boxRef}>
+        {isLocked ? (
+          <p className="m-0 pt-0.5 pb-1.5 text-lg leading-prose text-fg-3">No description in the file.</p>
+        ) : (
+          <AriaButton
+            onPress={onEdit}
+            aria-keyshortcuts="d"
+            className="w-full cursor-text rounded-sm pt-0.5 pb-1.5 text-left text-lg leading-prose text-fg-3 outline-none hover:text-fg-2 focus-visible:focus-ring"
+          >
+            Add a description…
+          </AriaButton>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    // A click on the text (not on a link or a checkbox) edits it, like D.
+    // biome-ignore lint/a11y/noStaticElementInteractions: D is the keyboard way to edit
+    // biome-ignore lint/a11y/useKeyWithClickEvents: D is the keyboard way to edit
+    <div
+      ref={boxRef}
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('a, input, button') || window.getSelection()?.toString()) return;
+        onEdit();
+      }}
+      className={cn('rounded-sm', !isLocked && 'cursor-text')}
+    >
+      <Markdown
+        source={source}
+        size="page"
+        variant={isLocked ? 'backlog' : 'default'}
+        {...(isLocked
+          ? {}
+          : {
+              onToggleCheckbox: (index: number) => void onSave(toggleCheckbox(source, index)),
+            })}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading and errors
+// ---------------------------------------------------------------------------
+
+/** "Request 8f2c…" under an error, for support. */
+export function RequestHint({ requestId }: { requestId: string }) {
+  return (
+    <p className="m-0 mt-2 text-xs text-fg-3">
+      Request <code className="font-mono">{requestId}</code>
+    </p>
   );
 }
 
@@ -418,7 +627,7 @@ function TaskPageError({
 }) {
   const described = describeError(error);
   return (
-    <div className="max-w-[720px] px-12 py-7">
+    <div className="max-w-180 px-14 py-8">
       <Banner
         action={
           <Button variant="secondary" size="sm" onPress={onRetry}>
@@ -436,14 +645,13 @@ function TaskPageError({
 function TaskPageSkeleton() {
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]" aria-busy="true">
-      <div className="flex flex-col gap-3.5 px-12 pt-8">
-        <Skeleton width="70%" height={18} />
-        <Skeleton width="45%" height={18} />
-        <Skeleton width="90%" className="mt-4" />
+      <div className="flex max-w-180 flex-col gap-3.5 px-14 pt-9">
+        <Skeleton width="70%" height={26} />
+        <Skeleton width="90%" className="mt-3" />
         <Skeleton width="96%" />
         <Skeleton width="60%" />
       </div>
-      <div className="flex flex-col gap-4 border-l border-line px-5 pt-5">
+      <div className="flex flex-col gap-4 border-l border-line px-4.5 pt-5">
         <Skeleton width="60%" />
         <Skeleton width="50%" />
         <Skeleton width="70%" />

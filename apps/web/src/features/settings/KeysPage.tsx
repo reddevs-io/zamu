@@ -91,7 +91,7 @@ export function KeysPage({ mode, ownerId }: KeysPageProps) {
             isAdmin ? (
               <Link
                 to="/settings/api-keys"
-                className="text-muted outline-none hover:text-fg focus-visible:focus-ring"
+                className="text-fg-2 outline-none hover:text-fg focus-visible:focus-ring"
               >
                 Show all keys
               </Link>

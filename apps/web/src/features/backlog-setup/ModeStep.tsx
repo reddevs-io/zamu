@@ -35,8 +35,8 @@ function ModeCard({
       value={value}
       className={({ isSelected, isFocusVisible }) =>
         cn(
-          'flex cursor-pointer flex-col gap-1.5 border px-4 py-3.5 outline-none',
-          isSelected ? 'border-accent bg-sel' : 'border-line bg-surface hover:bg-band',
+          'flex cursor-pointer flex-col gap-1.5 rounded-md border px-4 py-3.5 outline-none',
+          isSelected ? 'border-accent bg-accent-soft' : 'border-line bg-surface hover:bg-bg-grp',
           isFocusVisible && 'focus-ring',
         )
       }
@@ -47,8 +47,8 @@ function ModeCard({
             <RadioDot selected={isSelected} />
             {title}
           </span>
-          <span className="text-[12.5px] leading-[1.55] text-muted">{children}</span>
-          <span className="text-[11.5px] text-faint">{note}</span>
+          <span className="text-sm leading-normal text-fg-2">{children}</span>
+          <span className="text-xs text-fg-3">{note}</span>
         </>
       )}
     </AriaRadio>

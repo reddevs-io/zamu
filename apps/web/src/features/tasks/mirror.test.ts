@@ -1,17 +1,12 @@
 import type { ProjectActivity, Task } from '@pm/contracts';
 import { describe, expect, it } from 'vitest';
-import { formatDueDate, formatUtcDayTime } from './MirroredTask';
 import {
-  backlogCliId,
-  countSections,
   describeBacklogFields,
-  describeMirroredDescription,
   describeProjectEntry,
   describeVisibilityChange,
-  editExample,
+  fileFields,
   mirrorOf,
   projectRowsForTask,
-  shellWord,
 } from './mirror';
 
 const backlog = (id: string, kind: 'task' | 'draft' = 'task') =>
@@ -33,46 +28,6 @@ describe('mirrorOf', () => {
       isHidden: true,
     });
     expect(mirrorOf(undefined)).toMatchObject({ isMirrored: false, isDetached: false, backlogId: null });
-  });
-});
-
-describe('edit examples', () => {
-  it('drops the prefix and keeps subtask numbers', () => {
-    expect(backlogCliId('BACK-786')).toBe('786');
-    expect(backlogCliId('BACK-786.1.2')).toBe('786.1.2');
-    expect(backlogCliId('not an id')).toBe('not an id');
-  });
-
-  it('quotes values like core hints do', () => {
-    expect(shellWord('Done')).toBe('Done');
-    expect(shellWord('In Progress')).toBe('"In Progress"');
-    expect(shellWord('a$b')).toBe('"a\\$b"');
-  });
-
-  it('builds a command per field, and none for created_date', () => {
-    const task = { status: 'in_progress', priority: 'high', milestone: null, backlog: backlog('BACK-786.1') };
-    expect(editExample(task as Task, 'status')).toBe('backlog task edit 786.1 -s Done');
-    expect(editExample({ ...task, status: 'done' } as Task, 'status')).toBe(
-      'backlog task edit 786.1 -s "In Progress"',
-    );
-    expect(editExample(task as Task, 'priority')).toBe('backlog task edit 786.1 --priority medium');
-    expect(editExample(task as Task, 'createdAt')).toBeNull();
-    expect(editExample({ ...task, backlog: backlog('DRAFT-3', 'draft') } as Task, 'title')).toBe(
-      'backlog draft edit 3 -t "New title"',
-    );
-  });
-});
-
-describe('description summary', () => {
-  it('counts the leading text and each section, ignoring code fences', () => {
-    expect(countSections(null)).toBe(0);
-    expect(countSections('Text')).toBe(1);
-    expect(countSections('## Acceptance criteria\n\n- [ ] #1 a')).toBe(1);
-    expect(countSections('Text\n\n```\n## not a heading\n```\n\n## Notes\n\nx')).toBe(2);
-    expect(describeMirroredDescription('Text\n\n## AC\n\n- [x] #1 a\n- [ ] #2 b')).toBe(
-      '2 sections from Backlog.md, 1 of 2 checklist items done',
-    );
-    expect(describeMirroredDescription('')).toBe('empty in the file');
   });
 });
 
@@ -102,21 +57,80 @@ describe('history sentences', () => {
     expect(projectRowsForTask(history, [])).toHaveLength(2);
     expect(projectRowsForTask(history, [{ kind: 'activity', type: 'task.created' }])).toHaveLength(1);
     expect(describeProjectEntry(entry('project.backlog_imported', 412), 'Payments')).toBe(
-      'imported the task with 411 others',
+      'imported this with 411 others',
     );
-    expect(describeProjectEntry(entry('project.backlog_imported', 1), 'Payments')).toBe('imported the task');
+    expect(describeProjectEntry(entry('project.backlog_imported', 1), 'Payments')).toBe('imported this');
+    expect(
+      describeProjectEntry(entry('project.backlog_imported', 412), 'Payments', 'backlog/tasks/hbr-71.md'),
+    ).toBe('imported this from backlog/tasks/hbr-71.md');
     expect(describeProjectEntry(entry('project.backlog_detached'), 'Payments')).toBe(
       'detached Payments from Backlog.md. Every field is editable now.',
     );
   });
 });
 
-describe('dates', () => {
-  it('formats due dates with the year and created dates in UTC', () => {
-    expect(formatDueDate('2026-11-14')).toBe('Nov 14, 2026');
-    expect(formatDueDate('next week')).toBe('next week');
-    const now = new Date('2026-10-23T12:00:00Z');
-    expect(formatUtcDayTime('2026-10-02T09:14:00Z', now)).toBe('Oct 2, 09:14 UTC');
-    expect(formatUtcDayTime('2025-10-02T09:14:00Z', now)).toBe('Oct 2, 2025, 09:14 UTC');
+describe('fileFields', () => {
+  const data = {
+    kind: 'task',
+    status: 'In Progress',
+    priority: 'high',
+    milestone: 'm-1',
+    assignees: [{ value: '@claude-dev', user: { id: 'u1', name: 'claude-dev', kind: 'agent' } }],
+    reporter: '@ana',
+    labels: ['i18n', 'frontend'],
+    dependencies: [{ id: 'BACK-46', task: null }],
+    parent: null,
+    subtasks: [],
+    dueDate: '2026-11-14',
+    type: 'bug',
+    references: ['docs/i18n.md'],
+    documentation: [],
+    modifiedFiles: ['apps/mobile/src/inbox/sort.ts', 'packages/i18n/inbox.json'],
+    createdDate: '2026-10-12 09:14',
+    updatedDate: null,
+    ordinal: 3400,
+    other: { effort: 'M' },
+  };
+  const task = (overrides: Record<string, unknown> = {}) =>
+    ({
+      assignee: { id: 'u1', name: 'claude-dev', kind: 'agent', responsible: null },
+      backlog: {
+        id: 'BACK-71',
+        file: 'backlog/tasks/hbr-71.md',
+        fileUrl: null,
+        data: { ...data, ...overrides },
+      },
+    }) as unknown as Task;
+
+  it('lists the fields with no native home, as written, and leaves the native ones out', () => {
+    expect(fileFields(task())).toEqual([
+      { key: 'type', value: 'bug' },
+      { key: 'reporter', value: '@ana' },
+      { key: 'references', value: 'docs/i18n.md' },
+      { key: 'modified_files', value: 'apps/mobile/src/inbox/sort.ts, packages/i18n/inbox.json' },
+      { key: 'created_date', value: '2026-10-12 09:14' },
+      { key: 'ordinal', value: '3400' },
+      { key: 'effort', value: 'M' },
+    ]);
+    const keys = fileFields(task()).map((row) => row.key);
+    for (const native of ['labels', 'due_date', 'dependencies', 'parent_task_id', 'subtasks']) {
+      expect(keys).not.toContain(native);
+    }
+  });
+
+  it('adds the assignee values the field does not show', () => {
+    const rows = fileFields(
+      task({
+        assignees: [
+          { value: '@claude-dev', user: { id: 'u1', name: 'claude-dev', kind: 'agent' } },
+          { value: '@tomas', user: null },
+        ],
+      }),
+    );
+    expect(rows).toContainEqual({ key: 'assignee', value: '@claude-dev, @tomas' });
+  });
+
+  it('is empty for native tasks', () => {
+    expect(fileFields({ assignee: null, backlog: null } as unknown as Task)).toEqual([]);
   });
 });

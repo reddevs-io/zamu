@@ -1,101 +1,105 @@
-import { MILESTONE_STATUS_LABELS, milestoneProgressRatio } from '@pm/contracts';
+import type { MilestoneWithProgress, StatusCounts } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
-import {
-  isMirrored,
-  MirrorCreateButton,
-  milestonesFolder,
-  useProjectSummary,
-  ViewSwitch,
-} from '~/features/project-header';
+import { type ReactNode, useState } from 'react';
+import { isMirrored } from '~/features/project-header';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';
-import { useNow } from '~/features/tasks/clock';
 import { Markdown } from '~/features/tasks/Markdown';
-import { taskListQuery } from '~/features/tasks/queries';
-import {
-  Button,
-  cn,
-  DisabledCreateButton,
-  EmptyState,
-  FilterBar,
-  InlineCode,
-  isMilestoneFilled,
-  lockedHatch,
-  MilestoneGlyph,
-  NoticeStrip,
-  ProgressBar,
-  Skeleton,
-  SystemActorAvatar,
-  Tag,
-  useHotkeys,
-} from '~/ui';
-import { describeTarget, formatDay } from './dates';
+import { clearedFilter, DisplayButton, FilterButton, FilterChips } from '~/features/views';
+import { Button, EmptyState, Skeleton, SourceBadge, useHotkeys } from '~/ui';
+import { formatDay } from './dates';
 import { EditMilestoneDialog } from './MilestoneDialogHost';
-import { filterUnassigned, PlanningFilters, taskFilters } from './PlanningFilters';
+import { PlanningHeader } from './PlanningHeader';
 import { PlanningTaskTable } from './PlanningTaskTable';
-import { CrumbHeader, LoadError, useServerToday } from './parts';
+import {
+  LoadError,
+  PageHead,
+  PageKind,
+  PageTitle,
+  type StatItem,
+  Stats,
+  StatusBar,
+  StatusLegend,
+  type StatusSplit,
+  splitOf,
+  useServerToday,
+} from './parts';
 import { milestoneQuery } from './queries';
-import type { PlanningTasksSearch } from './search';
+import { planningGroupChoices, usePlanningTasks } from './usePlanningTasks';
 
-// /p/PAY/milestones/<id> (frames 17 and 18): the milestone with its progress and target, then its tasks
-// grouped by status. Edit opens the milestone dialog; New task opens quick create; Board shows the
-// project board filtered to this milestone.
-// Mirrored projects (M3): the milestone comes from a Backlog.md file, so its name, status and target
-// carry the hatch, a strip names the file's folder, and Edit and New task explain instead of acting.
+// /p/HBR/milestones/<id> (frame 108): kind and source, serif title, description, the numbers, the
+// segmented bar with its legend, then the milestone's tasks in the list rows. Filter and Display work
+// as in the list (the filter lives in the URL: ?status=todo&assignee=me&label=…). Edit opens the
+// milestone dialog in native projects; mirrored milestones change in their Backlog.md file.
 
 export interface MilestonePageProps {
   projectKey: string;
   milestoneId: string;
-  search: PlanningTasksSearch;
 }
 
-export function MilestonePage({ projectKey, milestoneId, search }: MilestonePageProps) {
+/** "30 tasks  18 done  11 days left" (or "4 days late", or no third number without a target). */
+export function milestoneStats(milestone: MilestoneWithProgress): StatItem[] {
+  const { progress } = milestone;
+  const counted = progress.total - progress.canceled;
+  const items: StatItem[] = [
+    { value: counted, label: counted === 1 ? 'task' : 'tasks' },
+    { value: progress.done, label: 'done' },
+  ];
+  const days = milestone.daysLeft;
+  if (milestone.status !== 'completed' && days != null) {
+    items.push(
+      days < 0
+        ? { value: -days, label: days === -1 ? 'day late' : 'days late' }
+        : { value: days, label: days === 1 ? 'day left' : 'days left' },
+    );
+  }
+  return items;
+}
+
+/** The bar's split from the milestone's task counts, or from its progress until those load. */
+export function milestoneSplit(
+  milestone: MilestoneWithProgress | undefined,
+  counts: StatusCounts | undefined,
+): StatusSplit {
+  if (counts) return splitOf(counts);
+  const progress = milestone?.progress;
+  return {
+    done: progress?.done ?? 0,
+    review: 0,
+    progress: progress?.inProgress ?? 0,
+    todo: progress?.open ?? 0,
+  };
+}
+
+export function MilestonePage({ projectKey, milestoneId }: MilestonePageProps) {
   const navigate = useNavigate();
   const quickCreate = useOptionalQuickCreate();
-  const project = useProjectSummary(projectKey);
   const milestone = useQuery(milestoneQuery(milestoneId));
-  const tasks = useQuery(
-    taskListQuery({ project: projectKey, milestone: milestoneId, ...taskFilters(search) }),
-  );
-  const now = useNow();
   const today = useServerToday(projectKey);
   const [editing, setEditing] = useState(false);
+  const view = usePlanningTasks(projectKey, { milestone: milestoneId });
+  const { project, filter, setFilter, fields, display, tasks, all } = view;
 
-  const projectName = project?.name ?? projectKey;
   const data = milestone.data;
   const mirrored = isMirrored(project);
-  const locked = new Set(data?.locked ?? []);
-  const isLocked = locked.size > 0;
-  const visibleTasks = useMemo(() => filterUnassigned(tasks.data?.items ?? [], search), [tasks.data, search]);
-
-  const openTask = (key: string) =>
-    void navigate({ to: '/p/$projectKey/$taskKey', params: { projectKey, taskKey: key } });
-  const toBoard = () => void navigate({ href: `/p/${projectKey}?view=board&milestone=${milestoneId}` });
+  const isLocked = (data?.locked ?? []).length > 0;
   const newTask = () => quickCreate?.open(projectKey);
-  const writeSearch = (next: PlanningTasksSearch) =>
-    void navigate({
-      to: '/p/$projectKey/milestones/$milestoneId',
-      params: { projectKey, milestoneId },
-      search: next as never,
-      replace: true,
-    });
-
+  const toBoard = () => void navigate({ href: `/p/${projectKey}?view=board&milestone=${milestoneId}` });
   useHotkeys({ v: toBoard });
 
-  const crumbs = [
-    { label: projectName, href: `/p/${projectKey}` },
-    { label: 'Milestones', href: `/p/${projectKey}/milestones` },
-    { label: data?.name ?? (milestone.isError ? 'Milestone' : '…') },
-  ];
+  const newTaskButton = (
+    <Button kbd="C" aria-keyshortcuts="c" onPress={newTask}>
+      New task
+    </Button>
+  );
 
   if (milestone.isError && !data) {
     const missing = (milestone.error as { code?: string }).code === 'NOT_FOUND';
     return (
-      <section aria-label="Milestone" className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
-        <CrumbHeader crumbs={crumbs} />
+      <Frame>
+        <PlanningHeader projectKey={projectKey} section="milestones" title="Milestone" />
         {missing ? (
-          <div className="flex px-6 py-12">
+          <div className="flex px-4.5 py-12">
             <EmptyState
               title="This milestone does not exist"
               text="It may have been deleted. Its tasks keep their other fields."
@@ -117,139 +121,80 @@ export function MilestonePage({ projectKey, milestoneId, search }: MilestonePage
             isRetrying={milestone.isFetching}
           />
         )}
-      </section>
+      </Frame>
     );
   }
 
-  const progress = data?.progress;
-  const counted = progress ? progress.total - progress.canceled : 0;
-  const percent = progress ? Math.round(milestoneProgressRatio(progress) * 100) : 0;
-  const target = data?.targetDate ? formatDay(data.targetDate, today ?? data.targetDate) : null;
-  const due =
-    data && data.status !== 'completed' && data.daysLeft != null ? describeTarget(data.daysLeft) : null;
+  const split = milestoneSplit(data, all.data?.counts);
+  const target = data?.targetDate
+    ? `Target ${formatDay(data.targetDate, today ?? data.targetDate)}`
+    : 'No target date';
 
   return (
-    <section aria-label="Milestone" className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
-      <CrumbHeader
-        crumbs={crumbs}
+    <Frame>
+      <PlanningHeader
+        projectKey={projectKey}
+        section="milestones"
+        title={data?.name ?? '…'}
+        filter={<FilterButton fields={fields} filter={filter} onChange={setFilter} />}
+        display={
+          <DisplayButton
+            projectKey={projectKey}
+            view="list"
+            groupChoices={planningGroupChoices('milestone')}
+            onLayoutChange={(layout) => {
+              if (layout === 'board') toBoard();
+            }}
+          />
+        }
         actions={
           <>
-            {isLocked ? (
-              <DisabledCreateButton
-                kbd=""
-                tooltip={
-                  <>
-                    This milestone comes from Backlog.md. Change it in its file under{' '}
-                    <InlineCode>{milestonesFolder()}</InlineCode> and push.
-                  </>
-                }
-              >
-                Edit
-              </DisabledCreateButton>
-            ) : (
-              <Button variant="secondary" isDisabled={!data || !today} onPress={() => setEditing(true)}>
+            {data && !isLocked && !mirrored ? (
+              <Button variant="secondary" isDisabled={!today} onPress={() => setEditing(true)}>
                 Edit
               </Button>
-            )}
-            {mirrored ? (
-              <MirrorCreateButton projectName={projectName} onPress={newTask} aria-keyshortcuts="c">
-                New task
-              </MirrorCreateButton>
-            ) : (
-              <Button kbd="C" aria-keyshortcuts="c" onPress={newTask}>
-                New task
-              </Button>
-            )}
+            ) : null}
+            {newTaskButton}
           </>
         }
       />
-      <div className="flex shrink-0 flex-col gap-3.5 border-b border-line px-6 pt-5 pb-[18px]">
-        {data ? (
-          <>
-            {isLocked ? (
-              <NoticeStrip marker={<SystemActorAvatar decorative />}>
-                <span className="leading-normal">
-                  Hatched fields come from Backlog.md
-                  {data.backlogId ? (
-                    <>
-                      {' '}
-                      milestone <span className="font-mono text-[11px] text-fg">{data.backlogId}</span>
-                    </>
-                  ) : null}
-                  . Change them in its file under <InlineCode>{milestonesFolder()}</InlineCode> and push.
-                </span>
-              </NoticeStrip>
-            ) : null}
-            <div
-              className={cn(
-                'flex min-w-0 items-center gap-3',
-                (locked.has('name') || locked.has('status')) && cn(lockedHatch, 'w-fit max-w-full py-1 pr-2'),
-              )}
-            >
-              <MilestoneGlyph filled={isMilestoneFilled(data.status)} size={10} />
-              <h1 className="m-0 truncate text-[24px] leading-tight font-semibold tracking-[-0.015em]">
-                {data.name}
-              </h1>
-              <Tag tone={data.status === 'active' ? 'accent' : 'default'}>
-                {MILESTONE_STATUS_LABELS[data.status]}
-              </Tag>
-            </div>
-            {data.description ? (
-              <div className="max-w-[760px] text-muted">
-                <Markdown source={data.description} size="page" />
+      <FilterChips
+        fields={fields}
+        filter={filter}
+        onChange={setFilter}
+        {...(tasks.data ? { matchCount: view.shown.length } : {})}
+      />
+      <div className="min-h-0 flex-1 overflow-auto">
+        <PageHead className="pt-5.5">
+          {data ? (
+            <>
+              <PageKind kind="milestone">
+                Milestone
+                {data.backlogId || isLocked ? <SourceBadge /> : null}
+              </PageKind>
+              <PageTitle>{data.name}</PageTitle>
+              <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+                <div className="min-w-0 flex-1 basis-120 text-md leading-prose text-fg-2">
+                  {data.description ? (
+                    <Markdown source={data.description} size="page" className="max-w-190" />
+                  ) : (
+                    <span className="text-fg-3">No description.</span>
+                  )}
+                </div>
+                <Stats items={milestoneStats(data)} />
               </div>
-            ) : null}
-            <div className="flex min-w-0 items-center gap-3.5">
-              <ProgressBar
-                size="md"
-                done={progress?.done ?? 0}
-                inProgress={progress?.inProgress ?? 0}
-                total={counted}
-                label="Milestone progress"
-                className="w-[360px] max-w-[360px] flex-none"
-              />
-              <span className="font-mono text-[12px] text-fg">{percent}%</span>
-              <span className="font-mono text-[10.5px] text-muted">
-                {progress?.done ?? 0} of {counted} done · {progress?.inProgress ?? 0} in progress
-              </span>
-              <span className="flex-1" />
-              <span
-                className={cn('text-muted', locked.has('targetDate') && cn(lockedHatch, 'px-1.5 py-0.5'))}
-              >
-                {target ? (
-                  <>
-                    Target <b className="font-semibold text-fg">{target}</b>
-                    {due ? (
-                      <>
-                        {' · '}
-                        <span className={due.overdue ? 'text-warn' : undefined}>{due.text}</span>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  'No target date'
-                )}
-              </span>
+              <StatusBar split={split} label="Milestone progress" className="mt-1.5" />
+              <StatusLegend split={split} end={<LegendEnd text={target} view={view} />} />
+            </>
+          ) : (
+            <div aria-busy="true" className="flex flex-col gap-3">
+              <Skeleton width={120} height={10} />
+              <Skeleton width={320} height={24} />
+              <Skeleton width="60%" />
+              <Skeleton height={8} />
             </div>
-          </>
-        ) : (
-          <div aria-busy="true" className="flex flex-col gap-3.5">
-            <Skeleton width={260} height={20} />
-            <Skeleton width="50%" />
-            <Skeleton width={360} height={8} />
-          </div>
-        )}
-      </div>
-      <FilterBar end={<ViewSwitch view="list" onChange={(view) => view === 'board' && toBoard()} />}>
-        <PlanningFilters
-          projectKey={projectKey}
-          search={search}
-          onChange={writeSearch}
-          third={project?.usesCycles === false ? undefined : 'cycle'}
-          statusPlaceholder="Open"
-        />
-      </FilterBar>
-      <div className="flex min-h-0 flex-1 flex-col">
+          )}
+        </PageHead>
         {tasks.isError && !tasks.data ? (
           <LoadError
             what="the tasks"
@@ -260,29 +205,33 @@ export function MilestonePage({ projectKey, milestoneId, search }: MilestonePage
         ) : (
           <PlanningTaskTable
             aria-label={`Tasks in ${data?.name ?? 'the milestone'}`}
-            tasks={visibleTasks}
-            extra={project?.usesCycles === false ? undefined : 'cycle'}
-            statuses={search.status}
+            projectKey={projectKey}
+            tasks={view.shown}
+            display={display}
+            from="Milestone"
+            hide="milestone"
             isLoading={tasks.isPending}
-            now={now}
-            onOpen={openTask}
             renderEmptyState={() => (
-              <div className="flex flex-col items-start gap-2 px-6 py-8 text-muted">
-                <span>
-                  {Object.keys(search).length
+              <EmptyTasks
+                text={
+                  view.filtered
                     ? 'No tasks in this milestone match these filters.'
-                    : 'No tasks in this milestone yet. Set the milestone from a task, or create one here.'}
-                </span>
-                {Object.keys(search).length ? (
-                  <Button variant="secondary" size="sm" onPress={() => writeSearch({})}>
-                    Clear filters
-                  </Button>
-                ) : (
-                  <Button variant="secondary" size="sm" onPress={newTask}>
-                    New task
-                  </Button>
-                )}
-              </div>
+                    : view.hiddenClosed
+                      ? 'Every task in this milestone is done.'
+                      : 'No tasks in this milestone yet. Set the milestone from a task, or create one here.'
+                }
+                action={
+                  view.filtered ? (
+                    <Button variant="secondary" size="sm" onPress={() => setFilter(clearedFilter(filter))}>
+                      Clear filters
+                    </Button>
+                  ) : view.hiddenClosed ? null : (
+                    <Button variant="secondary" size="sm" onPress={newTask}>
+                      New task
+                    </Button>
+                  )
+                }
+              />
             )}
           />
         )}
@@ -296,6 +245,58 @@ export function MilestonePage({ projectKey, milestoneId, search }: MilestonePage
           today={today}
         />
       ) : null}
+    </Frame>
+  );
+}
+
+function Frame({ children }: { children: ReactNode }) {
+  return (
+    <section aria-label="Milestone" className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
+      {children}
     </section>
+  );
+}
+
+/** "Target Nov 14 · done tasks hidden": the hidden part shows them, and hides them again. */
+export function LegendEnd({
+  text,
+  view,
+}: {
+  text: string;
+  view: { hiddenClosed: number; showClosed: boolean; setShowClosed: (show: boolean) => void };
+}) {
+  const toggle =
+    view.hiddenClosed > 0 ? (
+      <button
+        type="button"
+        onClick={() => view.setShowClosed(true)}
+        aria-label={`Show ${view.hiddenClosed} done ${view.hiddenClosed === 1 ? 'task' : 'tasks'}`}
+        className="cursor-pointer rounded-sm text-fg-3 outline-none hover:text-fg hover:underline focus-visible:shadow-[var(--focus-ring)]"
+      >
+        done tasks hidden
+      </button>
+    ) : view.showClosed ? (
+      <button
+        type="button"
+        onClick={() => view.setShowClosed(false)}
+        className="cursor-pointer rounded-sm text-fg-3 outline-none hover:text-fg hover:underline focus-visible:shadow-[var(--focus-ring)]"
+      >
+        hide done tasks
+      </button>
+    ) : null;
+  return (
+    <span>
+      {text}
+      {toggle ? <> · {toggle}</> : null}
+    </span>
+  );
+}
+
+export function EmptyTasks({ text, action }: { text: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-start gap-2.5 px-4.5 py-8 text-md text-fg-2">
+      <span>{text}</span>
+      {action}
+    </div>
   );
 }

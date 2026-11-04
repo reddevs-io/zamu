@@ -3,24 +3,31 @@ import type {
   Activity,
   Comment,
   Cycle,
+  Label,
+  LabelWithUsage,
   Me,
   Member,
   MilestoneWithProgress,
   ProjectActivity,
   ProjectBacklogSummary,
   ProjectWithCounts,
+  RelatedTask,
   StatusCounts,
   Task,
+  TaskBulkResult,
   TaskListItem,
   TaskListPage,
+  TaskOwnedField,
   TaskStatus,
   TimelineItem,
 } from '@pm/contracts';
-import { PRIORITIES, TASK_STATUSES } from '@pm/contracts';
+import { isOpenStatus, PRIORITIES, TASK_STATUSES } from '@pm/contracts';
 
 // In-memory stand-in for the /api/v1 client, for component tests of the task screens. It follows the
 // contract's shapes and rules that the screens rely on (ordering, counts ignoring the status filter,
-// cursor pagination). Tests replace `client` in ~/lib/orpc with `createFakeApi().client`.
+// cursor pagination, and from M5 labels, due dates, blockers with loop refusal, one level of
+// subtasks, bulk changes for native tasks only). Tests replace `client` in ~/lib/orpc with
+// `createFakeApi().client`.
 
 const ANA = '00000000-0000-4000-8000-000000000001';
 const TOMAS = '00000000-0000-4000-8000-000000000002';
@@ -43,12 +50,26 @@ export const FAKE_CYCLES = {
   c13: '60000000-0000-4000-8000-000000000013',
 };
 
+/** The labels of PAY: name and palette hue. */
+export const FAKE_LABELS: readonly (readonly [string, number])[] = [
+  ['api', 1],
+  ['backend', 2],
+  ['payouts', 6],
+  ['refunds', 4],
+  ['reliability', 9],
+];
+
 interface Options {
   /** Number of tasks in PAY (default 6). */
   tasks?: number;
   /** Project feature switches (default both on). */
   usesMilestones?: boolean;
   usesCycles?: boolean;
+  /**
+   * M5 sample values (default off, so older tests keep their rows): PAY-1 has the labels payouts and
+   * backend and is due in 2 days, PAY-2 waits on PAY-3, PAY-5 is a subtask of PAY-1.
+   */
+  fields?: boolean;
 }
 
 type Input = Record<string, unknown>;
@@ -57,6 +78,7 @@ export function createFakeApi({
   tasks: taskCount = 6,
   usesMilestones = true,
   usesCycles = true,
+  fields = false,
 }: Options = {}) {
   const now = Date.now();
   const project = { id: '10000000-0000-4000-8000-000000000001', key: 'PAY', name: 'Payments' };
@@ -159,6 +181,28 @@ export function createFakeApi({
       updatedAt: new Date(now - (taskCount - index) * 60_000).toISOString(),
     };
   });
+  // M5: labels of the project, and the relations by task key (blockedBy lists, parent of subtasks).
+  const labels: Label[] = FAKE_LABELS.map(([name, color], index) => ({
+    id: `80000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    name,
+    color,
+    source: 'app' as const,
+  }));
+  const blockers = new Map<string, string[]>();
+  const parents = new Map<string, string>();
+  for (const task of tasks) {
+    task.labels = [];
+    task.dueDate = null;
+  }
+  if (fields) {
+    const pay1 = tasks[0];
+    if (pay1) {
+      pay1.labels = labels.filter((label) => label.name === 'payouts' || label.name === 'backend');
+      pay1.dueDate = day(2);
+    }
+    if (tasks.length >= 3) blockers.set('PAY-2', ['PAY-3']);
+    if (tasks.length >= 5) parents.set('PAY-5', 'PAY-1');
+  }
   const activity: Activity[] = [];
   const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString();
   const comments: Comment[] = [
@@ -219,6 +263,8 @@ export function createFakeApi({
     create: [] as Input[],
     list: [] as Input[],
     comments: [] as Input[],
+    bulk: [] as Input[],
+    labels: [] as Input[],
   };
   /** Set to make the next tasks.update wait for `release` and then fail (or succeed). */
   const control = {
@@ -228,11 +274,66 @@ export function createFakeApi({
     failComments: false,
     /** Comment writes wait for this promise. */
     holdComments: null as null | Promise<void>,
+    /** The next task write (update, create or bulk) fails with this error, once. */
+    failNext: null as null | ORPCError<string, unknown>,
   };
 
+  const byKey = (key: string) => tasks.find((task) => task.key === key);
+  const related = (task: Task): RelatedTask => ({
+    key: task.key,
+    title: task.title,
+    status: task.status,
+    assignee: task.assignee
+      ? { id: task.assignee.id, name: task.assignee.name, kind: task.assignee.kind }
+      : null,
+  });
+  /** Hidden tasks read as null ("Removed task"). */
+  const relatedOrNull = (key: string) => {
+    const task = byKey(key);
+    return task && !task.hidden ? related(task) : null;
+  };
+  const subtasksOf = (key: string) =>
+    tasks.filter((task) => parents.get(task.key) === key && !task.hidden).sort((a, b) => a.number - b.number);
+  const progressOf = (key: string) => {
+    const counted = subtasksOf(key).filter((task) => task.status !== 'canceled');
+    return { done: counted.filter((task) => task.status === 'done').length, total: counted.length };
+  };
+  const isBlocked = (key: string) =>
+    (blockers.get(key) ?? []).some((other) => {
+      const task = byKey(other);
+      return task != null && !task.hidden && isOpenStatus(task.status);
+    });
+  const sortLabels = (list: Label[]) =>
+    [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  /** The task with its M5 relations, as tasks.get answers. */
+  const full = (task: Task): Task => {
+    const parentKey = parents.get(task.key);
+    return {
+      ...task,
+      labels: sortLabels(task.labels ?? []),
+      dueDate: task.dueDate ?? null,
+      parent: parentKey ? relatedOrNull(parentKey) : null,
+      subtasks: subtasksOf(task.key).map(related),
+      subtaskProgress: progressOf(task.key),
+      blockedBy: (blockers.get(task.key) ?? []).map(relatedOrNull),
+      blocks: [...blockers.entries()]
+        .filter(([, list]) => list.includes(task.key))
+        .map(([key]) => relatedOrNull(key)),
+      blocked: isBlocked(task.key),
+    };
+  };
   const listItem = (task: Task): TaskListItem => {
-    const { description: _d, createdBy: _c, createdOnBehalfOf: _o, ...item } = task;
-    return item;
+    const {
+      description: _d,
+      createdBy: _c,
+      createdOnBehalfOf: _o,
+      parent: _p,
+      subtasks: _s,
+      blockedBy: _b,
+      blocks: _r,
+      ...item
+    } = full(task);
+    return { ...item, parentKey: parents.get(task.key) ?? null };
   };
   const rank = (task: Task) => TASK_STATUSES.indexOf(task.status);
   const sorted = () =>
@@ -243,6 +344,48 @@ export function createFakeApi({
         b.updatedAt.localeCompare(a.updatedAt) ||
         b.number - a.number,
     );
+  /** tasks.list order: `sort` (one ordering for the whole result) or the list order by status. */
+  const sortedFor = (input: Input) => {
+    const sort = typeof input.sort === 'string' ? input.sort : undefined;
+    if (!sort) return sorted();
+    const byPriority = (a: Task, b: Task) => PRIORITIES.indexOf(b.priority) - PRIORITIES.indexOf(a.priority);
+    const byUpdated = (a: Task, b: Task) => b.updatedAt.localeCompare(a.updatedAt);
+    const compare: Record<string, (a: Task, b: Task) => number> = {
+      priority: (a, b) => byPriority(a, b) || byUpdated(a, b),
+      updated: byUpdated,
+      created: (a, b) => b.createdAt.localeCompare(a.createdAt),
+      // No date last.
+      due: (a, b) => (a.dueDate ?? '9999-99-99').localeCompare(b.dueDate ?? '9999-99-99') || byPriority(a, b),
+      manual: (a, b) => a.rank - b.rank,
+    };
+    const by = compare[sort] ?? compare.priority;
+    return [...tasks].sort((a, b) => (by as (x: Task, y: Task) => number)(a, b) || b.number - a.number);
+  };
+  /** One assignee filter value: me (Ana), agents, none or a user id. */
+  const assigneeMatches = (task: Task, value: string) => {
+    if (value === 'none') return !task.assignee;
+    if (!task.assignee) return false;
+    if (value === 'me') return task.assignee.id === people.ana.id;
+    if (value === 'agents') return task.assignee.kind === 'agent';
+    return task.assignee.id === value;
+  };
+  /** One cycle filter value: a number, current, next (the first upcoming) or none. */
+  const cycleMatches = (task: Task, value: string | number) => {
+    if (value === 'none') return !task.cycle;
+    if (!task.cycle) return false;
+    if (value === 'current') return task.cycle.state === 'current';
+    if (value === 'next') return task.cycle.number === cycles.find((c) => c.state === 'upcoming')?.number;
+    return task.cycle.number === Number(value);
+  };
+  /** overdue, soon (today to 2 days ahead), none or set; overdue and soon count open tasks only. */
+  const dueMatches = (task: Task, due: string, today: string, soon: string) => {
+    const date = task.dueDate ?? null;
+    if (due === 'none') return date === null;
+    if (due === 'set') return date !== null;
+    if (date === null || !isOpenStatus(task.status)) return false;
+    if (due === 'overdue') return date < today;
+    return date >= today && date <= soon;
+  };
   const find = (key: unknown) => {
     const task = tasks.find((candidate) => candidate.key === String(key).toUpperCase());
     if (!task)
@@ -250,6 +393,133 @@ export function createFakeApi({
     return task;
   };
   const asList = (value: unknown) => (value == null ? undefined : Array.isArray(value) ? value : [value]);
+
+  const failIfAsked = () => {
+    const error = control.failNext;
+    if (!error) return;
+    control.failNext = null;
+    throw error;
+  };
+  const labelNamed = (name: string) =>
+    labels.find((label) => label.name.toLowerCase() === name.trim().toLowerCase());
+  const newLabel = (name: string, color?: number): Label => {
+    const label: Label = {
+      id: `80000000-0000-4000-8000-${String(100 + labels.length).padStart(12, '0')}`,
+      name,
+      color: color ?? (labels.length % 9) + 1,
+      source: 'app',
+    };
+    labels.push(label);
+    return label;
+  };
+  /** Labels by name; missing ones are created, as task writes do. */
+  const resolveLabels = (names: readonly string[]) => {
+    const result: Label[] = [];
+    for (const name of names) {
+      const label = labelNamed(name) ?? newLabel(name.trim());
+      if (!result.some((item) => item.id === label.id)) result.push({ ...label });
+    }
+    return result;
+  };
+  /** The fields from TASK_OWNED_FIELDS each input key writes. */
+  const OWNED_BY_INPUT: Record<string, TaskOwnedField> = {
+    title: 'title',
+    description: 'description',
+    status: 'status',
+    priority: 'priority',
+    assignee: 'assignee',
+    milestone: 'milestone',
+    labels: 'labels',
+    addLabels: 'labels',
+    removeLabels: 'labels',
+    dueDate: 'dueDate',
+    parent: 'parent',
+    addBlockers: 'blockedBy',
+    removeBlockers: 'blockedBy',
+  };
+  const refuseMirrored = (task: Task, input: Input) => {
+    for (const [name, field] of Object.entries(OWNED_BY_INPUT)) {
+      if (input[name] === undefined || !task.locked?.includes(field)) continue;
+      throw new ORPCError('TASK_MIRRORED', {
+        status: 409,
+        message: `${field} comes from Backlog.md`,
+        data: { field },
+      });
+    }
+  };
+  const depthError = (key: string) =>
+    new ORPCError('SUBTASK_DEPTH', {
+      status: 409,
+      message: `${key} is a subtask. Subtasks go one level deep.`,
+    });
+  const setParent = (task: Task, value: string | null) => {
+    if (value === null) {
+      parents.delete(task.key);
+      return;
+    }
+    const parent = find(value);
+    if (parent.key === task.key || parents.has(parent.key)) throw depthError(parent.key);
+    if (subtasksOf(task.key).length > 0) {
+      throw new ORPCError('SUBTASK_DEPTH', {
+        status: 409,
+        message: `${task.key} has subtasks. Subtasks go one level deep.`,
+      });
+    }
+    parents.set(task.key, parent.key);
+  };
+  /** True when `from` waits on `to`, directly or through other tasks. */
+  const waitsOn = (from: string, to: string, seen = new Set<string>()): boolean => {
+    if (seen.has(from)) return false;
+    seen.add(from);
+    return (blockers.get(from) ?? []).some((key) => key === to || waitsOn(key, to, seen));
+  };
+  const addBlocker = (task: Task, value: string) => {
+    const blocker = find(value);
+    const current = blockers.get(task.key) ?? [];
+    if (current.includes(blocker.key)) return;
+    if (blocker.key === task.key || waitsOn(blocker.key, task.key)) {
+      const message = `Can't add: ${blocker.key} already waits on ${task.key}.`;
+      throw new ORPCError('DEPENDENCY_LOOP', {
+        status: 409,
+        message,
+        data: {
+          loop: { task: task.key, blocker: blocker.key },
+          issues: [{ path: 'addBlockers', message }],
+        },
+      });
+    }
+    blockers.set(task.key, [...current, blocker.key]);
+  };
+  const personById = (id: string) => Object.values(people).find((candidate) => candidate.id === id);
+  /** The plain fields of a task write (update and bulk). */
+  const applyFields = (task: Task, input: Input) => {
+    if (typeof input.title === 'string') task.title = input.title;
+    if (input.description !== undefined) task.description = input.description as string | null;
+    if (typeof input.status === 'string') task.status = input.status as TaskStatus;
+    if (typeof input.priority === 'string') task.priority = input.priority as Task['priority'];
+    if (input.assignee !== undefined) {
+      const person = typeof input.assignee === 'string' ? personById(input.assignee) : undefined;
+      task.assignee = person ? { ...person, responsible: person.kind === 'agent' ? people.ana : null } : null;
+    }
+    if (input.milestone !== undefined) task.milestone = milestoneRef(input.milestone);
+    if (input.cycle !== undefined) {
+      task.cycle = cycleRef(input.cycle);
+      task.cycleAddedAt = task.cycle ? new Date().toISOString() : null;
+    }
+    if (input.dueDate !== undefined) task.dueDate = input.dueDate as string | null;
+    if (Array.isArray(input.labels)) task.labels = resolveLabels(input.labels as string[]);
+    if (Array.isArray(input.removeLabels)) {
+      const removed = new Set((input.removeLabels as string[]).map((name) => name.toLowerCase()));
+      task.labels = (task.labels ?? []).filter((label) => !removed.has(label.name.toLowerCase()));
+    }
+    if (Array.isArray(input.addLabels)) {
+      const current = task.labels ?? [];
+      const added = resolveLabels(input.addLabels as string[]).filter(
+        (label) => !current.some((item) => item.id === label.id),
+      );
+      task.labels = [...current, ...added];
+    }
+  };
 
   const client = {
     me: {
@@ -310,8 +580,31 @@ export function createFakeApi({
         calls.list.push(input);
         const status = asList(input.status) as TaskStatus[] | undefined;
         const q = typeof input.q === 'string' ? input.q.toLowerCase() : undefined;
-        const matching = sorted().filter(
-          (task) => !q || task.title.toLowerCase().includes(q) || task.key.toLowerCase().includes(q),
+        const labelIds = asList(input.label) as string[] | undefined;
+        const parent = typeof input.parent === 'string' ? input.parent.toUpperCase() : undefined;
+        const priorities = asList(input.priority) as string[] | undefined;
+        const assignees = asList(input.assignee) as string[] | undefined;
+        const milestoneIds = asList(input.milestone) as string[] | undefined;
+        const cycleValues = asList(input.cycle) as (string | number)[] | undefined;
+        const due = typeof input.due === 'string' ? input.due : undefined;
+        const today = day(0);
+        const soon = day(2);
+        const matching = sortedFor(input).filter(
+          (task) =>
+            (input.hidden === 'only' ? task.hidden === true : !task.hidden) &&
+            (!q || task.title.toLowerCase().includes(q) || task.key.toLowerCase().includes(q)) &&
+            (!priorities || priorities.includes(task.priority)) &&
+            (!assignees || assignees.some((value) => assigneeMatches(task, value))) &&
+            (!milestoneIds ||
+              milestoneIds.some((value) =>
+                value === 'none' ? !task.milestone : task.milestone?.id === value,
+              )) &&
+            (!cycleValues || cycleValues.some((value) => cycleMatches(task, value))) &&
+            (!due || dueMatches(task, due, today, soon)) &&
+            (!labelIds || (task.labels ?? []).some((label) => labelIds.includes(label.id))) &&
+            (input.topLevel !== true || !parents.has(task.key)) &&
+            (input.blocked === undefined || isBlocked(task.key) === input.blocked) &&
+            (!parent || parents.get(task.key) === parent),
         );
         const counts = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as StatusCounts;
         for (const task of matching) counts[task.status]++;
@@ -322,7 +615,7 @@ export function createFakeApi({
         const next = offset + limit < filtered.length ? String(offset + limit) : null;
         return { items: page.map(listItem), nextCursor: next, counts };
       },
-      get: async (input: Input): Promise<Task> => structuredClone(find(input.key)),
+      get: async (input: Input): Promise<Task> => structuredClone(full(find(input.key))),
       activity: async (input: Input): Promise<{ items: Activity[] }> => {
         const task = find(input.key);
         return {
@@ -343,6 +636,7 @@ export function createFakeApi({
       update: async (input: Input): Promise<Task> => {
         calls.update.push(input);
         if (control.holdUpdates) await control.holdUpdates.promise;
+        failIfAsked();
         if (control.failUpdates) {
           throw new ORPCError('UNPROCESSABLE_CONTENT', {
             message: 'Title is too long',
@@ -350,17 +644,49 @@ export function createFakeApi({
           });
         }
         const task = find(input.key);
-        if (typeof input.title === 'string') task.title = input.title;
-        if (input.description !== undefined) task.description = input.description as string | null;
-        if (typeof input.status === 'string') task.status = input.status as TaskStatus;
-        if (typeof input.priority === 'string') task.priority = input.priority as Task['priority'];
-        if (input.milestone !== undefined) task.milestone = milestoneRef(input.milestone);
-        if (input.cycle !== undefined) {
-          task.cycle = cycleRef(input.cycle);
-          task.cycleAddedAt = task.cycle ? new Date().toISOString() : null;
+        refuseMirrored(task, input);
+        if (typeof input.ifUpdatedAt === 'string' && input.ifUpdatedAt < task.updatedAt) {
+          throw new ORPCError('TASK_CHANGED', {
+            status: 409,
+            message: 'The task changed since you loaded it',
+            data: { task: structuredClone(full(task)) },
+          });
         }
+        if (input.parent !== undefined) setParent(task, input.parent as string | null);
+        if (Array.isArray(input.addBlockers)) {
+          for (const key of input.addBlockers as string[]) addBlocker(task, key);
+        }
+        if (Array.isArray(input.removeBlockers)) {
+          const removed = new Set((input.removeBlockers as string[]).map((key) => key.toUpperCase()));
+          blockers.set(
+            task.key,
+            (blockers.get(task.key) ?? []).filter((key) => !removed.has(key)),
+          );
+        }
+        applyFields(task, input);
         task.updatedAt = new Date().toISOString();
-        return structuredClone(task);
+        return structuredClone(full(task));
+      },
+      bulkUpdate: async (input: Input): Promise<TaskBulkResult> => {
+        calls.bulk.push(input);
+        if (control.holdUpdates) await control.holdUpdates.promise;
+        failIfAsked();
+        const keys = [...new Set((input.keys as string[]).map((key) => key.toUpperCase()))];
+        const targets = keys.map(find);
+        const mirrored = targets.find((task) => (task.locked?.length ?? 0) > 0);
+        if (mirrored) {
+          throw new ORPCError('TASK_MIRRORED', {
+            status: 409,
+            message: `${mirrored.key} comes from Backlog.md`,
+            data: { field: 'status' },
+          });
+        }
+        const now = new Date().toISOString();
+        for (const task of targets) {
+          applyFields(task, input);
+          task.updatedAt = now;
+        }
+        return structuredClone({ items: targets.map(listItem) });
       },
       timeline: async (input: Input): Promise<{ items: TimelineItem[] }> => {
         const task = find(input.key);
@@ -392,7 +718,11 @@ export function createFakeApi({
       },
       create: async (input: Input): Promise<Task> => {
         calls.create.push(input);
+        failIfAsked();
         const number = tasks.length + 1;
+        const parentKey = typeof input.parent === 'string' ? input.parent.toUpperCase() : null;
+        const parentTask = parentKey ? find(parentKey) : null;
+        if (parentTask && parents.has(parentTask.key)) throw depthError(parentTask.key);
         const assigneeId = input.assignee as string | null | undefined;
         const person = Object.values(people).find((candidate) => candidate.id === assigneeId);
         const task: Task = {
@@ -404,7 +734,12 @@ export function createFakeApi({
           description: (input.description as string | undefined) ?? null,
           status: (input.status as TaskStatus | undefined) ?? 'todo',
           priority: (input.priority as Task['priority'] | undefined) ?? 'none',
-          assignee: person ? { ...person, responsible: person.kind === 'agent' ? people.ana : null } : null,
+          assignee: person
+            ? { ...person, responsible: person.kind === 'agent' ? people.ana : null }
+            : // A subtask without an assignee takes the parent's.
+              assigneeId === undefined && parentTask
+              ? structuredClone(parentTask.assignee)
+              : null,
           createdBy: people.ana,
           createdOnBehalfOf: null,
           milestone: milestoneRef(input.milestone),
@@ -412,11 +747,58 @@ export function createFakeApi({
           cycleAddedAt: input.cycle != null ? new Date().toISOString() : null,
           // New tasks go to the top of their column.
           rank: Math.min(0, ...tasks.map((other) => other.rank)) - 1,
+          labels: [],
+          dueDate: (input.dueDate as string | null | undefined) ?? null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
         tasks.push(task);
-        return structuredClone(task);
+        if (Array.isArray(input.labels)) task.labels = resolveLabels(input.labels as string[]);
+        if (parentTask) parents.set(task.key, parentTask.key);
+        if (Array.isArray(input.blockedBy)) {
+          for (const key of input.blockedBy as string[]) addBlocker(task, key);
+        }
+        return structuredClone(full(task));
+      },
+    },
+    labels: {
+      list: async (): Promise<{ items: LabelWithUsage[] }> => ({
+        items: sortLabels(labels).map((label) => ({
+          ...label,
+          usageCount: tasks.filter(
+            (task) => !task.hidden && (task.labels ?? []).some((other) => other.id === label.id),
+          ).length,
+        })),
+      }),
+      create: async (input: Input): Promise<LabelWithUsage> => {
+        calls.labels.push({ op: 'create', ...input });
+        const name = String(input.name).trim();
+        if (labelNamed(name)) {
+          throw new ORPCError('LABEL_EXISTS', {
+            status: 409,
+            message: `Payments has a label named “${labelNamed(name)?.name}”.`,
+          });
+        }
+        const label = newLabel(name, typeof input.color === 'number' ? input.color : undefined);
+        return structuredClone({ ...label, usageCount: 0 });
+      },
+      update: async (input: Input): Promise<LabelWithUsage> => {
+        calls.labels.push({ op: 'update', ...input });
+        const label = labels.find((item) => item.id === input.id);
+        if (!label) throw new ORPCError('NOT_FOUND', { message: 'Label not found' });
+        if (typeof input.name === 'string') label.name = input.name;
+        if (typeof input.color === 'number') label.color = input.color;
+        for (const task of tasks) {
+          task.labels = (task.labels ?? []).map((item) => (item.id === label.id ? { ...label } : item));
+        }
+        return structuredClone({ ...label, usageCount: 0 });
+      },
+      delete: async (input: Input): Promise<void> => {
+        calls.labels.push({ op: 'delete', ...input });
+        const index = labels.findIndex((item) => item.id === input.id);
+        if (index < 0) throw new ORPCError('NOT_FOUND', { message: 'Label not found' });
+        labels.splice(index, 1);
+        for (const task of tasks) task.labels = (task.labels ?? []).filter((item) => item.id !== input.id);
       },
     },
     milestones: {
@@ -487,7 +869,22 @@ export function createFakeApi({
     return release;
   };
 
-  return { client, calls, control, hold, tasks, activity, comments, milestones, cycles, mirror };
+  return {
+    client,
+    calls,
+    control,
+    hold,
+    tasks,
+    activity,
+    comments,
+    milestones,
+    cycles,
+    mirror,
+    labels,
+    /** M5 relations by task key: the keys each task waits on, and the parent of each subtask. */
+    blockers,
+    parents,
+  };
 }
 
 export type FakeApi = ReturnType<typeof createFakeApi>;

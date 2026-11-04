@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ApiKeyScope, BacklogMappings, DashboardScope, MAX_COMMENT_LENGTH } from './entities';
+import { ApiKeyScope, BacklogMappings, DashboardScope, HomeTab, MAX_COMMENT_LENGTH } from './entities';
 import {
   AuthId,
   BacklogMode,
@@ -11,7 +11,10 @@ import {
   cycleLengthDays,
   GitConnectionId,
   GitProvider,
+  LabelColor,
+  LabelId,
   MAX_CYCLE_DAYS,
+  MAX_LABEL_NAME_LENGTH,
   MilestoneId,
   MilestoneStatus,
   Priority,
@@ -27,10 +30,13 @@ import { MAX_REPOSITORY_URL_LENGTH, parseRepositoryUrl, REPOSITORY_URL_HINT } fr
 // Input schemas. Every entry point (API, server functions, CLI) parses with these.
 // Use z.input<> for what a caller may send and z.output<> (the exported types) for the parsed value.
 
-/** Accepts one value or a list, always yields a de-duplicated list. Query strings carry either form. */
-function oneOrMany<T extends z.ZodType<string>>(item: T) {
+/**
+ * Accepts one value or a list, always yields a de-duplicated list. Query strings carry either form.
+ * Items may be numbers too (cycle numbers): they de-duplicate by value.
+ */
+function oneOrMany<T extends z.ZodType<string | number>>(item: T, error?: string) {
   return z
-    .union([z.array(item).min(1), item])
+    .union([z.array(item).min(1), item], error ? { error } : undefined)
     .transform((value): z.output<T>[] => [...new Set(Array.isArray(value) ? value : [value])]);
 }
 
@@ -59,17 +65,23 @@ export const TaskDescription = z.string().max(100_000);
 export const ASSIGNEE_ME = 'me';
 export const AssigneeInput = z.union([z.literal(ASSIGNEE_ME), UserId]);
 
-/** Task list assignee filter: the caller, any agent, or one user id. */
-export const ASSIGNEE_AGENTS = 'agents';
-export const AssigneeFilter = z.union([z.literal(ASSIGNEE_ME), z.literal(ASSIGNEE_AGENTS), UserId]);
-
-/** Filter value for tasks without a milestone or without a cycle. */
+/** Filter value for tasks without an assignee, a milestone or a cycle. */
 export const FILTER_NONE = 'none';
 
-/** Task list milestone filter: one milestone id, or `none` for tasks without one. */
+/**
+ * One task list assignee filter value: the caller (`me`), any agent (`agents`), nobody (`none`,
+ * M5), or a user id. ListTasksInput.assignee takes one or several; a task matches any of them.
+ */
+export const ASSIGNEE_AGENTS = 'agents';
+export const AssigneeFilter = z.union(
+  [z.literal(ASSIGNEE_ME), z.literal(ASSIGNEE_AGENTS), z.literal(FILTER_NONE), UserId],
+  { error: 'Use me, agents, none or a user id' },
+);
+
+/** One task list milestone filter value: a milestone id, or `none` for tasks without one. */
 export const MilestoneFilter = z.union([z.literal(FILTER_NONE), MilestoneId]);
 
-/** Task list cycle filter: a cycle number, `current`, `next`, or `none` for tasks without one. */
+/** One task list cycle filter value: a cycle number, `current`, `next`, or `none` for tasks without one. */
 export const CycleFilter = z.union([z.literal(FILTER_NONE), CycleSelector], {
   error: 'Use a cycle number, current, next or none',
 });
@@ -100,10 +112,78 @@ export const TASK_LIST_ORDERS = ['list', 'board'] as const;
 export const TaskListOrder = z.enum(TASK_LIST_ORDERS);
 export type TaskListOrder = z.infer<typeof TaskListOrder>;
 
+/**
+ * A yes/no filter. Query strings carry it as text, so `true` and `false` are accepted too (and
+ * nothing else: z.coerce.boolean would read "false" as true).
+ */
+export const QueryBoolean = z.union(
+  [z.boolean(), z.enum(['true', 'false']).transform((value) => value === 'true')],
+  {
+    error: 'Use true or false',
+  },
+);
+
+/**
+ * M5 due-date filter. overdue: open tasks due before today. soon: open tasks due today or within
+ * DUE_SOON_DAYS after it. none: no due date. set: any due date. Today is in APP_TIME_ZONE.
+ */
+export const DUE_FILTERS = ['overdue', 'soon', 'none', 'set'] as const;
+export const DueFilter = z.enum(DUE_FILTERS);
+export type DueFilter = z.infer<typeof DueFilter>;
+
+/**
+ * M5 orderings ("Order by" in display options). priority: highest first. due: soonest first, none
+ * last. updated and created: newest first. manual: board rank. Ties fall back to the last update,
+ * then the id. See ListTasksInput.sort.
+ */
+export const TASK_SORTS = ['priority', 'due', 'updated', 'created', 'manual'] as const;
+export const TaskSort = z.enum(TASK_SORTS);
+export type TaskSort = z.infer<typeof TaskSort>;
+
+/** M5: most labels on one task, and most blockers added in one write. */
+export const MAX_TASK_LABELS = 20;
+export const MAX_TASK_BLOCKERS = 50;
+/** M5: most tasks one POST /tasks/bulk changes. */
+export const MAX_BULK_TASKS = 100;
+
 export const DEFAULT_TASK_STATUS = 'todo' satisfies TaskStatus;
 export const DEFAULT_TASK_PRIORITY = 'none' satisfies Priority;
 export const DEFAULT_TASK_LIST_LIMIT = 50;
 export const MAX_TASK_LIST_LIMIT = 200;
+
+// ---------------------------------------------------------------------------
+// Labels (M5)
+// ---------------------------------------------------------------------------
+
+/** A label name as typed: trimmed, 1 to 40 characters. Matched ignoring case. */
+export const LabelName = z
+  .string()
+  .trim()
+  .min(1, 'Name is required')
+  .max(MAX_LABEL_NAME_LENGTH, `Keep label names to ${MAX_LABEL_NAME_LENGTH} characters or fewer`);
+
+/**
+ * Labels of a task write, by name. Names that don't exist in the task's project are created (with
+ * a colour the app picks). Repeats that differ only in case collapse to the first.
+ */
+export const LabelNames = z
+  .array(LabelName)
+  .max(MAX_TASK_LABELS, `Use ${MAX_TASK_LABELS} labels or fewer`)
+  .transform((names) => {
+    const seen = new Set<string>();
+    return names.filter((name) => {
+      const folded = name.toLowerCase();
+      if (seen.has(folded)) return false;
+      seen.add(folded);
+      return true;
+    });
+  });
+
+/** Task keys of a write (blockers), de-duplicated. Same project as the task; core checks. */
+const TaskKeyList = z
+  .array(TaskKeyInput)
+  .max(MAX_TASK_BLOCKERS, `Use ${MAX_TASK_BLOCKERS} tasks or fewer`)
+  .transform((keys) => [...new Set(keys)]);
 
 // ---------------------------------------------------------------------------
 // Projects
@@ -160,15 +240,34 @@ export const ListTasksInput = z.object({
   project: oneOrMany(ProjectKeyInput).optional(),
   status: oneOrMany(TaskStatus).optional(),
   priority: oneOrMany(Priority).optional(),
-  assignee: AssigneeFilter.optional(),
-  milestone: MilestoneFilter.optional(),
-  /** current and next resolve per project. */
-  cycle: CycleFilter.optional(),
+  /** M5: one value or several (any of them): me, agents, none (unassigned) or user ids. */
+  assignee: oneOrMany(AssigneeFilter, 'Use me, agents, none or user ids').optional(),
+  /** M5: one value or several (any of them): milestone ids or none. */
+  milestone: oneOrMany(MilestoneFilter, 'Use milestone ids or none').optional(),
+  /** M5: one value or several (any of them): numbers, current, next or none; current and next resolve per project. */
+  cycle: oneOrMany(CycleFilter, 'Use a cycle number, current, next or none').optional(),
   /** Matches the title, the task key or the Backlog.md id. */
   q: z.string().trim().max(200).optional(),
   /** Omitted: hidden tasks are left out. */
   hidden: HiddenFilter.optional(),
+  /** M5: label ids; a task matches when it has any of them. */
+  label: oneOrMany(LabelId).optional(),
+  /** M5: see DueFilter. */
+  due: DueFilter.optional(),
+  /** M5: true: only tasks with an open blocker; false: only tasks without one. */
+  blocked: QueryBoolean.optional(),
+  /** M5: true: leave subtasks out (top-level tasks only); false or omitted: every task. */
+  topLevel: QueryBoolean.optional(),
+  /** M5: only the subtasks of this task (an app key). */
+  parent: TaskKeyInput.optional(),
+  /** list (default) or board; ignored when `sort` is set. */
   order: TaskListOrder.default('list'),
+  /**
+   * M5: one ordering for the whole result, without the status-first grouping of `order`; the
+   * client groups. Omitted: `order` applies as before (list: status, priority, updated; board:
+   * status, rank).
+   */
+  sort: TaskSort.optional(),
   /** Only valid with the same order and filters it came from. */
   cursor: z.string().min(1).max(512).optional(),
   /** Query strings carry numbers as text, so this coerces. */
@@ -207,6 +306,17 @@ export const CreateTaskInput = z.object({
   milestone: MilestoneId.nullable().optional(),
   /** A cycle of the same project. Omitted or null: none. */
   cycle: CycleInput.nullable().optional(),
+  /** M5: label names; missing ones are created in the project. */
+  labels: LabelNames.optional(),
+  /** M5: omitted or null: no due date. */
+  dueDate: CalendarDate.nullable().optional(),
+  /**
+   * M5: makes the new task a subtask of this one (same project, itself top level). Without an
+   * assignee, the subtask takes the parent's. Omitted or null: top level.
+   */
+  parent: TaskKeyInput.nullable().optional(),
+  /** M5: tasks of the same project the new task waits on. */
+  blockedBy: TaskKeyList.optional(),
 });
 export type CreateTaskInput = z.output<typeof CreateTaskInput>;
 
@@ -227,6 +337,23 @@ export const UpdateTaskInput = z
     cycle: CycleInput.nullable().optional(),
     /** Board placement in the target status column (the new status when `status` is set). */
     position: TaskPosition.optional(),
+    /** M5: replaces every label (by name; [] clears them). Not with addLabels or removeLabels. */
+    labels: LabelNames.optional(),
+    /** M5: labels to add by name; missing ones are created. */
+    addLabels: LabelNames.optional(),
+    /** M5: labels to take off by name (ignoring case); names the task doesn't have are ignored. */
+    removeLabels: LabelNames.optional(),
+    /** M5: null clears the due date. */
+    dueDate: CalendarDate.nullable().optional(),
+    /**
+     * M5: makes the task a subtask of this one (same project, one level: SUBTASK_DEPTH when either
+     * side would nest deeper). null makes it top level.
+     */
+    parent: TaskKeyInput.nullable().optional(),
+    /** M5: tasks of the same project this one starts waiting on. A loop fails with DEPENDENCY_LOOP. */
+    addBlockers: TaskKeyList.optional(),
+    /** M5: blockers to drop; keys that aren't blockers are ignored. */
+    removeBlockers: TaskKeyList.optional(),
     /**
      * The updatedAt the caller last saw. When the stored task is newer, the update fails with
      * TASK_CHANGED (409) and the current task. Compared at millisecond precision.
@@ -246,13 +373,108 @@ export const UpdateTaskInput = z
       'milestone',
       'cycle',
       'position',
+      'labels',
+      'addLabels',
+      'removeLabels',
+      'dueDate',
+      'parent',
+      'addBlockers',
+      'removeBlockers',
     ]),
     {
       message:
-        'Change at least one of title, description, status, priority, assignee, milestone, cycle or position',
+        'Change at least one of title, description, status, priority, assignee, milestone, cycle, ' +
+        'position, labels, dueDate, parent or blockers',
     },
-  );
+  )
+  .refine((value) => value.labels === undefined || (!value.addLabels && !value.removeLabels), {
+    path: ['labels'],
+    message: 'Send labels alone, or addLabels and removeLabels',
+  });
 export type UpdateTaskInput = z.output<typeof UpdateTaskInput>;
+
+/** The fields POST /tasks/bulk can change. Native projects only. */
+const BULK_FIELDS = [
+  'status',
+  'priority',
+  'assignee',
+  'milestone',
+  'cycle',
+  'dueDate',
+  'addLabels',
+  'removeLabels',
+] as const;
+
+/**
+ * M5: one change for up to MAX_BULK_TASKS tasks, in one transaction with one activity row per task
+ * (tasks that already have the values get none). Any mirrored task fails the whole request with
+ * TASK_MIRRORED. milestone and cycle need every task in one project (NOT_SAME_PROJECT); labels
+ * resolve per project by name.
+ */
+export const BulkUpdateTasksInput = z
+  .object({
+    /** App keys, de-duplicated; the result keeps this order. */
+    keys: z
+      .array(TaskKeyInput)
+      .min(1, 'Pick at least one task')
+      .max(MAX_BULK_TASKS, `Change ${MAX_BULK_TASKS} tasks or fewer at once`)
+      .transform((keys) => [...new Set(keys)]),
+    status: TaskStatus.optional(),
+    priority: Priority.optional(),
+    /** null clears the assignee. */
+    assignee: AssigneeInput.nullable().optional(),
+    /** null clears the milestone. */
+    milestone: MilestoneId.nullable().optional(),
+    /** null clears the cycle. */
+    cycle: CycleInput.nullable().optional(),
+    /** null clears the due date. */
+    dueDate: CalendarDate.nullable().optional(),
+    addLabels: LabelNames.optional(),
+    removeLabels: LabelNames.optional(),
+  })
+  .refine(requireOneOf(BULK_FIELDS), {
+    message: 'Change at least one of status, priority, assignee, milestone, cycle, dueDate or labels',
+  });
+export type BulkUpdateTasksInput = z.output<typeof BulkUpdateTasksInput>;
+
+// ---------------------------------------------------------------------------
+// Labels (M5): /projects/{project}/labels
+// ---------------------------------------------------------------------------
+
+export const ListLabelsInput = z.object({
+  project: ProjectKeyInput,
+});
+export type ListLabelsInput = z.output<typeof ListLabelsInput>;
+
+/** Fails with LABEL_EXISTS when the project has the name already (ignoring case). */
+export const CreateLabelInput = z.object({
+  project: ProjectKeyInput,
+  name: LabelName,
+  /** Omitted: the app picks the least used hue of the project. */
+  color: LabelColor.optional(),
+});
+export type CreateLabelInput = z.output<typeof CreateLabelInput>;
+
+/**
+ * Rename (LABEL_EXISTS on a clash, LABEL_MIRRORED for labels from Backlog.md) or recolour. Writes
+ * no activity: task history keeps the name it recorded.
+ */
+export const UpdateLabelInput = z
+  .object({
+    project: ProjectKeyInput,
+    id: LabelId,
+    name: LabelName.optional(),
+    color: LabelColor.optional(),
+  })
+  .refine(requireOneOf(['name', 'color']), { message: 'Change at least one of name or color' });
+export type UpdateLabelInput = z.output<typeof UpdateLabelInput>;
+
+/** Takes the label off every task, without activity rows. LABEL_MIRRORED for labels from Backlog.md. */
+export const DeleteLabelInput = z.object({
+  project: ProjectKeyInput,
+  id: LabelId,
+});
+export type DeleteLabelInput = z.output<typeof DeleteLabelInput>;
 
 // ---------------------------------------------------------------------------
 // Dashboard
@@ -270,6 +492,28 @@ export const GetDashboardInput = z
   })
   .prefault({});
 export type GetDashboardInput = z.output<typeof GetDashboardInput>;
+
+// ---------------------------------------------------------------------------
+// Home (M5)
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_HOME_TAB = 'mine' satisfies HomeTab;
+
+/**
+ * GET /home?tab=mine|everyone|agents, with the Home filters. The whole input may be omitted: a
+ * bare GET reads Mine. Filters narrow groups, counts and deadlines alike; the tab counts follow them.
+ */
+export const GetHomeInput = z
+  .object({
+    tab: HomeTab.default(DEFAULT_HOME_TAB),
+    /** Project keys. */
+    project: oneOrMany(ProjectKeyInput).optional(),
+    /** Label names, matched ignoring case across projects (Home merges labels by name); any of them. */
+    label: oneOrMany(LabelName).optional(),
+    priority: oneOrMany(Priority).optional(),
+  })
+  .prefault({});
+export type GetHomeInput = z.output<typeof GetHomeInput>;
 
 // ---------------------------------------------------------------------------
 // Me

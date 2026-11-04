@@ -18,6 +18,8 @@ export interface QuickCreateOptions {
    * active project (the dashboard covers every project, so there is no good guess).
    */
   pickProject?: boolean;
+  /** Title to start with, such as the palette's "Create task “offline”". */
+  title?: string;
 }
 
 interface QuickCreateState {
@@ -30,6 +32,8 @@ interface QuickCreateState {
   refusal: string | null;
   /** This opening starts without a project; the dialog focuses its project picker. */
   pickProject: boolean;
+  /** Title to start with for this opening; '' for none. */
+  title: string;
   open: (projectKey?: string, options?: QuickCreateOptions) => void;
   close: () => void;
 }
@@ -57,6 +61,7 @@ export function QuickCreateProvider({ children, refuse }: QuickCreateProviderPro
   refuseRef.current = refuse;
   const toastId = useRef(0);
   const [pickProject, setPickProject] = useState(false);
+  const [title, setTitle] = useState('');
   const open = useCallback((key?: string, options?: QuickCreateOptions) => {
     const reason = key ? (refuseRef.current?.(key) ?? null) : null;
     if (reason) {
@@ -68,13 +73,14 @@ export function QuickCreateProvider({ children, refuse }: QuickCreateProviderPro
     setProjectKey(key);
     setStatus(options?.status);
     setPickProject(key === undefined && options?.pickProject === true);
+    setTitle(options?.title?.trim() ?? '');
     setOpen(true);
   }, []);
   const close = useCallback(() => setOpen(false), []);
   const refusalText = refusal?.text ?? null;
   const value = useMemo(
-    () => ({ isOpen, projectKey, status, pickProject, refusal: refusalText, open, close }),
-    [isOpen, projectKey, status, pickProject, refusalText, open, close],
+    () => ({ isOpen, projectKey, status, pickProject, title, refusal: refusalText, open, close }),
+    [isOpen, projectKey, status, pickProject, title, refusalText, open, close],
   );
   return (
     <QuickCreateContext.Provider value={value}>
@@ -85,7 +91,7 @@ export function QuickCreateProvider({ children, refuse }: QuickCreateProviderPro
             key={refusal.id}
             timeout={REFUSAL_TOAST_MS}
             onDismiss={() => setRefusal(null)}
-            className="pointer-events-auto max-w-[560px] whitespace-normal"
+            className="pointer-events-auto max-w-140 whitespace-normal"
           >
             {refusal.text}
           </Toast>

@@ -9,11 +9,14 @@ import {
   type ExistingState,
   type ExistingTask,
   idFromFileName,
+  type LabelTarget,
   type PlanFile,
   type PlanInput,
   planChangesContent,
   planRefresh,
   stableJson,
+  type TaskTarget,
+  type TaskValues,
 } from './plan';
 import { blobSha, configFile, taskFile, taskPath } from './testing';
 
@@ -21,7 +24,15 @@ const NOW = new Date('2026-10-23T12:00:00Z');
 const EMPTY: BacklogMappings = { status: [], priority: [], assignee: [] };
 
 function emptyExisting(): ExistingState {
-  return { tasks: [], milestones: [], files: [], nextTaskNumber: 1, firstRead: true, problems: [] };
+  return {
+    tasks: [],
+    milestones: [],
+    files: [],
+    nextTaskNumber: 1,
+    firstRead: true,
+    problems: [],
+    labels: [],
+  };
 }
 
 /** Parses a folder held in memory into planner input. */
@@ -77,11 +88,29 @@ function applyInMemory(plan: BacklogPlan, before: ExistingState): ExistingState 
   }
   for (const hide of plan.milestones.hides)
     (milestones.get(hide.id) as { hiddenAt: Date | null }).hiddenAt = NOW;
+  const labels = new Map(before.labels.map((row) => [row.id, { ...row }]));
+  for (const create of plan.labels.creates) {
+    const id = `l:${create.name.toLowerCase()}`;
+    labels.set(id, { id, ...create, source: 'backlog' });
+  }
+  for (const { id } of plan.labels.adopt) (labels.get(id) as { source: string }).source = 'backlog';
+  const labelId = (target: LabelTarget) => ('id' in target ? target.id : `l:${target.name.toLowerCase()}`);
+  const taskId = (target: TaskTarget) => ('id' in target ? target.id : `t:${target.backlogId}`);
+  const nativeColumns = (values: Partial<TaskValues>) => ({
+    ...(values.labels !== undefined ? { labelIds: values.labels.map(labelId) } : {}),
+    ...(values.blockers !== undefined ? { blockerIds: values.blockers.map(taskId) } : {}),
+    ...(values.parent !== undefined ? { parentId: values.parent ? taskId(values.parent) : null } : {}),
+  });
   const taskIds = new Map<string, string>();
   for (const update of plan.tasks.updates) {
     const row = tasks.get(update.id) as ExistingTask;
-    const { milestone, ...rest } = update.set;
-    Object.assign(row, rest, milestone !== undefined ? { milestoneId: resolve(milestone) } : {});
+    const { milestone, labels: _l, blockers: _b, parent: _p, ...rest } = update.set;
+    Object.assign(
+      row,
+      rest,
+      nativeColumns(update.set),
+      milestone !== undefined ? { milestoneId: resolve(milestone) } : {},
+    );
     if (update.restore) row.hiddenAt = null;
   }
   for (const hide of plan.tasks.hides) (tasks.get(hide.id) as ExistingTask).hiddenAt = NOW;
@@ -89,6 +118,11 @@ function applyInMemory(plan: BacklogPlan, before: ExistingState): ExistingState 
     const id = `t:${create.backlogId}`;
     taskIds.set(create.backlogId, id);
     tasks.set(id, {
+      dueDate: create.dueDate,
+      labelIds: [],
+      blockerIds: [],
+      parentId: null,
+      ...nativeColumns(create),
       id,
       number: create.number,
       keySuffix: create.keySuffix,
@@ -125,6 +159,7 @@ function applyInMemory(plan: BacklogPlan, before: ExistingState): ExistingState 
     nextTaskNumber: Math.max(before.nextTaskNumber, plan.nextTaskNumber),
     firstRead: false,
     problems: plan.problems,
+    labels: [...labels.values()],
   };
 }
 
@@ -382,11 +417,13 @@ describe('planRefresh against existing rows', () => {
     const without = files.filter((file) => !file.path.includes('back-2.1'));
     const hidden = incremental(without, folder, state, mappings);
     expect(hidden.tasks.hides).toEqual([{ id: 't:BACK-2.1' }]);
-    // The parent's derived subtask list changes too.
+    // The parent's derived subtask list changes in its block, with no change to list (M5: subtasks
+    // are the other side of the native parent).
     expect(hidden.tasks.updates).toEqual([
       expect.objectContaining({
         id: 't:BACK-2',
-        changes: [{ field: 'backlog', from: null, to: ['subtasks'] }],
+        set: { backlogData: expect.objectContaining({ subtasks: [] }) },
+        changes: [],
       }),
     ]);
     const after = applyInMemory(hidden, state);
@@ -479,6 +516,167 @@ describe('planRefresh against existing rows', () => {
     const plan = planRefresh(input(files, folder));
     expect(plan.tasks.creates.some((task) => task.backlogId === 'BACK-0')).toBe(false);
     expect(fileProblems(plan).find((problem) => problem.backlogId === 'BACK-0')?.skipped).toBe(true);
+  });
+});
+
+describe('planRefresh native fields (M5)', () => {
+  const folder = 'backlog';
+  const LONG = 'x'.repeat(41);
+  const files = (): FolderFile[] => [
+    { path: `${folder}/config.yml`, text: configFile() },
+    {
+      path: taskPath(folder, 'back-1', 'First'),
+      text: taskFile({
+        id: 'BACK-1',
+        title: 'First',
+        labels: ['API', 'backend', 'Api'],
+        due: '2026-11-20',
+        dependencies: ['BACK-2', 'BACK-99'],
+      }),
+    },
+    {
+      path: taskPath(folder, 'back-2', 'Second'),
+      text: taskFile({ id: 'BACK-2', title: 'Second', labels: ['api'], dependencies: ['BACK-2'] }),
+    },
+    { path: taskPath(folder, 'back-2.1', 'Sub'), text: taskFile({ id: 'BACK-2.1', title: 'Sub' }) },
+    {
+      path: taskPath(folder, 'back-3', 'Third'),
+      text: taskFile({ id: 'BACK-3', title: 'Third', due: '2026-02-30', labels: [LONG] }),
+    },
+  ];
+  const existingLabels = (): ExistingState['labels'] => [
+    { id: 'label-backend', name: 'Backend', color: 1, source: 'app' },
+  ];
+  const create = (plan: BacklogPlan, id: string) =>
+    plan.tasks.creates.find((task) => task.backlogId === id) as BacklogPlan['tasks']['creates'][number];
+
+  it('maps labels, due dates, blockers and parents onto native values', () => {
+    const plan = planRefresh(
+      input(files(), folder, { existing: { ...emptyExisting(), labels: existingLabels() } }),
+    );
+    // One new label for API/api/Api, named after the first spelling in code point order, with the
+    // least used hue; the app label Backend is reused and its name locks.
+    expect(plan.labels).toEqual({ creates: [{ name: 'API', color: 2 }], adopt: [{ id: 'label-backend' }] });
+    expect(create(plan, 'BACK-1')).toMatchObject({
+      labels: [{ name: 'API' }, { id: 'label-backend' }],
+      dueDate: '2026-11-20',
+      blockers: [{ backlogId: 'BACK-2' }],
+      parent: null,
+    });
+    expect(create(plan, 'BACK-2')).toMatchObject({ labels: [{ name: 'API' }], blockers: [], parent: null });
+    expect(create(plan, 'BACK-2.1')).toMatchObject({ parent: { backlogId: 'BACK-2' }, labels: [] });
+    expect(create(plan, 'BACK-3')).toMatchObject({ dueDate: null, labels: [] });
+    // The block keeps the values as written.
+    expect(create(plan, 'BACK-3').backlogData).toMatchObject({ labels: [LONG], dueDate: null });
+
+    const messages = fileProblems(plan).map((problem) => `${problem.backlogId}: ${problem.message}`);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        'BACK-1: dependencies: BACK-99 matches no task in this project; the link is left out',
+        'BACK-2: dependencies: BACK-2 is this task; the link is left out',
+        `BACK-3: labels: "${LONG}" is longer than 40 characters and was left out`,
+        'BACK-3: due_date "2026-02-30" is not a YYYY-MM-DD date (line 9)',
+      ]),
+    );
+  });
+
+  it('plans nothing for the same files, without repeating the field warnings', () => {
+    const before = { ...emptyExisting(), labels: existingLabels() };
+    const mappings = prefillMappings(planRefresh(input(files(), folder)).seen, []);
+    const first = planRefresh(input(files(), folder, { existing: before, mappings }));
+    const state = applyInMemory(first, before);
+    const again = incremental(files(), folder, state, mappings);
+    expect(again.tasks).toEqual({ creates: [], updates: [], hides: [] });
+    expect(again.labels).toEqual({ creates: [], adopt: [] });
+    expect(planChangesContent(again)).toBe(false);
+    expect(fileProblems(again).filter((problem) => problem.message.includes('BACK-99'))).toHaveLength(1);
+    expect(fileProblems(again)).toHaveLength(fileProblems(first).length);
+  });
+
+  it('changed files plan native changes, not Backlog.md-only fields', () => {
+    const before = { ...emptyExisting(), labels: existingLabels() };
+    const mappings = prefillMappings(planRefresh(input(files(), folder)).seen, []);
+    const state = applyInMemory(planRefresh(input(files(), folder, { existing: before, mappings })), before);
+    const edited = files().map((file) => {
+      if (file.path.includes('back-1 - First')) {
+        return { ...file, text: taskFile({ id: 'BACK-1', title: 'First', labels: ['Backend', 'payouts'] }) };
+      }
+      if (file.path.includes('back-2.1 - Sub')) {
+        return {
+          ...file,
+          text: taskFile({ id: 'BACK-2.1', title: 'Sub', parent: 'BACK-1', due: '2026-12-01' }),
+        };
+      }
+      if (file.path.includes('back-3 - Third')) {
+        return {
+          ...file,
+          text: taskFile({ id: 'BACK-3', title: 'Third', dependencies: ['BACK-1', 'BACK-2.1'] }),
+        };
+      }
+      return file;
+    });
+    const plan = incremental(edited, folder, state, mappings);
+    expect(plan.labels).toEqual({ creates: [{ name: 'payouts', color: 3 }], adopt: [] });
+    const changes = new Map(plan.tasks.updates.map((update) => [update.id, update.changes]));
+    expect(changes.get('t:BACK-1')).toEqual([
+      {
+        field: 'labels',
+        from: [
+          { label: { id: 'l:api' }, name: 'API' },
+          { label: { id: 'label-backend' }, name: 'Backend' },
+        ],
+        to: [
+          { label: { id: 'label-backend' }, name: 'Backend' },
+          { label: { name: 'payouts' }, name: 'payouts' },
+        ],
+      },
+      { field: 'dueDate', from: '2026-11-20', to: null },
+      {
+        field: 'blockedBy',
+        from: [{ task: { id: 't:BACK-2' }, key: 'PAY-2', title: 'Second' }],
+        to: [],
+      },
+    ]);
+    expect(changes.get('t:BACK-2.1')).toEqual([
+      { field: 'dueDate', from: null, to: '2026-12-01' },
+      {
+        field: 'parent',
+        from: { task: { id: 't:BACK-2' }, key: 'PAY-2', title: 'Second' },
+        to: { task: { id: 't:BACK-1' }, key: 'PAY-1', title: 'First' },
+      },
+    ]);
+    expect(changes.get('t:BACK-3')).toEqual([
+      {
+        field: 'blockedBy',
+        from: [],
+        to: [
+          { task: { id: 't:BACK-1' }, key: 'PAY-1', title: 'First' },
+          { task: { id: 't:BACK-2.1' }, key: 'PAY-2.1', title: 'Sub' },
+        ],
+      },
+    ]);
+    // BACK-2 lost its subtask: its block changes, with nothing to list.
+    expect(changes.get('t:BACK-2')).toEqual([]);
+    for (const list of changes.values())
+      expect(list.some((change) => change.field === 'backlog')).toBe(false);
+
+    const after = applyInMemory(plan, state);
+    expect(planChangesContent(incremental(edited, folder, after, mappings))).toBe(false);
+  });
+
+  it('points at hidden tasks of the project, and at no task the files lost', () => {
+    const before = emptyExisting();
+    const mappings = prefillMappings(planRefresh(input(files(), folder)).seen, []);
+    const state = applyInMemory(planRefresh(input(files(), folder, { existing: before, mappings })), before);
+    // BACK-2's file goes: the task is hidden, BACK-1 still waits on it and BACK-2.1 keeps its parent.
+    const without = files().filter((file) => !file.path.includes('back-2 - Second'));
+    const plan = incremental(without, folder, state, mappings);
+    expect(plan.tasks.hides).toEqual([{ id: 't:BACK-2' }]);
+    expect(plan.tasks.updates.find((update) => update.id === 't:BACK-1')).toBeUndefined();
+    expect(plan.tasks.updates.find((update) => update.id === 't:BACK-2.1')).toBeUndefined();
+    expect(fileProblems(plan).some((problem) => problem.message.includes('BACK-2 matches no task'))).toBe(
+      false,
+    );
   });
 });
 

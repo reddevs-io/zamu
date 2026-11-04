@@ -1,0 +1,236 @@
+/*
+ * M5 redesign · Margin (direction 1c) — design tokens.
+ *
+ * Source of truth for the M5 build. Replaces the Ledger tokens in apps/web/src/styles/tokens.css.
+ * Values are the ones in round2/source/r2/margin.css, after the contrast fixes in label-palette.md.
+ *
+ * Theme switching follows the app's current pattern: no class = follow the system, `.light` or `.dark`
+ * on any element forces that theme for its subtree.
+ *
+ * Names: scales use Tailwind v4 theme namespaces (--text-*, --radius-*, --shadow-*, --font-*) so a
+ * `@theme inline` block in app.css can expose them as utilities (text-sm, rounded-lg, shadow-pop).
+ * Colour names avoid the --text-* namespace: the design source's --text / --text-2 / --text-3 are
+ * --fg / --fg-2 / --fg-3 here. The full rename table is at the end of this file.
+ */
+
+/* ---------- Fonts ----------
+ * Onest for UI, keys and numbers (tabular figures); Newsreader for page titles, task titles and dialog
+ * titles; a system monospace for code only. Self-host both through @fontsource-variable/onest and
+ * @fontsource-variable/newsreader, as the app already does for its current fonts. */
+:root {
+  --font-sans: 'Onest Variable', 'Onest', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Newsreader Variable', 'Newsreader', Georgia, serif;
+  --font-code: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* ---------- Type scale ----------
+   * Seven named steps. Replace every hand-set text-[Npx] with one of these.
+   * xs: keys, counts, chips, captions · sm: secondary UI, menus, buttons · md: body, rows, cards (base)
+   * lg: palette input, dialog body · xl: view-header project name (serif)
+   * 2xl: task and page titles (serif) · 3xl: reserved for marketing and empty-state heroes. */
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 13.5px;
+  --text-lg: 15px;
+  --text-xl: 20px;
+  --text-2xl: 30px;
+  --text-3xl: 38px;
+  --leading-tight: 1.15; /* serif titles */
+  --leading-ui: 1.4; /* UI default */
+  --leading-prose: 1.6; /* descriptions and comments */
+
+  /* ---------- Spacing ----------
+   * Eight steps. Rows, cards and popovers are built from 4, 8 and 12; page gutters use 16 to 24. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+
+  /* ---------- Radius ----------
+   * sm: inputs, menu items, kbd · md: buttons, rows, cards · lg: columns, popovers, dialogs · pill: chips. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* ---------- Fixed sizes ---------- */
+  --row-h: 38px; /* list row */
+  --header-h: 52px; /* view header */
+  --sidebar-w: 236px; /* collapses to 52px at 1024px and below, or with [ */
+  --sidebar-w-collapsed: 52px;
+}
+
+/* ---------- Colour: light ----------
+ * Warm paper neutrals (hue 55–85), one ink-blue accent (hue 262). */
+:root,
+.light {
+  color-scheme: light;
+
+  /* Surfaces, from back to front. bg: page · bg-side: sidebar · bg-lane: board columns, selected
+   * menu items, pills · bg-grp: label chips, segmented control, hovered rows · surface: cards,
+   * inputs, comments · surface-pop: popovers, dialogs, palette, peek. */
+  --bg: oklch(0.975 0.006 85);
+  --bg-side: oklch(0.975 0.006 85);
+  --bg-lane: oklch(0.95 0.009 85);
+  --bg-grp: oklch(0.96 0.008 85);
+  --surface: oklch(0.997 0.003 85);
+  --surface-hover: oklch(0.985 0.005 85);
+  --surface-pop: oklch(0.997 0.003 85);
+
+  /* Lines. line: borders that separate · line-soft: dividers inside a surface. */
+  --line: oklch(0.9 0.01 85);
+  --line-soft: oklch(0.93 0.008 85);
+
+  /* Text. fg: primary · fg-2: secondary · fg-3: hints, keys, counts, placeholders (AA on bg, surface
+   * and bg-lane). */
+  --fg: oklch(0.25 0.014 55);
+  --fg-2: oklch(0.45 0.014 55);
+  --fg-3: oklch(0.52 0.012 60);
+
+  /* Accent: primary buttons, selection, focus ring, links, the Home count. */
+  --accent: oklch(0.42 0.09 262);
+  --accent-ink: oklch(0.99 0 0); /* text on accent */
+  --accent-text: oklch(0.44 0.1 262); /* accent used as text */
+  --accent-soft: oklch(0.94 0.02 262); /* selected rows and cards, tags that are on */
+
+  /* Feedback. danger: overdue, Blocked, errors, destructive buttons · ok: success, "On track". */
+  --danger: oklch(0.54 0.19 27);
+  --danger-soft: oklch(0.95 0.03 27);
+  --ok: oklch(0.52 0.12 150);
+  --ok-soft: oklch(0.95 0.03 150);
+
+  /* Status glyphs. Backlog, Todo and Canceled use fg-3. */
+  --status-prog: oklch(0.68 0.14 75);
+  --status-rev: oklch(0.56 0.16 295);
+  --status-done: oklch(0.58 0.13 150);
+
+  /* Label palette: nine hues, used as a 7px dot beside the label's name, as the colour swatch, and as
+   * the project tile background (label-1 to label-6). Contrast checks: label-palette.md. */
+  --label-1: oklch(0.62 0.13 250);
+  --label-2: oklch(0.6 0.12 150);
+  --label-3: oklch(0.6 0.14 300);
+  --label-4: oklch(0.6 0.17 27);
+  --label-5: oklch(0.62 0.1 215);
+  --label-6: oklch(0.62 0.13 70);
+  --label-7: oklch(0.62 0.15 345);
+  --label-8: oklch(0.62 0.1 185);
+  --label-9: oklch(0.6 0.12 120);
+  --tile-ink: oklch(0.14 0.01 60); /* letter on a project tile */
+
+  --kbd-bg: oklch(0.93 0.008 85);
+  --scrim: oklch(0.3 0.02 60 / 0.18);
+
+  /* Elevation. card: board cards, comments · pop: popovers and menus · lift: dialogs, palette, peek,
+   * toasts, the card being dragged. */
+  --shadow-card: 0 1px 1px oklch(0.35 0.03 60 / 0.06), 0 2px 6px oklch(0.35 0.03 60 / 0.05);
+  --shadow-pop: 0 18px 44px oklch(0.35 0.03 60 / 0.16), 0 0 0 1px oklch(0.35 0.03 60 / 0.07);
+  --shadow-lift: 0 22px 50px oklch(0.35 0.03 60 / 0.22), 0 0 0 1px oklch(0.35 0.03 60 / 0.06);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/* ---------- Colour: dark ----------
+ * Same roles. Surfaces get lighter as they come forward; the accent turns into a pale ink blue with dark
+ * ink on it. Defined twice: once for the system preference, once for the forced .dark class. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+    --bg: oklch(0.205 0.008 60);
+    --bg-side: oklch(0.205 0.008 60);
+    --bg-lane: oklch(0.228 0.009 60);
+    --bg-grp: oklch(0.228 0.009 60);
+    --surface: oklch(0.262 0.01 60);
+    --surface-hover: oklch(0.285 0.01 60);
+    --surface-pop: oklch(0.275 0.01 60);
+    --line: oklch(0.315 0.01 60);
+    --line-soft: oklch(0.27 0.009 60);
+    --fg: oklch(0.935 0.008 85);
+    --fg-2: oklch(0.76 0.01 85);
+    --fg-3: oklch(0.64 0.01 85);
+    --accent: oklch(0.8 0.075 262);
+    --accent-ink: oklch(0.2 0.03 262);
+    --accent-text: oklch(0.8 0.08 262);
+    --accent-soft: oklch(0.32 0.04 262);
+    --danger: oklch(0.72 0.15 25);
+    --danger-soft: oklch(0.32 0.07 25);
+    --ok: oklch(0.74 0.13 150);
+    --ok-soft: oklch(0.3 0.05 150);
+    --status-prog: oklch(0.8 0.13 80);
+    --status-rev: oklch(0.72 0.13 295);
+    --status-done: oklch(0.74 0.13 150);
+    --label-1: oklch(0.72 0.12 250);
+    --label-2: oklch(0.72 0.12 150);
+    --label-3: oklch(0.72 0.12 300);
+    --label-4: oklch(0.72 0.14 27);
+    --label-5: oklch(0.74 0.09 215);
+    --label-6: oklch(0.8 0.12 75);
+    --label-7: oklch(0.72 0.13 345);
+    --label-8: oklch(0.74 0.09 185);
+    --label-9: oklch(0.76 0.11 115);
+    --tile-ink: oklch(0.18 0.01 260);
+    --kbd-bg: oklch(0.3 0.01 60);
+    --scrim: oklch(0 0 0 / 0.42);
+    --shadow-card: 0 1px 2px oklch(0 0 0 / 0.25);
+    --shadow-pop: 0 18px 44px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.07);
+    --shadow-lift: 0 22px 50px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.08);
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  }
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: oklch(0.205 0.008 60);
+  --bg-side: oklch(0.205 0.008 60);
+  --bg-lane: oklch(0.228 0.009 60);
+  --bg-grp: oklch(0.228 0.009 60);
+  --surface: oklch(0.262 0.01 60);
+  --surface-hover: oklch(0.285 0.01 60);
+  --surface-pop: oklch(0.275 0.01 60);
+  --line: oklch(0.315 0.01 60);
+  --line-soft: oklch(0.27 0.009 60);
+  --fg: oklch(0.935 0.008 85);
+  --fg-2: oklch(0.76 0.01 85);
+  --fg-3: oklch(0.64 0.01 85);
+  --accent: oklch(0.8 0.075 262);
+  --accent-ink: oklch(0.2 0.03 262);
+  --accent-text: oklch(0.8 0.08 262);
+  --accent-soft: oklch(0.32 0.04 262);
+  --danger: oklch(0.72 0.15 25);
+  --danger-soft: oklch(0.32 0.07 25);
+  --ok: oklch(0.74 0.13 150);
+  --ok-soft: oklch(0.3 0.05 150);
+  --status-prog: oklch(0.8 0.13 80);
+  --status-rev: oklch(0.72 0.13 295);
+  --status-done: oklch(0.74 0.13 150);
+  --label-1: oklch(0.72 0.12 250);
+  --label-2: oklch(0.72 0.12 150);
+  --label-3: oklch(0.72 0.12 300);
+  --label-4: oklch(0.72 0.14 27);
+  --label-5: oklch(0.74 0.09 215);
+  --label-6: oklch(0.8 0.12 75);
+  --label-7: oklch(0.72 0.13 345);
+  --label-8: oklch(0.74 0.09 185);
+  --label-9: oklch(0.76 0.11 115);
+  --tile-ink: oklch(0.18 0.01 260);
+  --kbd-bg: oklch(0.3 0.01 60);
+  --scrim: oklch(0 0 0 / 0.42);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.25);
+  --shadow-pop: 0 18px 44px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.07);
+  --shadow-lift: 0 22px 50px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.08);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/*
+ * Rename table: design source (round2/source/r2/margin.css) -> this file.
+ *   --font -> --font-sans · --display -> --font-serif · --mono -> --font-sans (keys use Onest with
+ *   tabular figures, not a monospace) · --code -> --font-code
+ *   --fs-xs … --fs-3xl -> --text-xs … --text-3xl · --sp-1 … --sp-8 -> --space-1 … --space-8
+ *   --r-sm, --r, --r-lg, --r-pill -> --radius-sm, --radius-md, --radius-lg, --radius-pill
+ *   --row, --hd, --side-w -> --row-h, --header-h, --sidebar-w
+ *   --text, --text-2, --text-3 -> --fg, --fg-2, --fg-3
+ *   --st-prog, --st-rev, --st-done -> --status-prog, --status-rev, --status-done
+ *   --lb1 … --lb9 -> --label-1 … --label-9 · --focus -> --focus-ring
+ *   Everything else keeps its name.
+ */

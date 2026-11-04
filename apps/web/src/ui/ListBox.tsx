@@ -10,8 +10,9 @@ import {
 } from 'react-aria-components';
 import { Avatar, type MemberKind } from './Avatar';
 import { cn, composeTw } from './cn';
+import { CheckGlyph } from './Glyphs';
 
-/** One option in Select, ComboBox and filter menus. */
+/** One option in Select and filter menus. */
 export interface OptionItem {
   id: Key;
   label: string;
@@ -23,14 +24,15 @@ export interface OptionItem {
   isDisabled?: boolean;
 }
 
+/** Margin popover surface (margin.css .pop): radius lg, --surface-pop, --shadow-pop, text-sm. */
 export function Popover({ className, ...props }: PopoverProps) {
   return (
     <AriaPopover
-      offset={4}
+      offset={6}
       {...props}
       className={composeTw(
         className,
-        'min-w-(--trigger-width) overflow-auto border border-line bg-surface text-fg shadow-dialog outline-none',
+        'min-w-(--trigger-width) overflow-auto rounded-lg bg-surface-pop text-sm text-fg shadow-pop outline-none',
       )}
     />
   );
@@ -38,7 +40,10 @@ export function Popover({ className, ...props }: PopoverProps) {
 
 export function ListBox<T extends object>({ className, ...props }: ListBoxProps<T>) {
   return (
-    <AriaListBox {...props} className={composeTw(className, 'max-h-72 overflow-auto py-1 outline-none')} />
+    <AriaListBox
+      {...props}
+      className={composeTw(className, 'flex max-h-72 flex-col gap-px overflow-auto p-1.5 outline-none')}
+    />
   );
 }
 
@@ -53,7 +58,7 @@ export function ListBoxItem({ className, ...props }: ListBoxItemProps) {
       {...props}
       className={composeTw(
         className,
-        'flex min-h-8 cursor-default items-center gap-2 px-3 py-1 text-fg outline-none select-none focus:bg-sel disabled:opacity-50',
+        'flex min-h-8 cursor-default items-center gap-2.25 rounded-sm px-2 py-1 text-fg outline-none select-none focus:bg-bg-lane disabled:text-fg-3',
       )}
     />
   );
@@ -67,16 +72,18 @@ export function OptionRow({ item }: { item: OptionItem }) {
         <>
           <OptionLead item={item} />
           <span className="min-w-0 flex-1">
-            <span className={cn('block truncate', isSelected && 'font-semibold')}>{item.label}</span>
+            <span className={cn('block truncate', isSelected && 'font-medium')}>{item.label}</span>
             {item.description ? (
-              <span className="block truncate text-[11.5px] text-muted">{item.description}</span>
+              <span className="block truncate text-xs text-fg-3">{item.description}</span>
             ) : null}
           </span>
           <span
-            aria-hidden
-            className={cn('w-3 shrink-0 text-center text-accent', !isSelected && 'invisible')}
+            className={cn(
+              'grid w-3.5 shrink-0 place-items-center text-accent-text',
+              !isSelected && 'invisible',
+            )}
           >
-            ✓
+            <CheckGlyph />
           </span>
         </>
       )}

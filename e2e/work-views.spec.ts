@@ -1,17 +1,18 @@
-// The M2 work views end to end: the board (keyboard moves, undo, drag and drop), milestones, cycles with an
-// early end and rollover, comments with mentions from the web and from the CLI, My tasks across two projects,
-// and the theme choice. Like the M1 flow, the tests build on each other, so they share one page and run in
-// order. The spec signs in as the admin from the M1 flow, or sets the server up itself when it runs alone.
+// The work views end to end on the 0.7.0 screens: the board (display options, keyboard moves, undo, drag and
+// drop), milestones, cycles with an early end and rollover, comments with mentions from the web and from the
+// CLI in the task view, the list keys around group rows, Home across two projects, and the theme choice. Like
+// the M1 flow, the tests build on each other, so they share one page and run in order. The spec signs in as
+// the admin from the M1 flow, or sets the server up itself when it runs alone.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createCli, parseJson } from './cli';
-import { addAgent, admin, api, collectPageErrors, settle, signInAsAdmin } from './session';
+import { addAgent, admin, api, collectPageErrors, homeURL, settle, signInAsAdmin } from './session';
 import { baseURL } from './stack';
 
 const checkout = { name: 'Checkout', key: 'CHK' };
 const website = { name: 'Website', key: 'WEB' };
 const agentName = 'claude-dev';
 
-/** Created in this order, so the board's Todo column lists them newest first: CHK-5 at the top. */
+/** Created in this order, so the board's Todo column in Manual order lists them newest first: CHK-5 on top. */
 const checkoutTitles = [
   'Validate the card form',
   'Add the Apple Pay button',
@@ -39,9 +40,6 @@ const pageErrors: string[] = [];
 const cli = createCli();
 let me: Me['user'];
 
-/** Today in UTC, as the server sees it: compose sets no APP_TIME_ZONE, so cycles use UTC. */
-const todayUtc = () => new Date().toISOString().slice(0, 10);
-
 /** Task keys of a board column, top to bottom. */
 async function columnKeys(status: string): Promise<string[]> {
   const grid = page.getByRole('grid', { name: status, exact: true });
@@ -63,15 +61,38 @@ async function taskOf(key: string): Promise<TaskRef> {
   return api<TaskRef>(page.request, 'GET', `/tasks/${key}`);
 }
 
-/** A row of the milestones list. */
+/** A row of the open milestones list. */
 function milestoneRow(name: string) {
   return page
-    .getByRole('list', { name: `Milestones of ${checkout.name}` })
+    .getByRole('list', { name: `Open milestones of ${checkout.name}` })
     .getByRole('listitem')
     .filter({ has: page.getByRole('link', { name, exact: true }) });
 }
 
-/** Focuses a card the way a keyboard user lands on it, so the board's Shift+H/J/K/L act on it. */
+/** The task view's Properties sidebar. */
+function properties() {
+  return page.getByRole('complementary', { name: 'Properties' });
+}
+
+/**
+ * Today in UTC as the calendar names it ("Wednesday, November 4, 2026"): compose sets no APP_TIME_ZONE, so
+ * cycles use UTC, and the context runs in UTC too.
+ */
+const todayLong = () =>
+  new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+
+/** The field toast after a change ("Moved CHK-3 to In progress · Undo ⌘Z"). */
+function toast(text: string) {
+  return page.getByRole('status').filter({ hasText: text });
+}
+
+/** Focuses a card the way a keyboard user lands on it, so the board's Shift+arrows and Shift+J/K act on it. */
 async function focusCard(key: string): Promise<void> {
   const card = page.locator(`[data-card-key="${key}"]`);
   await card.focus();
@@ -126,22 +147,40 @@ test('seed two projects through the API and add an agent', async () => {
   expect(login.code, login.stdout + login.stderr).toBe(0);
 });
 
-test('board: Shift+L moves a card, Ctrl+Z undoes it, Shift+J reorders', async () => {
+test('board: Manual order and empty columns from Display; Shift+→ moves a card, Ctrl+Z undoes, Shift+J reorders', async () => {
   await page.goto(`/p/${checkout.key}?view=board`);
   await settle(page);
   await expect(page.getByRole('region', { name: 'Todo, 5 tasks' })).toBeVisible();
-  expect(await columnKeys('Todo')).toEqual(['CHK-5', 'CHK-4', 'CHK-3', 'CHK-2', 'CHK-1']);
+
+  // The default order is by priority: Shift+J explains how to reorder by hand.
+  await focusCard('CHK-3');
+  await page.keyboard.press('Shift+J');
+  await expect(toast('Choose Manual in Display to move them by hand.')).toBeVisible();
+
+  // Display options: Manual order, and show the empty columns (In progress, In review …).
+  await page.getByRole('button', { name: 'Display' }).click();
+  const display = page.getByRole('dialog', { name: 'Display options' });
+  await display.getByRole('button', { name: /Order by/ }).click();
+  await page.getByRole('listbox', { name: 'Order by' }).getByRole('option', { name: 'Manual' }).click();
+  await expect(display.getByRole('button', { name: /Order by/ })).toContainText('Manual');
+  await display.getByRole('switch', { name: 'Show empty columns' }).click({ force: true });
+  await expect(display.getByRole('switch', { name: 'Show empty columns' })).toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(display).toBeHidden();
+  await expect(page.getByRole('grid', { name: 'In progress', exact: true })).toBeVisible();
+  await expect.poll(() => columnKeys('Todo')).toEqual(['CHK-5', 'CHK-4', 'CHK-3', 'CHK-2', 'CHK-1']);
 
   await focusCard('CHK-3');
-  await page.keyboard.press('Shift+L');
+  await page.keyboard.press('Shift+ArrowRight');
   await expect(
     page.getByRole('grid', { name: 'In progress', exact: true }).locator('[data-card-key="CHK-3"]'),
   ).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: 'CHK-3 moved to In progress' })).toBeVisible();
+  await expect(toast('Moved CHK-3 to In progress')).toBeVisible();
   await expect.poll(async () => (await taskOf('CHK-3')).status).toBe('in_progress');
 
+  // Ctrl+Z (⌘Z on a Mac) is the toast's Undo.
   await page.keyboard.press('Control+z');
-  await expect(page.getByText('CHK-3 moved back to Todo')).toBeVisible();
+  await expect(toast('Moved CHK-3 back to Todo')).toBeVisible();
   await expect.poll(async () => (await taskOf('CHK-3')).status).toBe('todo');
   await expect.poll(() => columnKeys('Todo')).toEqual(['CHK-5', 'CHK-4', 'CHK-3', 'CHK-2', 'CHK-1']);
   expect(await boardOrder('todo')).toEqual(['CHK-5', 'CHK-4', 'CHK-3', 'CHK-2', 'CHK-1']);
@@ -151,12 +190,15 @@ test('board: Shift+L moves a card, Ctrl+Z undoes it, Shift+J reorders', async ()
   await expect.poll(() => columnKeys('Todo')).toEqual(['CHK-5', 'CHK-4', 'CHK-2', 'CHK-3', 'CHK-1']);
   await expect.poll(() => boardOrder('todo')).toEqual(['CHK-5', 'CHK-4', 'CHK-2', 'CHK-3', 'CHK-1']);
 
-  // The order is stored: it survives a reload.
+  // The order is stored, and so are the display options (per person, project and view): both survive a
+  // reload.
   await page.reload();
   await settle(page);
   expect(await columnKeys('Todo')).toEqual(['CHK-5', 'CHK-4', 'CHK-2', 'CHK-3', 'CHK-1']);
+  await expect(page.getByRole('grid', { name: 'In review', exact: true })).toBeVisible();
 
   // V switches to the list and back; the project remembers the last view.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
   await page.keyboard.press('v');
   await expect(page.getByRole('region', { name: /^Todo, / })).toBeHidden();
   await expect(page.getByRole('row', { name: /\bCHK-3\b/ })).toBeVisible();
@@ -180,7 +222,7 @@ test('board: drag a card to In review', async () => {
   expect(await columnKeys('In review')).toEqual(['CHK-5']);
 });
 
-test('milestone: create, assign from the panel, turns Active when its task starts', async () => {
+test('milestone: create, assign in the task view, turns Active when its task starts', async () => {
   await page.goto(`/p/${checkout.key}/milestones`);
   await settle(page);
   await page.getByRole('button', { name: 'New milestone' }).first().click();
@@ -191,20 +233,22 @@ test('milestone: create, assign from the panel, turns Active when its task start
   await expect(dialog).toBeHidden();
   await expect(milestoneRow('Launch')).toContainText('Planned');
 
-  await page.goto(`/p/${checkout.key}?task=CHK-2`);
+  await page.goto(`/p/${checkout.key}/CHK-2`);
   await settle(page);
-  const pane = page.getByRole('region', { name: 'Task detail' });
-  await expect(pane.getByText('CHK-2', { exact: true })).toBeVisible();
-  await pane.getByRole('button', { name: 'Milestone: none' }).click();
+  const milestone = properties().getByRole('button', { name: 'Milestone' });
+  await milestone.click();
   await page
-    .getByRole('menu', { name: /^Milestone/ })
-    .getByRole('menuitemradio', { name: /Launch/ })
+    .getByRole('menu', { name: 'Milestone' })
+    .getByRole('menuitemradio', { name: /^Launch/ })
     .click();
-  await expect(pane.getByRole('button', { name: 'Milestone: Launch' })).toBeVisible();
+  await expect(milestone).toContainText('Launch');
 
-  const status = pane.getByRole('button', { name: /Status/ });
+  const status = properties().getByRole('button', { name: 'Status' });
   await status.click();
-  await page.getByRole('option', { name: 'In progress' }).click();
+  await page
+    .getByRole('menu', { name: 'Status' })
+    .getByRole('menuitemradio', { name: 'In progress' })
+    .click();
   await expect(status).toContainText('In progress');
 
   await page.goto(`/p/${checkout.key}/milestones`);
@@ -223,11 +267,12 @@ test('cycle: create one starting today, end it early, unfinished tasks roll over
   await dialog.getByRole('textbox').fill('Checkout polish');
 
   // The first cycle defaults to next Monday; start it today instead.
-  await dialog.getByRole('button', { name: /Starts/ }).click();
-  const today = todayUtc();
-  const day = page.locator(`[data-date="${today}"]`);
-  if (!(await day.isVisible())) await page.getByRole('button', { name: 'Previous month' }).click();
+  await dialog.getByRole('button', { name: /^Starts/ }).click();
+  const picker = page.getByRole('dialog', { name: 'Pick starts' });
+  const day = picker.getByRole('button', { name: new RegExp(`${todayLong()}$`) });
+  if (!(await day.isVisible())) await picker.getByRole('button', { name: 'Previous month' }).click();
   await day.click();
+  await expect(dialog.getByRole('button', { name: /^Starts/ })).toBeVisible();
   await dialog.getByRole('button', { name: /^Create/ }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('region', { name: 'Current cycle: Cycle 1' })).toBeVisible();
@@ -254,8 +299,8 @@ test('cycle: create one starting today, end it early, unfinished tasks roll over
   await page.goto(`/p/${checkout.key}/cycles/1`);
   await settle(page);
   const cycle = page.getByRole('region', { name: 'Cycle 1' });
-  await expect(cycle.getByText('Completed', { exact: true }).first()).toBeVisible();
-  const rolled = cycle.getByRole('list', { name: 'Rolled over' });
+  await expect(cycle.getByText('Cycle · completed')).toBeVisible();
+  const rolled = cycle.getByRole('region', { name: 'Rolled over, 2' }).getByRole('list');
   await expect(rolled.getByRole('listitem')).toHaveCount(2);
   await expect(rolled.getByRole('listitem').filter({ hasText: 'CHK-1' })).toContainText('Cycle 2');
   await expect(rolled.getByRole('listitem').filter({ hasText: 'CHK-3' })).toContainText('Cycle 2');
@@ -268,14 +313,13 @@ test('cycle: create one starting today, end it early, unfinished tasks roll over
 });
 
 test('comments: mention from the web, from the CLI as the agent, edit and delete', async () => {
-  await page.goto(`/p/${checkout.key}?task=CHK-1`);
+  await page.goto(`/p/${checkout.key}/CHK-1`);
   await settle(page);
-  const pane = page.getByRole('region', { name: 'Task detail' });
-  await expect(pane.getByText('CHK-1', { exact: true })).toBeVisible();
-  const history = pane.getByRole('region', { name: 'Activity and comments' });
+  const history = page.getByRole('region', { name: 'Activity' });
+  await expect(history).toBeVisible();
 
   // M focuses the composer, @ opens the picker, Enter inserts the mention, Ctrl+Enter sends.
-  await page.locator('body').click({ position: { x: 600, y: 5 } });
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
   await page.keyboard.press('m');
   const composer = page.getByRole('textbox', { name: 'Comment' });
   await expect(composer).toBeFocused();
@@ -286,11 +330,12 @@ test('comments: mention from the web, from the CLI as the agent, edit and delete
   await expect(picker).toBeHidden();
   await page.keyboard.type('please');
   await page.keyboard.press('Control+Enter');
-  await expect(composer).toHaveValue('');
+  // Sent: the box closes.
+  await expect(composer).toBeHidden();
 
   const own = history.getByRole('article', { name: `Comment by ${admin.name}` });
   await expect(own).toHaveCount(1);
-  await expect(own.locator('[data-mention="agent"]')).toHaveText(new RegExp(agentName));
+  await expect(own.locator('[data-mention]')).toHaveText(new RegExp(agentName));
 
   // The agent answers from the CLI with a plain @email; the server turns it into a mention.
   const add = cli.run(['comments', 'add', 'CHK-1', `On it. @${admin.email}`, '--json']);
@@ -313,7 +358,7 @@ test('comments: mention from the web, from the CLI as the agent, edit and delete
   await page.reload();
   await settle(page);
   const fromAgent = history.getByRole('article', { name: `Comment by ${agentName}` });
-  await expect(fromAgent).toContainText(`for ${admin.name}`);
+  await expect(fromAgent).toContainText(`acting for ${admin.name.split(' ')[0]}`);
   await expect(fromAgent.locator('[data-mention]')).toHaveText(new RegExp(admin.name));
   // Ana may not edit the agent's comment.
   await expect(fromAgent.getByRole('button', { name: 'Edit' })).toHaveCount(0);
@@ -337,16 +382,18 @@ test('comments: mention from the web, from the CLI as the agent, edit and delete
 });
 
 test('task list keys: Down skips a group row, Left collapses the group, Right expands it', async () => {
-  // The board test left the board as the remembered view; open the list.
-  await page.goto('/');
-  await page.evaluate((key) => localStorage.removeItem(`pm:view:${key}`), checkout.key);
-  await page.goto(`/p/${checkout.key}`);
+  // The board test left the board as the remembered view: G then L opens the list (and pins it).
+  await page.goto(`/p/${checkout.key}/milestones`);
   await settle(page);
-  const grid = page.getByRole('grid', { name: `Tasks in ${checkout.name}` });
+  await page.keyboard.press('g');
+  await page.keyboard.press('l');
+  await expect(page).toHaveURL(new RegExp(`/p/${checkout.key}$`));
+  await settle(page);
+  const grid = page.getByRole('treegrid', { name: `Tasks in ${checkout.name}` });
   await expect(grid.locator('[data-group-row]').first()).toBeVisible();
-  const rows = await grid.locator('[role="row"][data-key]').evaluateAll((elements) =>
+  const rows = await grid.locator('[role="row"][data-row-id]').evaluateAll((elements) =>
     elements.map((row) => ({
-      key: row.getAttribute('data-key') ?? '',
+      id: row.getAttribute('data-row-id') ?? '',
       group: row.hasAttribute('data-group-row'),
     })),
   );
@@ -355,31 +402,30 @@ test('task list keys: Down skips a group row, Left collapses the group, Right ex
     (row, index) => !row.group && rows[index + 1]?.group && rows[index + 2] && !rows[index + 2]?.group,
   );
   expect(at, JSON.stringify(rows)).toBeGreaterThanOrEqual(0);
-  const before = rows[at]?.key ?? '';
-  const groupKey = rows[at + 1]?.key ?? '';
-  const after = rows[at + 2]?.key ?? '';
-  const row = (key: string) => grid.locator(`[role="row"][data-key="${key}"]`);
-  // Group row keys start with a control character, so find the group row by position.
+  const before = rows[at]?.id ?? '';
+  const groupId = rows[at + 1]?.id ?? '';
+  const after = rows[at + 2]?.id ?? '';
+  const row = (id: string) => grid.locator(`[role="row"][data-row-id="${id}"]`);
+  // Group row ids start with a control character, so find the group row by position.
   const groupRow = grid.locator('[data-group-row]').nth(rows.slice(0, at + 1).filter((r) => r.group).length);
   const focusedRow = () =>
-    page.evaluate(() => document.activeElement?.closest('[role="row"]')?.getAttribute('data-key') ?? null);
+    page.evaluate(() => document.activeElement?.closest('[role="row"]')?.getAttribute('data-row-id') ?? null);
 
-  await row(before).getByText(before, { exact: true }).click();
-  await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe(before);
+  // Focus the row as the keyboard does (a click would open the task view).
+  await row(before).focus();
   await expect.poll(focusedRow).toBe(before);
+  await expect(row(before)).toHaveAttribute('data-cursor', 'true');
 
   // Down lands on the next task, not on the group row between them.
   await page.keyboard.press('ArrowDown');
-  await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe(after);
   await expect.poll(focusedRow).toBe(after);
-  await expect(row(after)).toHaveAttribute('aria-selected', 'true');
+  await expect(row(after)).toHaveAttribute('data-cursor', 'true');
 
-  // Left folds the task's group and puts focus on the group row; the task stays selected.
+  // Left folds the task's group and puts the cursor on the group row.
   await page.keyboard.press('ArrowLeft');
   await expect(row(after)).toHaveCount(0);
-  await expect.poll(focusedRow).toBe(groupKey);
+  await expect.poll(focusedRow).toBe(groupId);
   await expect(groupRow).toContainText('collapsed');
-  expect(new URL(page.url()).searchParams.get('task')).toBe(after);
 
   // Right opens it again and focuses its first task.
   await page.keyboard.press('ArrowRight');
@@ -389,12 +435,11 @@ test('task list keys: Down skips a group row, Left collapses the group, Right ex
 
   // Up skips the group row too.
   await page.keyboard.press('ArrowUp');
-  await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe(before);
   await expect.poll(focusedRow).toBe(before);
 });
 
-test('My tasks lists tasks from both projects and opens them in the panel', async () => {
-  // The agent takes WEB-2: it shows in the agent's --mine, not in Ana's My tasks.
+test('Home lists your tasks from both projects and opens them in the task view', async () => {
+  // The agent takes WEB-2: it shows in the agent's --mine, not in Ana's Home.
   const assign = cli.run(['tasks', 'update', 'WEB-2', '--assignee', 'me', '--json']);
   expect(assign.code, assign.stdout + assign.stderr).toBe(0);
   const mine = cli.run(['tasks', 'list', '--mine', '--json']);
@@ -403,23 +448,32 @@ test('My tasks lists tasks from both projects and opens them in the panel', asyn
     'WEB-2',
   ]);
 
-  await page.goto('/');
+  // G then H goes Home from anywhere.
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+  await page.keyboard.press('g');
+  await page.keyboard.press('h');
+  await expect(page).toHaveURL(homeURL);
   await settle(page);
-  await page.getByRole('link', { name: 'My tasks' }).click();
-  await expect(page).toHaveURL(/\/my-tasks/);
-  await settle(page);
-  await expect(page.getByRole('row', { name: /\bCHK-1\b/ })).toBeVisible();
-  await expect(page.getByRole('row', { name: /\bWEB-1\b/ })).toBeVisible();
-  await expect(page.getByRole('row', { name: /\bWEB-2\b/ })).toHaveCount(0);
+  // Each task shows once, in its first group: CHK-1 under Mentions (the agent's reply), WEB-1 under
+  // Assigned to you.
+  const minePanel = page.getByRole('tabpanel', { name: /^Mine/ });
+  await expect(minePanel.locator('a[data-task-key="CHK-1"]')).toHaveCount(1);
+  const assigned = page.getByRole('region', { name: /^Assigned to you \d+/ });
+  await expect(assigned.locator('a[data-task-key="WEB-1"]')).toBeVisible();
+  await expect(page.locator('a[data-task-key="WEB-2"]')).toHaveCount(0);
 
-  await page.getByRole('row', { name: /\bWEB-1\b/ }).click();
-  const pane = page.getByRole('region', { name: 'Task detail' });
-  await expect(pane.getByText('WEB-1', { exact: true })).toBeVisible();
-  await expect(pane).toContainText(`in ${website.name}`);
+  await assigned.locator('a[data-task-key="WEB-1"]').click();
+  await expect(page).toHaveURL(new RegExp(`/p/${website.key}/WEB-1$`));
+  await settle(page);
+  await expect(
+    page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: website.name }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /Rewrite the pricing page/ })).toBeVisible();
 });
 
 test('theme: Dark from the account menu survives a reload with no flash', async () => {
-  await page.goto('/my-tasks');
+  await page.goto('/');
   await settle(page);
   await page.getByRole('button', { name: `${admin.name}: account menu` }).click();
   const account = page.getByRole('dialog', { name: 'Account' });
@@ -429,7 +483,7 @@ test('theme: Dark from the account menu survives a reload with no flash', async 
   await page.keyboard.press('Escape');
 
   // The server renders the class, so the first HTML already has it: no light frame before hydration.
-  const html = await (await page.request.get('/my-tasks')).text();
+  const html = await (await page.request.get('/')).text();
   expect(html).toMatch(/<html[^>]*class="[^"]*\bdark\b/);
 
   await page.reload();
@@ -442,7 +496,7 @@ test('theme: Dark from the account menu survives a reload with no flash', async 
   // Back to System: no class, the page follows the browser.
   await page.getByRole('radio', { name: /System/ }).click({ force: true });
   await expect.poll(async () => (await api<Me>(page.request, 'GET', '/me')).user.theme).toBe('system');
-  const after = await (await page.request.get('/my-tasks')).text();
+  const after = await (await page.request.get('/')).text();
   expect(after).not.toMatch(/<html[^>]*class="[^"]*\bdark\b/);
 });
 

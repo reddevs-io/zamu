@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="../support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./margin.css" />
+<link rel="stylesheet" href="./screens.css" />
+<style>body{margin:0}a{color:inherit}a:hover{color:inherit}
+.lb.hover{background:var(--line-soft);color:var(--text)}.lb.focus{box-shadow:var(--focus)}
+.k-tip{position:relative;display:inline-flex}
+.k-tip .tip{position:static}
+.k-toast{position:relative}
+.k-toast .toast{position:static;transform:none}
+.k-menu .pop{position:static;width:260px}
+.k-card-ro .lock{position:absolute;right:12px;top:13px;color:var(--text-3)}
+</style>
+</helmet>
+<div class="{{ rootClass }}" data-screen-label="Kit">
+<div class="kit">
+<div class="kit-hd"><span class="home-t">Kit</span><span class="muted">{{ themeName }} · Onest for UI and keys, Newsreader for titles · every component in its states</span></div>
+
+<div class="kit-sec"><div class="kit-t">Buttons</div>
+<div class="kit-grid c5">
+<span></span><span class="kit-cap">Default</span><span class="kit-cap">Hover</span><span class="kit-cap">Keyboard focus</span><span class="kit-cap">Disabled</span>
+<span class="kit-cap">Primary</span><span><span class="btn primary">New task<span class="kbd">C</span></span></span><span><span class="btn primary hover">New task<span class="kbd">C</span></span></span><span><span class="btn primary focus">New task<span class="kbd">C</span></span></span><span><span class="btn primary disabled">New task<span class="kbd">C</span></span></span>
+<span class="kit-cap">Secondary</span><span><span class="btn ghost">Copy link</span></span><span><span class="btn ghost hover">Copy link</span></span><span><span class="btn ghost focus">Copy link</span></span><span><span class="btn ghost disabled">Copy link</span></span>
+<span class="kit-cap">Quiet</span><span><span class="btn"><span class="filters-glyph"></span>Filter</span></span><span><span class="btn hover"><span class="filters-glyph"></span>Filter</span></span><span><span class="btn focus"><span class="filters-glyph"></span>Filter</span></span><span><span class="btn disabled"><span class="filters-glyph"></span>Filter</span></span>
+<span class="kit-cap">Danger</span><span><span class="btn danger">Delete label</span></span><span><span class="btn danger hover">Delete label</span></span><span><span class="btn danger focus">Delete label</span></span><span><span class="btn danger disabled">Delete label</span></span>
+</div>
+</div>
+
+<div class="kit-sec"><div class="kit-t">Inputs and controls</div>
+<div class="kit-grid c3">
+<div class="field"><span class="flabel">Default</span><span class="input"><span class="ph">Project name</span></span></div>
+<div class="field"><span class="flabel">Keyboard focus</span><span class="input focus">Harb<span class="caretbar"></span></span></div>
+<div class="field"><span class="flabel">Error</span><span class="input err">harbor</span><span class="help err">A project key is 2 to 5 capital letters.</span></div>
+<div class="field"><span class="flabel">Disabled</span><span class="input dis">HBR</span></div>
+<div class="field"><span class="flabel">Read-only (mirrored)</span><span class="input ro">needs-owner<span class="spacer"></span><span class="lock"></span></span></div>
+<div class="field"><span class="flabel">Select</span><span class="selb" style="height:36px"><span>Priority</span><span class="caret">▾</span></span></div>
+</div>
+<div class="kit-row"><span class="tgl"></span><span class="tgl on"></span><span class="box"></span><span class="box on"><span class="check"></span></span><span class="seg"><span class="seg-i">List</span><span class="seg-i on">Board</span></span><span class="tabs"><span class="tab on">Mine<span class="nav-count">7</span></span><span class="tab">Everyone</span><span class="tab">Agents</span></span></div>
+</div>
+
+<div class="kit-sec"><div class="kit-t">Status and priority</div>
+<div class="kit-row"><span class="kit-row" style="gap:6px"><span class="st backlog"></span>Backlog</span><span class="kit-row" style="gap:6px"><span class="st todo"></span>Todo</span><span class="kit-row" style="gap:6px"><span class="st prog"></span>In progress</span><span class="kit-row" style="gap:6px"><span class="st rev"></span>In review</span><span class="kit-row" style="gap:6px"><span class="st done"></span>Done</span><span class="kit-row" style="gap:6px"><span class="st cancel"></span>Canceled</span></div>
+<div class="kit-row"><span class="kit-row" style="gap:6px"><span class="pri u">!</span>Urgent</span><span class="kit-row" style="gap:6px"><span class="pri h"></span>High</span><span class="kit-row" style="gap:6px"><span class="pri m"></span>Medium</span><span class="kit-row" style="gap:6px"><span class="pri l"></span>Low</span><span class="kit-row" style="gap:6px"><span class="pri n"></span>None</span><span class="kit-cap">Cards and rows show only Urgent and High.</span></div>
+</div>
+
+<div class="kit-sec"><div class="kit-t">Avatars</div>
+<div class="kit-row"><span class="av av-ana">AR</span><span class="av av-tf">TF</span><span class="av agent av-cd">cd</span><span class="av agent av-rb">rb</span><span class="av none"></span><span class="av av-ana lg">AR</span><span class="av agent av-cd lg">cd</span><span class="av av-ana xl">AR</span><span class="kit-row" style="gap:6px"><span class="av agent av-cd">cd</span><b style="font-weight:500">claude-dev</b><span class="muted" style="font-size:var(--fs-xs)">for Ana</span></span><span class="kit-cap">People are round, agents square. Your own avatar is hidden on cards.</span></div>
+</div>
+
+<div class="kit-sec full"><div class="kit-t">Chips and markers</div>
+<div class="kit-row"><span class="lb"><span class="lbd c1"></span>frontend</span><span class="lb"><span class="lbd c2"></span>backend</span><span class="lb"><span class="lbd c3"></span>mobile</span><span class="lb"><span class="lbd c4"></span>security</span><span class="lb"><span class="lbd c5"></span>infra</span><span class="lb"><span class="lbd c6"></span>i18n</span><span class="lb"><span class="lbd c7"></span>needs-owner</span><span class="lb"><span class="lbd c8"></span>design</span><span class="lb"><span class="lbd c9"></span>perf</span>
+<span class="kit-cap" style="margin-left:12px">Label chip:</span><span class="lb"><span class="lbd c3"></span>default</span><span class="lb hover"><span class="lbd c3"></span>hover</span><span class="lb focus"><span class="lbd c3"></span>focus</span><span class="lb"><span class="lbd c3"></span>mirrored<span class="lock" style="margin-left:2px;color:var(--text-3)"></span></span><span class="skel" style="width:64px;height:20px;border-radius:999px"></span></div>
+<div class="kit-row"><span class="kit-cap">Due</span><span class="due">Nov 14</span><span class="due soon">Tomorrow</span><span class="due soon">Today</span><span class="due over">3 days overdue</span><span class="due quiet">Oct 2 · done</span>
+<span class="kit-cap" style="margin-left:12px">Blocked</span><span class="blk">Blocked</span>
+<span class="kit-cap" style="margin-left:12px">Subtasks</span><span class="subp"><span class="ring p0"></span>0/4</span><span class="subp"><span class="ring p30"></span>2/7</span><span class="subp"><span class="ring p75"></span>3/4</span><span class="subp"><span class="ring p100"></span>5/5</span>
+<span class="kit-cap" style="margin-left:12px">Pills</span><span class="pill">in review</span><span class="pill warn">blocked</span><span class="pill acc">mentions you</span><span class="pill ok">done</span>
+<span class="kit-cap" style="margin-left:12px">Source</span><span class="bm"><span class="dot"></span>Backlog.md</span><span class="bm"><span class="dot warn"></span>Backlog.md · syncing</span><span class="bm"><span class="dot err"></span>Backlog.md · sync failed</span></div>
+</div>
+
+<div class="kit-sec full"><div class="kit-t">Cards</div>
+<div class="kit-grid c4" style="align-items:start">
+<div class="kit-cell"><span class="kit-cap">Default</span><div class="kit-lane"><div class="card"><span class="av agent av-cd card-av">cd</span><div class="card-t has-av">Retry webhook deliveries with backoff</div><div class="card-m"><span class="pri h"></span><span class="key">HBR-181</span><span class="lb"><span class="lbd c2"></span>backend</span></div></div></div></div>
+<div class="kit-cell"><span class="kit-cap">Hover</span><div class="kit-lane"><div class="card hover"><span class="av agent av-cd card-av">cd</span><div class="card-t has-av">Retry webhook deliveries with backoff</div><div class="card-m"><span class="pri h"></span><span class="key">HBR-181</span><span class="lb"><span class="lbd c2"></span>backend</span></div></div></div></div>
+<div class="kit-cell"><span class="kit-cap">Keyboard focus (J/K)</span><div class="kit-lane"><div class="card sel"><span class="av agent av-cd card-av">cd</span><div class="card-t has-av">Retry webhook deliveries with backoff</div><div class="card-m"><span class="pri h"></span><span class="key">HBR-181</span><span class="lb"><span class="lbd c2"></span>backend</span></div></div></div></div>
+<div class="kit-cell"><span class="kit-cap">Selected (X)</span><div class="kit-lane"><div class="card multi"><span class="av agent av-cd card-av">cd</span><div class="card-t has-av">Retry webhook deliveries with backoff</div><div class="card-m"><span class="pri h"></span><span class="key">HBR-181</span><span class="lb"><span class="lbd c2"></span>backend</span></div></div></div></div>
+<div class="kit-cell"><span class="kit-cap">Mirrored, hover (fields locked)</span><div class="kit-lane"><div class="card hover k-card-ro"><span class="lock"></span><div class="card-t has-av">Store release 1.22.0 with the offline cache</div><div class="card-m"><span class="pri h"></span><span class="key">HBR-193</span><span class="lb"><span class="lbd c3"></span>mobile</span><span class="spacer"></span><span class="blk">Blocked</span><span class="due">Nov 14</span></div></div></div></div>
+<div class="kit-cell"><span class="kit-cap">Loading</span><div class="kit-lane"><div class="card"><span class="skel w80"></span><span class="skel w45"></span><div class="card-m"><span class="skel w12"></span><span class="skel" style="width:60px;height:18px;border-radius:999px"></span></div></div></div></div>
+<div class="kit-cell" style="grid-column:span 2"><span class="kit-cap">Everything set (urgent, 3 labels, subtasks, blocked, overdue, agent)</span><div class="kit-lane" style="max-width:360px"><div class="card"><span class="av agent av-cd card-av">cd</span><div class="card-t has-av full">Reconcile pending card transactions that settle with a different amount, currency or merchant name after the authorisation window closes</div><div class="card-m"><span class="pri u">!</span><span class="key">HBR-201</span><span class="lb"><span class="lbd c2"></span>backend</span><span class="lb"><span class="lbd c4"></span>security</span><span class="more">+1</span><span class="spacer"></span><span class="blk">Blocked</span><span class="subp"><span class="ring p50"></span>3/5</span><span class="due over">3 days overdue</span></div></div></div></div>
+</div>
+</div>
+
+<div class="kit-sec full"><div class="kit-t">List rows</div>
+<div style="border:1px solid var(--line-soft);border-radius:var(--r);overflow:hidden">
+<div class="row"><span class="pri h"></span><span class="key">HBR-181</span><span class="st rev"></span><span class="row-t">Retry webhook deliveries with backoff</span><span class="row-r"><span class="lb"><span class="lbd c2"></span>backend</span><span class="av agent av-cd">cd</span><span class="row-upd">3h</span></span><span class="kit-cap" style="width:110px;text-align:right">default</span></div>
+<div class="row hover"><span class="pri h"></span><span class="key">HBR-181</span><span class="st rev"></span><span class="row-t">Retry webhook deliveries with backoff</span><span class="row-r"><span class="lb"><span class="lbd c2"></span>backend</span><span class="av agent av-cd">cd</span><span class="row-upd">3h</span></span><span class="kit-cap" style="width:110px;text-align:right">hover</span></div>
+<div class="row sel"><span class="pri h"></span><span class="key">HBR-181</span><span class="st rev"></span><span class="row-t">Retry webhook deliveries with backoff</span><span class="row-r"><span class="lb"><span class="lbd c2"></span>backend</span><span class="av agent av-cd">cd</span><span class="row-upd">3h</span></span><span class="kit-cap" style="width:110px;text-align:right">keyboard focus</span></div>
+<div class="row multi"><span class="box on"><span class="check"></span></span><span class="pri h"></span><span class="key">HBR-181</span><span class="st rev"></span><span class="row-t">Retry webhook deliveries with backoff</span><span class="row-r"><span class="lb"><span class="lbd c2"></span>backend</span><span class="av agent av-cd">cd</span><span class="row-upd">3h</span></span><span class="kit-cap" style="width:110px;text-align:right">selected</span></div>
+<div class="row"><span class="skel" style="width:14px"></span><span class="skel" style="width:54px"></span><span class="skel round" style="width:13px;height:13px"></span><span class="skel w45"></span><span class="spacer"></span><span class="skel" style="width:60px"></span><span class="skel round"></span><span class="kit-cap" style="width:110px;text-align:right">loading</span></div>
+</div>
+</div>
+
+<div class="kit-sec"><div class="kit-t">Menu, tooltip, toast</div>
+<div class="kit-row" style="align-items:flex-start;gap:24px">
+<div class="k-menu"><div class="pop menu">
+<div class="menu-in"><span class="ph">Set status…</span><span class="spacer"></span><span class="kbd">S</span></div>
+<div class="menu-i"><span class="st backlog"></span>Backlog<span class="kbd">1</span></div>
+<div class="menu-i"><span class="st todo"></span>Todo<span class="kbd">2</span></div>
+<div class="menu-i on"><span class="st prog"></span>In progress<span class="chk" style="margin-left:auto"><span class="check"></span></span></div>
+<div class="menu-i"><span class="st rev"></span>In review<span class="kbd">4</span></div>
+<div class="menu-i"><span class="st done"></span>Done<span class="kbd">5</span></div>
+<div class="menu-i dim"><span class="st cancel"></span>Canceled<span class="kbd">6</span></div>
+</div></div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<span class="k-tip"><span class="tip">Assign to me<span class="kbd">I</span></span></span>
+<span class="k-tip"><span class="tip">Labels<span class="kbd">L</span></span></span>
+<span class="k-toast"><span class="toast">Moved HBR-71 to In review<span class="link">Undo</span><span class="kbd" style="background:oklch(1 0 0 / .16);color:var(--bg)">⌘Z</span></span></span>
+</div>
+</div>
+</div>
+
+<div class="kit-sec"><div class="kit-t">Error and empty</div>
+<div class="err"><span>Couldn’t load tasks. The server didn’t answer in time.</span><span class="btn sm ghost">Try again</span></div>
+<div class="ro-note"><span class="lock"></span>Fields come from the file in the repository. Comments stay in this app.</div>
+<div style="border:1.5px dashed var(--line);border-radius:var(--r-lg);display:flex"><div class="empty" style="padding:24px"><div class="empty-t" style="font-size:20px">Nothing needs you</div><div class="empty-d">Reviews, mentions and blocked work land here.</div></div></div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{
+  "theme": { "editor": "enum", "options": ["light", "dark"], "default": "light" }
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    return { rootClass: theme, themeName: theme === 'dark' ? 'Dark' : 'Light' };
+  }
+}
+</script>
+</body>
+</html>

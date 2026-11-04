@@ -378,6 +378,8 @@ export function taskFile(values: {
   labels?: string[];
   ordinal?: number;
   parent?: string;
+  dependencies?: string[];
+  due?: string;
   created?: string;
   updated?: string;
   description?: string;
@@ -389,7 +391,8 @@ export function taskFile(values: {
   if (values.updated) lines.push(`updated_date: '${values.updated}'`);
   lines.push(`labels: [${(values.labels ?? []).join(', ')}]`);
   if (values.milestone) lines.push(`milestone: ${values.milestone}`);
-  lines.push('dependencies: []');
+  lines.push(`dependencies: [${(values.dependencies ?? []).join(', ')}]`);
+  if (values.due) lines.push(`due_date: '${values.due}'`);
   if (values.parent) lines.push(`parent_task_id: ${values.parent}`);
   if (values.priority) lines.push(`priority: ${values.priority}`);
   if (values.ordinal !== undefined) lines.push(`ordinal: ${values.ordinal}`);

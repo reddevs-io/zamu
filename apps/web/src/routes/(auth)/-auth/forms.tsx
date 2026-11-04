@@ -1,6 +1,7 @@
 import { AccountFields, InviteFields, SignInFields, WorkspaceFields } from '@pm/contracts';
 import { useState } from 'react';
 import { Link } from 'react-aria-components';
+import { AUTH_ERRORS } from '~/lib/auth-client';
 import { Banner, Button, TextField } from '~/ui';
 import { AuthForm, AuthHeading, SetupSteps } from './AuthLayout';
 import { type FieldErrors, fieldErrors, hasErrors, passwordHint } from './validation';
@@ -17,7 +18,11 @@ export interface FormError {
 
 export const WRONG_CREDENTIALS = 'Wrong email or password. Check both and try again.';
 
-const linkClass = 'font-semibold text-fg underline underline-offset-2 outline-none focus-visible:focus-ring';
+/** Better Auth's rate limit answered 429 (plan call 1: a short window, not a lockout). */
+export const TOO_MANY_ATTEMPTS = 'Too many attempts. Wait a few seconds and try again.';
+
+const linkClass =
+  'font-semibold text-danger underline underline-offset-2 outline-none focus-visible:focus-ring';
 
 export function ErrorBanner({ error }: { error: FormError }) {
   return (
@@ -50,13 +55,13 @@ function useSubmit<E>() {
 
 /** Single sign-on for a form: the button label and the action that sends the browser to the provider. */
 export interface SsoAction {
-  /** "Continue with Authentik". */
+  /** "Continue with Authentik", or "Continue with single sign-on". */
   label: string;
   /** Starts the redirect; resolves with an error message when it could not start. */
   onPress: () => Promise<string | null>;
 }
 
-/** "Continue with {provider}" (design frame 01), pending while the browser leaves for the provider. */
+/** "Continue with {provider}" (frame 128), pending while the browser leaves for the provider. */
 export function SsoButton({ sso, onError }: { sso: SsoAction; onError: (message: string) => void }) {
   const [pending, setPending] = useState(false);
   const press = async () => {
@@ -70,25 +75,56 @@ export function SsoButton({ sso, onError }: { sso: SsoAction; onError: (message:
   };
   return (
     <Button variant="secondary" size="lg" fullWidth isPending={pending} onPress={press}>
-      <span aria-hidden className="size-3.5 border-[1.5px] border-fg" />
       {sso.label}
     </Button>
   );
 }
 
-/** The "or with email" divider between the SSO button and the password form. */
-export function OrWithEmail() {
+/** The "or" divider between the form and the SSO button (screens.css .auth .or). */
+export function OrDivider() {
   return (
-    <div className="flex items-center gap-3 text-[11.5px] text-faint">
+    <div className="flex items-center gap-2.5 text-xs text-fg-3">
       <span aria-hidden className="h-px flex-1 bg-line" />
-      or with email
+      or
       <span aria-hidden className="h-px flex-1 bg-line" />
     </div>
   );
 }
 
-/** Sign-in error: wrong credentials (banner and password field in error) or anything else. */
+/** Divider and SSO button under a password form; just the button when password sign-in is off. */
+function SsoBelow({
+  sso,
+  onError,
+  alone,
+}: {
+  sso: SsoAction;
+  onError: (message: string) => void;
+  alone?: boolean;
+}) {
+  return (
+    <>
+      {alone ? null : <OrDivider />}
+      <SsoButton sso={sso} onError={onError} />
+    </>
+  );
+}
+
+/** Sign-in error: wrong credentials (inline under the password) or anything else (banner). */
 export type SignInError = { kind: 'credentials' } | { kind: 'other'; message: string };
+
+/** Turns what Better Auth's email sign-in answered into the error the form shows. */
+export function signInError(error: {
+  code?: string | undefined;
+  status?: number;
+  message?: string | undefined;
+}): SignInError {
+  if (error.code === AUTH_ERRORS.invalidCredentials || error.status === 401) return { kind: 'credentials' };
+  if (error.status === 429) return { kind: 'other', message: TOO_MANY_ATTEMPTS };
+  if (error.code === AUTH_ERRORS.passwordLoginDisabled) {
+    return { kind: 'other', message: 'Password sign-in is turned off. Use single sign-on.' };
+  }
+  return { kind: 'other', message: error.message || "Couldn't sign in. Try again." };
+}
 
 export interface SignInFormProps {
   onSubmit: (values: { email: string; password: string }) => Promise<SignInError | null>;
@@ -120,23 +156,19 @@ export function SignInForm({ onSubmit, sso, passwordLogin = true, initialError }
     setErrors(found);
     if (hasErrors(found)) return;
     const result = await run(() => onSubmit({ email: values.email.trim(), password: values.password }));
-    // The banner is an alert, so screen readers announce it; focus stays put so the password field
-    // shows its error border rather than the focus halo.
+    // Wrong credentials show under the password field as an alert, so screen readers announce it; focus
+    // stays put so the field shows its error border rather than the focus halo.
     setFailure(result);
   };
 
   const wrongCredentials = failure?.kind === 'credentials';
-  const banner = failure ? (
-    <ErrorBanner error={{ message: failure.kind === 'credentials' ? WRONG_CREDENTIALS : failure.message }} />
-  ) : null;
+  const banner = failure?.kind === 'other' ? <ErrorBanner error={{ message: failure.message }} /> : null;
 
   if (sso && !passwordLogin) {
     return (
       <>
         {banner}
-        <div className="flex flex-col gap-3.5">
-          <SsoButton sso={sso} onError={ssoFailed} />
-        </div>
+        <SsoBelow sso={sso} onError={ssoFailed} alone />
       </>
     );
   }
@@ -145,12 +177,6 @@ export function SignInForm({ onSubmit, sso, passwordLogin = true, initialError }
     <>
       {banner}
       <AuthForm label="Sign in" onSubmit={submit}>
-        {sso ? (
-          <>
-            <SsoButton sso={sso} onError={ssoFailed} />
-            <OrWithEmail />
-          </>
-        ) : null}
         <TextField
           label="Email"
           name="email"
@@ -171,13 +197,16 @@ export function SignInForm({ onSubmit, sso, passwordLogin = true, initialError }
           value={values.password}
           onChange={update('password')}
           isInvalid={Boolean(errors.password) || wrongCredentials}
-          errorMessage={errors.password}
+          errorMessage={
+            errors.password ?? (wrongCredentials ? <span role="alert">{WRONG_CREDENTIALS}</span> : undefined)
+          }
           validationBehavior="aria"
         />
-        <Button type="submit" variant="accent" size="lg" fullWidth isPending={pending}>
+        <Button type="submit" variant="primary" size="lg" fullWidth isPending={pending} kbd="↵">
           Sign in
         </Button>
       </AuthForm>
+      {sso ? <SsoBelow sso={sso} onError={ssoFailed} /> : null}
     </>
   );
 }
@@ -251,55 +280,50 @@ export function SetupForm({ onSubmit, sso, passwordLogin = true, initialError = 
       )}
       {failure ? <ErrorBanner error={failure} /> : null}
       {step === 1 && sso && !passwordLogin ? (
-        <div className="flex flex-col gap-3.5">
-          <SsoButton sso={sso} onError={ssoFailed} />
-        </div>
+        <SsoBelow sso={sso} onError={ssoFailed} alone />
       ) : step === 1 ? (
-        <AuthForm label="Admin account" onSubmit={next}>
-          {sso ? (
-            <>
-              <SsoButton sso={sso} onError={ssoFailed} />
-              <OrWithEmail />
-            </>
-          ) : null}
-          <TextField
-            label="Your name"
-            name="name"
-            autoComplete="name"
-            autoFocus={!sso}
-            value={values.name}
-            onChange={update('name')}
-            isInvalid={Boolean(errors.name)}
-            errorMessage={errors.name}
-            validationBehavior="aria"
-          />
-          <TextField
-            label="Email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            value={values.email}
-            onChange={update('email')}
-            isInvalid={Boolean(errors.email)}
-            errorMessage={errors.email}
-            validationBehavior="aria"
-          />
-          <TextField
-            label="Password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            value={values.password}
-            onChange={update('password')}
-            description={passwordHint(values.password.length)}
-            isInvalid={Boolean(errors.password)}
-            errorMessage={errors.password}
-            validationBehavior="aria"
-          />
-          <Button type="submit" variant="accent" size="lg" fullWidth>
-            Continue
-          </Button>
-        </AuthForm>
+        <>
+          <AuthForm label="Admin account" onSubmit={next}>
+            <TextField
+              label="Your name"
+              name="name"
+              autoComplete="name"
+              autoFocus
+              value={values.name}
+              onChange={update('name')}
+              isInvalid={Boolean(errors.name)}
+              errorMessage={errors.name}
+              validationBehavior="aria"
+            />
+            <TextField
+              label="Email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={values.email}
+              onChange={update('email')}
+              isInvalid={Boolean(errors.email)}
+              errorMessage={errors.email}
+              validationBehavior="aria"
+            />
+            <TextField
+              label="Password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              value={values.password}
+              onChange={update('password')}
+              description={passwordHint(values.password.length)}
+              isInvalid={Boolean(errors.password)}
+              errorMessage={errors.password}
+              validationBehavior="aria"
+            />
+            <Button type="submit" variant="primary" size="lg" fullWidth kbd="↵">
+              Continue
+            </Button>
+          </AuthForm>
+          {sso ? <SsoBelow sso={sso} onError={ssoFailed} /> : null}
+        </>
       ) : (
         <AuthForm label="Workspace" onSubmit={submit}>
           <TextField
@@ -326,7 +350,7 @@ export function SetupForm({ onSubmit, sso, passwordLogin = true, initialError = 
             >
               Back
             </Button>
-            <Button type="submit" variant="accent" size="lg" className="flex-1" isPending={pending}>
+            <Button type="submit" variant="primary" size="lg" className="flex-1" isPending={pending} kbd="↵">
               Create workspace
             </Button>
           </div>
@@ -378,7 +402,7 @@ export function WorkspaceForm({ onSubmit }: WorkspaceFormProps) {
           errorMessage={error}
           validationBehavior="aria"
         />
-        <Button type="submit" variant="accent" size="lg" fullWidth isPending={pending}>
+        <Button type="submit" variant="primary" size="lg" fullWidth isPending={pending} kbd="↵">
           Create workspace
         </Button>
       </AuthForm>
@@ -424,25 +448,15 @@ export function InviteForm({
   };
 
   const emailField = (
-    <TextField
-      label="Email"
-      name="email"
-      type="email"
-      autoComplete="username"
-      value={email}
-      isReadOnly
-      inputClassName="bg-band text-muted"
-    />
+    <TextField label="Email" name="email" type="email" autoComplete="username" value={email} isReadOnly />
   );
 
   if (sso && !passwordLogin) {
     return (
       <>
         {failure ? <ErrorBanner error={failure} /> : null}
-        <div className="flex flex-col gap-3.5">
-          {emailField}
-          <SsoButton sso={sso} onError={ssoFailed} />
-        </div>
+        {emailField}
+        <SsoBelow sso={sso} onError={ssoFailed} alone />
       </>
     );
   }
@@ -451,18 +465,12 @@ export function InviteForm({
     <>
       {failure ? <ErrorBanner error={failure} /> : null}
       <AuthForm label="Join workspace" onSubmit={submit}>
-        {sso ? (
-          <>
-            <SsoButton sso={sso} onError={ssoFailed} />
-            <OrWithEmail />
-          </>
-        ) : null}
         {emailField}
         <TextField
           label="Your name"
           name="name"
           autoComplete="name"
-          autoFocus={!sso}
+          autoFocus
           value={values.name}
           onChange={update('name')}
           isInvalid={Boolean(errors.name)}
@@ -481,10 +489,11 @@ export function InviteForm({
           errorMessage={errors.password}
           validationBehavior="aria"
         />
-        <Button type="submit" variant="accent" size="lg" fullWidth isPending={pending}>
+        <Button type="submit" variant="primary" size="lg" fullWidth isPending={pending} kbd="↵">
           Join workspace
         </Button>
       </AuthForm>
+      {sso ? <SsoBelow sso={sso} onError={ssoFailed} /> : null}
     </>
   );
 }
