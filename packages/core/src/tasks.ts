@@ -1,20 +1,27 @@
 // Tasks: list, get by key, create, update. Every write records activity in the same transaction.
 // M3: tasks of a project mirrored from Backlog.md carry their Backlog.md block, keep the fields
 // Backlog.md owns locked (TASK_MIRRORED), and hide while their file is gone from the default branch.
+// M5: labels, due dates, blockers and parents (see labels.ts and relations.ts for their rules),
+// list filters and orderings over them, and bulk changes of native tasks.
 import {
   ASSIGNEE_AGENTS,
   ASSIGNEE_ME,
   BacklogBlock,
   type BacklogTaskLink,
+  BulkUpdateTasksInput,
+  CalendarDate,
   CreateTaskInput,
   type CycleSelector,
   DEFAULT_TASK_PRIORITY,
   DEFAULT_TASK_STATUS,
+  DUE_SOON_DAYS,
   FILTER_NONE,
   formatBacklogId,
   formatTaskKey,
   GetTaskInput,
   ListTasksInput,
+  MAX_TASK_LABELS,
+  OPEN_TASK_STATUSES,
   type Priority,
   parseBacklogId,
   parseRepositoryUrl,
@@ -22,13 +29,17 @@ import {
   priorityFromValue,
   priorityToValue,
   TASK_OWNED_FIELDS,
+  TASK_SORTS,
   TASK_STATUS_LABELS,
   TASK_STATUSES,
   Task,
   type TaskBacklog,
+  TaskBulkResult,
+  type TaskListItem,
   TaskListPage,
   type TaskOwnedField,
   type TaskPosition,
+  type TaskSort,
   type TaskStatus,
   UpdateTaskInput,
 } from '@pm/contracts';
@@ -36,10 +47,24 @@ import { type DbOrTx, schema, type Tx } from '@pm/db';
 import { createProvider, hostnameOf } from '@pm/git-providers';
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { recordActivity, type StoredChange } from './activity';
+import {
+  compareLabelNames,
+  compareTaskKeys,
+  recordActivity,
+  type StoredChange,
+  type StoredLabelRef,
+  type StoredTaskRef,
+} from './activity';
 import { type Actor, authorize } from './authz';
 import type { DbContext, GitContext } from './context';
-import { type ClockContext, type CycleRow, cycleStateOn, resolveCycleSelector, todayIn } from './cycles';
+import {
+  addCalendarDays,
+  type ClockContext,
+  type CycleRow,
+  cycleStateOn,
+  resolveCycleSelector,
+  todayIn,
+} from './cycles';
 import { Invalid, NotFound, ProjectMirrored, parseInput, TaskChanged, TaskMirrored } from './errors';
 import {
   type BacklogSourceRow,
@@ -60,9 +85,26 @@ import {
   userRef,
   workspaceMember,
 } from './internal';
+import { findOrCreateLabels, type LabelRow, labelsOfTasks, loadTaskLabelRows, setTaskLabels } from './labels';
 import { activateMilestoneForTask } from './milestones';
+import {
+  assertNoDependencyLoop,
+  assertParentAllowed,
+  blockedTaskIds,
+  deleteBlockers,
+  hasOpenBlockerSql,
+  insertBlockers,
+  loadBlockers,
+  loadTaskRelations,
+  NotSameProject,
+  type ProjectTask,
+  resolveProjectTasks,
+  storedTaskRef,
+  subtaskProgressOf,
+  taskKeysById,
+} from './relations';
 
-const { comment, cycle, gitConnection, milestone, project, task, user } = schema;
+const { comment, cycle, gitConnection, milestone, project, task, taskLabel, user } = schema;
 type TaskInsert = typeof task.$inferInsert;
 
 /**
@@ -294,6 +336,8 @@ async function toTask(db: DbOrTx, projectRow: ProjectRow, row: TaskRow, view: Ta
   const backlog = row.backlogId
     ? await taskBacklog(db, projectRow, { ...row, backlogId: row.backlogId }, source, view.gitHosts)
     : null;
+  const labels = (await labelsOfTasks(db, [row.id])).get(row.id) ?? [];
+  const relations = await loadTaskRelations(db, projectRow, row);
   return Task.parse({
     id: row.id,
     key: formatTaskKey(projectRow.key, row.number, row.keySuffix),
@@ -314,6 +358,9 @@ async function toTask(db: DbOrTx, projectRow: ProjectRow, row: TaskRow, view: Ta
     locked: lockedFields(sourceMirrors(source)),
     hidden: row.hiddenAt !== null,
     hiddenAt: row.hiddenAt,
+    labels,
+    dueDate: row.dueDate,
+    ...relations,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -333,10 +380,128 @@ const ListCursor = z.tuple([
 ]);
 /** Position after the last row of a page in board order (status, rank, id). */
 const BoardCursor = z.tuple([z.literal('board'), z.enum(TASK_STATUSES), z.number(), z.uuid()]);
-const Cursor = z.union([ListCursor, BoardCursor]);
+/**
+ * M5: position after the last row of a page in one `sort` ordering: 'sort', the sort, then the
+ * row's value for each part of SORT_PARTS[sort] (timestamps as Postgres text, a null due date as
+ * null).
+ */
+const SortCursor = z
+  .tuple([z.literal('sort'), z.enum(TASK_SORTS)])
+  .rest(z.union([z.string().max(64), z.number(), z.null()]));
+const Cursor = z.union([ListCursor, BoardCursor, SortCursor]);
 type ListCursor = z.infer<typeof ListCursor>;
 type BoardCursor = z.infer<typeof BoardCursor>;
+type SortCursor = z.infer<typeof SortCursor>;
 type Cursor = z.infer<typeof Cursor>;
+
+/** What a page query selects per row: the task, its project, and timestamps as text for cursors. */
+interface ListRow {
+  task: TaskRow;
+  project: { id: string; key: string; name: string };
+  updatedAtText: string;
+  createdAtText: string;
+}
+
+type SortValue = string | number | null;
+
+/** One key of a `sort` ordering. Nullable keys sort nulls last. */
+interface SortPart {
+  column: SQL;
+  dir: 'asc' | 'desc';
+  /** Postgres type the cursor value is cast to. */
+  type: 'smallint' | 'timestamptz' | 'uuid' | 'date' | 'double precision';
+  nullable?: boolean;
+  value: (row: ListRow) => SortValue;
+}
+
+const UPDATED_PART: SortPart = {
+  column: sql`${task.updatedAt}`,
+  dir: 'desc',
+  type: 'timestamptz',
+  value: (row) => row.updatedAtText,
+};
+const ID_PART: SortPart = { column: sql`${task.id}`, dir: 'desc', type: 'uuid', value: (row) => row.task.id };
+
+/**
+ * M5 orderings of ListTasksInput.sort. Ties fall back to the last update (newest first), then the
+ * id, so every ordering is total and keyset cursors stay exact.
+ */
+const SORT_PARTS: Record<TaskSort, SortPart[]> = {
+  priority: [
+    { column: sql`${task.priority}`, dir: 'desc', type: 'smallint', value: (row) => row.task.priority },
+    UPDATED_PART,
+    ID_PART,
+  ],
+  due: [
+    {
+      column: sql`${task.dueDate}`,
+      dir: 'asc',
+      type: 'date',
+      nullable: true,
+      value: (row) => row.task.dueDate,
+    },
+    UPDATED_PART,
+    ID_PART,
+  ],
+  updated: [UPDATED_PART, ID_PART],
+  created: [
+    { column: sql`${task.createdAt}`, dir: 'desc', type: 'timestamptz', value: (row) => row.createdAtText },
+    ID_PART,
+  ],
+  manual: [
+    { column: sql`${task.rank}`, dir: 'asc', type: 'double precision', value: (row) => row.task.rank },
+    UPDATED_PART,
+    ID_PART,
+  ],
+};
+
+function sortOrderBy(parts: SortPart[]): SQL[] {
+  return parts.map((part) =>
+    part.nullable
+      ? sql`${part.column} ${sql.raw(part.dir)} nulls last`
+      : part.dir === 'asc'
+        ? asc(part.column)
+        : desc(part.column),
+  );
+}
+
+/** Whether `value` fits the part's type (cursor values come from the client). */
+function sortValueValid(part: SortPart, value: SortValue): boolean {
+  if (value === null) return part.nullable === true;
+  switch (part.type) {
+    case 'smallint':
+      return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 4;
+    case 'double precision':
+      return typeof value === 'number' && Number.isFinite(value);
+    case 'timestamptz':
+      return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+    case 'uuid':
+      return z.uuid().safeParse(value).success;
+    case 'date':
+      return CalendarDate.safeParse(value).success;
+  }
+}
+
+/** Rows after `values` in the ordering `parts`: the keyset condition, nulls last on nullable parts. */
+function afterSortCursor(parts: SortPart[], values: SortValue[]): SQL {
+  const clauses: SQL[] = [];
+  const equal: SQL[] = [];
+  parts.forEach((part, index) => {
+    const value = values[index] ?? null;
+    const cast = sql.raw(part.type);
+    if (value !== null) {
+      const beyond =
+        part.dir === 'asc'
+          ? sql`${part.column} > ${value}::${cast}`
+          : sql`${part.column} < ${value}::${cast}`;
+      const after = part.nullable ? sql`(${beyond} or ${part.column} is null)` : beyond;
+      clauses.push(and(...equal, after) as SQL);
+    }
+    // After a null (nulls last) only rows with null in this part and later parts beyond follow.
+    equal.push(value === null ? sql`${part.column} is null` : sql`${part.column} = ${value}::${cast}`);
+  });
+  return clauses.length === 0 ? sql`false` : (or(...clauses) as SQL);
+}
 
 function encodeCursor(cursor: Cursor): string {
   return Buffer.from(JSON.stringify(cursor)).toString('base64url');
@@ -346,13 +511,24 @@ function invalidCursor(): Invalid {
   return new Invalid('The cursor is not valid', { issues: [{ path: 'cursor', message: 'Invalid cursor' }] });
 }
 
-function decodeCursor(value: string, order: 'list' | 'board'): Cursor {
+/** Decodes a cursor and checks it came from the same ordering: `sort` when set, else `order`. */
+function decodeCursor(value: string, order: 'list' | 'board', sort: TaskSort | undefined): Cursor {
   let cursor: Cursor;
   try {
     cursor = Cursor.parse(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')));
   } catch {
     throw invalidCursor();
   }
+  if (cursor[0] === 'sort') {
+    const [, cursorSort, ...values] = cursor as SortCursor;
+    if (cursorSort !== sort) throw invalidCursor();
+    const parts = SORT_PARTS[cursorSort];
+    if (values.length !== parts.length || parts.some((part, i) => !sortValueValid(part, values[i] ?? null))) {
+      throw invalidCursor();
+    }
+    return cursor;
+  }
+  if (sort) throw invalidCursor();
   const isBoard = cursor[0] === 'board';
   if (isBoard !== (order === 'board')) throw invalidCursor();
   if (!isBoard && Number.isNaN(Date.parse((cursor as ListCursor)[2]))) throw invalidCursor();
@@ -410,11 +586,40 @@ async function cycleIdsFor(
 }
 
 /**
- * One page of tasks in list order (status, then priority highest first, then last update newest
- * first) or board order (status, then rank). Without `project`, the page spans every project the
- * actor can read in the workspace. `counts` covers every status for the same filters, ignoring the
- * status filter, so the UI can show group sizes. Hidden tasks (file gone from Backlog.md) are left
- * out of the page and the counts unless `hidden` is only or include.
+ * Tasks assigned to any of `values`: the caller (`me`), any agent (`agents`), nobody (`none`) or
+ * a user id.
+ */
+function assigneeCondition(db: DbOrTx, actor: Actor, values: string[]): SQL {
+  const ids = new Set<string>();
+  const parts: (SQL | undefined)[] = [];
+  for (const value of values) {
+    if (value === FILTER_NONE) parts.push(isNull(task.assigneeId));
+    else if (value === ASSIGNEE_AGENTS) {
+      parts.push(
+        inArray(task.assigneeId, db.select({ id: user.id }).from(user).where(eq(user.kind, 'agent'))),
+      );
+    } else ids.add(value === ASSIGNEE_ME ? actor.userId : value);
+  }
+  if (ids.size > 0) parts.push(inArray(task.assigneeId, [...ids]));
+  return or(...parts) as SQL;
+}
+
+/** Open: any status but Done and Canceled. */
+const isOpenTask = () => inArray(task.status, [...OPEN_TASK_STATUSES]);
+
+/**
+ * One page of tasks. Without `sort`: list order (status, then priority highest first, then last
+ * update newest first) or board order (status, then rank). With `sort` (M5): one ordering over the
+ * whole result (SORT_PARTS), without the status grouping. Without `project`, the page spans every
+ * project the actor can read in the workspace. `counts` covers every status for the same filters,
+ * ignoring the status filter, so the UI can show group sizes. Hidden tasks (file gone from
+ * Backlog.md) are left out of the page and the counts unless `hidden` is only or include.
+ *
+ * Assignee, milestone and cycle take one value or several (M5); a task matches any of them, `none`
+ * matching tasks without one. M5 filters: label ids (any of), due (overdue and soon count open tasks only, judged on today in
+ * the context's time zone), blocked (an open, visible blocker), topLevel and parent. Items carry
+ * labels, dueDate, blocked, subtaskProgress and parentKey, read for the whole page in a fixed
+ * number of queries.
  */
 export async function listTasks(
   ctx: TaskContext,
@@ -423,7 +628,7 @@ export async function listTasks(
 ): Promise<TaskListPage> {
   const { db } = ctx;
   const filters = parseInput(ListTasksInput, input);
-  const cursor = filters.cursor ? decodeCursor(filters.cursor, filters.order) : null;
+  const cursor = filters.cursor ? decodeCursor(filters.cursor, filters.order, filters.sort) : null;
   const projects = await readableProjects(db, actor, filters.project);
   const counts = Object.fromEntries(TASK_STATUSES.map((status) => [status, 0])) as Record<TaskStatus, number>;
   if (projects.length === 0) return TaskListPage.parse({ items: [], nextCursor: null, counts });
@@ -435,19 +640,31 @@ export async function listTasks(
     ),
   ];
   if (filters.priority) conditions.push(inArray(task.priority, filters.priority.map(priorityToValue)));
-  if (filters.assignee === ASSIGNEE_ME) conditions.push(eq(task.assigneeId, actor.userId));
-  else if (filters.assignee === ASSIGNEE_AGENTS) {
+  if (filters.assignee) conditions.push(assigneeCondition(db, actor, filters.assignee));
+  if (filters.milestone) {
+    const ids = filters.milestone.filter((value) => value !== FILTER_NONE);
     conditions.push(
-      inArray(task.assigneeId, db.select({ id: user.id }).from(user).where(eq(user.kind, 'agent'))),
+      or(
+        filters.milestone.includes(FILTER_NONE) ? isNull(task.milestoneId) : undefined,
+        ids.length > 0 ? inArray(task.milestoneId, ids) : undefined,
+      ),
     );
-  } else if (filters.assignee) conditions.push(eq(task.assigneeId, filters.assignee));
-  if (filters.milestone === FILTER_NONE) conditions.push(isNull(task.milestoneId));
-  else if (filters.milestone) conditions.push(eq(task.milestoneId, filters.milestone));
-  if (filters.cycle === FILTER_NONE) conditions.push(isNull(task.cycleId));
-  else if (filters.cycle !== undefined) {
-    const ids = await cycleIdsFor(ctx, projects, filters.cycle);
-    // No such cycle anywhere: nothing matches.
-    conditions.push(ids.length === 0 ? sql`false` : inArray(task.cycleId, ids));
+  }
+  if (filters.cycle) {
+    const selectors = filters.cycle.filter((value) => value !== FILTER_NONE);
+    // Sequential: one selector set per project; current and next resolve per project.
+    const ids: string[] = [];
+    for (const selector of selectors) ids.push(...(await cycleIdsFor(ctx, projects, selector)));
+    const none = filters.cycle.includes(FILTER_NONE);
+    // No such cycle anywhere and no `none`: nothing matches.
+    conditions.push(
+      none || ids.length > 0
+        ? or(
+            none ? isNull(task.cycleId) : undefined,
+            ids.length > 0 ? inArray(task.cycleId, [...new Set(ids)]) : undefined,
+          )
+        : sql`false`,
+    );
   }
   if (filters.hidden === 'only') conditions.push(isNotNull(task.hiddenAt));
   else if (filters.hidden !== 'include') conditions.push(isNull(task.hiddenAt));
@@ -464,13 +681,51 @@ export async function listTasks(
       ),
     );
   }
+  if (filters.label) {
+    conditions.push(
+      inArray(
+        task.id,
+        db
+          .select({ id: taskLabel.taskId })
+          .from(taskLabel)
+          .where(inArray(taskLabel.labelId, [...new Set(filters.label)])),
+      ),
+    );
+  }
+  if (filters.due) {
+    const today = todayIn(ctx);
+    if (filters.due === 'overdue') conditions.push(isOpenTask(), sql`${task.dueDate} < ${today}::date`);
+    else if (filters.due === 'soon') {
+      const last = addCalendarDays(today, DUE_SOON_DAYS);
+      conditions.push(isOpenTask(), sql`${task.dueDate} between ${today}::date and ${last}::date`);
+    } else if (filters.due === 'none') conditions.push(isNull(task.dueDate));
+    else conditions.push(isNotNull(task.dueDate));
+  }
+  if (filters.blocked !== undefined) {
+    const blocked = hasOpenBlockerSql(task.id);
+    conditions.push(filters.blocked ? blocked : sql`not ${blocked}`);
+  }
+  if (filters.topLevel) conditions.push(isNull(task.parentId));
+  if (filters.parent) {
+    const parent = await findTask(db, actor, filters.parent);
+    conditions.push(eq(task.parentId, parent.task.id));
+  }
   const statusCondition = filters.status ? inArray(task.status, filters.status) : undefined;
+  const sortParts = filters.sort ? SORT_PARTS[filters.sort] : null;
   const board = filters.order === 'board';
-  const after = cursor
-    ? cursor[0] === 'board'
-      ? afterBoardCursor(cursor as BoardCursor)
-      : afterListCursor(cursor as ListCursor)
-    : undefined;
+  let after: SQL | undefined;
+  if (cursor && cursor[0] === 'sort' && sortParts) {
+    const [, , ...values] = cursor as SortCursor;
+    after = afterSortCursor(sortParts, values);
+  } else if (cursor) {
+    after =
+      cursor[0] === 'board' ? afterBoardCursor(cursor as BoardCursor) : afterListCursor(cursor as ListCursor);
+  }
+  const orderBy = sortParts
+    ? sortOrderBy(sortParts)
+    : board
+      ? [asc(task.status), asc(task.rank), asc(task.id)]
+      : [asc(task.status), desc(task.priority), desc(task.updatedAt), desc(task.id)];
 
   const [rows, countRows] = await Promise.all([
     db
@@ -478,15 +733,12 @@ export async function listTasks(
         task,
         project: { id: project.id, key: project.key, name: project.name },
         updatedAtText: sql<string>`${task.updatedAt}::text`,
+        createdAtText: sql<string>`${task.createdAt}::text`,
       })
       .from(task)
       .innerJoin(project, eq(project.id, task.projectId))
       .where(and(...conditions, statusCondition, after))
-      .orderBy(
-        ...(board
-          ? [asc(task.status), asc(task.rank), asc(task.id)]
-          : [asc(task.status), desc(task.priority), desc(task.updatedAt), desc(task.id)]),
-      )
+      .orderBy(...orderBy)
       .limit(filters.limit + 1),
     db
       .select({ status: task.status, count: sql<number>`count(*)`.mapWith(Number) })
@@ -500,57 +752,106 @@ export async function listTasks(
   const last = page.at(-1);
   let nextCursor: string | null = null;
   if (rows.length > filters.limit && last) {
-    nextCursor = encodeCursor(
-      board
-        ? ['board', last.task.status, last.task.rank, last.task.id]
-        : [last.task.status, last.task.priority, last.updatedAtText, last.task.id],
-    );
+    if (filters.sort && sortParts) {
+      nextCursor = encodeCursor(['sort', filters.sort, ...sortParts.map((part) => part.value(last))]);
+    } else {
+      nextCursor = encodeCursor(
+        board
+          ? ['board', last.task.status, last.task.rank, last.task.id]
+          : [last.task.status, last.task.priority, last.updatedAtText, last.task.id],
+      );
+    }
   }
-
-  const pageIds = page.map((row) => row.task.id);
-  const [users, refs, mirrored, comments] = await Promise.all([
-    usersFor(
-      db,
-      page.map((row) => row.task.assigneeId),
-    ),
-    planningRefs(
-      db,
-      page.map((row) => row.task),
-      todayIn(ctx),
-    ),
-    mirroredProjectIds(
-      db,
-      page.map((row) => row.project.id),
-    ),
-    liveCommentCounts(db, pageIds),
-  ]);
   for (const row of countRows) counts[row.status] = row.count;
 
-  return TaskListPage.parse({
-    items: page.map(({ task: row, project: projectRef }) => ({
-      id: row.id,
-      key: formatTaskKey(projectRef.key, row.number, row.keySuffix),
-      number: row.number,
-      project: projectRef,
-      title: row.title,
-      status: row.status,
-      priority: priorityFromValue(row.priority),
-      assignee: assigneeRef(row.assigneeId, users),
-      milestone: refs.milestone(row),
-      cycle: refs.cycle(row),
-      cycleAddedAt: row.cycleAddedAt,
-      rank: row.rank,
-      backlogId: row.backlogId,
-      locked: lockedFields(mirrored.has(projectRef.id)),
-      hidden: row.hiddenAt !== null,
-      hiddenAt: row.hiddenAt,
-      commentCount: comments.get(row.id) ?? 0,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    })),
-    nextCursor,
-    counts,
-  });
+  return TaskListPage.parse({ items: await toListItems(db, page, todayIn(ctx)), nextCursor, counts });
+}
+
+/**
+ * Tasks as list rows, with everything a row shows. A fixed number of queries for the whole set
+ * (users, milestones, cycles, mirrors, comment counts, labels, blockers, subtask progress, parent
+ * keys), whatever its size.
+ */
+async function toListItems(
+  db: DbOrTx,
+  rows: Pick<ListRow, 'task' | 'project'>[],
+  today: string,
+  options: { inTransaction?: boolean } = {},
+): Promise<z.input<typeof TaskListItem>[]> {
+  const ids = rows.map((row) => row.task.id);
+  const reads = [
+    () =>
+      usersFor(
+        db,
+        rows.map((row) => row.task.assigneeId),
+      ),
+    () =>
+      planningRefs(
+        db,
+        rows.map((row) => row.task),
+        today,
+      ),
+    () =>
+      mirroredProjectIds(
+        db,
+        rows.map((row) => row.project.id),
+      ),
+    () => liveCommentCounts(db, ids),
+    () => labelsOfTasks(db, ids),
+    () => blockedTaskIds(db, ids),
+    () => subtaskProgressOf(db, ids),
+    () =>
+      taskKeysById(
+        db,
+        rows.flatMap((row) => (row.task.parentId ? [row.task.parentId] : [])),
+      ),
+  ] as const;
+  // A transaction has one connection: run its reads one after the other.
+  const [users, refs, mirrored, comments, labels, blocked, progress, parentKeys] = await runReads(
+    reads,
+    options.inTransaction === true,
+  );
+  return rows.map(({ task: row, project: projectRef }) => ({
+    id: row.id,
+    key: formatTaskKey(projectRef.key, row.number, row.keySuffix),
+    number: row.number,
+    project: projectRef,
+    title: row.title,
+    status: row.status,
+    priority: priorityFromValue(row.priority),
+    assignee: assigneeRef(row.assigneeId, users),
+    milestone: refs.milestone(row),
+    cycle: refs.cycle(row),
+    cycleAddedAt: row.cycleAddedAt,
+    rank: row.rank,
+    backlogId: row.backlogId,
+    locked: lockedFields(mirrored.has(projectRef.id)),
+    hidden: row.hiddenAt !== null,
+    hiddenAt: row.hiddenAt,
+    commentCount: comments.get(row.id) ?? 0,
+    labels: labels.get(row.id) ?? [],
+    dueDate: row.dueDate,
+    blocked: blocked.has(row.id),
+    subtaskProgress: progress.get(row.id) ?? { done: 0, total: 0 },
+    parentKey: row.parentId ? (parentKeys.get(row.parentId) ?? null) : null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
+}
+
+type ReadResults<T extends readonly (() => Promise<unknown>)[]> = {
+  -readonly [K in keyof T]: T[K] extends () => Promise<infer R> ? R : never;
+};
+
+/** Runs `reads` at once, or one after the other when `sequential` (inside a transaction). */
+async function runReads<T extends readonly (() => Promise<unknown>)[]>(
+  reads: T,
+  sequential: boolean,
+): Promise<ReadResults<T>> {
+  if (!sequential) return (await Promise.all(reads.map((read) => read()))) as ReadResults<T>;
+  const results: unknown[] = [];
+  for (const read of reads) results.push(await read());
+  return results as ReadResults<T>;
 }
 
 /** Comments that are not deleted, per task id; tasks without any are left out. */
@@ -750,10 +1051,40 @@ async function rankForPosition(
 // Create and update
 // ---------------------------------------------------------------------------
 
+/** Labels as a stored change lists them: by name ignoring case. */
+function storedLabels(rows: Pick<LabelRow, 'id' | 'name'>[]): StoredLabelRef[] {
+  return [...rows].sort(compareLabelNames).map((row) => ({ id: row.id, name: row.name }));
+}
+
+/** Blockers as a stored change lists them: by key. */
+function storedBlockers(projectRow: ProjectRow, rows: ProjectTask[]): StoredTaskRef[] {
+  return rows.map((row) => storedTaskRef(projectRow, row)).sort((a, b) => compareTaskKeys(a.key, b.key));
+}
+
+function labelScope(projectRow: ProjectRow) {
+  return { workspaceId: projectRow.workspaceId, projectId: projectRow.id };
+}
+
+function asProjectTask(row: TaskRow): ProjectTask {
+  return {
+    id: row.id,
+    number: row.number,
+    keySuffix: row.keySuffix,
+    title: row.title,
+    parentId: row.parentId,
+    assigneeId: row.assigneeId,
+  };
+}
+
 /**
  * Creates a task at the top of its status column. Its number comes from the project counter in
  * the same transaction. A milestone and a cycle of the same project may be set; a started task
  * activates its milestone.
+ *
+ * M5: `labels` are found by name ignoring case or created; `dueDate` is stored as given; `parent`
+ * makes it a subtask (same project, the parent top level), which takes the parent's assignee when
+ * no assignee is sent (an explicit null leaves it unassigned); `blockedBy` lists tasks of the same
+ * project it waits on (a new task can't close a loop: nothing waits on it yet).
  */
 export async function createTask(
   ctx: TaskContext,
@@ -763,7 +1094,8 @@ export async function createTask(
   const parsed = parseInput(CreateTaskInput, input);
   return ctx.db.transaction(async (tx) => {
     // Row lock on the project first: concurrent creations queue here and each gets the next number
-    // and a rank above the column's current top; a cycle cannot end while the task joins it.
+    // and a rank above the column's current top; a cycle cannot end while the task joins it; a
+    // parent cannot become a subtask meanwhile.
     const projectRow = await findProjectByKey(tx, actor, parsed.project, { forUpdate: true });
     authorize(actor, 'task.write', { type: 'project', projectId: projectRow.id });
     const source = await loadBacklogSource(tx, projectRow.id);
@@ -774,9 +1106,18 @@ export async function createTask(
         `${projectRow.name} is importing from Backlog.md. Add tasks once the import has finished.`,
       );
     }
-    const assigneeId = (await resolveAssignee(tx, actor, parsed.assignee)) ?? null;
+    const [parentRow] = parsed.parent
+      ? await resolveProjectTasks(tx, projectRow, [parsed.parent], 'parent')
+      : [];
+    if (parentRow) await assertParentAllowed(tx, projectRow, null, parentRow);
+    const assigneeId =
+      parsed.assignee === undefined && parentRow
+        ? parentRow.assigneeId
+        : ((await resolveAssignee(tx, actor, parsed.assignee)) ?? null);
     const milestoneRow = (await resolveMilestone(tx, projectRow, parsed.milestone)) ?? null;
     const cycleRow = (await resolveCycle(tx, ctx, projectRow, parsed.cycle)) ?? null;
+    const blockers = await resolveProjectTasks(tx, projectRow, parsed.blockedBy ?? [], 'blockedBy');
+    const labelRows = await findOrCreateLabels(tx, labelScope(projectRow), parsed.labels ?? []);
 
     const [counter] = await tx
       .update(project)
@@ -787,6 +1128,7 @@ export async function createTask(
     const rank = await topRank(tx, projectRow.id, parsed.status);
 
     const description = parsed.description ? parsed.description : null;
+    const dueDate = parsed.dueDate ?? null;
     const [row] = await tx
       .insert(task)
       .values({
@@ -803,9 +1145,21 @@ export async function createTask(
         cycleId: cycleRow?.id ?? null,
         cycleAddedAt: cycleRow ? sql`now()` : null,
         rank,
+        dueDate,
+        parentId: parentRow?.id ?? null,
       })
       .returning();
     if (!row) throw new Error('task insert returned no row');
+    await setTaskLabels(
+      tx,
+      row.id,
+      labelRows.map((label) => label.id),
+    );
+    await insertBlockers(
+      tx,
+      row.id,
+      blockers.map((blocker) => blocker.id),
+    );
 
     if (milestoneRow && STARTED_STATUSES.has(row.status)) await activateMilestoneForTask(tx, milestoneRow.id);
 
@@ -820,6 +1174,12 @@ export async function createTask(
     if (assigneeId) changes.push({ field: 'assignee', from: null, to: assigneeId });
     if (milestoneRow) changes.push({ field: 'milestone', from: null, to: milestoneRow.id });
     if (cycleRow) changes.push({ field: 'cycle', from: null, to: cycleRow.id });
+    if (labelRows.length > 0) changes.push({ field: 'labels', from: [], to: storedLabels(labelRows) });
+    if (dueDate !== null) changes.push({ field: 'dueDate', from: null, to: dueDate });
+    if (parentRow) changes.push({ field: 'parent', from: null, to: storedTaskRef(projectRow, parentRow) });
+    if (blockers.length > 0) {
+      changes.push({ field: 'blockedBy', from: [], to: storedBlockers(projectRow, blockers) });
+    }
     await recordActivity(tx, actor, {
       projectId: projectRow.id,
       taskId: row.id,
@@ -829,6 +1189,261 @@ export async function createTask(
 
     return toTask(tx, projectRow, row, viewOf(ctx));
   });
+}
+
+/** The fields one task write changes: UpdateTaskInput without the key and the precondition. */
+type TaskPatch = Omit<UpdateTaskInput, 'key' | 'project' | 'ifUpdatedAt'>;
+
+/** Whether applying `patch` needs the project lock: rank changes, cycles, blockers and parents. */
+function patchNeedsProjectLock(patch: TaskPatch): boolean {
+  return (
+    patch.status !== undefined ||
+    patch.position !== undefined ||
+    patch.cycle !== undefined ||
+    patch.parent !== undefined ||
+    (patch.addBlockers?.length ?? 0) > 0
+  );
+}
+
+/** The label names a task ends up with after `patch`, or null when the patch leaves labels alone. */
+function targetLabelNames(patch: TaskPatch, current: Pick<LabelRow, 'name'>[]): string[] | null {
+  if (patch.labels !== undefined) return patch.labels;
+  if (!patch.addLabels && !patch.removeLabels) return null;
+  const removed = new Set((patch.removeLabels ?? []).map((name) => name.toLowerCase()));
+  const names = current.map((row) => row.name).filter((name) => !removed.has(name.toLowerCase()));
+  const kept = new Set(names.map((name) => name.toLowerCase()));
+  for (const name of patch.addLabels ?? []) {
+    if (!kept.has(name.toLowerCase())) {
+      kept.add(name.toLowerCase());
+      names.push(name);
+    }
+  }
+  return names;
+}
+
+function sameNames(a: string[], b: string[]): boolean {
+  const left = new Set(a.map((name) => name.toLowerCase()));
+  const right = new Set(b.map((name) => name.toLowerCase()));
+  return left.size === right.size && [...left].every((name) => right.has(name));
+}
+
+/**
+ * Applies `patch` to `current` (locked by the caller, with the project lock when
+ * patchNeedsProjectLock) and records one task.updated row with every change. Returns the row as
+ * it is now. See updateTask for the rules.
+ */
+async function applyTaskPatch(
+  tx: Tx,
+  ctx: TaskContext,
+  actor: Actor,
+  projectRow: ProjectRow,
+  current: TaskRow,
+  patch: TaskPatch,
+): Promise<TaskRow> {
+  const set: Partial<TaskInsert> = {};
+  /** now() of the transaction when the cycle changes, null when it is cleared. */
+  let cycleAddedAt: SQL | null | undefined;
+  const changes: StoredChange[] = [];
+  if (patch.title !== undefined && patch.title !== current.title) {
+    set.title = patch.title;
+    changes.push({ field: 'title', from: current.title, to: patch.title });
+  }
+  if (patch.description !== undefined) {
+    const description = patch.description ? patch.description : null;
+    if (description !== current.description) {
+      set.description = description;
+      changes.push({ field: 'description', from: current.description, to: description });
+    }
+  }
+  if (patch.status !== undefined && patch.status !== current.status) {
+    set.status = patch.status;
+    changes.push({ field: 'status', from: current.status, to: patch.status });
+  }
+  if (patch.priority !== undefined) {
+    const value = priorityToValue(patch.priority);
+    if (value !== current.priority) {
+      set.priority = value;
+      const from: Priority = priorityFromValue(current.priority);
+      changes.push({ field: 'priority', from, to: patch.priority });
+    }
+  }
+  const assigneeId = await resolveAssignee(tx, actor, patch.assignee);
+  if (assigneeId !== undefined && assigneeId !== current.assigneeId) {
+    set.assigneeId = assigneeId;
+    changes.push({ field: 'assignee', from: current.assigneeId, to: assigneeId });
+  }
+  if (patch.milestone !== undefined && patch.milestone !== current.milestoneId) {
+    const milestoneRow = await resolveMilestone(tx, projectRow, patch.milestone);
+    const milestoneId = milestoneRow?.id ?? null;
+    set.milestoneId = milestoneId;
+    changes.push({ field: 'milestone', from: current.milestoneId, to: milestoneId });
+  }
+  if (patch.cycle !== undefined) {
+    // Same cycle again is no change, even when that cycle has completed since.
+    const unchanged =
+      patch.cycle === null
+        ? current.cycleId === null
+        : current.cycleId !== null && (await sameCycle(tx, current.cycleId, patch.cycle));
+    if (!unchanged) {
+      const cycleRow = await resolveCycle(tx, ctx, projectRow, patch.cycle);
+      const cycleId = cycleRow?.id ?? null;
+      if (cycleId !== current.cycleId) {
+        set.cycleId = cycleId;
+        cycleAddedAt = cycleId ? sql`now()` : null;
+        changes.push({ field: 'cycle', from: current.cycleId, to: cycleId });
+      }
+    }
+  }
+
+  // M5 fields: work out what changes first, so a mirrored task is refused before anything is written.
+  const currentLabels =
+    patch.labels || patch.addLabels || patch.removeLabels ? await loadTaskLabelRows(tx, current.id) : [];
+  const labelNames = targetLabelNames(patch, currentLabels);
+  const labelsChange =
+    labelNames !== null &&
+    !sameNames(
+      labelNames,
+      currentLabels.map((row) => row.name),
+    );
+  if (labelsChange && labelNames.length > MAX_TASK_LABELS) {
+    throw invalidField('labels', `Use ${MAX_TASK_LABELS} labels or fewer on a task`);
+  }
+  const dueChange = patch.dueDate !== undefined && patch.dueDate !== current.dueDate;
+  let parentTarget: ProjectTask | null | undefined;
+  if (patch.parent === null) parentTarget = current.parentId === null ? undefined : null;
+  else if (patch.parent !== undefined) {
+    const [found] = await resolveProjectTasks(tx, projectRow, [patch.parent], 'parent');
+    parentTarget = found && found.id !== current.parentId ? found : undefined;
+  }
+  const blockersTouched = (patch.addBlockers?.length ?? 0) > 0 || (patch.removeBlockers?.length ?? 0) > 0;
+  const currentBlockers = blockersTouched ? await loadBlockers(tx, current.id) : [];
+  const currentBlockerIds = new Set(currentBlockers.map((row) => row.id));
+  const addedBlockers = (
+    await resolveProjectTasks(tx, projectRow, patch.addBlockers ?? [], 'addBlockers')
+  ).filter((row) => !currentBlockerIds.has(row.id));
+  const removedKeys = new Set(patch.removeBlockers ?? []);
+  const removedBlockers = currentBlockers.filter((row) =>
+    removedKeys.has(formatTaskKey(projectRow.key, row.number, row.keySuffix)),
+  );
+  const blockersChange = addedBlockers.length > 0 || removedBlockers.length > 0;
+
+  const locked: LockedChange[] = changes.filter(isOwnedChange);
+  if (labelsChange) locked.push({ field: 'labels', to: labelNames });
+  if (dueChange) locked.push({ field: 'dueDate', from: current.dueDate, to: patch.dueDate ?? null });
+  if (parentTarget !== undefined) locked.push({ field: 'parent', to: parentTarget?.id ?? null });
+  if (blockersChange) {
+    const removedIds = new Set(removedBlockers.map((row) => row.id));
+    locked.push({
+      field: 'blockedBy',
+      to: [...currentBlockers.filter((row) => !removedIds.has(row.id)), ...addedBlockers].map(
+        (row) => row.id,
+      ),
+    });
+  }
+  const [owned] = locked;
+  if (owned) {
+    const source = await loadBacklogSource(tx, projectRow.id);
+    if (sourceMirrors(source)) {
+      throw await taskMirrored(tx, projectRow, current, source as BacklogSourceRow, owned);
+    }
+  }
+
+  if (labelsChange) {
+    const rows = await findOrCreateLabels(tx, labelScope(projectRow), labelNames);
+    await setTaskLabels(
+      tx,
+      current.id,
+      rows.map((row) => row.id),
+    );
+    changes.push({ field: 'labels', from: storedLabels(currentLabels), to: storedLabels(rows) });
+  }
+  if (dueChange) {
+    set.dueDate = patch.dueDate ?? null;
+    changes.push({ field: 'dueDate', from: current.dueDate, to: patch.dueDate ?? null });
+  }
+  if (parentTarget !== undefined) {
+    if (parentTarget) await assertParentAllowed(tx, projectRow, asProjectTask(current), parentTarget);
+    const [from] = current.parentId
+      ? await resolveProjectTasksById(tx, projectRow, [current.parentId])
+      : [undefined];
+    set.parentId = parentTarget?.id ?? null;
+    changes.push({
+      field: 'parent',
+      from: from ? storedTaskRef(projectRow, from) : null,
+      to: parentTarget ? storedTaskRef(projectRow, parentTarget) : null,
+    });
+  }
+  if (blockersChange) {
+    // Removals first: dropping a link can only open paths, never close a loop.
+    await deleteBlockers(
+      tx,
+      current.id,
+      removedBlockers.map((row) => row.id),
+    );
+    const waiting = asProjectTask(current);
+    for (const blocker of addedBlockers) {
+      await assertNoDependencyLoop(tx, projectRow, waiting, blocker);
+      await insertBlockers(tx, current.id, [blocker.id]);
+    }
+    const removedIds = new Set(removedBlockers.map((row) => row.id));
+    const after = [...currentBlockers.filter((row) => !removedIds.has(row.id)), ...addedBlockers];
+    changes.push({
+      field: 'blockedBy',
+      from: storedBlockers(projectRow, currentBlockers),
+      to: storedBlockers(projectRow, after),
+    });
+  }
+
+  const status = set.status ?? current.status;
+  if (patch.position) {
+    set.rank = await rankForPosition(tx, projectRow, current.id, status, patch.position);
+  } else if (set.status !== undefined) {
+    set.rank = await topRank(tx, projectRow.id, status, current.id);
+  }
+
+  // Label and blocker changes live in other tables; they still make the task updated.
+  if (Object.keys(set).length === 0 && changes.length > 0) set.updatedAt = new Date();
+  if (Object.keys(set).length === 0) return current;
+
+  const [row] = await tx
+    .update(task)
+    .set(cycleAddedAt === undefined ? set : { ...set, cycleAddedAt })
+    .where(eq(task.id, current.id))
+    .returning();
+  if (!row) throw new Error('task update returned no row');
+  const startedOrMoved = set.status !== undefined || set.milestoneId !== undefined;
+  if (row.milestoneId && startedOrMoved && STARTED_STATUSES.has(row.status)) {
+    await activateMilestoneForTask(tx, row.milestoneId);
+  }
+  if (changes.length > 0) {
+    await recordActivity(tx, actor, {
+      projectId: projectRow.id,
+      taskId: row.id,
+      type: 'task.updated',
+      changes,
+    });
+  }
+  return row;
+}
+
+/** Tasks of the project by id, as project tasks (for the parent a stored change names). */
+async function resolveProjectTasksById(
+  tx: Tx,
+  projectRow: ProjectRow,
+  ids: string[],
+): Promise<ProjectTask[]> {
+  if (ids.length === 0) return [];
+  return tx
+    .select({
+      id: task.id,
+      number: task.number,
+      keySuffix: task.keySuffix,
+      title: task.title,
+      parentId: task.parentId,
+      assigneeId: task.assigneeId,
+    })
+    .from(task)
+    .where(and(eq(task.projectId, projectRow.id), inArray(task.id, ids)));
 }
 
 /**
@@ -841,131 +1456,148 @@ export async function createTask(
  * - A task that ends up started (In progress, In review) after a status or milestone change
  *   activates its milestone.
  * - M3: in a project that mirrors Backlog.md, a change to a field Backlog.md owns (title,
- *   description, status, priority, assignee, milestone) fails with TaskMirrored, which names the
- *   field, the file and a `backlog task edit` hint. A board move to another column is a status
- *   change and fails the same way. Cycle and rank within the column stay editable.
+ *   description, status, priority, assignee, milestone, and from M5 labels, dueDate, parent and
+ *   blockers) fails with TaskMirrored, which names the field, the file and a `backlog task edit`
+ *   hint. A board move to another column is a status change and fails the same way. Cycle and
+ *   rank within the column stay editable.
+ * - M5: labels replaces the labels by name (missing ones are created), addLabels and removeLabels
+ *   change some; dueDate sets or clears the due date; parent sets (same project, one level:
+ *   SubtaskDepth) or clears the parent; addBlockers and removeBlockers change what the task waits
+ *   on (same project; a loop fails with DependencyLoop). Each records the whole list before and
+ *   after.
  */
 export async function updateTask(
   ctx: TaskContext,
   actor: Actor,
   input: z.input<typeof UpdateTaskInput>,
 ): Promise<Task> {
-  const parsed = parseInput(UpdateTaskInput, input);
+  const { key, project: narrow, ifUpdatedAt, ...patch } = parseInput(UpdateTaskInput, input);
   const view = viewOf(ctx);
   return ctx.db.transaction(async (tx) => {
-    // Rank changes may renumber the column, and ending a cycle moves tasks under the project lock:
-    // take it first for those changes (see findTask).
-    const lockProject =
-      parsed.status !== undefined || parsed.position !== undefined || parsed.cycle !== undefined;
-    const { project: projectRow, task: current } = await findTask(tx, actor, parsed.key, {
+    // Rank changes may renumber the column, ending a cycle moves tasks under the project lock, and
+    // the blocker loop and subtask depth checks need a stable project: take it first for those
+    // changes (see findTask).
+    const { project: projectRow, task: current } = await findTask(tx, actor, key, {
       forUpdate: true,
-      lockProject,
-      project: parsed.project,
+      lockProject: patchNeedsProjectLock(patch),
+      project: narrow,
     });
     authorize(actor, 'task.write', { type: 'project', projectId: projectRow.id });
 
-    if (parsed.ifUpdatedAt) {
+    if (ifUpdatedAt) {
       const [check] = await tx
         .select({
-          stale: sql<boolean>`date_trunc('milliseconds', ${task.updatedAt}) > ${parsed.ifUpdatedAt}::timestamptz`,
+          stale: sql<boolean>`date_trunc('milliseconds', ${task.updatedAt}) > ${ifUpdatedAt}::timestamptz`,
         })
         .from(task)
         .where(eq(task.id, current.id));
       if (check?.stale) throw new TaskChanged(await toTask(tx, projectRow, current, view));
     }
 
-    const set: Partial<TaskInsert> = {};
-    /** now() of the transaction when the cycle changes, null when it is cleared. */
-    let cycleAddedAt: SQL | null | undefined;
-    const changes: StoredChange[] = [];
-    if (parsed.title !== undefined && parsed.title !== current.title) {
-      set.title = parsed.title;
-      changes.push({ field: 'title', from: current.title, to: parsed.title });
-    }
-    if (parsed.description !== undefined) {
-      const description = parsed.description ? parsed.description : null;
-      if (description !== current.description) {
-        set.description = description;
-        changes.push({ field: 'description', from: current.description, to: description });
-      }
-    }
-    if (parsed.status !== undefined && parsed.status !== current.status) {
-      set.status = parsed.status;
-      changes.push({ field: 'status', from: current.status, to: parsed.status });
-    }
-    if (parsed.priority !== undefined) {
-      const value = priorityToValue(parsed.priority);
-      if (value !== current.priority) {
-        set.priority = value;
-        const from: Priority = priorityFromValue(current.priority);
-        changes.push({ field: 'priority', from, to: parsed.priority });
-      }
-    }
-    const assigneeId = await resolveAssignee(tx, actor, parsed.assignee);
-    if (assigneeId !== undefined && assigneeId !== current.assigneeId) {
-      set.assigneeId = assigneeId;
-      changes.push({ field: 'assignee', from: current.assigneeId, to: assigneeId });
-    }
-    if (parsed.milestone !== undefined && parsed.milestone !== current.milestoneId) {
-      const milestoneRow = await resolveMilestone(tx, projectRow, parsed.milestone);
-      const milestoneId = milestoneRow?.id ?? null;
-      set.milestoneId = milestoneId;
-      changes.push({ field: 'milestone', from: current.milestoneId, to: milestoneId });
-    }
-    if (parsed.cycle !== undefined) {
-      // Same cycle again is no change, even when that cycle has completed since.
-      const unchanged =
-        parsed.cycle === null
-          ? current.cycleId === null
-          : current.cycleId !== null && (await sameCycle(tx, current.cycleId, parsed.cycle));
-      if (!unchanged) {
-        const cycleRow = await resolveCycle(tx, ctx, projectRow, parsed.cycle);
-        const cycleId = cycleRow?.id ?? null;
-        if (cycleId !== current.cycleId) {
-          set.cycleId = cycleId;
-          cycleAddedAt = cycleId ? sql`now()` : null;
-          changes.push({ field: 'cycle', from: current.cycleId, to: cycleId });
-        }
-      }
-    }
-
-    const owned = changes.find((change) => isOwnedChange(change));
-    if (owned) {
-      const source = await loadBacklogSource(tx, projectRow.id);
-      if (sourceMirrors(source)) {
-        throw await taskMirrored(tx, projectRow, current, source as BacklogSourceRow, owned);
-      }
-    }
-
-    const status = set.status ?? current.status;
-    if (parsed.position) {
-      set.rank = await rankForPosition(tx, projectRow, current.id, status, parsed.position);
-    } else if (set.status !== undefined) {
-      set.rank = await topRank(tx, projectRow.id, status, current.id);
-    }
-
-    if (Object.keys(set).length === 0) return toTask(tx, projectRow, current, view);
-
-    const [row] = await tx
-      .update(task)
-      .set(cycleAddedAt === undefined ? set : { ...set, cycleAddedAt })
-      .where(eq(task.id, current.id))
-      .returning();
-    if (!row) throw new Error('task update returned no row');
-    const startedOrMoved = set.status !== undefined || set.milestoneId !== undefined;
-    if (row.milestoneId && startedOrMoved && STARTED_STATUSES.has(row.status)) {
-      await activateMilestoneForTask(tx, row.milestoneId);
-    }
-    if (changes.length > 0) {
-      await recordActivity(tx, actor, {
-        projectId: projectRow.id,
-        taskId: row.id,
-        type: 'task.updated',
-        changes,
-      });
-    }
+    const row = await applyTaskPatch(tx, ctx, actor, projectRow, current, patch);
     return toTask(tx, projectRow, row, view);
   });
+}
+
+/**
+ * M5: one change for up to MAX_BULK_TASKS tasks of native projects, in one transaction: every task
+ * changes or none does. Each changed task gets its own task.updated row; tasks that have the
+ * values already get none. Rules:
+ * - Any task of a project that mirrors Backlog.md fails the request with TaskMirrored.
+ * - A milestone or cycle (not null) needs every task in one project (NotSameProject).
+ * - Labels resolve by name per project (missing ones are created); a status change puts each task
+ *   at the top of its new column.
+ * - Locks: projects, then tasks, each in id order, so concurrent bulk changes can't deadlock.
+ * Returns every task as a list row, in the order of the keys sent.
+ */
+export async function bulkUpdateTasks(
+  ctx: TaskContext,
+  actor: Actor,
+  input: z.input<typeof BulkUpdateTasksInput>,
+): Promise<TaskBulkResult> {
+  const { keys, ...patch } = parseInput(BulkUpdateTasksInput, input);
+  return ctx.db.transaction(async (tx) => {
+    const hits: { project: ProjectRow; task: TaskRow }[] = [];
+    for (const key of keys) hits.push(await findTask(tx, actor, key));
+    const projectIds = [...new Set(hits.map((hit) => hit.project.id))].sort();
+    for (const projectId of projectIds) authorize(actor, 'task.write', { type: 'project', projectId });
+
+    const mirrored = await mirroredProjectIds(tx, projectIds);
+    const mirroredHit = hits.find((hit) => mirrored.has(hit.project.id));
+    if (mirroredHit) {
+      const source = await loadBacklogSource(tx, mirroredHit.project.id);
+      const field = bulkOwnedField(patch);
+      const key = formatTaskKey(mirroredHit.project.key, mirroredHit.task.number, mirroredHit.task.keySuffix);
+      const file = await backlogFilePath(tx, source, { taskId: mirroredHit.task.id });
+      throw new TaskMirrored(
+        `${key} is mirrored from Backlog.md. Change several tasks at once in native projects only.`,
+        {
+          ...(field ? { field } : {}),
+          ...(file ? { file } : {}),
+          ...(mirroredHit.task.backlogId ? { backlogId: mirroredHit.task.backlogId } : {}),
+        },
+      );
+    }
+    if (projectIds.length > 1 && (patch.milestone || (patch.cycle !== undefined && patch.cycle !== null))) {
+      const what = patch.milestone ? 'milestone' : 'cycle';
+      throw new NotSameProject(`Pick tasks of one project to set a ${what} on all of them`, {
+        issues: [{ path: what, message: 'The tasks are in different projects' }],
+      });
+    }
+
+    const lockedProjects = await tx
+      .select()
+      .from(project)
+      .where(inArray(project.id, projectIds))
+      .orderBy(asc(project.id))
+      .for('update');
+    const projectById = new Map(lockedProjects.map((row) => [row.id, row]));
+    const taskIds = [...new Set(hits.map((hit) => hit.task.id))].sort();
+    const lockedTasks = await tx
+      .select()
+      .from(task)
+      .where(inArray(task.id, taskIds))
+      .orderBy(asc(task.id))
+      .for('update');
+    const taskById = new Map(lockedTasks.map((row) => [row.id, row]));
+
+    // Resolve the assignee once; applyTaskPatch then compares ids.
+    const assignee = await resolveAssignee(tx, actor, patch.assignee);
+    const updated = new Map<string, TaskRow>();
+    for (const hit of hits) {
+      if (updated.has(hit.task.id)) continue;
+      const projectRow = projectById.get(hit.project.id);
+      const current = taskById.get(hit.task.id);
+      if (!projectRow || !current) throw new NotFound(`Task ${hit.task.id} not found`);
+      const row = await applyTaskPatch(tx, ctx, actor, projectRow, current, {
+        ...patch,
+        ...(assignee === undefined ? {} : { assignee }),
+      });
+      updated.set(row.id, row);
+    }
+
+    const rows = hits.map((hit) => {
+      const projectRow = projectById.get(hit.project.id) as ProjectRow;
+      return {
+        task: updated.get(hit.task.id) as TaskRow,
+        project: { id: projectRow.id, key: projectRow.key, name: projectRow.name },
+      };
+    });
+    return TaskBulkResult.parse({
+      items: await toListItems(tx, rows, todayIn(ctx), { inTransaction: true }),
+    });
+  });
+}
+
+/** The first field of a bulk change Backlog.md owns, for TaskMirrored; undefined for cycle only. */
+function bulkOwnedField(patch: Omit<BulkUpdateTasksInput, 'keys'>): TaskOwnedField | undefined {
+  if (patch.status !== undefined) return 'status';
+  if (patch.priority !== undefined) return 'priority';
+  if (patch.assignee !== undefined) return 'assignee';
+  if (patch.milestone !== undefined) return 'milestone';
+  if (patch.dueDate !== undefined) return 'dueDate';
+  if (patch.addLabels !== undefined || patch.removeLabels !== undefined) return 'labels';
+  return undefined;
 }
 
 /** Whether `selector` names the cycle `cycleId` already points at, without resolving current/next. */
@@ -988,13 +1620,27 @@ const OWNED_FIELD_LABELS: Record<TaskOwnedField, string> = {
   assignee: 'assignee',
   milestone: 'milestone',
   createdAt: 'created date',
+  labels: 'labels',
+  dueDate: 'due date',
+  blockedBy: 'blockers',
+  parent: 'parent',
 };
 
-/** A change updateTask can make; isOwnedChange picks the ones to fields Backlog.md owns. */
-type OwnedChange = Exclude<StoredChange, { field: 'backlog' }>;
+/** A change updateTask can make to a field of the task row (everything but the backlog marker). */
+type RowChange = Exclude<StoredChange, { field: 'backlog' | 'labels' | 'blockedBy' | 'parent' }>;
+
+/**
+ * A change to a field Backlog.md owns, as the lock check sees it before anything is written:
+ * label names, blocker task ids and the parent task id for the M5 relations.
+ */
+type LockedChange =
+  | RowChange
+  | { field: 'labels'; to: string[] }
+  | { field: 'blockedBy'; to: string[] }
+  | { field: 'parent'; to: string | null };
 
 /** True for changes to fields Backlog.md owns (every task field but cycle). */
-function isOwnedChange(change: StoredChange): change is OwnedChange {
+function isOwnedChange(change: StoredChange): change is RowChange {
   return (TASK_OWNED_FIELDS as readonly string[]).includes(change.field);
 }
 
@@ -1014,7 +1660,7 @@ function mappedFrom<T extends { from: string; how: string }>(
 async function editArguments(
   tx: Tx,
   source: BacklogSourceRow,
-  change: OwnedChange,
+  change: LockedChange,
 ): Promise<{ flags: string } | { text: string }> {
   const mappings = source.mappings;
   switch (change.field) {
@@ -1060,6 +1706,30 @@ async function editArguments(
     case 'cycle':
       // Not owned (isOwnedChange leaves it out); here for completeness.
       return { text: 'Cycles are set here, not in Backlog.md' };
+    case 'labels':
+      return change.to.length === 0
+        ? { flags: '--clear-labels' }
+        : { flags: `-l ${shellWord(change.to.join(','))}` };
+    case 'dueDate':
+      return change.to ? { flags: `--due-date ${change.to}` } : { flags: '--clear-due-date' };
+    case 'blockedBy': {
+      if (change.to.length === 0) return { flags: '--clear-deps' };
+      const rows = await tx
+        .select({ id: task.id, backlogId: task.backlogId })
+        .from(task)
+        .where(inArray(task.id, change.to));
+      const byId = new Map(rows.map((row) => [row.id, row.backlogId]));
+      const ids = change.to.flatMap((id) => {
+        const backlogId = byId.get(id);
+        return backlogId ? [backlogId] : [];
+      });
+      return ids.length === change.to.length
+        ? { flags: `--dep ${shellWord(ids.join(','))}` }
+        : { text: 'Change dependencies in the task file and push' };
+    }
+    case 'parent':
+      // Backlog.md's CLI has no flag for the parent.
+      return { text: 'Change parent_task_id in the task file and push' };
   }
 }
 
@@ -1069,7 +1739,7 @@ async function taskEditHint(
   source: BacklogSourceRow,
   row: TaskRow,
   backlogId: string,
-  change: OwnedChange,
+  change: LockedChange,
 ): Promise<string> {
   const parts = parseBacklogId(backlogId);
   const id = parts ? formatTaskKey('', parts.number, parts.suffix).slice(1) : backlogId;
@@ -1085,7 +1755,7 @@ async function taskMirrored(
   projectRow: ProjectRow,
   row: TaskRow,
   source: BacklogSourceRow,
-  change: OwnedChange,
+  change: LockedChange,
 ): Promise<TaskMirrored> {
   const key = formatTaskKey(projectRow.key, row.number, row.keySuffix);
   const file = await backlogFilePath(tx, source, { taskId: row.id });

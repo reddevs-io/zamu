@@ -228,3 +228,40 @@ export async function createTaskRow(
     return row;
   });
 }
+
+// ---------------------------------------------------------------------------
+// M5 rows: labels, task labels and blocker links. Raw inserts like the M2 rows above; the task
+// services check the rules (same project, no loops), these don't.
+// ---------------------------------------------------------------------------
+
+/** Inserts a label. Name defaults to a unique one, colour to 1, source to app. */
+export async function createLabelRow(
+  db: Db,
+  scope: ProjectScope,
+  values: Partial<Omit<typeof schema.label.$inferInsert, 'workspaceId' | 'projectId'>> = {},
+): Promise<typeof schema.label.$inferSelect> {
+  const [row] = await db
+    .insert(schema.label)
+    .values({ name: `label-${unique()}`, color: 1, ...values, ...scope })
+    .returning();
+  if (!row) throw new Error('label insert failed');
+  return row;
+}
+
+/** Puts labels on a task. */
+export async function addTaskLabels(db: Db, taskId: string, labelIds: string[]): Promise<void> {
+  if (labelIds.length === 0) return;
+  await db
+    .insert(schema.taskLabel)
+    .values(labelIds.map((labelId) => ({ taskId, labelId })))
+    .onConflictDoNothing();
+}
+
+/** Makes `taskId` wait on each of `blockerIds`. */
+export async function addTaskBlockers(db: Db, taskId: string, blockerIds: string[]): Promise<void> {
+  if (blockerIds.length === 0) return;
+  await db
+    .insert(schema.taskDependency)
+    .values(blockerIds.map((blockerId) => ({ taskId, blockerId })))
+    .onConflictDoNothing();
+}

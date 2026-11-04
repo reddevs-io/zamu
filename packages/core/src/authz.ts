@@ -18,6 +18,8 @@
 //   read the project reads the source status and its problems.
 // 0.6.0 (PM-12): deleting a project is for owners and admins, people only; through an API key only
 //   a workspace-wide write key.
+// M5: labels follow milestones: read with project.read, create, rename, recolour and delete with
+//   task.write. Bulk task changes need task.write on every project they touch.
 import type { Actor, WorkspaceRole } from '@pm/auth';
 import { Forbidden } from './errors';
 
