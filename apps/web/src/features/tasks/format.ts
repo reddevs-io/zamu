@@ -52,6 +52,18 @@ export function formatPageTime(value: string | Date, now: Date = new Date()): st
   return formatDayTime(value, now);
 }
 
+/**
+ * The task view's history and properties (frames 051, 057): "Just now", "38 min ago", "2 h ago" within a
+ * day, then "Oct 14".
+ */
+export function formatRelative(value: string | Date, now: Date = new Date()): string {
+  const elapsed = Math.max(0, now.getTime() - toDate(value).getTime());
+  if (elapsed < MINUTE) return 'Just now';
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} min ago`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} h ago`;
+  return formatDay(value, now);
+}
+
 /** Splits a CalendarDate ("2026-11-14") into a local Date at midnight, so the day never shifts by zone. */
 function calendarDate(value: string): Date {
   const [year = 1970, month = 1, day = 1] = value.split('-').map(Number);
@@ -158,18 +170,49 @@ export function describeCheckboxChange(from: string | null, to: string | null): 
 const statusLabel = (status: TaskStatus | null) => (status ? STATUS_LABELS[status] : 'none');
 const priorityLabel = (priority: Priority | null) => (priority ? PRIORITY_LABELS[priority] : 'None');
 
+function joinWords(words: readonly string[]): string {
+  if (words.length <= 1) return words[0] ?? '';
+  return `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+}
+
+/**
+ * "added the label ui and removed the labels bug and docs" (labels), "added blocker PAY-120" (blockers):
+ * what changed between two lists of names.
+ */
+function listChange(
+  from: readonly string[],
+  to: readonly string[],
+  noun: (count: number) => string,
+  fallback: string,
+): string {
+  const lower = (items: readonly string[]) => items.map((item) => item.toLowerCase());
+  const before = lower(from);
+  const after = lower(to);
+  const added = to.filter((name) => !before.includes(name.toLowerCase()));
+  const removed = from.filter((name) => !after.includes(name.toLowerCase()));
+  const parts = [
+    added.length ? `added ${noun(added.length)} ${joinWords(added)}` : null,
+    removed.length ? `removed ${noun(removed.length)} ${joinWords(removed)}` : null,
+  ];
+  return parts.filter(Boolean).join(' and ') || fallback;
+}
+
+const labelNoun = (count: number) => (count === 1 ? 'the label' : 'the labels');
+const blockerNoun = (count: number) => (count === 1 ? 'blocker' : 'blockers');
+
+/** One field change as the task view's history says it (frames 051, 057): "moved this to In progress". */
 function describeChange(change: ActivityChange): string {
   switch (change.field) {
     case 'status':
-      return change.from
-        ? `moved it from ${statusLabel(change.from)} to ${statusLabel(change.to)}`
-        : `set status to ${statusLabel(change.to)}`;
+      return change.to ? `moved this to ${statusLabel(change.to)}` : 'cleared the status';
     case 'priority':
-      return `set priority to ${priorityLabel(change.to)}`;
+      return change.to && change.to !== 'none'
+        ? `set priority to ${priorityLabel(change.to)}`
+        : 'cleared the priority';
     case 'assignee':
-      return change.to ? `assigned it to ${change.to.name}` : 'unassigned it';
+      return change.to ? `assigned this to ${change.to.name}` : 'unassigned this';
     case 'title':
-      return `renamed it to “${change.to ?? ''}”`;
+      return `renamed this to “${change.to ?? ''}”`;
     case 'description': {
       const checks = describeCheckboxChange(change.from, change.to);
       if (checks) return checks;
@@ -178,32 +221,49 @@ function describeChange(change: ActivityChange): string {
       return 'edited the description';
     }
     case 'milestone':
-      return change.to ? `set milestone ${change.to.name}` : 'cleared the milestone';
+      return change.to ? `set the milestone to ${change.to.name}` : 'cleared the milestone';
     case 'cycle':
-      if (change.to) return `moved it to Cycle ${change.to.number}`;
-      return change.from ? `removed it from Cycle ${change.from.number}` : 'removed it from the cycle';
+      if (change.to) return `moved this to ${cycleName(change.to)}`;
+      return change.from ? `removed this from ${cycleName(change.from)}` : 'removed this from the cycle';
+    case 'labels':
+      return listChange(
+        change.from.map((label) => label.name),
+        change.to.map((label) => label.name),
+        labelNoun,
+        'changed the labels',
+      );
+    case 'dueDate':
+      if (!change.to) return 'cleared the due date';
+      return change.from
+        ? `moved the due date to ${formatCalendarDay(change.to)}`
+        : `set the due date to ${formatCalendarDay(change.to)}`;
+    case 'blockedBy':
+      return listChange(
+        change.from.map((task) => task.key),
+        change.to.map((task) => task.key),
+        blockerNoun,
+        'changed the blockers',
+      );
+    case 'parent':
+      if (change.to) return `made this a subtask of ${change.to.key}`;
+      return change.from ? `moved this out of ${change.from.key}` : 'made this a top-level task';
   }
-}
-
-function joinPhrases(phrases: string[]): string {
-  if (phrases.length <= 1) return phrases[0] ?? '';
-  return `${phrases.slice(0, -1).join(', ')} and ${phrases.at(-1)}`;
 }
 
 const cycleName = (cycle: { number: number }) => `Cycle ${cycle.number}`;
 
-/** The verb phrase after the actor: "moved it from Todo to In progress", "created the task". */
+/** The verb phrase after the actor: "moved this to In progress", "created this task". */
 export function describeActivity(activity: Pick<Activity, 'type' | 'changes'>): string {
-  if (activity.type === 'task.created') return 'created the task';
+  if (activity.type === 'task.created') return 'created this task';
   if (activity.type === 'cycle.ended') {
     const change = activity.changes.find((item) => item.field === 'cycle');
     if (change?.field === 'cycle' && change.from) {
       return change.to
-        ? `ended ${cycleName(change.from)} and moved it to ${cycleName(change.to)}`
-        : `ended ${cycleName(change.from)} and took it out of the cycle`;
+        ? `ended ${cycleName(change.from)} and moved this to ${cycleName(change.to)}`
+        : `ended ${cycleName(change.from)} and took this out of the cycle`;
     }
   }
-  return joinPhrases(activity.changes.map(describeChange)) || 'updated the task';
+  return joinWords(activity.changes.map(describeChange)) || 'updated this task';
 }
 
 /**

@@ -50,14 +50,14 @@ export function MappingTable({
       style={{ '--map-cols': cols } as CSSProperties}
       className={cn(
         'm-0 flex min-w-0 flex-col border-0 p-0',
-        variant === 'edit' && 'border border-line bg-surface',
+        variant === 'edit' && 'overflow-hidden rounded-md border border-line bg-surface',
         className,
       )}
     >
       {variant === 'edit' && columns ? (
         <div
           aria-hidden
-          className="caps grid h-7 grid-cols-(--map-cols) items-center gap-3 border-b border-line px-3"
+          className="grid h-7 grid-cols-(--map-cols) items-center gap-3 border-b border-line px-3 text-xs font-medium text-fg-3"
         >
           <span>{columns.from}</span>
           <span />
@@ -79,7 +79,7 @@ export interface MappingRowProps {
   value: Key | null;
   onChange?: (value: Key) => void;
   /**
-   * How the value was picked: `name` shows "by name", `fallback` turns the select --warn and says
+   * How the value was picked: `name` shows "by name", `fallback` turns the select --danger and says
    * "fallback", `manual` shows nothing.
    */
   how?: MappingHow;
@@ -116,8 +116,8 @@ export function MappingRow({
     showHow && how !== 'manual' ? (
       <span
         className={cn(
-          'shrink-0 text-[11px] whitespace-nowrap',
-          isFallback ? 'font-semibold text-warn' : 'text-faint',
+          'shrink-0 text-xs whitespace-nowrap',
+          isFallback ? 'font-semibold text-danger' : 'text-fg-3',
         )}
       >
         {isFallback ? 'fallback' : 'by name'}
@@ -130,19 +130,19 @@ export function MappingRow({
     <div
       data-how={how}
       className={cn(
-        'grid grid-cols-(--map-cols) items-center border-b border-line-2 last:border-b-0',
-        isReadOnly ? 'gap-2.5 py-1.5 text-[12.5px]' : 'min-h-10 gap-3 px-3',
+        'grid grid-cols-(--map-cols) items-center border-b border-line-soft last:border-b-0',
+        isReadOnly ? 'gap-2.5 py-1.5 text-sm' : 'min-h-10 gap-3 px-3',
         className,
       )}
     >
-      <span title={from} className="truncate font-mono text-[11px] text-fg">
+      <span title={from} className="truncate font-mono text-xs text-fg">
         {from}
       </span>
-      <span aria-hidden className="text-center text-faint">
+      <span aria-hidden className="text-center text-fg-3">
         →
       </span>
       {isReadOnly ? (
-        <span className="flex min-w-0 items-center gap-[7px]">
+        <span className="flex min-w-0 items-center gap-1.75">
           {selected ? <OptionLead item={selected} /> : null}
           <span className="truncate">{selected?.label ?? placeholder}</span>
           {isFallback && showHow ? note : null}
@@ -160,10 +160,10 @@ export function MappingRow({
           tone={isFallback ? 'warn' : 'default'}
           trailing={note}
           isDisabled={isDisabled}
-          triggerClassName={isFocused ? 'border-focus shadow-[0_0_0_3px_oklch(0.6_0.15_262/0.2)]' : undefined}
+          triggerClassName={isFocused ? 'border-accent shadow-[0_0_0_3px_var(--accent-soft)]' : undefined}
         />
       )}
-      <span className="text-right font-mono text-[10.5px] text-muted">{countText}</span>
+      <span className="text-right font-mono text-xs text-fg-2">{countText}</span>
     </div>
   );
 }

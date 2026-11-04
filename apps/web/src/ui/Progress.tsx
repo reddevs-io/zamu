@@ -11,7 +11,7 @@ export interface ProgressBarProps {
   inProgress?: number;
   /** All tasks counted (canceled excluded by the caller). */
   total: number;
-  /** `sm` is 4px (rows), `md` is 6px (cycle card and pages). */
+  /** `sm` is 4px (rows, margin.css .bar), `md` is 6px (page headers). */
   size?: 'sm' | 'md';
   /** Draw "14/22" after the bar. */
   showCount?: boolean;
@@ -20,7 +20,7 @@ export interface ProgressBarProps {
   className?: string;
 }
 
-/** Done in --done, then in progress in --accent at 55%, on a --track ground. */
+/** Margin progress bar (.bar): done in --status-done, then in progress in --accent at 55%, on --line, rounded. */
 export function ProgressBar({
   done,
   inProgress = 0,
@@ -41,12 +41,16 @@ export function ProgressBar({
       aria-valuenow={safeDone}
       aria-valuetext={`${safeDone} of ${total} done${safeProgress ? `, ${safeProgress} in progress` : ''}`}
       className={cn(
-        'flex min-w-[60px] flex-1 overflow-hidden bg-track',
+        'flex min-w-10 flex-1 overflow-hidden rounded-full bg-line',
         size === 'sm' ? 'h-1' : 'h-1.5',
         !showCount && className,
       )}
     >
-      <span data-part="done" className="h-full bg-done" style={{ width: pct(safeDone, total) }} />
+      <span
+        data-part="done"
+        className="h-full rounded-full bg-status-done"
+        style={{ width: pct(safeDone, total) }}
+      />
       <span
         data-part="in-progress"
         className="h-full bg-accent opacity-55"
@@ -65,80 +69,86 @@ export function ProgressBar({
   );
 }
 
-export interface TimeBarProps {
-  /** Days elapsed since the cycle started (the current day counts). */
-  elapsedDays: number;
-  /** Cycle length in days. */
-  totalDays: number;
-  /** Draw "11/14d" after the bar. */
-  showCount?: boolean;
-  className?: string;
-}
-
-/** Time elapsed in a cycle: 6px bar, --muted fill on --track. */
-export function TimeBar({ elapsedDays, totalDays, showCount = false, className }: TimeBarProps) {
-  const elapsed = Math.max(0, Math.min(elapsedDays, totalDays));
-  const bar = (
-    <span
-      role="progressbar"
-      aria-label="Time elapsed"
-      aria-valuemin={0}
-      aria-valuemax={Math.max(totalDays, 0)}
-      aria-valuenow={elapsed}
-      aria-valuetext={`Day ${elapsed} of ${totalDays}`}
-      className={cn('flex h-1.5 min-w-[60px] flex-1 bg-track', !showCount && className)}
-    >
-      <span className="h-full bg-muted" style={{ width: pct(elapsed, totalDays) }} />
-    </span>
-  );
-  if (!showCount) return bar;
-  return (
-    <span className={cn('flex min-w-0 items-center gap-3', className)}>
-      {bar}
-      <Count>
-        {elapsed}/{totalDays}d
-      </Count>
-    </span>
-  );
-}
-
 function Count({ children }: { children: ReactNode }) {
   return (
-    <span aria-hidden className="font-mono text-[10.5px] whitespace-nowrap text-muted">
+    <span aria-hidden className="text-xs whitespace-nowrap text-fg-2 tabular-nums">
       {children}
     </span>
   );
 }
 
-/** "3 days left", "1 day left", "Last day" (0), "Ended" (below 0). */
-export function formatDaysLeft(daysLeft: number): string {
-  if (daysLeft < 0) return 'Ended';
-  if (daysLeft === 0) return 'Last day';
-  return daysLeft === 1 ? '1 day left' : `${daysLeft} days left`;
-}
+export type SegmentTone = 'done' | 'review' | 'progress' | 'muted';
 
-export interface DaysLeftPillProps {
-  daysLeft: number;
-  /** Warn style at this many days or fewer (default 3). */
-  warnAt?: number;
-  /** Override the text, for example "3d left" in tight spots. */
-  children?: string;
+const SEGMENT_FILL: Record<SegmentTone, string> = {
+  done: 'bg-status-done',
+  review: 'bg-status-rev',
+  progress: 'bg-status-prog',
+  muted: 'bg-fg-3',
+};
+
+export interface SegmentedBarProps {
+  /** Segments in order, each a count and a tone: done, in review, in progress. */
+  segments: readonly { tone: SegmentTone; value: number; label?: string }[];
+  /** Everything counted (the rest of the bar stays --line). */
+  total: number;
+  /** `md` 8px (cycle card, page headers; default), `sm` 4px. */
+  size?: 'sm' | 'md';
+  /** Accessible name. Defaults to "Progress". */
+  label?: string;
   className?: string;
 }
 
-/** 18px pill. In --warn on --warn-bg when `daysLeft` is `warnAt` or fewer, plain muted text otherwise. */
-export function DaysLeftPill({ daysLeft, warnAt = 3, children, className }: DaysLeftPillProps) {
-  const warn = daysLeft <= warnAt;
+/** Segmented progress (screens.css .seg-bar): done, in review and in progress side by side on --line. */
+export function SegmentedBar({
+  segments,
+  total,
+  size = 'md',
+  label = 'Progress',
+  className,
+}: SegmentedBarProps) {
+  const text = segments
+    .filter((segment) => segment.value > 0)
+    .map((segment) => `${segment.value} ${segment.label ?? segment.tone}`)
+    .join(', ');
   return (
     <span
-      data-warn={warn || undefined}
+      role="img"
+      aria-label={`${label}: ${text || 'nothing yet'} of ${total}`}
       className={cn(
-        'inline-flex h-[18px] shrink-0 items-center px-1.5 text-[10.5px] whitespace-nowrap',
-        warn ? 'bg-warn-bg font-semibold text-warn' : 'text-muted',
+        'flex min-w-10 flex-1 overflow-hidden rounded-full bg-line',
+        size === 'md' ? 'h-2' : 'h-1',
         className,
       )}
     >
-      {children ?? formatDaysLeft(daysLeft)}
+      {segments.map((segment) => (
+        <span
+          key={segment.tone}
+          data-part={segment.tone}
+          className={cn('block h-full', SEGMENT_FILL[segment.tone])}
+          style={{ width: pct(segment.value, total) }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** Legend under a segmented bar: square swatch plus "12 done". */
+export function SegmentLegend({
+  segments,
+  className,
+}: {
+  segments: readonly { tone: SegmentTone; value: number; label: string }[];
+  className?: string;
+}) {
+  return (
+    <span className={cn('flex flex-wrap gap-3.5 text-xs text-fg-3', className)}>
+      {segments.map((segment) => (
+        <span key={segment.tone} className="inline-flex items-center gap-1.25 tabular-nums">
+          {/* 8px swatch with a 2px corner (screens.css .seg-key): below the radius scale. */}
+          <i aria-hidden className={cn('inline-block size-2 rounded-[2px]', SEGMENT_FILL[segment.tone])} />
+          {segment.value} {segment.label}
+        </span>
+      ))}
     </span>
   );
 }

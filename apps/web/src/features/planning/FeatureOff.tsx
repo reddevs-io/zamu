@@ -26,9 +26,9 @@ export function FeatureOff({ projectKey, feature }: FeatureOffProps) {
   const name = project?.name ?? projectKey;
   const label = feature === 'milestones' ? 'Milestones' : 'Cycles';
   return (
-    <div className="flex flex-col gap-4 px-6 py-12">
+    <div className="flex flex-col gap-4 px-4.5 py-12">
       {turnOn.isError ? (
-        <Banner className="max-w-[640px]">Couldn't turn {feature} on. You may not have permission.</Banner>
+        <Banner className="max-w-160">Couldn't turn {feature} on. You may not have permission.</Banner>
       ) : null}
       <EmptyState
         title={`${label} are off in ${name}`}

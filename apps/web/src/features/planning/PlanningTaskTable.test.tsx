@@ -1,10 +1,35 @@
 import type { TaskListItem } from '@pm/contracts';
-import { render, screen } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { PlanningTaskTable } from './PlanningTaskTable';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { closePeek, isPeekOpen } from '~/features/peek/store';
+import { defaultDisplayOptions, readTaskNavigation } from '~/features/views';
+import { newQueryClient } from '~/features/views/testing';
+import { UIProvider } from '~/ui';
+import { PlanningTaskTable, planningGroupBy, visibleKeys } from './PlanningTaskTable';
 
-// Keyboard moves in the milestone and cycle task tables: no selection, so focus moves alone.
+vi.mock('~/lib/orpc', async () => {
+  const { createTanstackQueryUtils } = await import('@orpc/tanstack-query');
+  const { fakeViewsClient } = await import('~/features/views/testing');
+  // The views' fake procedures, and a rejecting stub for anything else (task writes, projects).
+  const never = () => Promise.reject(new Error('not in these tests'));
+  const stub = new Proxy({}, { get: () => never });
+  const client = new Proxy(fakeViewsClient as Record<string, unknown>, {
+    get: (target, key) => (typeof key === 'string' && key in target ? target[key] : stub),
+  });
+  return { client, orpc: createTanstackQueryUtils(client as never) };
+});
+
+// The Margin rows of the milestone and cycle pages: groups, keys, peek and opening the task view.
 
 const PROJECT = { id: '00000000-0000-7000-8000-000000000001', key: 'PAY', name: 'Payments' };
 
@@ -22,6 +47,9 @@ function task(number: number, partial: Partial<TaskListItem> = {}): TaskListItem
     cycle: null,
     cycleAddedAt: null,
     rank: number,
+    labels: [],
+    dueDate: null,
+    blocked: false,
     createdAt: '2026-10-01T10:00:00.000Z',
     updatedAt: '2026-10-01T10:00:00.000Z',
     ...partial,
@@ -30,54 +58,145 @@ function task(number: number, partial: Partial<TaskListItem> = {}): TaskListItem
 
 // Groups: In progress PAY-1; Todo PAY-2, PAY-3; Done PAY-4 (folded).
 const TASKS = [
-  task(1, { status: 'in_progress' }),
-  task(2, { priority: 'high' }),
+  task(1, { status: 'in_progress', title: 'Offline cache', blocked: true }),
+  task(2, { priority: 'urgent', labels: [{ id: 'l1', name: 'mobile', color: 3 } as never] }),
   task(3),
   task(4, { status: 'done' }),
 ];
 
-const row = (key: string) => screen.getByRole('row', { name: new RegExp(`${key}\\b`) });
-const focused = (key: string) => row(key).contains(document.activeElement);
-const group = (name: string) =>
-  screen.getAllByRole('row').find((element) => element.textContent?.startsWith(name)) as HTMLElement;
+function renderTable() {
+  const root = createRootRoute({
+    component: () => (
+      <UIProvider>
+        <Outlet />
+      </UIProvider>
+    ),
+  });
+  const cycle = createRoute({
+    getParentRoute: () => root,
+    path: '/p/$projectKey/cycles/$cycleNumber',
+    component: () => (
+      <PlanningTaskTable
+        aria-label="Tasks in Cycle 12"
+        projectKey="PAY"
+        tasks={TASKS}
+        display={defaultDisplayOptions('list')}
+        from="Cycle 12"
+        hide="cycle"
+      />
+    ),
+  });
+  const taskPage = createRoute({
+    getParentRoute: () => root,
+    path: '/p/$projectKey/$taskKey',
+    component: () => <p>Task page</p>,
+  });
+  const history = createMemoryHistory({ initialEntries: ['/p/PAY/cycles/12?status=todo'] });
+  const router = createRouter({ routeTree: root.addChildren([cycle, taskPage]), history });
+  render(
+    <QueryClientProvider client={newQueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  return router;
+}
 
-describe('PlanningTaskTable keyboard', () => {
-  it('moves with the arrow keys and J/K over group rows, folds with Left and Right, opens with Enter', async () => {
-    const user = userEvent.setup();
-    const onOpen = vi.fn();
-    render(<PlanningTaskTable aria-label="Tasks in Webhooks v2" tasks={TASKS} now={null} onOpen={onOpen} />);
+const row = (key: string) => document.querySelector(`li[data-key="${key}"]`) as HTMLElement | null;
 
-    await user.tab(); // Tab lands on the first row, a group row
-    expect(group('In progress')).toHaveFocus();
-    await user.keyboard('{ArrowDown}');
-    expect(focused('PAY-1')).toBe(true);
-    await user.keyboard('{ArrowDown}'); // over the Todo group row
-    expect(focused('PAY-2')).toBe(true);
-    await user.keyboard('jj'); // PAY-3, then stays: Done is folded
-    expect(focused('PAY-3')).toBe(true);
-    await user.keyboard('kk');
-    expect(focused('PAY-1')).toBe(true);
-    expect(row('PAY-1')).not.toHaveAttribute('aria-selected');
+afterEach(() => {
+  closePeek();
+  sessionStorage.clear();
+});
 
-    await user.keyboard('{ArrowLeft}');
-    expect(group('In progress')).toHaveFocus();
-    expect(group('In progress')).toHaveTextContent(/collapsed/);
-    await user.keyboard('{ArrowDown}');
-    expect(focused('PAY-2')).toBe(true);
-    await user.keyboard('{ArrowUp}'); // nothing above: the folded group is skipped
-    expect(focused('PAY-2')).toBe(true);
+describe('PlanningTaskTable', () => {
+  it('groups by status in the list order with Done folded, and draws the row properties', async () => {
+    renderTable();
+    const region = await screen.findByRole('region', { name: 'Tasks in Cycle 12' });
+    const groups = within(region).getAllByRole('button', { expanded: true });
+    expect(groups.map((group) => group.textContent)).toEqual(['In progress1', 'Todo2']);
+    expect(within(region).getByRole('button', { expanded: false })).toHaveTextContent('Done1');
+    expect(row('PAY-4')).toBeNull();
+    expect(row('PAY-1')).toHaveTextContent('Blocked');
+    expect(row('PAY-2')).toHaveTextContent('mobile');
+    expect(within(row('PAY-2') as HTMLElement).getByRole('img', { name: 'Priority: Urgent' })).toBeTruthy();
 
-    await user.keyboard('{Enter}');
-    expect(onOpen).toHaveBeenCalledWith('PAY-2');
+    await userEvent.setup().click(screen.getByRole('button', { name: /Done/ }));
+    expect(row('PAY-4')).not.toBeNull();
   });
 
-  it('unfolds Done with Right onto its first task', async () => {
+  it('moves with J / K, peeks with Space, opens with Enter and remembers the list', async () => {
     const user = userEvent.setup();
-    render(<PlanningTaskTable aria-label="Tasks" tasks={TASKS} now={null} onOpen={() => {}} />);
-    await user.click(screen.getByText('Done')); // unfold
-    await user.click(screen.getByText('Done')); // fold again; focus stays on the group row
-    expect(screen.queryByRole('row', { name: /PAY-4\b/ })).not.toBeInTheDocument();
-    await user.keyboard('{ArrowRight}');
-    expect(focused('PAY-4')).toBe(true);
+    const router = renderTable();
+    await screen.findByRole('region', { name: 'Tasks in Cycle 12' });
+
+    await user.keyboard('j');
+    expect(row('PAY-1')).toHaveAttribute('data-focused');
+    await user.keyboard('jj');
+    expect(row('PAY-3')).toHaveAttribute('data-focused');
+    await user.keyboard('j'); // Done is folded: stays on the last open row
+    expect(row('PAY-3')).toHaveAttribute('data-focused');
+    await user.keyboard('k');
+    expect(row('PAY-2')).toHaveAttribute('data-focused');
+
+    await user.keyboard(' ');
+    expect(isPeekOpen()).toBe(true);
+    await user.keyboard(' ');
+    expect(isPeekOpen()).toBe(false);
+
+    await user.keyboard('{Enter}');
+    await screen.findByText('Task page');
+    expect(router.state.location.pathname).toBe('/p/PAY/PAY-2');
+    expect(readTaskNavigation()).toEqual({
+      keys: ['PAY-1', 'PAY-2', 'PAY-3'],
+      from: 'Cycle 12',
+      returnTo: '/p/PAY/cycles/12?status=todo',
+    });
+  });
+
+  it('selects with X and Shift+click, and opens on a plain click', async () => {
+    const user = userEvent.setup();
+    const router = renderTable();
+    await screen.findByRole('region', { name: 'Tasks in Cycle 12' });
+    await user.keyboard('jx');
+    expect(row('PAY-1')).toHaveAttribute('data-selected');
+    await user.keyboard('{Shift>}');
+    await user.click(within(row('PAY-3') as HTMLElement).getByText('PAY-3'));
+    await user.keyboard('{/Shift}');
+    expect(row('PAY-2')).toHaveAttribute('data-selected');
+    expect(row('PAY-3')).toHaveAttribute('data-selected');
+    expect(router.state.location.pathname).toBe('/p/PAY/cycles/12');
+
+    await act(async () => {
+      await user.click(screen.getByRole('link', { name: /Task 3/ }));
+    });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY/PAY-3'));
+    expect(readTaskNavigation()?.from).toBe('Cycle 12');
+  });
+});
+
+describe('planning groups', () => {
+  it('falls back to status when grouping by the page itself', () => {
+    expect(planningGroupBy('cycle', 'cycle')).toBe('status');
+    expect(planningGroupBy('milestone', 'cycle')).toBe('milestone');
+    expect(planningGroupBy('label', undefined)).toBe('label');
+  });
+
+  it('lists the visible keys once, skipping folded groups', () => {
+    const groups = [
+      {
+        key: 'a',
+        label: 'A',
+        value: { field: 'none' as const },
+        tasks: [{ key: 'PAY-1' }, { key: 'PAY-2' }],
+      },
+      {
+        key: 'b',
+        label: 'B',
+        value: { field: 'none' as const },
+        tasks: [{ key: 'PAY-2' }, { key: 'PAY-3' }],
+      },
+      { key: 'c', label: 'C', value: { field: 'none' as const }, tasks: [{ key: 'PAY-4' }] },
+    ];
+    expect(visibleKeys(groups, new Set(['c']))).toEqual(['PAY-1', 'PAY-2', 'PAY-3']);
   });
 });

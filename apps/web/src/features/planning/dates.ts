@@ -130,6 +130,16 @@ export function formatRange(start: string, end: string, today?: string): string 
   return `${formatDay(start, today)} – ${formatDay(end, today)}`;
 }
 
+/** "Oct 27 – Nov 9", "Nov 10 – 23" in one month, "Dec 29, 2026 – Jan 11, 2027" across years: cycle rows. */
+export function formatShortRange(start: string, end: string): string {
+  const a = parts(start);
+  const b = parts(end);
+  if (a.year !== b.year)
+    return `${MONTHS[a.month]} ${a.day}, ${a.year} – ${MONTHS[b.month]} ${b.day}, ${b.year}`;
+  if (a.month === b.month) return `${MONTHS[a.month]} ${a.day} – ${b.day}`;
+  return `${MONTHS[a.month]} ${a.day} – ${MONTHS[b.month]} ${b.day}`;
+}
+
 /** "2 weeks", "1 week", "10 days", "1 day". */
 export function formatLength(days: number): string {
   if (days % 7 === 0) return days === 7 ? '1 week' : `${days / 7} weeks`;

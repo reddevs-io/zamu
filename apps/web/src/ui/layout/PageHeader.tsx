@@ -18,10 +18,8 @@ export function PageHeader({ title, subtitle, actions, children, className }: Pa
     <header className={cn('flex h-16 shrink-0 items-center gap-3 border-b border-line px-6', className)}>
       {children ?? (
         <div className="min-w-0">
-          <h1 className="m-0 truncate text-[20px] leading-[1.15] font-semibold tracking-[-0.01em]">
-            {title}
-          </h1>
-          {subtitle ? <div className="mt-[3px] truncate text-[11.5px] text-muted">{subtitle}</div> : null}
+          <h1 className="m-0 truncate text-xl font-semibold">{title}</h1>
+          {subtitle ? <div className="mt-0.75 truncate text-xs text-fg-3">{subtitle}</div> : null}
         </div>
       )}
       {actions ? <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div> : null}

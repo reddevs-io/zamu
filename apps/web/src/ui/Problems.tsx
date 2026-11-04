@@ -11,12 +11,15 @@ export interface ProblemListProps {
   className?: string;
 }
 
-/** Bordered list of skipped files and warnings (ledger-m3.css .m3-issues). */
+/** Bordered list of skipped files and warnings. */
 export function ProblemList({ children, className, ...props }: ProblemListProps) {
   return (
     <ul
       aria-label={props['aria-label']}
-      className={cn('m-0 flex list-none flex-col border border-line bg-surface p-0', className)}
+      className={cn(
+        'm-0 flex list-none flex-col overflow-hidden rounded-md border border-line bg-surface p-0',
+        className,
+      )}
     >
       {children}
     </ul>
@@ -24,7 +27,7 @@ export function ProblemList({ children, className, ...props }: ProblemListProps)
 }
 
 export interface ProblemRowProps {
-  /** `error`: a file was skipped (--danger dot). `warning`: a value fell back or a file was kept (--warn dot). */
+  /** `error`: a file was skipped (--danger dot). `warning`: a value fell back or a file was kept (--status-prog dot). */
   severity: 'error' | 'warning';
   /** File path, or a short subject such as `status "Blocked" · 2 tasks`. */
   file?: string;
@@ -47,7 +50,7 @@ export function ProblemRow({ severity, file, children, layout = 'columns', class
       className="self-center"
     />
   );
-  const row = 'grid items-baseline gap-3 border-b border-line-2 px-3 py-2 text-[12px] last:border-b-0';
+  const row = 'grid items-baseline gap-3 border-b border-line-soft px-3 py-2 text-sm last:border-b-0';
   if (!file || layout === 'inline') {
     return (
       <li className={cn(row, 'grid-cols-[10px_minmax(0,1fr)]', className)} data-severity={severity}>
@@ -55,7 +58,7 @@ export function ProblemRow({ severity, file, children, layout = 'columns', class
         <span className="min-w-0">
           {file ? (
             <>
-              <span className="font-mono text-[10.5px]">{file}</span> · {children}
+              <span className="font-mono text-xs">{file}</span> · {children}
             </>
           ) : (
             children
@@ -70,7 +73,7 @@ export function ProblemRow({ severity, file, children, layout = 'columns', class
         {dot}
         <span className="flex min-w-0 flex-col gap-0.5">
           <TruncatedPath path={file} truncate="end" />
-          <span className="text-muted">{children}</span>
+          <span className="text-fg-2">{children}</span>
         </span>
       </li>
     );
@@ -82,7 +85,7 @@ export function ProblemRow({ severity, file, children, layout = 'columns', class
     >
       {dot}
       <TruncatedPath path={file} truncate="end" />
-      <span className="min-w-0 text-muted">{children}</span>
+      <span className="min-w-0 text-fg-2">{children}</span>
     </li>
   );
 }

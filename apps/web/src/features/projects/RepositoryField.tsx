@@ -6,10 +6,10 @@ import { InlineCode, TextField } from '~/ui';
 // (M2.1 frames 2a to 3c). The hint reads the URL back as the short form it matches; format errors show
 // when the field loses focus.
 
-const codeClass = 'text-[10.5px] whitespace-nowrap text-fg';
+const codeClass = 'text-xs whitespace-nowrap text-fg';
 
 function Short({ children }: { children: ReactNode }) {
-  return <span className="font-mono text-[10.5px] text-fg">{children}</span>;
+  return <span className="font-mono text-xs text-fg">{children}</span>;
 }
 
 /** Hint for an empty field: what the link is for. */
@@ -84,7 +84,7 @@ export function RepositoryField({
     <TextField
       label={
         <>
-          Repository <span className="font-normal text-faint">optional</span>
+          Repository <span className="font-normal text-fg-3">optional</span>
         </>
       }
       name="repository"

@@ -9,7 +9,7 @@ import { findCheckboxes } from './format';
 
 export interface MarkdownProps {
   source: string;
-  /** Task page uses 14px with roomier lines; the pane 13.5px. */
+  /** `page`: the task view's description (text-lg, prose leading); `pane`: smaller panels (text-md). */
   size?: 'pane' | 'page';
   /** Called with the checkbox index (document order) when someone ticks a box. Omit for read-only. */
   onToggleCheckbox?: (index: number) => void;
@@ -20,6 +20,8 @@ export interface MarkdownProps {
   variant?: 'default' | 'backlog';
   className?: string;
 }
+
+const heading = 'm-0 mt-2 font-serif text-xl font-medium';
 
 type HastNode = { position?: { start?: { line?: number } } } | undefined;
 
@@ -53,29 +55,30 @@ export function Markdown({
           {...props}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-accent underline decoration-[color-mix(in_oklch,var(--accent)_40%,transparent)] underline-offset-2 hover:decoration-current"
+          className="text-accent-text underline decoration-accent-soft underline-offset-2 hover:decoration-current"
         />
       ),
-      h1: ({ node: _node, ...props }) => <h3 {...props} className="m-0 text-[16px] font-semibold" />,
+      // Headings in the serif (frame 056 .desc h3), one step under the title.
+      h1: ({ node: _node, ...props }) => <h3 {...props} className={heading} />,
       h2: ({ node: _node, ...props }) =>
         backlog ? (
-          <h4 {...props} className="m-0 mt-1 text-[13px] font-semibold" />
+          <h4 {...props} className="m-0 mt-1 text-md font-semibold" />
         ) : (
-          <h3 {...props} className="m-0 text-[15px] font-semibold" />
+          <h3 {...props} className={heading} />
         ),
-      h3: ({ node: _node, ...props }) => <h4 {...props} className="m-0 text-[14px] font-semibold" />,
-      h4: ({ node: _node, ...props }) => <h5 {...props} className="m-0 text-[13px] font-semibold" />,
+      h3: ({ node: _node, ...props }) => <h4 {...props} className={heading} />,
+      h4: ({ node: _node, ...props }) => <h5 {...props} className="m-0 mt-1 text-md font-semibold" />,
       ul: ({ node: _node, className: listClass, ...props }) => (
         <ul
           {...props}
           className={cn(
-            'm-0 flex flex-col gap-1 p-0',
-            listClass?.includes('contains-task-list') ? 'list-none' : 'list-disc pl-5',
+            'm-0 flex flex-col gap-0.5 p-0',
+            listClass?.includes('contains-task-list') ? 'list-none' : 'list-disc pl-4.5',
           )}
         />
       ),
       ol: ({ node: _node, ...props }) => (
-        <ol {...props} className="m-0 flex list-decimal flex-col gap-1 pl-5" />
+        <ol {...props} className="m-0 flex list-decimal flex-col gap-0.5 pl-4.5" />
       ),
       li: ({ node, className: itemClass, children, ...props }) => {
         if (!itemClass?.includes('task-list-item')) return <li {...props}>{children}</li>;
@@ -95,9 +98,7 @@ export function Markdown({
               checked={checked}
               onToggle={box && editable ? () => toggleRef.current?.(box.index) : undefined}
             />
-            <span
-              className={cn('min-w-0', checked && 'text-muted line-through decoration-[color:var(--faint)]')}
-            >
+            <span className={cn('min-w-0', checked && 'text-fg-3 line-through decoration-line')}>
               {children}
             </span>
           </li>
@@ -107,34 +108,31 @@ export function Markdown({
       input: ({ node: _node, ...props }) =>
         props.type === 'checkbox' ? null : <input {...props} readOnly />,
       code: ({ node: _node, className: codeClass, ...props }) => (
-        <code {...props} className={cn('bg-band px-1 py-px font-mono text-[11px]', codeClass)} />
+        <code {...props} className={cn('rounded-sm bg-bg-lane px-1.25 py-px font-mono text-sm', codeClass)} />
       ),
       pre: ({ node: _node, ...props }) => (
         <pre
           {...props}
-          className="m-0 overflow-x-auto border border-line-2 bg-band p-3 font-mono text-[11px] leading-normal [&_code]:bg-transparent [&_code]:p-0"
+          className="m-0 overflow-x-auto rounded-md bg-bg-lane px-3.5 py-3 font-mono text-sm leading-normal [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-sm"
         />
       ),
       blockquote: ({ node: _node, ...props }) => (
-        <blockquote {...props} className="m-0 border-l-2 border-line pl-3 text-muted" />
+        <blockquote {...props} className="m-0 border-l-2 border-line pl-3 text-fg-2" />
       ),
       hr: () => <hr className="my-1 h-px border-0 bg-line" />,
       table: ({ node: _node, ...props }) => (
-        <div className={cn('overflow-x-auto', size === 'page' && 'max-w-[520px]')}>
-          <table
-            {...props}
-            className="w-full border-collapse border border-line font-mono text-[11px] leading-normal"
-          />
+        <div className={cn('overflow-x-auto', size === 'page' && 'max-w-130')}>
+          <table {...props} className="w-full border-collapse border border-line text-sm leading-normal" />
         </div>
       ),
       th: ({ node: _node, ...props }) => (
         <th
           {...props}
-          className="border-r border-b border-line-2 bg-band px-2.5 py-1.5 text-left font-normal text-muted last:border-r-0"
+          className="border-r border-b border-line-soft bg-bg-lane px-2.5 py-1.5 text-left font-medium text-fg-2 last:border-r-0"
         />
       ),
       td: ({ node: _node, ...props }) => (
-        <td {...props} className="border-r border-b border-line-2 px-2.5 py-1.5 last:border-r-0" />
+        <td {...props} className="border-r border-b border-line-soft px-2.5 py-1.5 last:border-r-0" />
       ),
       img: ({ node: _node, alt, ...props }) => <img {...props} alt={alt ?? ''} className="max-w-full" />,
     };
@@ -144,9 +142,7 @@ export function Markdown({
     <div
       className={cn(
         'flex min-w-0 flex-col break-words',
-        size === 'page'
-          ? 'max-w-[720px] gap-2.5 text-[14px] leading-[1.6]'
-          : 'gap-2 text-[13.5px] leading-[1.55]',
+        size === 'page' ? 'max-w-180 gap-2.5 text-lg leading-prose' : 'gap-2 text-md leading-prose',
         className,
       )}
     >
@@ -161,7 +157,7 @@ export function Markdown({
 function CheckboxSquare({ checked, onToggle }: { checked: boolean; onToggle?: () => void }) {
   const look = cn(
     'block size-2.5 shrink-0 translate-y-px appearance-none',
-    checked ? 'bg-fg' : 'border-[1.5px] border-muted',
+    checked ? 'bg-fg' : 'border-[1.5px] border-fg-2',
   );
   if (!onToggle) {
     return <span role="img" aria-label={checked ? 'Done' : 'Not done'} className={look} />;

@@ -148,11 +148,11 @@ function FolderField({
         validationBehavior="aria"
         className="min-w-0 flex-1"
       />
-      <Button type="submit" variant="secondary" className="mt-[23px] h-[38px]">
+      <Button type="submit" variant="secondary" className="mt-5.75 h-9.5">
         Look again
       </Button>
       {onClear ? (
-        <Button variant="ghost" className="mt-[23px] h-[38px]" onPress={onClear}>
+        <Button variant="ghost" className="mt-5.75 h-9.5" onPress={onClear}>
           Detect the folder
         </Button>
       ) : null}
@@ -167,7 +167,7 @@ function KeyNote({ detection, projectKey }: { detection: BacklogDetection; proje
   const to = `${projectKey}-${EXAMPLE}`;
   if (PROJECT_KEY_PATTERN.test(prefix)) {
     return (
-      <NoticeStrip marker={<span className="w-2 text-center text-faint">i</span>}>
+      <NoticeStrip marker={<span className="w-2 text-center text-fg-3">i</span>}>
         <span>
           <Mono>{from}</Mono> becomes <Mono>{to}</Mono>. Search and <InlineCode>pm</InlineCode> accept both.
           To keep them identical, change the project key to {prefix} in General first.
@@ -222,16 +222,16 @@ function FolderFound({
         Found a Backlog.md folder at <Mono>{detection.folder}/</Mono>
       </b>
       {detection.folderSource === 'config' ? (
-        <span className="text-muted"> · set in backlog.config.yml</span>
+        <span className="text-fg-2"> · set in backlog.config.yml</span>
       ) : null}
       {config ? (
-        <div className="text-[12.5px] text-muted">
+        <div className="text-sm text-fg-2">
           {config.projectName ? <>Project “{config.projectName}”, task prefix </> : <>Task prefix </>}
           <Mono>{config.taskPrefix}</Mono>, {statuses} {statuses === 1 ? 'status' : 'statuses'}.
         </div>
       ) : null}
       {detection.folders.length ? (
-        <div className="mt-1 flex flex-wrap gap-x-3.5 gap-y-1 font-mono text-[10.5px] text-muted">
+        <div className="mt-1 flex flex-wrap gap-x-3.5 gap-y-1 font-mono text-xs text-fg-2">
           {orderFolders(detection.folders).map((entry) => (
             <span key={entry.path}>
               {entry.path} {entry.count.toLocaleString('en-US')}
@@ -303,7 +303,7 @@ export function SourceStep({
           isReadOnly
           value={repo?.short ?? repository ?? ''}
           placeholder="No repository"
-          inputClassName={`${lockedHatch} text-[11.5px]`}
+          inputClassName={`${lockedHatch} text-xs`}
           description={
             <>
               From the project. Change it in <TextLink href={settingsHref}>General</TextLink>.
@@ -371,7 +371,7 @@ export function SourceStep({
                       <span>
                         <Mono>{detection.defaultBranch}</Mono>
                         {detection.headCommit ? (
-                          <span className="text-faint">
+                          <span className="text-fg-3">
                             {' '}
                             · at {detection.headCommit.slice(0, 7)}
                             {detection.headCommittedAt ? (

@@ -3,21 +3,25 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import type { Key } from 'react-aria-components';
 import { describe, expect, it, vi } from 'vitest';
-import { BacklogBlock, KeyValueRow, LabelChip, MissingTaskLink, TaskLink } from './BacklogBlock';
 import { BoardColumn, ColumnRefusal } from './Board';
-import { Checklist } from './Checklist';
 import { ConnectionStatusTag, ProviderBadge } from './Connection';
 import { CopyField } from './CopyField';
-import { STATUS_ITEMS } from './gallery/m3-sample';
-import { DisabledCreateButton, OwnedFieldCaption } from './Locked';
-import { PropertyGrid } from './layout/PropertyGrid';
-import { Rail } from './layout/Rail';
+import type { OptionItem } from './ListBox';
+import { DisabledCreateButton } from './Locked';
 import { type MappingHow, MappingRow, MappingTable } from './Mapping';
+import { STATUS_LABELS, TASK_STATUSES } from './meta';
 import { ProblemList, ProblemRow } from './Problems';
 import { SetupSteps } from './SetupSteps';
-import { SourceButton, SourceStatusDot } from './SourceStatus';
-import { NoticeStrip, SourceStrip, TruncatedPath } from './SourceStrip';
-import { SystemActorAvatar, SystemActorDot } from './SystemActor';
+import { SourceStatusDot } from './SourceStatus';
+import { NoticeStrip, TruncatedPath } from './SourceStrip';
+import { StatusSquare } from './StatusSquare';
+import { SystemActorDot } from './SystemActor';
+
+const STATUS_ITEMS: OptionItem[] = TASK_STATUSES.map((status) => ({
+  id: status,
+  label: STATUS_LABELS[status],
+  prefix: <StatusSquare status={status} />,
+}));
 
 const FILE = 'backlog/tasks/back-786 - Retry-failed-webhook-deliveries.md';
 
@@ -43,15 +47,10 @@ function MappingExample({ how = 'name', onChange }: { how?: MappingHow; onChange
 }
 
 describe('system actor', () => {
-  it('is a named square, or decorative next to a visible name', () => {
-    const { container, rerender } = render(<SystemActorAvatar size="lg" />);
-    const avatar = screen.getByRole('img', { name: 'Backlog.md' });
-    expect(avatar).toHaveTextContent('B');
-    expect(avatar).toHaveAttribute('data-kind', 'system');
-    rerender(<SystemActorAvatar decorative />);
+  it('is a decorative square next to a visible name', () => {
+    const { container } = render(<SystemActorDot />);
     expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
-    rerender(<SystemActorDot />);
-    expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
+    expect(container.firstElementChild).toHaveAttribute('data-kind', 'system');
   });
 });
 
@@ -70,18 +69,6 @@ describe('source state', () => {
     for (const name of ['Healthy', 'Refreshing', 'Problems', 'Failed', 'Paused', 'Detached on Oct 23']) {
       expect(screen.getByRole('img', { name })).toBeInTheDocument();
     }
-  });
-
-  it('SourceButton says the state and note, presses, and can be forced open', async () => {
-    const user = userEvent.setup();
-    const onPress = vi.fn();
-    const { rerender } = render(<SourceButton state="warnings" note="31 problems" onPress={onPress} />);
-    const button = screen.getByRole('button', { name: /Problems.*Backlog\.md.*31 problems/ });
-    await user.click(button);
-    expect(onPress).toHaveBeenCalledTimes(1);
-    expect(button).not.toHaveAttribute('data-open');
-    rerender(<SourceButton state="healthy" note="3m ago" isOpen />);
-    expect(screen.getByRole('button', { name: /Healthy/ })).toHaveAttribute('data-open', 'true');
   });
 });
 
@@ -114,27 +101,6 @@ describe('connections', () => {
 });
 
 describe('locks', () => {
-  it('OwnedFieldCaption defaults to "· file"', () => {
-    render(<OwnedFieldCaption />);
-    expect(screen.getByText('· file')).toBeInTheDocument();
-  });
-
-  it('PropertyGrid hatches locked cells and adds the caption note', () => {
-    const { container } = render(
-      <PropertyGrid
-        items={[
-          { id: 'status', label: 'Status', value: 'In progress', locked: true },
-          { id: 'cycle', label: 'Cycle', value: 'Cycle 4' },
-        ]}
-      />,
-    );
-    const cells = container.querySelectorAll('dl > div');
-    expect(cells[0]).toHaveAttribute('data-locked', 'true');
-    expect(cells[0]).toHaveClass('locked-hatch');
-    expect(cells[0]).toHaveTextContent('Status · file');
-    expect(cells[1]).not.toHaveAttribute('data-locked');
-  });
-
   it('DisabledCreateButton stays focusable and explains itself in a tooltip', async () => {
     const user = userEvent.setup();
     const onPress = vi.fn();
@@ -200,21 +166,6 @@ describe('source strip and paths', () => {
     expect(container.firstElementChild).not.toHaveAttribute('dir');
   });
 
-  it('SourceStrip shows the lead, the path and an external link', () => {
-    render(
-      <SourceStrip
-        lead="Fields with a hatch come from"
-        path={FILE}
-        link={{ label: 'Open file', href: 'https://gitlab.com/reddevs/payments/-/blob/main/x.md' }}
-      />,
-    );
-    expect(screen.getByText('Fields with a hatch come from')).toBeInTheDocument();
-    expect(screen.getByTitle(FILE)).toHaveTextContent(FILE);
-    const link = screen.getByRole('link', { name: 'Open file' });
-    expect(link).toHaveAttribute('href', 'https://gitlab.com/reddevs/payments/-/blob/main/x.md');
-    expect(link).toHaveAttribute('target', '_blank');
-  });
-
   it('NoticeStrip draws marker, text and trailing content', () => {
     render(
       <NoticeStrip marker={<SourceStatusDot state="paused" />} trailing={<span>Listening…</span>}>
@@ -226,52 +177,6 @@ describe('source strip and paths', () => {
     expect(screen.getByRole('img', { name: 'Paused' })).toBeInTheDocument();
     expect(screen.getByText('never')).toBeInTheDocument();
     expect(screen.getByText('Listening…')).toBeInTheDocument();
-  });
-});
-
-describe('Backlog.md block', () => {
-  it('lists label and value rows with links and missing IDs', () => {
-    render(
-      <BacklogBlock backlogId="BACK-786" note="read-only · fields this app doesn’t have">
-        <KeyValueRow label="Labels">
-          <LabelChip>webhooks</LabelChip>
-        </KeyValueRow>
-        <KeyValueRow label="Depends on" layout="stack">
-          <TaskLink taskKey="PAY-805" title="Signature check" status="in_progress" href="/p/PAY/PAY-805" />
-          <MissingTaskLink backlogId="BACK-12" />
-        </KeyValueRow>
-      </BacklogBlock>,
-    );
-    const block = screen.getByRole('region', { name: 'Backlog.md BACK-786' });
-    expect(block).toHaveTextContent('read-only · fields this app doesn’t have');
-    expect(
-      within(block)
-        .getAllByRole('term')
-        .map((term) => term.textContent),
-    ).toEqual(['Labels', 'Depends on']);
-    expect(within(block).getByText('webhooks')).toBeInTheDocument();
-    const link = within(block).getByRole('link', { name: /PAY-805.*Signature check/ });
-    expect(link).toHaveAttribute('href', '/p/PAY/PAY-805');
-    expect(within(block).getByText('no task with this ID')).toBeInTheDocument();
-    expect(within(block).getByText('BACK-12')).toBeInTheDocument();
-  });
-
-  it('Checklist numbers items and says which are done, without controls', () => {
-    render(
-      <Checklist
-        aria-label="Acceptance criteria"
-        items={[
-          { index: 1, text: 'Retries follow the schedule', checked: true },
-          { index: 3, text: 'A 429 waits for Retry-After', checked: false },
-        ]}
-      />,
-    );
-    const list = screen.getByRole('list', { name: 'Acceptance criteria' });
-    const items = within(list).getAllByRole('listitem');
-    expect(items[0]).toHaveTextContent('#1 Retries follow the schedule');
-    expect(within(items[0] as HTMLElement).getByRole('img', { name: 'Done' })).toBeInTheDocument();
-    expect(within(items[1] as HTMLElement).getByRole('img', { name: 'Not done' })).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox')).toBeNull();
   });
 });
 
@@ -389,25 +294,5 @@ describe('CopyField', () => {
     render(<CopyField label="Secret token" maskedValue="whsec_…" />);
     expect(screen.getByRole('group', { name: 'Secret token' })).toHaveTextContent('whsec_…');
     expect(screen.queryByRole('button')).toBeNull();
-  });
-});
-
-describe('Rail', () => {
-  it('marks mirrored projects', () => {
-    render(
-      <Rail
-        workspace={{ name: 'Reddevs' }}
-        user={{ name: 'Ana Ruiz' }}
-        projects={[
-          { key: 'PAY', name: 'Payments', openCount: 38, href: '/p/PAY', mirrored: true },
-          { key: 'WEB', name: 'Web app', openCount: 27, href: '/p/WEB' },
-        ]}
-      />,
-    );
-    expect(screen.getByRole('link', { name: 'Payments, 38 open, mirrored from Backlog.md' })).toHaveAttribute(
-      'data-mirrored',
-      'true',
-    );
-    expect(screen.getByRole('link', { name: 'Web app, 27 open' })).not.toHaveAttribute('data-mirrored');
   });
 });

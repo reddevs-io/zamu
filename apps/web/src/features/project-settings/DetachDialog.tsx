@@ -12,7 +12,6 @@ import {
   Modal,
   TextField,
 } from '~/ui';
-import { filledDanger } from '../connections/DeleteConnectionDialog';
 import { errorMessage } from '../settings/result';
 import { providerName, shortCommit, sourceTaskTotals } from './format';
 
@@ -66,25 +65,25 @@ function DetachContent({
   return (
     <Dialog role="alertdialog">
       <form noValidate onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-        <DialogHeader title={`Detach ${projectName} from Backlog.md?`} showEsc={false} />
+        <DialogHeader title={`Detach ${projectName} from Backlog.md?`} showEsc={false} className="pt-4.5" />
         <DialogBody className="gap-3">
           {error ? <Banner>{error}</Banner> : null}
-          <p className="m-0 leading-[1.55]">
+          <p className="m-0 leading-prose text-fg-2">
             This can't be undone. {projectName} keeps all {tasks} {tasks === 1 ? 'task' : 'tasks'} and{' '}
             {milestones} {milestones === 1 ? 'milestone' : 'milestones'} as they are now
             {commit ? (
               <>
-                , at commit <span className="font-mono text-[11px]">{shortCommit(commit)}</span>
+                , at commit <span className="font-mono text-xs text-fg">{shortCommit(commit)}</span>
               </>
             ) : null}
             .
           </p>
-          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-[18px] text-[12.5px] leading-[1.55]">
+          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-4.5 text-sm leading-prose text-fg-2">
             <li>Every field becomes editable here, by people and agents.</li>
             <li>
               Changes to the files no longer reach this project. Agents should stop editing{' '}
-              <InlineCode className="text-[11px]">{folder}</InlineCode> and use{' '}
-              <InlineCode className="text-[11px]">pm</InlineCode>.
+              <InlineCode className="text-xs">{folder}</InlineCode> and use{' '}
+              <InlineCode className="text-xs">pm</InlineCode>.
             </li>
             <li>
               {status.nextTaskKey
@@ -117,13 +116,7 @@ function DetachContent({
           <Button variant="secondary" onPress={close}>
             Keep mirroring
           </Button>
-          <Button
-            type="submit"
-            variant="destructive"
-            className={filledDanger}
-            isDisabled={!matches}
-            isPending={pending}
-          >
+          <Button type="submit" variant="danger" isDisabled={!matches} isPending={pending}>
             Detach
           </Button>
         </DialogFooter>

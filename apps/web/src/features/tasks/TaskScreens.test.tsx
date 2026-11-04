@@ -1,3 +1,4 @@
+import { ORPCError } from '@orpc/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -6,23 +7,25 @@ import {
   createRouter,
   Outlet,
   RouterProvider,
+  redirect,
 } from '@tanstack/react-router';
 import { act, configure, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { closePeek, usePeek } from '~/features/peek/store';
 import { PageSearchProvider, useFocusPageSearch } from '~/features/shell/page-search';
 import { QuickCreateProvider, useQuickCreate } from '~/features/shell/quick-create';
+import { readTaskNavigation } from '~/features/views';
+import { displayStorageKey, resetDisplayOptionsForTests } from '~/features/views/useDisplayOptions';
 import { UIProvider, useHotkeys } from '~/ui';
-import { createFakeApi, type FakeApi } from './fake-api';
-import { QuickCreateDialog } from './QuickCreateDialog';
-import { parseTaskListSearch } from './search';
+import { createFakeApi, FAKE_PEOPLE, type FakeApi } from './fake-api';
+import { parseTaskListSearch, taskLinkRedirect } from './search';
 import { TaskListScreen } from './TaskListScreen';
-import { TaskPage } from './TaskPage';
 
-// Component tests of the task screens against an in-memory /api/v1 client, inside a real TanStack
-// router (memory history), so selection and filters really go through the URL.
+// Component tests of the project list (M5-11) against an in-memory /api/v1 client, inside a real TanStack
+// router (memory history), so filters, ?focus= and the redirect of old ?task= links go through the URL.
+// The task view and quick create are stand-ins: their own tests cover them.
 
-// The screens make several requests per render; give them time on a busy machine.
 configure({ asyncUtilTimeout: 5000 });
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -44,6 +47,8 @@ vi.mock('~/lib/orpc', async () => {
   return { client, orpc: createTanstackQueryUtils(client as never) };
 });
 
+const fake = () => api.current as FakeApi;
+
 /** The shell binds / to the page search; the tests stand in for it. */
 function SlashFocusesSearch() {
   const focus = useFocusPageSearch();
@@ -51,18 +56,27 @@ function SlashFocusesSearch() {
   return null;
 }
 
-/** Opens quick create the way the board column's "+" does. */
-function OpenInReview() {
+/** What quick create was asked for (the dialog has its own tests). */
+function QuickCreateProbe() {
   const quickCreate = useQuickCreate();
   return (
-    <button type="button" onClick={() => quickCreate.open('PAY', { status: 'in_review' })}>
-      Open in review
-    </button>
+    <output data-testid="quick-create">
+      {quickCreate.isOpen
+        ? `open ${quickCreate.projectKey ?? ''} ${quickCreate.status ?? ''}`.trim()
+        : 'closed'}
+    </output>
   );
 }
 
-/** `guardMs` delays every navigation, like the signed-in layout's server-side session check. */
-function renderApp(url: string, { guardMs = 0 }: { guardMs?: number } = {}) {
+/** The peek's request (PeekHost, the real component, is the task view workstream's). */
+function PeekProbe() {
+  const peek = usePeek();
+  return (
+    <output data-testid="peek">{peek ? `${peek.key} of ${peek.keys.length} in ${peek.from}` : ''}</output>
+  );
+}
+
+function renderApp(url: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, refetchInterval: false } },
   });
@@ -72,9 +86,9 @@ function renderApp(url: string, { guardMs = 0 }: { guardMs?: number } = {}) {
         <PageSearchProvider>
           <QuickCreateProvider>
             <SlashFocusesSearch />
-            <OpenInReview />
+            <QuickCreateProbe />
+            <PeekProbe />
             <Outlet />
-            <QuickCreateDialog />
           </QuickCreateProvider>
         </PageSearchProvider>
       </UIProvider>
@@ -84,7 +98,10 @@ function renderApp(url: string, { guardMs = 0 }: { guardMs?: number } = {}) {
     getParentRoute: () => root,
     path: '/p/$projectKey/',
     validateSearch: parseTaskListSearch,
-    beforeLoad: () => (guardMs ? new Promise((resolve) => setTimeout(resolve, guardMs)) : undefined),
+    beforeLoad: ({ params, search }) => {
+      const target = taskLinkRedirect(params.projectKey, search);
+      if (target) throw redirect({ ...target, replace: true });
+    },
     component: function ListRoute() {
       const { projectKey } = list.useParams();
       return <TaskListScreen projectKey={projectKey} search={list.useSearch()} />;
@@ -94,8 +111,8 @@ function renderApp(url: string, { guardMs = 0 }: { guardMs?: number } = {}) {
     getParentRoute: () => root,
     path: '/p/$projectKey/$taskKey',
     component: function PageRoute() {
-      const { projectKey, taskKey } = page.useParams();
-      return <TaskPage key={taskKey} projectKey={projectKey} taskKey={taskKey} />;
+      const { taskKey } = page.useParams();
+      return <h1>Task view {taskKey}</h1>;
     },
   });
   const router = createRouter({
@@ -110,334 +127,356 @@ function renderApp(url: string, { guardMs = 0 }: { guardMs?: number } = {}) {
   return { router, queryClient };
 }
 
-const searchOf = (router: ReturnType<typeof renderApp>['router']) =>
-  router.state.location.search as { task?: string };
-const row = (key: string) => screen.getByRole('row', { name: new RegExp(`${key}\\b`) });
-const pane = () => screen.getByRole('region', { name: 'Task detail' });
+type Router = ReturnType<typeof renderApp>['router'];
+const searchOf = (router: Router) => router.state.location.search as Record<string, unknown>;
+const row = (key: string) => screen.getByRole('row', { name: new RegExp(`^${key}\\b`) });
+const findRow = (key: string) => screen.findByRole('row', { name: new RegExp(`^${key}\\b`) });
+const groupRows = () =>
+  screen
+    .getAllByRole('row')
+    .filter((element) => element.hasAttribute('data-group-row'))
+    .map((element) => element.textContent);
+const group = (name: string) =>
+  screen
+    .getAllByRole('row')
+    .find(
+      (element) => element.hasAttribute('data-group-row') && element.textContent?.startsWith(name),
+    ) as HTMLElement;
+const isCursor = (element: HTMLElement) => element.hasAttribute('data-cursor');
+const lastListCall = () => fake().calls.list.at(-1) as Record<string, unknown>;
 
 beforeEach(() => {
-  api.current = createFakeApi();
+  api.current = createFakeApi({ fields: true });
+  localStorage.clear();
+  sessionStorage.clear();
+  resetDisplayOptionsForTests();
 });
 
-describe('task list selection', () => {
-  it('selects the task from ?task= and follows clicks into the URL', async () => {
-    const user = userEvent.setup();
-    const { router } = renderApp('/p/PAY?task=PAY-3');
+afterEach(() => closePeek());
 
-    await screen.findByRole('region', { name: 'Task detail' });
-    expect(await within(pane()).findByRole('heading', { name: 'Task number 3' })).toBeInTheDocument();
-    expect(await screen.findByRole('row', { name: /PAY-3\b/ })).toHaveAttribute('aria-selected', 'true');
+// Fake PAY: PAY-1 in progress (claude-dev, labels backend and payouts, due in 2 days, parent of PAY-5),
+// PAY-2 in review (Tomás, high, blocked by PAY-3), PAY-3 todo (low), PAY-4 todo (claude-dev, urgent),
+// PAY-5 backlog (Tomás, medium, subtask of PAY-1), PAY-6 done. The viewer is Ana Ruiz.
 
-    await user.click(within(row('PAY-1')).getByText('Task number 1'));
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-1'));
-    expect(row('PAY-1')).toHaveAttribute('aria-selected', 'true');
-    expect(await within(pane()).findByRole('heading', { name: 'Task number 1' })).toBeInTheDocument();
-  });
-
-  it('groups by status with Backlog and Done collapsed, and expands them on demand', async () => {
+describe('list rows and groups', () => {
+  it('groups by status with Backlog and Done folded, rows show their properties', async () => {
     const user = userEvent.setup();
     renderApp('/p/PAY');
-    await screen.findByRole('row', { name: /PAY-1\b/ });
+    await findRow('PAY-1');
 
-    const groupNames = screen
-      .getAllByRole('row')
-      .filter((element) => element.hasAttribute('data-group-row'))
-      .map((element) => element.textContent);
-    expect(groupNames).toEqual([
+    expect(groupRows()).toEqual([
       'In progress1, expanded',
       'In review1, expanded',
       'Todo2, expanded',
       'Backlog1, collapsed',
       'Done1, collapsed',
     ]);
-    expect(screen.queryByRole('row', { name: /PAY-5\b/ })).not.toBeInTheDocument();
+    // Urgent first in Todo (priority order).
+    const keys = screen
+      .getAllByRole('row')
+      .map((element) => element.getAttribute('data-task-key'))
+      .filter(Boolean);
+    expect(keys).toEqual(['PAY-1', 'PAY-2', 'PAY-4', 'PAY-3']);
 
-    await user.click(within(screen.getByRole('grid')).getByText('Backlog'));
-    expect(await screen.findByRole('row', { name: /PAY-5\b/ })).toBeInTheDocument();
+    const pay1 = row('PAY-1');
+    expect(within(pay1).getByText('backend')).toBeInTheDocument();
+    expect(within(pay1).getByText('payouts')).toBeInTheDocument();
+    expect(within(pay1).getByRole('img', { name: '0 of 1 subtasks done' })).toBeInTheDocument();
+    expect(pay1.querySelector('[data-due="soon"]')).not.toBeNull();
+    // claude-dev's avatar shows (not the viewer's); PAY-3 has no one, so no avatar.
+    expect(within(pay1).getByRole('img', { name: /claude-dev/ })).toBeInTheDocument();
+    expect(within(row('PAY-2')).getByText('Blocked')).toBeInTheDocument();
+    // Priority shows for urgent and high only.
+    expect(within(row('PAY-4')).getByRole('img', { name: 'Priority: Urgent' })).toBeInTheDocument();
+    expect(within(row('PAY-3')).queryByRole('img', { name: /Priority/ })).toBeNull();
+
+    // Unfolding Backlog loads it; PAY-5 nests under its parent.
+    await user.click(within(group('Backlog')).getByText('Backlog'));
+    const pay5 = await findRow('PAY-5');
+    expect(pay5).toHaveAttribute('aria-level', '3');
+    expect(row('PAY-1')).toHaveAttribute('aria-level', '2');
+    const order = screen
+      .getAllByRole('row')
+      .map((element) => element.getAttribute('data-task-key'))
+      .filter(Boolean);
+    expect(order.slice(0, 2)).toEqual(['PAY-1', 'PAY-5']);
+    expect(lastListCall()).toMatchObject({ project: ['PAY'], status: ['backlog'] });
+  });
+
+  it('groups by label from the display options, a task in each of its label groups', async () => {
+    localStorage.setItem(
+      displayStorageKey(FAKE_PEOPLE.ana.id, 'PAY', 'list'),
+      JSON.stringify({ groupBy: 'label', listSubtasks: 'flat' }),
+    );
+    renderApp('/p/PAY');
+    await waitFor(() => expect(groupRows()[0]).toMatch(/^backend1/));
+    expect(groupRows()).toEqual(['backend1, expanded', 'payouts1, expanded', 'No labels5, expanded']);
+    // PAY-1 shows twice (backend and payouts); every other task is under No labels.
+    expect(screen.getAllByRole('row', { name: /^PAY-1\b/ })).toHaveLength(2);
+    // Every status loads at once (no folded groups), ordered by priority.
+    expect(lastListCall()).toMatchObject({ project: ['PAY'], sort: 'priority' });
+    expect(lastListCall().status).toBeUndefined();
+  });
+
+  it('renders only the rows in view of a long list, and still reaches the last one', async () => {
+    api.current = createFakeApi({ tasks: 600 });
+    const user = userEvent.setup();
+    renderApp('/p/PAY');
+    const grid = await screen.findByRole('treegrid');
+    const total = Number(grid.getAttribute('aria-rowcount'));
+    expect(total).toBeGreaterThan(300);
+    expect(screen.getAllByRole('row').length).toBeLessThan(120);
+
+    // K from nothing goes to the last task row, which renders although it is far below.
+    await user.keyboard('k');
+    const last = screen.getAllByRole('row').find(isCursor) as HTMLElement;
+    expect(last).toHaveFocus();
+    // The rows after it are the folded Backlog and Done group rows.
+    expect(Number(last.getAttribute('aria-rowindex'))).toBe(total - 2);
+    expect(last).toHaveAttribute('data-task-key');
   });
 });
 
-describe('keyboard flow', () => {
-  it('moves with J/K, opens with Enter, returns with Esc and clears with Esc', async () => {
+describe('keyboard', () => {
+  it('moves with J/K, opens with Enter (remembering the list) and peeks with Space', async () => {
     const user = userEvent.setup();
     const { router } = renderApp('/p/PAY');
-    await screen.findByRole('row', { name: /PAY-1\b/ });
+    await findRow('PAY-1');
 
-    // J from the page selects the first task and puts focus in the table.
+    // J from the page puts the cursor and focus on the first task.
     await user.keyboard('j');
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-1'));
-    await waitFor(() => expect(row('PAY-1').contains(document.activeElement)).toBe(true));
-
-    // In the table, J and K move between tasks, skipping group rows; the row, the pane and the URL follow.
+    expect(row('PAY-1')).toHaveFocus();
+    expect(isCursor(row('PAY-1'))).toBe(true);
     await user.keyboard('j');
-    await waitFor(() => expect(row('PAY-2')).toHaveAttribute('aria-selected', 'true'));
-    expect(await within(pane()).findByRole('heading', { name: 'Task number 2' })).toBeInTheDocument();
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-2'));
-    await waitFor(() => expect(row('PAY-2').contains(document.activeElement)).toBe(true));
-    await user.keyboard('k');
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-1'));
+    expect(row('PAY-2')).toHaveFocus();
+    await user.keyboard('jk');
+    expect(row('PAY-2')).toHaveFocus();
+    expect(isCursor(row('PAY-1'))).toBe(false);
 
-    // Enter opens the task page; Esc goes back to the list with the task selected.
+    // Quick presses move one row each, and stop at the last task.
+    await user.keyboard('jjjkkj');
+    expect(row('PAY-4')).toHaveFocus();
+
+    // Space peeks the cursor task with the list's keys.
+    await user.keyboard(' ');
+    expect(screen.getByTestId('peek')).toHaveTextContent('PAY-4 of 4 in List');
+
+    act(() => closePeek());
     await user.keyboard('{Enter}');
-    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY/PAY-1'));
-    expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY'));
-    expect(searchOf(router).task).toBe('PAY-1');
-
-    // Esc on the list clears the selection.
-    await screen.findByRole('row', { name: /PAY-1\b/ });
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(searchOf(router).task).toBeUndefined());
-    expect(await screen.findByText('Nothing selected')).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY/PAY-4'));
+    expect(readTaskNavigation()).toMatchObject({ keys: ['PAY-1', 'PAY-2', 'PAY-4', 'PAY-3'], from: 'List' });
+    expect(await screen.findByRole('heading', { name: 'Task view PAY-4' })).toBeInTheDocument();
   });
 
-  it('moves exactly one row per quick J/K press, from the last requested task', async () => {
-    // Order in the table: PAY-1 (in progress), PAY-2 (in review), PAY-4, PAY-3 (todo, urgent first).
-    const user = userEvent.setup({ delay: null });
-    const { router } = renderApp('/p/PAY?task=PAY-2', { guardMs: 250 });
-    await screen.findByRole('row', { name: /PAY-2\b/ });
-
-    // J J K K J about 100 to 160 ms apart while navigations are slow: PAY-4, PAY-3, PAY-4, PAY-2, PAY-4.
-    await user.keyboard('j');
-    await new Promise((resolve) => setTimeout(resolve, 160));
-    await user.keyboard('j');
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await user.keyboard('kk');
-    await new Promise((resolve) => setTimeout(resolve, 160));
-    await user.keyboard('j');
-    expect(row('PAY-4')).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-4'));
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    expect(searchOf(router).task).toBe('PAY-4');
-    expect(row('PAY-4')).toHaveAttribute('aria-selected', 'true');
-
-    // No pause at all between keys: PAY-2, PAY-4, PAY-3, PAY-4, PAY-2.
-    await user.keyboard('kjjkk');
-
-    expect(row('PAY-2')).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-2'));
-    // Late URL writes must not pull the selection back.
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    expect(searchOf(router).task).toBe('PAY-2');
-    expect(row('PAY-2')).toHaveAttribute('aria-selected', 'true');
-
-    // A press right after the URL caught up still moves one row.
-    await user.keyboard('j');
-    expect(row('PAY-4')).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-4'));
+  it('comes back from the task view with the task focused (?focus=), then drops the param', async () => {
+    const { router } = renderApp('/p/PAY?focus=PAY-3');
+    await findRow('PAY-3');
+    await waitFor(() => expect(row('PAY-3')).toHaveFocus());
+    expect(isCursor(row('PAY-3'))).toBe(true);
+    await waitFor(() => expect(searchOf(router).focus).toBeUndefined());
   });
 
-  it('moves with the arrow keys over group rows, and folds groups with Left and Right', async () => {
-    // Order in the table: PAY-1 (in progress), PAY-2 (in review), PAY-4, PAY-3 (todo); Backlog and Done folded.
+  it('sends old ?task= links to the task view', async () => {
+    const { router } = renderApp('/p/PAY?task=PAY-3');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY/PAY-3'));
+  });
+
+  it('moves with the arrow keys over group rows, and folds groups with Left and Right (PM-3)', async () => {
+    // Order: PAY-1 (in progress), PAY-2 (in review), PAY-4, PAY-3 (todo); Backlog and Done folded.
     const user = userEvent.setup();
-    const { router } = renderApp('/p/PAY?task=PAY-2');
-    await screen.findByRole('row', { name: /PAY-2\b/ });
-    const group = (name: string) =>
-      screen.getAllByRole('row').find((element) => element.textContent?.startsWith(name)) as HTMLElement;
+    renderApp('/p/PAY?focus=PAY-2');
+    await findRow('PAY-2');
+    await waitFor(() => expect(row('PAY-2')).toHaveFocus());
 
-    await user.keyboard('j'); // from the page
-    await waitFor(() => expect(row('PAY-4').contains(document.activeElement)).toBe(true));
-    await user.keyboard('{ArrowUp}'); // over the Todo group row
-    expect(row('PAY-2')).toHaveAttribute('aria-selected', 'true');
-    expect(row('PAY-2').contains(document.activeElement)).toBe(true);
-    await user.keyboard('{ArrowUp}{ArrowUp}'); // PAY-1, then stays: never the In progress group row
-    expect(row('PAY-1').contains(document.activeElement)).toBe(true);
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-1'));
+    await user.keyboard('{ArrowDown}'); // over the Todo group row
+    expect(row('PAY-4')).toHaveFocus();
+    await user.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}'); // PAY-2, PAY-1, then stays
+    expect(row('PAY-1')).toHaveFocus();
 
-    // Left folds the task's group and puts focus on the group row; the task stays selected.
+    // Left folds the task's group and puts the cursor on the group row.
     await user.keyboard('{ArrowLeft}');
     expect(group('In progress')).toHaveFocus();
-    expect(group('In progress')).toHaveTextContent(/collapsed/);
-    expect(screen.queryByRole('row', { name: /PAY-1\b/ })).not.toBeInTheDocument();
-    expect(within(pane()).getByRole('heading', { name: 'Task number 1' })).toBeInTheDocument();
+    expect(group('In progress')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('row', { name: /^PAY-1\b/ })).not.toBeInTheDocument();
     await user.keyboard('{ArrowLeft}'); // folded already: nothing
     expect(group('In progress')).toHaveFocus();
-    // Right unfolds it onto its first task.
+    // Down from a group row goes to the next task; Right unfolds onto the first task.
     await user.keyboard('{ArrowRight}');
-    expect(group('In progress')).toHaveTextContent(/expanded/);
-    await waitFor(() => expect(row('PAY-1').contains(document.activeElement)).toBe(true));
+    expect(group('In progress')).toHaveAttribute('aria-expanded', 'true');
+    await waitFor(() => expect(row('PAY-1')).toHaveFocus());
 
     // A lazily loaded group: Right loads its tasks and focuses the first one.
-    await user.click(within(screen.getByRole('grid')).getByText('Backlog')); // unfold (loads)
-    await screen.findByRole('row', { name: /PAY-5\b/ });
-    await user.click(within(screen.getByRole('grid')).getByText('Backlog')); // fold again, focus stays
-    expect(screen.queryByRole('row', { name: /PAY-5\b/ })).not.toBeInTheDocument();
+    await user.click(within(group('Done')).getByText('Done'));
+    expect(group('Done')).toHaveFocus();
     await user.keyboard('{ArrowRight}');
-    await waitFor(() => expect(row('PAY-5').contains(document.activeElement)).toBe(true));
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-5'));
-    await user.keyboard('{ArrowUp}'); // over the Backlog group row to the last Todo task
-    expect(row('PAY-3').contains(document.activeElement)).toBe(true);
+    await waitFor(() => expect(row('PAY-6')).toHaveFocus());
+    await user.keyboard('{ArrowUp}'); // over the Done and Backlog group rows to the last Todo task
+    expect(row('PAY-3')).toHaveFocus();
   });
 
   it('focuses the search with / and filters by the typed text', async () => {
     const user = userEvent.setup();
     const { router } = renderApp('/p/PAY');
-    await screen.findByRole('row', { name: /PAY-1\b/ });
+    await findRow('PAY-1');
 
     await user.keyboard('/');
     expect(screen.getByRole('searchbox', { name: 'Search tasks' })).toHaveFocus();
     await user.keyboard('number 3');
-    await waitFor(() => expect((router.state.location.search as { q?: string }).q).toBe('number 3'));
-    await waitFor(() => expect(screen.queryByRole('row', { name: /PAY-1\b/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(searchOf(router).q).toBe('number 3'));
+    await waitFor(() => expect(screen.queryByRole('row', { name: /^PAY-1\b/ })).not.toBeInTheDocument());
     expect(row('PAY-3')).toBeInTheDocument();
+    // Enter goes from the search to the list.
+    await user.keyboard('{Enter}');
+    expect(row('PAY-3')).toHaveFocus();
   });
 });
 
-describe('optimistic edits', () => {
-  it('shows a new title at once and rolls it back when the server refuses it', async () => {
+describe('selection and the action bar', () => {
+  it('selects with X, Shift+↓ and ⌘A, shows the action bar for two or more, and clears with Esc', async () => {
     const user = userEvent.setup();
-    renderApp('/p/PAY?task=PAY-2');
-    const fake = api.current as FakeApi;
-    await screen.findByRole('region', { name: 'Task detail' });
-    await within(pane()).findByRole('heading', { name: 'Task number 2' });
+    renderApp('/p/PAY');
+    await findRow('PAY-1');
 
-    fake.control.failUpdates = true;
-    const release = fake.hold();
-    await user.click(within(pane()).getByRole('button', { name: 'Task number 2' }));
-    const input = within(pane()).getByRole('textbox', { name: 'Title' });
-    await user.clear(input);
-    await user.type(input, 'Renamed task{Enter}');
+    await user.keyboard('jx');
+    expect(row('PAY-1')).toHaveAttribute('aria-selected', 'true');
+    // Every row shows its checkbox while anything is selected; one selected task has no bar.
+    expect(within(row('PAY-3')).getByRole('checkbox', { name: 'Select PAY-3' })).not.toBeChecked();
+    expect(screen.queryByRole('toolbar', { name: /selected/ })).toBeNull();
 
-    // Optimistic: the pane and the list row change before the server answers. Under a loaded full-suite
-    // run the render can lag, so wait on the whole optimistic state with a generous timeout.
-    await waitFor(
-      () => {
-        expect(within(pane()).getByRole('heading', { name: 'Renamed task' })).toBeInTheDocument();
-        expect(within(row('PAY-2')).getByText('Renamed task')).toBeInTheDocument();
-        expect(fake.calls.update).toEqual([{ key: 'PAY-2', title: 'Renamed task' }]);
-      },
-      { timeout: 10_000 },
-    );
+    await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+    expect(row('PAY-2')).toHaveAttribute('aria-selected', 'true');
+    const bar = screen.getByRole('toolbar', { name: '2 selected' });
+    for (const name of ['Status', 'Assignee', 'Labels', 'Priority', 'Due']) {
+      expect(within(bar).getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+    }
 
-    await act(async () => release());
-    // Rolled back, with the reason. The banner and the rollback come from the same failed mutation;
-    // wait for both instead of reading the banner right after the heading.
-    await waitFor(
-      () => {
-        expect(within(pane()).getByRole('heading', { name: 'Task number 2' })).toBeInTheDocument();
-        expect(within(row('PAY-2')).getByText('Task number 2')).toBeInTheDocument();
-        expect(within(pane()).getByRole('alert')).toHaveTextContent(
-          "Couldn't save your change, so it was undone. Title is too long",
-        );
-      },
-      { timeout: 10_000 },
-    );
+    // Shift+click on a checkbox selects the range.
+    await user.keyboard('{Shift>}');
+    await user.click(within(row('PAY-3')).getByRole('checkbox'));
+    await user.keyboard('{/Shift}');
+    expect(screen.getByRole('toolbar', { name: '4 selected' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('toolbar', { name: /selected/ })).toBeNull();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+
+    await user.keyboard('{Control>}a{/Control}');
+    expect(screen.getByRole('toolbar', { name: '4 selected' })).toBeInTheDocument();
   });
 
-  it('ticks a checkbox in the description and saves the new Markdown', async () => {
+  it('changes the status of the selection from the action bar in one bulk request', async () => {
     const user = userEvent.setup();
-    renderApp('/p/PAY?task=PAY-1');
-    const fake = api.current as FakeApi;
-    await screen.findByRole('region', { name: 'Task detail' });
-    const boxes = await within(pane()).findAllByRole('checkbox', { name: 'Done' });
-    expect(boxes.map((box) => (box as HTMLInputElement).checked)).toEqual([true, false]);
+    renderApp('/p/PAY');
+    await findRow('PAY-1');
+    await user.keyboard('jx{Shift>}{ArrowDown}{/Shift}');
+    const bar = screen.getByRole('toolbar', { name: '2 selected' });
 
-    await user.click(boxes[1] as HTMLElement);
-    await waitFor(() =>
-      expect(fake.calls.update).toEqual([
-        { key: 'PAY-1', description: 'First line.\n\n- [x] Done thing\n- [x] Open thing' },
-      ]),
-    );
-    // Ticking does not open the editor.
-    expect(within(pane()).queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+    await user.click(within(bar).getByRole('button', { name: /^Status/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Status' });
+    await user.click(within(dialog).getByRole('menuitemradio', { name: /Done/ }));
+    await waitFor(() => expect(fake().calls.bulk).toHaveLength(1));
+    expect(fake().calls.bulk[0]).toMatchObject({ keys: ['PAY-1', 'PAY-2'], status: 'done' });
+  });
+
+  it('offers copy and Backlog.md links instead of field changes in a mirrored project', async () => {
+    const api = fake();
+    api.mirror.summary = {
+      mode: 'mirror',
+      state: 'healthy',
+      defaultBranch: 'main',
+      lastReadAt: new Date().toISOString(),
+      lastReadCommit: 'e91b07fdeadbeef',
+      lastTrigger: 'webhook',
+      problems: { files: 0, values: 0 },
+      hidden: 0,
+      detachedAt: null,
+    };
+    for (const task of api.tasks) task.locked = ['title', 'status', 'priority', 'assignee'];
+    const user = userEvent.setup();
+    renderApp('/p/PAY');
+    await findRow('PAY-1');
+    await user.keyboard('jx{Shift>}{ArrowDown}{/Shift}');
+    const bar = await screen.findByRole('toolbar', { name: '2 selected' });
+    expect(within(bar).getByRole('button', { name: /^Copy keys/ })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: /^Copy links/ })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Open in Backlog.md' })).toBeInTheDocument();
+    expect(within(bar).queryByRole('button', { name: /^Status/ })).toBeNull();
   });
 });
 
-describe('quick create', () => {
-  it('creates two tasks with Create more on, selecting each new task in the list', async () => {
+describe('filters and states', () => {
+  it('sends the whole filter to tasks.list and shows it as chips with a Clear', async () => {
     const user = userEvent.setup();
-    const { router } = renderApp('/p/PAY');
-    const fake = api.current as FakeApi;
-    await screen.findByRole('row', { name: /PAY-1\b/ });
+    const payouts = fake().labels.find((label) => label.name === 'payouts')?.id ?? '';
+    const { router } = renderApp(`/p/PAY?label=${payouts}&assignee=agents,none`);
+    await findRow('PAY-1');
+    expect(lastListCall()).toMatchObject({ label: [payouts], assignee: ['agents', 'none'] });
+    expect(screen.queryByRole('row', { name: /^PAY-3\b/ })).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: /^New/ }));
-    const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    const title = within(dialog).getByRole('textbox', { name: 'Title' });
-    await waitFor(() => expect(title).toHaveFocus());
+    const chips = screen.getByRole('toolbar', { name: 'Filters' });
+    expect(within(chips).getByRole('button', { name: /^Labels is payouts/ })).toBeInTheDocument();
+    expect(within(chips).getByText(/1 of \d+ tasks/)).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole('switch', { name: 'Create more' }));
-    await user.click(title);
-    await user.keyboard('First new task');
-    await user.keyboard('{Control>}{Enter}{/Control}');
-
-    await waitFor(() => expect(fake.calls.create).toHaveLength(1));
-    expect(fake.calls.create[0]).toMatchObject({
-      project: 'PAY',
-      title: 'First new task',
-      status: 'todo',
-      priority: 'none',
-      assignee: null,
-    });
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-7'));
-    // Still open, emptied and ready for the next one.
-    expect(screen.getByRole('dialog', { name: 'New task' })).toBeInTheDocument();
-    expect(within(dialog).getByText('Created PAY-7')).toBeInTheDocument();
-    await waitFor(() => expect(within(dialog).getByRole('textbox', { name: 'Title' })).toHaveValue(''));
-
-    // I assigns to me when focus is not in a text field.
-    await user.click(within(dialog).getByRole('button', { name: /Assign to me/ }));
-    await user.click(within(dialog).getByRole('textbox', { name: 'Title' }));
-    await user.keyboard('Second new task');
-    await user.click(within(dialog).getByRole('button', { name: /Create task/ }));
-
-    await waitFor(() => expect(fake.calls.create).toHaveLength(2));
-    expect(fake.calls.create[1]).toMatchObject({
-      title: 'Second new task',
-      assignee: fake.tasks[0]?.createdBy.id,
-    });
-    await waitFor(() => expect(searchOf(router).task).toBe('PAY-8'));
-    // The dialog hides the page from assistive tech while open, hence hidden: true.
-    expect(await screen.findByRole('row', { name: /PAY-8\b/, hidden: true })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(within(chips).getByRole('button', { name: 'Clear' }));
+    await waitFor(() => expect(searchOf(router).label).toBeUndefined());
+    expect(screen.queryByRole('toolbar', { name: 'Filters' })).toBeNull();
+    expect(await findRow('PAY-3')).toBeInTheDocument();
   });
 
-  it('preselects the status passed to open() for that opening only', async () => {
+  it('says why nothing matches and clears the filters', async () => {
     const user = userEvent.setup();
-    renderApp('/p/PAY');
-    const fake = api.current as FakeApi;
-    await screen.findByRole('row', { name: /PAY-1\b/ });
-
-    await user.click(screen.getByRole('button', { name: 'Open in review' }));
-    let dialog = await screen.findByRole('dialog', { name: 'New task' });
-    expect(within(dialog).getByRole('button', { name: /In review/ })).toBeInTheDocument();
-    await user.type(
-      within(dialog).getByRole('textbox', { name: 'Title' }),
-      'Review me{Control>}{Enter}{/Control}',
-    );
-    await waitFor(() => expect(fake.calls.create).toHaveLength(1));
-    expect(fake.calls.create[0]).toMatchObject({ title: 'Review me', status: 'in_review' });
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-
-    // The next plain open starts from the default status again.
-    await user.click(screen.getByRole('button', { name: /^New/ }));
-    dialog = await screen.findByRole('dialog', { name: 'New task' });
-    expect(within(dialog).getByRole('button', { name: /Todo/ })).toBeInTheDocument();
-    await user.type(
-      within(dialog).getByRole('textbox', { name: 'Title' }),
-      'Plain{Control>}{Enter}{/Control}',
-    );
-    await waitFor(() => expect(fake.calls.create).toHaveLength(2));
-    expect(fake.calls.create[1]).toMatchObject({ title: 'Plain', status: 'todo' });
+    const { router } = renderApp('/p/PAY?due=overdue&q=refund');
+    expect(await screen.findByRole('heading', { name: 'No tasks match these filters' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Nothing in Payments is overdue and matches "refund". Remove a filter or clear them all.',
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    await waitFor(() => expect(searchOf(router).q).toBeUndefined());
+    expect(searchOf(router).due).toBeUndefined();
+    expect(await findRow('PAY-1')).toBeInTheDocument();
   });
 
-  it('closes after creating when Create more is off', async () => {
+  it('shows the empty project with New task, and + on a group presets its status', async () => {
+    api.current = createFakeApi({ tasks: 0 });
     const user = userEvent.setup();
     renderApp('/p/PAY');
-    await screen.findByRole('row', { name: /PAY-1\b/ });
+    expect(await screen.findByRole('heading', { name: 'No tasks in Payments yet' })).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /^New task/ }).at(-1) as HTMLElement);
+    expect(screen.getByTestId('quick-create')).toHaveTextContent('open PAY');
+  });
 
-    await user.click(screen.getByRole('button', { name: /^New/ }));
-    const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    await user.type(
-      within(dialog).getByRole('textbox', { name: 'Title' }),
-      'Only task{Control>}{Enter}{/Control}',
+  it('opens quick create in a group status from its +', async () => {
+    const user = userEvent.setup();
+    renderApp('/p/PAY');
+    await findRow('PAY-1');
+    await user.click(screen.getByRole('button', { name: 'New task in In review' }));
+    expect(screen.getByTestId('quick-create')).toHaveTextContent('open PAY in_review');
+  });
+
+  it('shows skeleton rows while loading and an error banner with Try again', async () => {
+    const api = fake();
+    const list = api.client.tasks.list;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    api.client.tasks.list = async () => {
+      await gate;
+      throw new ORPCError('INTERNAL_SERVER_ERROR', { data: { requestId: 'req_list1' } });
+    };
+    const user = userEvent.setup();
+    renderApp('/p/PAY');
+    expect(await screen.findByRole('status', { name: 'Loading tasks' })).toBeInTheDocument();
+
+    act(() => release());
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Couldn’t load tasks. The server ran into an error.',
     );
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(await screen.findByRole('row', { name: /PAY-7\b/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('req_list1')).toBeInTheDocument();
+    api.client.tasks.list = list;
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await findRow('PAY-1')).toBeInTheDocument();
   });
 });

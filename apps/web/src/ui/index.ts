@@ -1,48 +1,44 @@
-// Ledger UI kit. Screens import from '~/ui' only.
+// UI kit (Margin since M5; some components keep their Ledger names). Screens import from '~/ui' only.
 
 export {
   Avatar,
   type AvatarProps,
+  type AvatarSize,
+  agentMark,
   type MemberKind,
   MemberLabel,
   type MemberLabelProps,
   UnassignedAvatar,
   type UnassignedAvatarProps,
 } from './Avatar';
+export { Banner, type BannerProps, ReadOnlyNote } from './Banner';
 export {
-  BacklogBlock,
-  type BacklogBlockProps,
-  KeyValueRow,
-  type KeyValueRowProps,
-  LabelChip,
-  MissingTaskLink,
-  type MissingTaskLinkProps,
-  TaskLink,
-  type TaskLinkProps,
-} from './BacklogBlock';
-export { Banner, type BannerProps } from './Banner';
-export {
-  BoardCard,
   BoardCardContent,
   type BoardCardContentProps,
-  BoardCardGhost,
   type BoardCardMember,
-  type BoardCardProps,
   BoardCardSkeleton,
-  type BoardCardState,
   BoardColumn,
+  BoardColumnEmpty,
   BoardColumnHeader,
   type BoardColumnHeaderProps,
   type BoardColumnProps,
+  BoardDragHint,
+  type BoardDragHintProps,
+  BoardFoldedColumn,
+  type BoardFoldedColumnProps,
+  BoardSubtaskRow,
+  type BoardSubtaskRowProps,
+  BoardSubtaskToggle,
+  type BoardSubtaskToggleProps,
   boardCardStyles,
   ColumnRefusal,
   type ColumnRefusalProps,
-  DropLine,
   dropIndicatorClass,
   SwimlaneHeader,
   type SwimlaneHeaderProps,
 } from './Board';
 export { Button, type ButtonProps, buttonStyles } from './Button';
+export { Calendar, type CalendarProps } from './Calendar';
 export {
   Checkbox,
   CheckboxBox,
@@ -50,27 +46,10 @@ export {
   type CheckboxGroupProps,
   type CheckboxProps,
 } from './Checkbox';
-export { Checklist, type ChecklistItem, type ChecklistProps, CheckMark } from './Checklist';
+export { CheckMark } from './Checklist';
 export { Chip, type ChipProps } from './Chip';
 export { CodeBlock, type CodeBlockProps, copyText, InlineCode, useCopy } from './CodeBlock';
-export { ComboBox, type ComboBoxProps } from './ComboBox';
-export {
-  Comment,
-  type CommentAuthor,
-  CommentBody,
-  CommentDeleted,
-  type CommentDeletedProps,
-  type CommentProps,
-  commentProse,
-} from './Comment';
-export {
-  CommentEditor,
-  type CommentEditorProps,
-  Composer,
-  type ComposerMode,
-  type ComposerProps,
-  type ComposerTextAreaAttributes,
-} from './Composer';
+export { ColorSwatches, type ColorSwatchesProps } from './ColorSwatches';
 export {
   CONNECTION_STATUS_LABELS,
   CONNECTION_STATUSES,
@@ -97,50 +76,71 @@ export {
   VIRTUALIZE_FROM,
 } from './DataTable';
 export {
+  ConfirmBody,
+  ConfirmDialog,
+  type ConfirmDialogProps,
   Dialog,
   DialogBody,
   DialogFooter,
   type DialogFooterProps,
   DialogHeader,
   type DialogHeaderProps,
+  DialogSurface,
+  DialogTitle,
   DialogTrigger,
   Modal,
   type ModalProps,
+  Scrim,
+  type ScrimProps,
 } from './Dialog';
+export {
+  DueChip,
+  type DueChipProps,
+  daysBetween,
+  dueText,
+  formatShortDate,
+  localToday,
+} from './DueChip';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { type Fact, FactList, type FactListProps } from './FactList';
-export { FieldDescription, FieldError, Label } from './Field';
-export { Kbd, type KbdProps } from './Kbd';
-export { ListBox, ListBoxItem, type OptionItem, OptionRow, Popover } from './ListBox';
+export { FieldDescription, FieldError, inputBase, Label } from './Field';
+export { CaretGlyph, CheckGlyph, CloseGlyph, FiltersGlyph, LockGlyph, PlusGlyph } from './Glyphs';
+export { Kbd, type KbdProps, KeyHint, type KeyHintProps } from './Kbd';
+export {
+  LABEL_HUE_NAMES,
+  LABEL_HUES,
+  LabelChip,
+  type LabelChipProps,
+  LabelDot,
+  LabelList,
+  type LabelListItem,
+  LabelOverflow,
+  labelColor,
+} from './LabelChip';
+export { ListBox, type OptionItem, OptionRow, Popover } from './ListBox';
 export {
   DisabledCreateButton,
   type DisabledCreateButtonProps,
   lockedHatch,
-  OwnedFieldCaption,
-  type OwnedFieldCaptionProps,
 } from './Locked';
-export { type ActivityEntry, ActivityTimeline } from './layout/ActivityTimeline';
 export { AppFrame, type AppFrameProps } from './layout/AppFrame';
 export { FilterBar, type FilterBarProps, FilterValue } from './layout/FilterBar';
 export { PageHeader, type PageHeaderProps } from './layout/PageHeader';
-export { type Property, PropertyGrid } from './layout/PropertyGrid';
+export { ProjectTile, type ProjectTileProps, projectHue } from './layout/ProjectTile';
+export { SettingsNav, type SettingsNavItem, type SettingsNavSection } from './layout/SettingsNav';
+export { GearGlyph, HomeGlyph, SearchGlyph, SidebarGlyph } from './layout/ShellGlyphs';
 export {
-  formatRailCount,
-  Rail,
-  type RailNavItem,
-  type RailProject,
-  type RailProps,
-  type RailUserAction,
-} from './layout/Rail';
-export { SettingsNav, type SettingsNavSection } from './layout/SettingsNav';
-export {
-  THEME_CHOICES,
-  type ThemeChoice,
-  UserMenu,
-  type UserMenuItem,
-  type UserMenuProps,
-  type UserMenuSubItem,
-} from './layout/UserMenu';
+  Sidebar,
+  type SidebarPage,
+  SidebarPersonButton,
+  type SidebarPersonButtonProps,
+  type SidebarProject,
+  type SidebarProps,
+  SidebarWorkspaceButton,
+  type SidebarWorkspaceButtonProps,
+  useSidebarCollapsed,
+} from './layout/Sidebar';
+export { ViewHeader, type ViewHeaderProps } from './layout/ViewHeader';
 export {
   type MappingHow,
   MappingRow,
@@ -148,8 +148,24 @@ export {
   MappingTable,
   type MappingTableProps,
 } from './Mapping';
-export { MentionChip, type MentionChipProps } from './MentionChip';
-export { Menu, MenuItem, type MenuItemProps, MenuSeparator, MenuTrigger, SubmenuTrigger } from './Menu';
+export {
+  BlockedMarker,
+  type BlockedMarkerProps,
+  BlockedNotice,
+  SubtaskProgress,
+  type SubtaskProgressProps,
+  SubtaskRing,
+} from './Markers';
+export {
+  Menu,
+  MenuGroup,
+  type MenuGroupProps,
+  MenuItem,
+  type MenuItemProps,
+  MenuSeparator,
+  MenuTrigger,
+  SubmenuTrigger,
+} from './Menu';
 export {
   hueFromName,
   initialsFor,
@@ -163,6 +179,23 @@ export {
   toPriority,
 } from './meta';
 export {
+  highlightMatch,
+  MenuDivider,
+  MenuFooter,
+  type MenuFooterHint,
+  MenuNote,
+  MenuRowButton,
+  type MenuRowButtonProps,
+  MenuTip,
+  PickerMenu,
+  type PickerMenuCreate,
+  type PickerMenuItem,
+  PickerMenuPopover,
+  type PickerMenuPopoverProps,
+  type PickerMenuProps,
+  type PickerMenuSection,
+} from './PickerMenu';
+export {
   filterPickerItems,
   movePickerActive,
   PICKER_NONE,
@@ -173,6 +206,7 @@ export {
   type PickerPopoverProps,
   pickerOptionId,
 } from './PickerPopover';
+export { Pill, type PillProps, type PillTone } from './Pill';
 export {
   CycleGlyph,
   type CycleGlyphProps,
@@ -184,32 +218,16 @@ export {
   NoneGlyph,
   type NoneGlyphProps,
 } from './PlanningGlyph';
-export { PriorityGlyph, type PriorityGlyphProps } from './PriorityGlyph';
+export { PriorityGlyph, type PriorityGlyphProps, showsPriorityOnCards } from './PriorityGlyph';
 export { ProblemList, type ProblemListProps, ProblemRow, type ProblemRowProps } from './Problems';
 export {
-  DaysLeftPill,
-  type DaysLeftPillProps,
-  formatDaysLeft,
   ProgressBar,
   type ProgressBarProps,
-  TimeBar,
-  type TimeBarProps,
+  SegmentedBar,
+  type SegmentedBarProps,
+  SegmentLegend,
+  type SegmentTone,
 } from './Progress';
-export {
-  QUEUE_COLUMNS,
-  Queue,
-  type QueueAction,
-  QueueGroupFooter,
-  type QueueGroupFooterProps,
-  QueueGroupGlyph,
-  type QueueGroupGlyphProps,
-  QueueGroupHeader,
-  type QueueGroupHeaderProps,
-  type QueueGroupKind,
-  type QueueProps,
-  QueueRow,
-  type QueueRowProps,
-} from './Queue';
 export {
   Radio,
   RadioCard,
@@ -233,12 +251,11 @@ export {
   type StepMarkerProps,
   type StepState,
 } from './SetupSteps';
-export { Skeleton, type SkeletonProps } from './Skeleton';
+export { Skeleton, SkeletonCard, type SkeletonProps, SkeletonRow, SkeletonRows } from './Skeleton';
+export { SourceBadge, type SourceBadgeProps, type SyncState } from './SourceBadge';
 export {
   SOURCE_DOT_LABELS,
   SOURCE_DOT_STATES,
-  SourceButton,
-  type SourceButtonProps,
   type SourceDotState,
   SourceStatusDot,
   type SourceStatusDotProps,
@@ -246,16 +263,14 @@ export {
 export {
   NoticeStrip,
   type NoticeStripProps,
-  SourceStrip,
-  type SourceStripProps,
   TruncatedPath,
   type TruncatedPathProps,
 } from './SourceStrip';
 export { StatStrip, type StatStripProps, StatTile, type StatTileProps } from './Stat';
-export { StatusBar, type StatusBarProps } from './StatusBar';
+export { StatusGlyph, type StatusGlyphProps } from './StatusGlyph';
 export { StatusSquare, type StatusSquareProps } from './StatusSquare';
 export { Switch, type SwitchProps } from './Switch';
-export { SystemActorAvatar, type SystemActorAvatarProps, SystemActorDot } from './SystemActor';
+export { SystemActorDot } from './SystemActor';
 export { Tab, TabList, TabPanel, Tabs } from './Tabs';
 export { Tag, type TagProps } from './Tag';
 export {
@@ -267,7 +282,7 @@ export {
   type TextFieldProps,
 } from './TextField';
 export { Toast, type ToastProps } from './Toast';
-export { Tooltip, TooltipTrigger } from './Tooltip';
+export { Tooltip, TooltipChip, type TooltipProps, TooltipTrigger } from './Tooltip';
 export { UIProvider } from './UIProvider';
 export {
   type HotkeyBinding,
@@ -279,5 +294,3 @@ export {
   type UseHotkeysOptions,
   useHotkeys,
 } from './useHotkeys';
-export { type ViewTab, ViewTabs, type ViewTabsProps } from './ViewTabs';
-export { WarnPill, type WarnPillProps } from './WarnPill';

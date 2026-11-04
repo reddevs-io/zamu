@@ -7,23 +7,32 @@ import {
 } from 'react-aria-components';
 import { cn, composeTw } from './cn';
 import { type FieldChromeProps, FieldDescription, FieldError, Label } from './Field';
+import { CheckGlyph } from './Glyphs';
 
-/** The 14px box on its own; also used for read-only markers. */
-export function CheckboxBox({ checked, indeterminate }: { checked: boolean; indeterminate?: boolean }) {
+/** The 14px box on its own (margin.css .box); also used for read-only markers and multi-pick menus. */
+export function CheckboxBox({
+  checked,
+  indeterminate,
+  className,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  className?: string;
+}) {
   return (
     <span
       aria-hidden
+      data-checked={checked || undefined}
       className={cn(
-        'grid size-3.5 shrink-0 place-items-center',
-        checked || indeterminate ? 'bg-accent text-on-accent' : 'border-[1.5px] border-muted',
+        'grid size-3.5 shrink-0 place-items-center rounded-[4px] border-[1.5px]',
+        checked || indeterminate ? 'border-accent bg-accent text-accent-ink' : 'border-fg-3',
+        className,
       )}
     >
       {indeterminate ? (
-        <span className="h-0.5 w-2 bg-current" />
+        <span className="h-0.5 w-1.75 rounded-full bg-current" />
       ) : checked ? (
-        <svg viewBox="0 0 14 14" className="size-3.5" fill="none" aria-hidden>
-          <path d="M3.5 7.2 5.9 9.6 10.5 4.6" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
-        </svg>
+        <CheckGlyph className="h-1.75 w-2.25" />
       ) : null}
     </span>
   );
@@ -39,12 +48,12 @@ export function Checkbox({ children, ...props }: CheckboxProps) {
       {...props}
       className={composeTw(
         props.className,
-        'group inline-flex cursor-pointer items-center gap-2 text-[12.5px] text-fg outline-none disabled:cursor-default disabled:opacity-50',
+        'group inline-flex cursor-pointer items-center gap-2 text-sm text-fg outline-none disabled:cursor-default disabled:opacity-45',
       )}
     >
       {({ isSelected, isIndeterminate, isFocusVisible }) => (
         <>
-          <span className={cn('inline-flex', isFocusVisible && 'focus-ring')}>
+          <span className={cn('inline-flex rounded-[4px]', isFocusVisible && 'shadow-[var(--focus-ring)]')}>
             <CheckboxBox checked={isSelected} indeterminate={isIndeterminate} />
           </span>
           {children}

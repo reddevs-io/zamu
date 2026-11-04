@@ -21,8 +21,8 @@ export interface SetupStepsProps {
 }
 
 /**
- * Step list of the Backlog.md setup (ledger-m3.css .m3-steps): done steps show a --done tick, the current
- * step is bold on --surface with a 2px accent bar, steps to come are muted with an outlined number.
+ * Step list of the Backlog.md setup: done steps show a --status-done tick, the current step is semibold
+ * on --bg-lane, steps to come are --fg-2 with an outlined number.
  */
 export function SetupSteps({ steps, orientation = 'vertical', className, ...props }: SetupStepsProps) {
   return (
@@ -40,10 +40,8 @@ export function SetupSteps({ steps, orientation = 'vertical', className, ...prop
           aria-current={step.state === 'current' ? 'step' : undefined}
           data-state={step.state}
           className={cn(
-            'flex h-[34px] items-center gap-2.5 px-3',
-            step.state === 'current'
-              ? 'bg-surface font-semibold text-fg shadow-[inset_2px_0_0_var(--accent)]'
-              : 'text-muted',
+            'flex h-8.5 items-center gap-2.5 rounded-md px-3',
+            step.state === 'current' ? 'bg-bg-lane font-semibold text-fg' : 'text-fg-2',
           )}
         >
           <StepMarker state={step.state} number={i + 1} />
@@ -51,7 +49,7 @@ export function SetupSteps({ steps, orientation = 'vertical', className, ...prop
           {step.note ? (
             <>
               <span className="flex-1" />
-              <span className="text-[11px] font-normal text-faint">{step.note}</span>
+              <span className="text-xs font-normal text-fg-3">{step.note}</span>
             </>
           ) : null}
           {step.state === 'done' ? <span className="sr-only">, done</span> : null}
@@ -69,18 +67,17 @@ export interface StepMarkerProps {
   className?: string;
 }
 
-/** Numbered square: ✓ on --done, the number inverted (current), or an outlined number (to do). */
+/** Round marker: ✓ on --status-done, the number on --accent (current), or an outlined number (to do). */
 export function StepMarker({ state, number, size = 'md', className }: StepMarkerProps) {
   return (
     <span
       aria-hidden
       className={cn(
-        'box-border grid shrink-0 place-items-center font-mono',
-        size === 'md' ? 'size-[18px] text-[9.5px]' : 'size-4 text-[8.5px]',
-        state === 'done' && 'bg-done font-sans font-bold text-bg',
-        state === 'done' && (size === 'md' ? 'text-[10px]' : 'text-[9px]'),
-        state === 'current' && 'bg-fg text-bg',
-        state === 'todo' && 'border border-line text-muted',
+        'box-border grid shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums',
+        size === 'md' ? 'size-4.5' : 'size-4',
+        state === 'done' && 'bg-status-done text-bg',
+        state === 'current' && 'bg-accent text-accent-ink',
+        state === 'todo' && 'border border-line text-fg-3',
         className,
       )}
     >

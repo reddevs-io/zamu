@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { RouterProvider } from 'react-aria-components';
 
 /**
- * Makes React Aria links (Rail, SettingsNav, MenuItem with href) navigate through TanStack Router
+ * Makes React Aria links (Sidebar, SettingsNav, MenuItem with href) navigate through TanStack Router
  * instead of reloading the page. Render it once inside the router, around the signed-in layout.
  */
 export function UIProvider({ children }: { children: ReactNode }) {

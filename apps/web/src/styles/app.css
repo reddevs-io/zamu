@@ -1,55 +1,100 @@
 @import 'tailwindcss';
-/* Self-hosted variable fonts (no Google Fonts request). Families: 'Instrument Sans Variable', 'Martian Mono Variable'. */
-@import '@fontsource-variable/instrument-sans';
-@import '@fontsource-variable/martian-mono';
+/* Self-hosted variable fonts (no Google Fonts request). Families: 'Onest Variable' (wght) and
+   'Newsreader Variable' (wght and opsz, so titles get the display cut at large sizes). */
+@import '@fontsource-variable/onest';
+@import '@fontsource-variable/newsreader/opsz.css';
 @import './tokens.css';
 
 /* React Aria state variants: hover:, focus:, focus-visible:, pressed:, selected:, disabled:, invalid:, entering: …
    (they match data-hovered, data-focused and so on; on non-RAC elements they fall back to the native pseudo-class). */
 @plugin 'tailwindcss-react-aria-components';
 
-/* Only Ledger colors exist; Tailwind's default palette is removed so screens cannot drift from the tokens. */
+/* Only Margin tokens exist: Tailwind's default palette, type scale, radii and shadows are removed so screens
+   cannot drift from tokens.css. Spacing keeps Tailwind's 4px scale (p-2, gap-3 …); the --space-* steps
+   in tokens.css are the same numbers and stay available as p-(--space-3) and so on. */
 @theme {
   --color-*: initial;
-  --font-sans: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'Martian Mono Variable', 'Martian Mono', ui-monospace, monospace;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
 }
 
-/* `inline` keeps var() references in the utilities, so a nested .light/.dark subtree re-themes itself. */
+/* Scales and fonts. These keys share their names with tokens.css, so `reference` registers the utilities
+   (text-sm, rounded-lg, shadow-pop, font-serif …) without emitting `--text-sm: var(--text-sm)` to :root.
+   `inline` makes each utility read the tokens.css variable directly. */
+@theme inline reference {
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  /* Code only (code blocks, inline code). Task keys move to Onest with tabular figures in later workstreams. */
+  --font-mono: var(--font-code);
+
+  --text-xs: var(--text-xs);
+  --text-xs--line-height: var(--leading-ui);
+  --text-sm: var(--text-sm);
+  --text-sm--line-height: var(--leading-ui);
+  --text-md: var(--text-md);
+  --text-md--line-height: var(--leading-ui);
+  --text-lg: var(--text-lg);
+  --text-lg--line-height: var(--leading-ui);
+  --text-xl: var(--text-xl);
+  --text-xl--line-height: var(--leading-tight);
+  --text-2xl: var(--text-2xl);
+  --text-2xl--line-height: var(--leading-tight);
+  --text-3xl: var(--text-3xl);
+  --text-3xl--line-height: var(--leading-tight);
+
+  /* Tailwind's leading-normal, leading-snug and leading-none stay; leading-tight becomes the serif 1.15. */
+  --leading-tight: var(--leading-tight);
+  --leading-ui: var(--leading-ui);
+  --leading-prose: var(--leading-prose);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-lift: var(--shadow-lift);
+}
+
+/* Colours. `inline` keeps var() references in the utilities, so a nested .light/.dark subtree re-themes itself. */
 @theme inline {
   --color-bg: var(--bg);
+  --color-bg-side: var(--bg-side);
+  --color-bg-lane: var(--bg-lane);
+  --color-bg-grp: var(--bg-grp);
   --color-surface: var(--surface);
-  --color-band: var(--band);
-  --color-rail: var(--rail);
-  --color-rail-fg: var(--rail-fg);
-  --color-rail-on: var(--rail-on);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-pop: var(--surface-pop);
   --color-line: var(--line);
-  --color-line-2: var(--line-2);
+  --color-line-soft: var(--line-soft);
   --color-fg: var(--fg);
-  --color-muted: var(--muted);
-  --color-faint: var(--faint);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
   --color-accent: var(--accent);
-  --color-on-accent: var(--on-accent);
-  --color-sel: var(--sel);
-  --color-focus: var(--focus);
-  --color-review: var(--review);
-  --color-done: var(--done);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
-  --color-danger-bg: var(--danger-bg);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-status-prog: var(--status-prog);
+  --color-status-rev: var(--status-rev);
+  --color-status-done: var(--status-done);
+  --color-label-1: var(--label-1);
+  --color-label-2: var(--label-2);
+  --color-label-3: var(--label-3);
+  --color-label-4: var(--label-4);
+  --color-label-5: var(--label-5);
+  --color-label-6: var(--label-6);
+  --color-label-7: var(--label-7);
+  --color-label-8: var(--label-8);
+  --color-label-9: var(--label-9);
+  --color-tile-ink: var(--tile-ink);
+  --color-kbd-bg: var(--kbd-bg);
   --color-scrim: var(--scrim);
-  --color-warn: var(--warn);
-  --color-warn-bg: var(--warn-bg);
-  --color-drop: var(--drop);
-  --color-drop-line: var(--drop-line);
-  --color-mention: var(--mention);
-  --color-mention-bg: var(--mention-bg);
-  --color-comment-bg: var(--comment-bg);
-  --color-track: var(--track);
-  --color-sys-bg: var(--sys-bg);
-  --color-sys-fg: var(--sys-fg);
-  --color-hatch: var(--hatch);
-  --color-src-bg: var(--src-bg);
-  --shadow-dialog: var(--shadow);
 }
 
 @layer base {
@@ -60,8 +105,8 @@
   body {
     margin: 0;
     font-family: var(--font-sans);
-    font-size: 13px;
-    line-height: 1.4;
+    font-size: var(--text-md);
+    line-height: var(--leading-ui);
     color: var(--fg);
     background: var(--bg);
     -webkit-font-smoothing: antialiased;
@@ -74,38 +119,41 @@
   }
 
   ::selection {
-    background: var(--sel);
+    background: var(--accent-soft);
   }
 }
 
-/* Column-header style caption: 10px caps, 600, faint. */
-@utility caps {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--faint);
-}
+/* Arbitrary values that stay (no token fits; each use says why where it isn't obvious): 1.5px strokes of
+   glyphs, radios, checkboxes and dashed drop boxes (border-[1.5px]: the design's control stroke, finer than
+   border-2); corners below radius-sm on marks and swatches (rounded-[2px] … [5px]); composite shadows built
+   from tokens (shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]); calc() heights; the header's
+   max-[1099px] breakpoints from the 1024 frames. Text sizes are never arbitrary: use the seven steps (the
+   no-arbitrary-text test fails on text-[<number>…]). */
 
-/* Shared keyboard focus ring for buttons, links and rows. Inputs use their own border and halo. */
+/* Shared keyboard focus ring for buttons, links and rows: the accent ring of --focus-ring, drawn as an
+   outline so it never fights a component's own box-shadow. Inputs use their own border and halo. */
 @utility focus-ring {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 @utility focus-ring-inset {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
-/* Halo used by focused inputs (ledger.css .lg-inputf). */
+/* Halo used by focused inputs. */
 @utility halo {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 3px oklch(0.6 0.15 262 / 0.2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 20%, transparent);
 }
 
-/* Diagonal hatch on anything Backlog.md owns (ledger-m3.css .m3-lock). Always pair it with words that say why:
-   OwnedFieldCaption ("· file") or a note such as "comes from Backlog.md". */
+/* Diagonal hatch on a value Backlog.md owns (the setup's locked source fields). Always pair it with words that
+   say why, such as "comes from Backlog.md". */
 @utility locked-hatch {
-  background-image: repeating-linear-gradient(135deg, var(--hatch) 0 5px, transparent 5px 10px);
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--fg) 5%, transparent) 0 5px,
+    transparent 5px 10px
+  );
 }

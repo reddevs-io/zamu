@@ -2,7 +2,7 @@ import type { UserRef } from '@pm/contracts';
 import { createContext, useContext, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CommentBody, MentionChip } from '~/ui';
+import { cn } from '~/ui';
 import { commentUrlTransform, mentionId } from './mentions';
 
 // Comment bodies and the composer preview. react-markdown never renders raw HTML; links keep only
@@ -10,6 +10,17 @@ import { commentUrlTransform, mentionId } from './mentions';
 // comment's own mention list or the workspace members); otherwise it reads as plain text.
 
 type KnownMember = Pick<UserRef, 'id' | 'name' | 'kind'>;
+
+/** Comment prose (screens.css .cmt-b): text-md with prose leading, lists, code and links. */
+export const commentProse = cn(
+  'flex min-w-0 flex-col gap-2 text-md leading-prose break-words text-fg',
+  '[&_p]:m-0 [&_p]:text-pretty',
+  '[&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-4.5 [&_ol]:m-0 [&_ol]:list-decimal [&_ol]:pl-4.5',
+  '[&_pre]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-bg-lane [&_pre]:px-3 [&_pre]:py-2.5',
+  '[&_pre]:font-mono [&_pre]:text-sm [&_pre]:leading-normal [&_pre]:whitespace-pre',
+  '[&_:not(pre)>code]:rounded-sm [&_:not(pre)>code]:bg-bg-lane [&_:not(pre)>code]:px-1.25 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-sm',
+  '[&_a:not([data-mention])]:text-accent-text [&_a:not([data-mention])]:underline',
+);
 
 const MembersContext = createContext<ReadonlyMap<string, KnownMember>>(new Map());
 
@@ -21,7 +32,12 @@ const components: Components = {
     if (id) {
       const member = members.get(id);
       if (!member) return <>{children}</>;
-      return <MentionChip name={member.name} kind={member.kind} />;
+      // Margin mention (frame 058): the name in the accent text colour, no chip.
+      return (
+        <span data-mention className="font-medium text-accent-text">
+          @{member.name}
+        </span>
+      );
     }
     if (!href) return <>{children}</>;
     return (
@@ -54,14 +70,14 @@ export function CommentMarkdown({ source, mentions, members, className }: Commen
   }, [members, mentions]);
   return (
     <MembersContext.Provider value={known}>
-      <CommentBody className={className}>
+      <div className={cn(commentProse, className)}>
         <MarkdownOnly source={source} />
-      </CommentBody>
+      </div>
     </MembersContext.Provider>
   );
 }
 
-/** The Markdown alone, for the composer preview (which wraps it in CommentBody itself). */
+/** The Markdown alone, for the composer preview (which wraps it in commentProse itself). */
 export function CommentMarkdownContent({
   source,
   members,

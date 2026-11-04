@@ -1,8 +1,7 @@
-import type { TaskStatus } from '@pm/contracts';
 import type { Placement } from './board-cache';
 
-// Keyboard geometry of the board: which card H/J/K/L land on, where Shift+J/K put a card, and which
-// status Shift+H/L move it to. Columns hold cells: one per lane (or a single cell without lanes).
+// Keyboard geometry of the board: which card J/K (↓/↑) and ←/→ land on, where Shift+J/K put a card, and
+// which column Shift+←/→ move it to. Columns hold cells: one per lane (or a single cell without lanes).
 
 export interface NavCell {
   /** Lane id, or null without swimlanes. */
@@ -11,7 +10,8 @@ export interface NavCell {
 }
 
 export interface NavColumn {
-  status: TaskStatus;
+  /** The column: a status, or a group key when the board groups by another field. */
+  id: string;
   /** Open lanes top to bottom. */
   cells: readonly NavCell[];
 }
@@ -42,10 +42,10 @@ export function locate(columns: readonly NavColumn[], key: string): Location | n
 }
 
 /** Result of a focus move: the card to focus, or `end` when J ran past the last loaded card. */
-export type FocusTarget = { key: string } | { end: TaskStatus } | null;
+export type FocusTarget = { key: string } | { end: string } | null;
 
 /**
- * Card that J (down), K (up), H (left) or L (right) moves to. Without a current card, the first card
+ * Card that J or ↓ (down), K or ↑ (up), ← (left) or → (right) moves to. Without a current card, the first card
  * of the board. Columns without cards are skipped; between columns the lane and the row are kept when
  * they exist.
  */
@@ -66,7 +66,7 @@ export function focusTarget(
     const keys = flatKeys(column);
     const next = keys[here.flat + (direction === 'down' ? 1 : -1)];
     if (next) return { key: next };
-    if (direction === 'down') return { end: column.status };
+    if (direction === 'down') return { end: column.id };
     return { key: keys[here.flat] ?? current ?? '' };
   }
   const step = direction === 'right' ? 1 : -1;
@@ -106,15 +106,23 @@ export function reorderPlacement(
   return previous ? { before: previous } : null;
 }
 
-/** Status Shift+H (left) or Shift+L (right) moves a card to: the neighbouring board column, folded or not. */
-export function statusStep(
-  statuses: readonly TaskStatus[],
-  from: TaskStatus,
+/** Column Shift+← or Shift+→ moves a card to: the neighbouring board column, folded or not. */
+export function columnStep<T extends string>(
+  columns: readonly T[],
+  from: T,
   direction: 'left' | 'right',
-): TaskStatus | null {
-  const index = statuses.indexOf(from);
+): T | null {
+  const index = columns.indexOf(from);
   if (index < 0) return null;
-  return statuses[index + (direction === 'right' ? 1 : -1)] ?? null;
+  return columns[index + (direction === 'right' ? 1 : -1)] ?? null;
+}
+
+/** True when the card has a neighbour above (up) or below (down) in its own cell. */
+export function hasNeighbour(columns: readonly NavColumn[], key: string, direction: 'up' | 'down'): boolean {
+  const here = locate(columns, key);
+  if (!here) return false;
+  const cell = columns[here.column]?.cells[here.cell];
+  return cell?.keys[here.index + (direction === 'down' ? 1 : -1)] !== undefined;
 }
 
 /**

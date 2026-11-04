@@ -127,10 +127,10 @@ export function WebhookContent({
   return (
     <Dialog>
       <DialogHeader title="Refresh on every push">
-        <span className="text-faint">optional</span>
+        <span className="text-fg-3">optional</span>
       </DialogHeader>
       <DialogBody className="gap-3.5">
-        <p className="m-0 leading-[1.55]">
+        <p className="m-0 leading-prose text-fg-2">
           Add a webhook in the repository so the mirror refreshes seconds after a push. Without one, the
           hourly check picks changes up.
         </p>
@@ -156,12 +156,12 @@ export function WebhookContent({
                   />
                 )}
                 {info.secretState === 'hidden' && !issued ? (
-                  <span className="-mt-2 text-[11.5px] text-muted">
+                  <span className="-mt-2 text-xs text-fg-3">
                     Only owners and admins can see the secret. Ask one of them to add the webhook.
                   </span>
                 ) : newSecret ? (
                   <div className="-mt-1.5 flex items-center gap-3">
-                    <span role="status" className="min-w-0 flex-1 text-[11.5px] text-muted">
+                    <span role="status" className="min-w-0 flex-1 text-xs text-fg-2">
                       {issued
                         ? `Paste this into the webhook settings on ${PROVIDER_LABELS[info.provider ?? shown]}.`
                         : null}
@@ -179,7 +179,7 @@ export function WebhookContent({
           </div>
         ) : null}
         <Tabs selectedKey={shown} onSelectionChange={(key) => setProvider(key as GitProvider)}>
-          <div className="border-b border-line-2">
+          <div className="border-b border-line-soft">
             <TabList aria-label="Provider">
               {(['github', 'gitlab', 'gitea'] as const).map((id) => (
                 <Tab key={id} id={id} className="h-8">
@@ -189,7 +189,7 @@ export function WebhookContent({
             </TabList>
           </div>
         </Tabs>
-        <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5 text-[12.5px] leading-[1.55] [&_b]:font-semibold">
+        <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5 text-sm leading-prose text-fg-2 [&_b]:font-semibold [&_b]:text-fg">
           {webhookSteps(shown, repo, branch).map((step, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: fixed list of steps
             <li key={index}>{step}</li>
@@ -197,7 +197,7 @@ export function WebhookContent({
         </ol>
         <NoticeStrip
           marker={<SourceStatusDot state={info?.lastAt ? 'healthy' : 'paused'} decorative />}
-          trailing={info?.lastAt ? null : <span className="text-faint">Listening…</span>}
+          trailing={info?.lastAt ? null : <span className="text-fg-3">Listening…</span>}
         >
           <span role="status">
             Last notification received:{' '}
@@ -205,9 +205,7 @@ export function WebhookContent({
           </span>
         </NoticeStrip>
       </DialogBody>
-      <DialogFooter
-        start={<span className="text-[11.5px] text-muted">Pushes to other branches are ignored.</span>}
-      >
+      <DialogFooter start={<span className="text-xs text-fg-3">Pushes to other branches are ignored.</span>}>
         <Button variant="secondary" onPress={close}>
           Skip, hourly is fine
         </Button>
@@ -219,7 +217,7 @@ export function WebhookContent({
 
 /** Where to add the webhook, per provider (GitLab copy from frame 2k). */
 export function webhookSteps(provider: GitProvider, repository: string, branch: string): ReactNode[] {
-  const code = <InlineCode className="text-[11px]">{branch}</InlineCode>;
+  const code = <InlineCode className="text-xs">{branch}</InlineCode>;
   switch (provider) {
     case 'gitlab':
       return [

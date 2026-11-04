@@ -39,6 +39,7 @@ import { Route as AppPProjectKeyMilestonesIndexRouteImport } from './routes/_app
 import { Route as AppPProjectKeyMilestonesMilestoneIdRouteImport } from './routes/_app/p/$projectKey/milestones/$milestoneId'
 import { Route as AppPProjectKeySettingsIndexRouteImport } from './routes/_app/p/$projectKey/settings/index'
 import { Route as AppPProjectKeySettingsBacklogRouteImport } from './routes/_app/p/$projectKey/settings/backlog'
+import { Route as AppPProjectKeySettingsLabelsRouteImport } from './routes/_app/p/$projectKey/settings/labels'
 
 const _uiRoute = _uiRouteImport.update({
   id: '/__ui',
@@ -198,6 +199,12 @@ const AppPProjectKeySettingsBacklogRoute =
     path: '/backlog',
     getParentRoute: () => AppPProjectKeySettingsRouteRoute,
   } as any)
+const AppPProjectKeySettingsLabelsRoute =
+  AppPProjectKeySettingsLabelsRouteImport.update({
+    id: '/labels',
+    path: '/labels',
+    getParentRoute: () => AppPProjectKeySettingsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/__ui': typeof _uiRoute
@@ -226,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/p/$projectKey/cycles/$cycleNumber': typeof AppPProjectKeyCyclesCycleNumberRoute
   '/p/$projectKey/milestones/$milestoneId': typeof AppPProjectKeyMilestonesMilestoneIdRoute
   '/p/$projectKey/settings/backlog': typeof AppPProjectKeySettingsBacklogRoute
+  '/p/$projectKey/settings/labels': typeof AppPProjectKeySettingsLabelsRoute
   '/p/$projectKey/cycles/': typeof AppPProjectKeyCyclesIndexRoute
   '/p/$projectKey/milestones/': typeof AppPProjectKeyMilestonesIndexRoute
   '/p/$projectKey/settings/': typeof AppPProjectKeySettingsIndexRoute
@@ -255,6 +263,7 @@ export interface FileRoutesByTo {
   '/p/$projectKey/cycles/$cycleNumber': typeof AppPProjectKeyCyclesCycleNumberRoute
   '/p/$projectKey/milestones/$milestoneId': typeof AppPProjectKeyMilestonesMilestoneIdRoute
   '/p/$projectKey/settings/backlog': typeof AppPProjectKeySettingsBacklogRoute
+  '/p/$projectKey/settings/labels': typeof AppPProjectKeySettingsLabelsRoute
   '/p/$projectKey/cycles': typeof AppPProjectKeyCyclesIndexRoute
   '/p/$projectKey/milestones': typeof AppPProjectKeyMilestonesIndexRoute
   '/p/$projectKey/settings': typeof AppPProjectKeySettingsIndexRoute
@@ -288,6 +297,7 @@ export interface FileRoutesById {
   '/_app/p/$projectKey/cycles/$cycleNumber': typeof AppPProjectKeyCyclesCycleNumberRoute
   '/_app/p/$projectKey/milestones/$milestoneId': typeof AppPProjectKeyMilestonesMilestoneIdRoute
   '/_app/p/$projectKey/settings/backlog': typeof AppPProjectKeySettingsBacklogRoute
+  '/_app/p/$projectKey/settings/labels': typeof AppPProjectKeySettingsLabelsRoute
   '/_app/p/$projectKey/cycles/': typeof AppPProjectKeyCyclesIndexRoute
   '/_app/p/$projectKey/milestones/': typeof AppPProjectKeyMilestonesIndexRoute
   '/_app/p/$projectKey/settings/': typeof AppPProjectKeySettingsIndexRoute
@@ -321,6 +331,7 @@ export interface FileRouteTypes {
     | '/p/$projectKey/cycles/$cycleNumber'
     | '/p/$projectKey/milestones/$milestoneId'
     | '/p/$projectKey/settings/backlog'
+    | '/p/$projectKey/settings/labels'
     | '/p/$projectKey/cycles/'
     | '/p/$projectKey/milestones/'
     | '/p/$projectKey/settings/'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/p/$projectKey/cycles/$cycleNumber'
     | '/p/$projectKey/milestones/$milestoneId'
     | '/p/$projectKey/settings/backlog'
+    | '/p/$projectKey/settings/labels'
     | '/p/$projectKey/cycles'
     | '/p/$projectKey/milestones'
     | '/p/$projectKey/settings'
@@ -382,6 +394,7 @@ export interface FileRouteTypes {
     | '/_app/p/$projectKey/cycles/$cycleNumber'
     | '/_app/p/$projectKey/milestones/$milestoneId'
     | '/_app/p/$projectKey/settings/backlog'
+    | '/_app/p/$projectKey/settings/labels'
     | '/_app/p/$projectKey/cycles/'
     | '/_app/p/$projectKey/milestones/'
     | '/_app/p/$projectKey/settings/'
@@ -611,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectKeySettingsBacklogRouteImport
       parentRoute: typeof AppPProjectKeySettingsRouteRoute
     }
+    '/_app/p/$projectKey/settings/labels': {
+      id: '/_app/p/$projectKey/settings/labels'
+      path: '/labels'
+      fullPath: '/p/$projectKey/settings/labels'
+      preLoaderRoute: typeof AppPProjectKeySettingsLabelsRouteImport
+      parentRoute: typeof AppPProjectKeySettingsRouteRoute
+    }
   }
 }
 
@@ -637,12 +657,14 @@ const AppSettingsRouteRouteWithChildren =
 
 interface AppPProjectKeySettingsRouteRouteChildren {
   AppPProjectKeySettingsBacklogRoute: typeof AppPProjectKeySettingsBacklogRoute
+  AppPProjectKeySettingsLabelsRoute: typeof AppPProjectKeySettingsLabelsRoute
   AppPProjectKeySettingsIndexRoute: typeof AppPProjectKeySettingsIndexRoute
 }
 
 const AppPProjectKeySettingsRouteRouteChildren: AppPProjectKeySettingsRouteRouteChildren =
   {
     AppPProjectKeySettingsBacklogRoute: AppPProjectKeySettingsBacklogRoute,
+    AppPProjectKeySettingsLabelsRoute: AppPProjectKeySettingsLabelsRoute,
     AppPProjectKeySettingsIndexRoute: AppPProjectKeySettingsIndexRoute,
   }
 

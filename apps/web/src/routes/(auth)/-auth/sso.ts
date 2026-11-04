@@ -9,8 +9,17 @@ export interface SignInOptions {
   passwordLogin: boolean;
 }
 
+/** OIDC_PROVIDER_NAME's default (packages/auth DEFAULT_OIDC_PROVIDER_NAME): no real name was set. */
+const UNNAMED_PROVIDER = 'SSO';
+
+/** The provider's name for the button, or "single sign-on" when the server didn't name it. */
+export function ssoName(providerName: string): string {
+  return providerName === UNNAMED_PROVIDER ? 'single sign-on' : providerName;
+}
+
+/** "Continue with Authentik", or "Continue with single sign-on" (frame 128). */
 export function ssoLabel(providerName: string): string {
-  return `Continue with ${providerName}`;
+  return `Continue with ${ssoName(providerName)}`;
 }
 
 /** Banner copy for the `error` an SSO sign-in came back with. */

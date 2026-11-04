@@ -1,7 +1,8 @@
-// Project settings, General (frame 2a): name, key, description, repository and the planning
-// switches. Replaces the Edit project dialog. While the project mirrors Backlog.md the key and the
-// milestones switch are locked and say why; the repository can only be cleared, which pauses the mirror.
-// Owners and admins get the Delete this project row at the bottom (PM-12).
+// Project settings, General (frame 127): name, key, repository, description and the features the
+// project uses (milestones, cycles), then Save changes and Discard. While the project mirrors Backlog.md
+// the key and the milestones switch are locked and say why; the repository can only be cleared, which
+// pauses the mirror. Owners and admins get the danger zone with Delete project (PM-12). No web address
+// and no archive in M5 (design notes, "Answered by the product owner").
 import { parseRepositoryUrl, UpdateProjectInput } from '@pm/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -12,7 +13,7 @@ import { editRepositoryHint, RepositoryField } from '~/features/projects/Reposit
 import { normalizeKeyInput, repositoryError, repositoryMessage } from '~/features/projects/validation';
 import { isAdminRole } from '~/features/settings/format';
 import { orpc } from '~/lib/orpc';
-import { Banner, Button, cn, lockedHatch, Skeleton, Switch, TextArea, TextField, useHotkeys } from '~/ui';
+import { Banner, Button, Skeleton, Switch, TextArea, TextField, useHotkeys } from '~/ui';
 import { DeleteProjectDialog, DeleteProjectRow } from './DeleteProjectDialog';
 import {
   type GeneralChanges,
@@ -25,6 +26,7 @@ import {
   keyLockReason,
   projectChanges,
 } from './general';
+import { SettingsPage } from './ProjectSettingsLayout';
 import { hasTasksQuery, useDeleteProject } from './queries';
 
 /** The General page wired to the API. */
@@ -39,7 +41,13 @@ export function GeneralSettings({ projectKey }: { projectKey: string }) {
   const remove = useDeleteProject(projectKey);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  if (!project) return <GeneralSkeleton />;
+  if (!project) {
+    return (
+      <SettingsPage title="General" description={GENERAL_DESCRIPTION}>
+        <GeneralSkeleton />
+      </SettingsPage>
+    );
+  }
 
   const onSubmit = async (changes: GeneralChanges): Promise<GeneralFailure | null> => {
     try {
@@ -58,7 +66,7 @@ export function GeneralSettings({ projectKey }: { projectKey: string }) {
 
   const backlog = project.backlog;
   return (
-    <div className="flex max-w-[560px] flex-col gap-8">
+    <SettingsPage title="General" description={GENERAL_DESCRIPTION}>
       <GeneralForm
         // Another project (or a new key) starts the form over; a save keeps it, with "Saved." showing.
         key={project.key}
@@ -78,9 +86,11 @@ export function GeneralSettings({ projectKey }: { projectKey: string }) {
           />
         </>
       ) : null}
-    </div>
+    </SettingsPage>
   );
 }
+
+const GENERAL_DESCRIPTION = 'The project’s name, key, repository and the features it uses.';
 
 export interface GeneralFormProps {
   project: GeneralProject;
@@ -164,9 +174,17 @@ export function GeneralForm({ project, hasTasks, onSubmit }: GeneralFormProps) {
   useHotkeys({ 'Mod+Enter': () => void submit() });
 
   const repositoryHint = mirrored ? mirroredRepositoryHint(values.repository, project) : null;
+  const dirty = Object.keys(projectChanges(project, values)).length > 0;
+
+  const discard = () => {
+    setValues(initialValues(project));
+    setErrors({});
+    setFailure(null);
+    setSaved(false);
+  };
 
   return (
-    <form noValidate onSubmit={submit} aria-label="General" className="flex max-w-[560px] flex-col gap-4">
+    <form noValidate onSubmit={submit} aria-label="General" className="flex flex-col gap-5.5">
       {failure ? <Banner>{failure}</Banner> : null}
       <TextField
         label="Name"
@@ -179,25 +197,37 @@ export function GeneralForm({ project, hasTasks, onSubmit }: GeneralFormProps) {
         errorMessage={errors.name}
         validationBehavior="aria"
       />
-      <TextField
-        label="Key"
-        name="key"
-        inputRef={keyRef}
-        mono
-        autoComplete="off"
-        spellCheck="false"
-        value={values.key}
-        isReadOnly={keyLock !== null}
-        inputClassName={cn(keyLock !== null && [lockedHatch, 'text-muted'].join(' '))}
-        onChange={(value) => set('key', normalizeKeyInput(value))}
-        description={
-          keyLock ??
-          `Task keys start with it, like ${values.key || project.key}-1. It can change while the project has no tasks.`
-        }
-        isInvalid={Boolean(errors.key)}
-        errorMessage={errors.key}
-        validationBehavior="aria"
-      />
+      <div className="grid grid-cols-2 items-start gap-3.5">
+        <TextField
+          label="Key"
+          name="key"
+          inputRef={keyRef}
+          mono
+          locked={keyLock !== null}
+          autoComplete="off"
+          spellCheck="false"
+          value={values.key}
+          onChange={(value) => set('key', normalizeKeyInput(value))}
+          description={
+            keyLock ??
+            `Task keys start with it, like ${values.key || project.key}-1. It can change while the project has no tasks.`
+          }
+          isInvalid={Boolean(errors.key)}
+          errorMessage={errors.key}
+          validationBehavior="aria"
+        />
+        <RepositoryField
+          inputRef={repositoryRef}
+          value={values.repository}
+          onChange={(value) => set('repository', value)}
+          onBlur={() => {
+            const error = repositoryError(values.repository);
+            if (error) setErrors((current) => ({ ...current, repository: error }));
+          }}
+          description={repositoryHint ?? editRepositoryHint(values.repository, project)}
+          error={errors.repository}
+        />
+      </div>
       <TextArea
         label="Description"
         name="description"
@@ -209,47 +239,39 @@ export function GeneralForm({ project, hasTasks, onSubmit }: GeneralFormProps) {
         errorMessage={errors.description}
         validationBehavior="aria"
       />
-      <RepositoryField
-        inputRef={repositoryRef}
-        value={values.repository}
-        onChange={(value) => set('repository', value)}
-        onBlur={() => {
-          const error = repositoryError(values.repository);
-          if (error) setErrors((current) => ({ ...current, repository: error }));
-        }}
-        description={repositoryHint ?? editRepositoryHint(values.repository, project)}
-        error={errors.repository}
-      />
-      <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-        <legend className="mb-1.5 p-0 text-[12px] font-semibold text-fg">Planning</legend>
-        <span className="flex items-center gap-2.5">
+      <fieldset className="m-0 flex flex-col gap-2.5 border-0 p-0">
+        <legend className="mb-2 p-0 text-sm font-medium text-fg-2">Features</legend>
+        <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <Switch
             isSelected={values.usesMilestones}
             isDisabled={milestonesLocked}
             onChange={(value) => set('usesMilestones', value)}
             aria-describedby={milestonesLocked ? 'milestones-locked' : undefined}
           >
-            <span className="text-[12.5px] text-fg">Milestones</span>
+            <span className="text-md text-fg">Milestones</span>
           </Switch>
           {milestonesLocked ? (
-            <span id="milestones-locked" className="text-[12.5px] text-faint">
+            <span id="milestones-locked" className="text-sm text-fg-3">
               · stays on while Backlog.md is mirrored; its milestones live here
             </span>
           ) : null}
         </span>
         <Switch isSelected={values.usesCycles} onChange={(value) => set('usesCycles', value)}>
-          <span className="text-[12.5px] text-fg">Cycles</span>
+          <span className="text-md text-fg">Cycles</span>
         </Switch>
-        <p className="m-0 text-[11.5px] text-muted">
-          Turning one off hides its tab, filter and task fields. Nothing is deleted.
+        <p className="m-0 text-xs text-fg-3">
+          Turning one off hides its pages, filter and task fields. Nothing is deleted.
         </p>
       </fieldset>
       <div className="flex items-center gap-2">
-        <Button type="submit" isPending={pending}>
-          Save
+        <Button type="submit" isPending={pending} aria-keyshortcuts="Meta+Enter Control+Enter">
+          Save changes
+        </Button>
+        <Button variant="secondary" onPress={discard} isDisabled={!dirty || pending}>
+          Discard
         </Button>
         {saved ? (
-          <span role="status" className="text-[11.5px] text-muted">
+          <span role="status" className="ml-1 text-sm text-fg-2">
             Saved.
           </span>
         ) : null}
@@ -271,7 +293,7 @@ function mirroredRepositoryHint(value: string, project: GeneralProject): ReactNo
 
 function GeneralSkeleton() {
   return (
-    <div aria-busy className="flex max-w-[560px] flex-col gap-5">
+    <div aria-busy className="flex flex-col gap-5.5">
       {[38, 38, 60, 38].map((height, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows
         <div key={index} className="flex flex-col gap-2">

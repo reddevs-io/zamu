@@ -6,14 +6,17 @@ export interface TagProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: 'default' | 'accent';
 }
 
-/** Small uppercase label with a hairline border: PERSON, AGENT, REVOKED. */
+/**
+ * Small role or state tag: Person, Agent, Revoked. Margin has no caps captions, so it is a Pill: --bg-lane, or
+ * --accent-soft for agents. Pass the text in sentence case.
+ */
 export function Tag({ tone = 'default', className, ...props }: TagProps) {
   return (
     <span
       {...props}
       className={cn(
-        'inline-flex h-5 shrink-0 items-center border px-1.5 text-[10px] font-semibold tracking-[0.06em] uppercase',
-        tone === 'accent' ? 'border-accent text-accent' : 'border-line text-muted',
+        'inline-flex h-5 shrink-0 items-center rounded-pill px-2 text-xs font-medium whitespace-nowrap',
+        tone === 'accent' ? 'bg-accent-soft text-accent-text' : 'bg-bg-lane text-fg-2',
         className,
       )}
     />

@@ -158,7 +158,7 @@ function AddAgentForm({
           />
         </DialogBody>
         <DialogFooter
-          start={<span className="text-[11.5px] text-muted">Creates the agent and its first API key.</span>}
+          start={<span className="text-xs text-fg-2">Creates the agent and its first API key.</span>}
         >
           <Button variant="secondary" onPress={onCancel}>
             Cancel

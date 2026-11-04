@@ -9,7 +9,6 @@ import {
   Button,
   CycleGlyph,
   isMilestoneFilled,
-  Kbd,
   MilestoneGlyph,
   NoneGlyph,
   type OptionItem,
@@ -17,9 +16,10 @@ import {
   Select,
 } from '~/ui';
 
-// Filters of a project's tasks, shared by the list and the board: Status, Priority, Assignee,
-// Milestone and Cycle (when the project uses them), Lanes (board only), Removed from Backlog.md (list
-// of a mirrored project). Plus the List / Board switch.
+// The M1–M4 filter row of a project's tasks: Status, Priority, Assignee, Milestone and Cycle (when the
+// project uses them), Lanes (board only), Removed from Backlog.md. Plus the List / Board switch.
+// Retired from the list in M5 (it uses FilterButton and FilterChips from features/views); the board
+// keeps it until its M5 screen lands, then M5-18 removes the row and keeps ViewSwitch.
 
 const ANY = 'any';
 const HIDDEN_OFF = 'hidden';
@@ -251,7 +251,10 @@ const VIEW_ITEMS = [
   { id: 'board', label: 'Board' },
 ] as const;
 
-/** Right end of the filter bar: [Clear] [List | Board] V. The page binds V itself. */
+/**
+ * The List / Board switch (the view header's switch slot), with Clear before it when filters are set. The
+ * page binds V itself; the hint is in the shortcut list, not on the switch (shortcuts.md).
+ */
 export function ViewSwitch({ view, onChange, onClear }: ViewSwitchProps) {
   return (
     <span className="flex items-center gap-2">
@@ -261,7 +264,6 @@ export function ViewSwitch({ view, onChange, onClear }: ViewSwitchProps) {
         </Button>
       ) : null}
       <SegmentedControl<TaskView> aria-label="View" items={VIEW_ITEMS} value={view} onChange={onChange} />
-      <Kbd aria-hidden>V</Kbd>
     </span>
   );
 }

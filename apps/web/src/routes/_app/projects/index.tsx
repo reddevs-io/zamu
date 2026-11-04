@@ -1,14 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { ProjectsPage } from '../../../features/projects/ProjectsPage';
-import { meQuery, projectsQuery } from '../../../features/projects/queries';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
+// The projects page is gone in M5: the sidebar lists the projects, and New project lives in its "+",
+// the workspace menu and the palette. Old links land on Home.
 export const Route = createFileRoute('/_app/projects/')({
-  loader: async ({ context }) => {
-    await Promise.all([
-      context.queryClient.prefetchQuery(projectsQuery()),
-      context.queryClient.prefetchQuery(meQuery()),
-    ]);
+  beforeLoad: () => {
+    throw redirect({ to: '/', replace: true });
   },
-  head: () => ({ meta: [{ title: 'Projects · project-management' }] }),
-  component: ProjectsPage,
 });

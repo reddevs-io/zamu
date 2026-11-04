@@ -34,8 +34,6 @@ export { TaskFilterBar, type TaskFilterBarProps, ViewSwitch, type ViewSwitchProp
 export {
   cycleElapsed,
   cycleNote,
-  type ProjectTabsInput,
   type ProjectView,
-  projectTabs,
   projectViewHref,
 } from './tabs';

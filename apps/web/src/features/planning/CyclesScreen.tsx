@@ -1,51 +1,48 @@
 import type { Cycle } from '@pm/contracts';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { type MouseEvent, useMemo, useState } from 'react';
+import { Link } from 'react-aria-components';
 import { ProjectHeader, useProjectSummary } from '~/features/project-header';
-import { usePageSearchRef } from '~/features/shell/page-search';
-import {
-  Button,
-  CycleGlyph,
-  DaysLeftPill,
-  ProgressBar,
-  SearchField,
-  Skeleton,
-  StatStrip,
-  StatTile,
-  StatusSquare,
-  Tag,
-  TimeBar,
-} from '~/ui';
+import { useOptionalQuickCreate } from '~/features/shell/quick-create';
+import { Button, cn, Pill, Skeleton, useHotkeys } from '~/ui';
 import { cycleDefaults } from './CycleDialog';
 import { NewCycleDialog } from './CycleDialogHost';
 import {
-  describeEnd,
   describeStart,
+  formatLength,
   formatLengthSentence,
   formatLongWeekdayDay,
-  formatRange,
+  formatShortRange,
   lengthInDays,
+  weekday,
 } from './dates';
 import { FeatureOff } from './FeatureOff';
 import {
-  GroupBand,
-  ListCell,
-  ListHead,
-  ListRow,
-  ListTable,
   LoadError,
-  RowChevron,
-  RowLink,
+  PageHead,
+  PageMeta,
+  PageTitle,
+  PLAN_ROW_GRID,
+  PlanIcon,
+  PlanListHead,
+  RowBar,
+  Stats,
+  StatusBar,
+  StatusLegend,
+  splitOf,
+  splitTotal,
   useServerToday,
 } from './parts';
-import { cyclesQuery } from './queries';
+import { cycleQuery, cyclesQuery } from './queries';
 
-// /p/PAY/cycles (frames 22 to 31): the current cycle card with its numbers and bars, then the upcoming
-// and completed cycles. New cycle dialog prefilled from the last cycle; empty, loading and error states.
+// /p/HBR/cycles (frame 109): the current cycle card (dates, "day 8 of 14", segmented progress with its
+// legend, the scope note and the numbers), then the upcoming and completed cycles with what carried
+// over. Cycles are app-side even in mirrored projects, so New cycle is always there (notes.md call 3).
 
-const TEMPLATE = 'minmax(0,1fr) 190px 120px 220px 24px';
-const HEADERS = ['Cycle', 'Dates', 'Tasks', 'Result', ''];
+const WEEKDAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+/** Completed cycles whose carry-over note reads the cycle detail ("moved to Cycle 12"). */
+const DETAILED_COMPLETED = 12;
 
 export function cycleHref(projectKey: string, number: number): string {
   return `/p/${encodeURIComponent(projectKey)}/cycles/${number}`;
@@ -55,10 +52,20 @@ export function cycleTitle(cycle: Pick<Cycle, 'number' | 'name'>): string {
   return cycle.name ? `Cycle ${cycle.number} · ${cycle.name}` : `Cycle ${cycle.number}`;
 }
 
-/** Days gone in a current cycle: 11 of 14 when 3 days are left. */
-export function elapsedDays(cycle: Pick<Cycle, 'startsOn' | 'endsOn' | 'daysLeft'>): number {
+/** Day of a current cycle: 8 on the eighth day. daysLeft counts today. */
+export function cycleDay(cycle: Pick<Cycle, 'startsOn' | 'endsOn' | 'daysLeft'>): number {
   const length = lengthInDays(cycle.startsOn, cycle.endsOn);
-  return cycle.daysLeft == null ? 0 : Math.max(0, length - cycle.daysLeft);
+  return cycle.daysLeft == null ? 0 : Math.max(1, Math.min(length, length - cycle.daysLeft + 1));
+}
+
+/** Days gone in a current cycle before today: 7 on the eighth day. */
+export function elapsedDays(cycle: Pick<Cycle, 'startsOn' | 'endsOn' | 'daysLeft'>): number {
+  return Math.max(0, cycleDay(cycle) - 1);
+}
+
+/** Whole days after today: 6 on day 8 of 14. */
+export function daysAfterToday(cycle: Pick<Cycle, 'daysLeft'>): number {
+  return Math.max(0, (cycle.daysLeft ?? 1) - 1);
 }
 
 export interface SplitCycles {
@@ -78,53 +85,101 @@ export function splitCycles(cycles: readonly Cycle[]): SplitCycles {
   };
 }
 
-/** "Cycle 12 ends Sunday", "Cycle 13 starts Monday", "no cycles yet". */
-export function cyclesSubtitle(
-  split: SplitCycles | undefined,
+/** "Two weeks, starting Mondays", from the latest cycle. */
+export function cadenceText(cycles: readonly Pick<Cycle, 'number' | 'startsOn' | 'endsOn'>[]): string | null {
+  const latest = [...cycles].sort((a, b) => b.number - a.number)[0];
+  if (!latest) return null;
+  const length = lengthInDays(latest.startsOn, latest.endsOn);
+  const words = length % 7 === 0 ? formatLengthSentence(length) : capitalize(formatLength(length));
+  return `${words}, starting ${WEEKDAYS[weekday(latest.startsOn)]}`;
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The note under a cycle's name in the list. */
+export function cycleNoteText(
+  cycle: Cycle,
   today: string | null,
-  total: number | undefined,
-) {
-  if (!split || total === undefined) return undefined;
-  if (total === 0) return 'no cycles yet';
-  if (split.current) {
-    return today
-      ? `Cycle ${split.current.number} ${describeEnd(split.current.endsOn, today)}`
-      : `Cycle ${split.current.number}`;
+  movedTo?: readonly (number | null)[],
+): string {
+  if (cycle.state === 'upcoming') {
+    const planned = `${cycle.counts.total} ${cycle.counts.total === 1 ? 'task' : 'tasks'} planned`;
+    return today ? `${describeStart(cycle.startsOn, today)} · ${planned}` : planned;
   }
-  const next = split.upcoming[0];
-  if (next) {
-    return today
-      ? `Cycle ${next.number} ${describeStart(next.startsOn, today).replace(/^Starts/, 'starts')}`
-      : `Cycle ${next.number}`;
-  }
-  return 'no current cycle';
+  if (cycle.state === 'current') return 'In progress';
+  const moved = cycle.summary?.rolledOver ?? 0;
+  if (!moved) return 'Everything done';
+  const tasks = `${moved} unfinished ${moved === 1 ? 'task' : 'tasks'}`;
+  const targets = [...new Set(movedTo ?? [])];
+  if (!movedTo?.length) return `${tasks} rolled over`;
+  const words = targets.map((number) => (number == null ? 'no cycle' : `Cycle ${number}`)).join(' and ');
+  return `${tasks} moved to ${words}`;
+}
+
+function isControl(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('a, button, input, textarea, select') != null;
 }
 
 export function CyclesScreen({ projectKey }: { projectKey: string }) {
+  const navigate = useNavigate();
+  const quickCreate = useOptionalQuickCreate();
   const project = useProjectSummary(projectKey);
   const cycles = useQuery(cyclesQuery(projectKey));
   const today = useServerToday(projectKey);
-  const searchRef = usePageSearchRef();
-  const [query, setQuery] = useState('');
-  const deferredQuery = useDeferredValue(query);
   const [creating, setCreating] = useState(false);
+  const [focused, setFocused] = useState<number | null>(null);
 
   const isOff = project != null && !project.usesCycles;
   const items = cycles.data?.items;
   const split = useMemo(() => (items ? splitCycles(items) : undefined), [items]);
-  const filtered = useMemo(() => {
-    if (!split) return undefined;
-    const needle = deferredQuery.trim().toLowerCase();
-    if (!needle) return split;
-    const match = (cycle: Cycle) => cycleTitle(cycle).toLowerCase().includes(needle);
-    return {
-      current: split.current && match(split.current) ? split.current : undefined,
-      upcoming: split.upcoming.filter(match),
-      completed: split.completed.filter(match),
-    };
-  }, [split, deferredQuery]);
+  const others = useMemo(() => (split ? [...split.upcoming, ...split.completed] : []), [split]);
 
-  const isEmpty = items?.length === 0;
+  // What the latest completed cycles carried over, and where to: their detail has the record.
+  const detailed =
+    split?.completed.filter((cycle) => cycle.summary?.rolledOver).slice(0, DETAILED_COMPLETED) ?? [];
+  const details = useQueries({
+    queries: detailed.map((cycle) => ({ ...cycleQuery(projectKey, cycle.number), staleTime: 10 * 60_000 })),
+  });
+  const movedTo = new Map<number, (number | null)[]>();
+  detailed.forEach((cycle, index) => {
+    const detail = details[index]?.data;
+    if (detail)
+      movedTo.set(
+        cycle.number,
+        detail.rollovers.map((roll) => roll.movedTo?.number ?? null),
+      );
+  });
+
+  const rowNumbers = useMemo(
+    () => [...(split?.current ? [split.current.number] : []), ...others.map((cycle) => cycle.number)],
+    [split, others],
+  );
+  const move = (step: 1 | -1) => {
+    if (!rowNumbers.length) return;
+    const index = focused == null ? -1 : rowNumbers.indexOf(focused);
+    const next = index < 0 ? (step > 0 ? 0 : rowNumbers.length - 1) : index + step;
+    setFocused(rowNumbers[Math.max(0, Math.min(rowNumbers.length - 1, next))] ?? null);
+  };
+  useHotkeys(
+    {
+      j: () => move(1),
+      k: () => move(-1),
+      down: () => move(1),
+      up: () => move(-1),
+      Enter: {
+        preventDefault: false,
+        handler: (event) => {
+          if (focused == null || isControl(event.target)) return;
+          event.preventDefault();
+          void navigate({ href: cycleHref(projectKey, focused) });
+        },
+      },
+      Escape: { preventDefault: false, handler: () => setFocused(null) },
+    },
+    { enabled: rowNumbers.length > 0 },
+  );
 
   const body = () => {
     if (isOff) return <FeatureOff projectKey={projectKey} feature="cycles" />;
@@ -138,16 +193,14 @@ export function CyclesScreen({ projectKey }: { projectKey: string }) {
         />
       );
     }
-    if (cycles.isPending || !filtered) return <CurrentCardSkeleton />;
-    if (isEmpty) {
+    if (cycles.isPending || !split) return <CurrentCardSkeleton />;
+    if (!items?.length) {
       const first = today ? cycleDefaults([], today) : null;
       return (
-        <div className="flex px-6 py-12">
-          <div className="flex max-w-[500px] flex-col items-start gap-3">
-            <h2 className="m-0 text-[22px] leading-tight font-semibold tracking-[-0.015em]">
-              Work in fixed-length cycles
-            </h2>
-            <p className="m-0 leading-[1.55] text-muted">
+        <div className="flex px-4.5 py-12">
+          <div className="flex max-w-125 flex-col items-start gap-3">
+            <h3 className="m-0 font-serif text-xl leading-tight font-medium">Work in fixed-length cycles</h3>
+            <p className="m-0 leading-prose text-fg-2">
               A cycle is a sprint with a start and an end date. Put the tasks you mean to finish in it. When
               it ends, anything unfinished moves to the next cycle and the finished cycle keeps a record of
               what moved.
@@ -156,7 +209,7 @@ export function CyclesScreen({ projectKey }: { projectKey: string }) {
               Start Cycle 1
             </Button>
             {first ? (
-              <p className="m-0 text-[11.5px] text-muted">
+              <p className="m-0 text-xs text-fg-3">
                 {formatLengthSentence(lengthInDays(first.startsOn, first.endsOn))} from{' '}
                 {formatLongWeekdayDay(first.startsOn)}. You can change the length.
               </p>
@@ -165,65 +218,69 @@ export function CyclesScreen({ projectKey }: { projectKey: string }) {
         </div>
       );
     }
-    const { current, upcoming, completed } = filtered;
-    const nothing = !current && !upcoming.length && !completed.length;
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-        {current ? <CurrentCycleCard projectKey={projectKey} cycle={current} /> : null}
-        {nothing ? <p className="m-0 px-6 py-4 text-muted">No cycles match “{query.trim()}”.</p> : null}
-        {upcoming.length ? (
-          <>
-            <GroupBand label="Upcoming" count={upcoming.length} className="mt-3 border-t" />
-            <ListHead template={TEMPLATE} headers={HEADERS} />
-            <ListTable label="Upcoming cycles">
-              {upcoming.map((cycle) => (
-                <CycleRow key={cycle.id} projectKey={projectKey} cycle={cycle} today={today} />
-              ))}
-            </ListTable>
-          </>
+        {split.current ? (
+          <CurrentCycleCard
+            projectKey={projectKey}
+            cycle={split.current}
+            isFocused={focused === split.current.number}
+            onFocus={() => setFocused(split.current?.number ?? null)}
+          />
         ) : null}
-        {completed.length ? (
+        {others.length ? (
           <>
-            <GroupBand
-              label="Completed"
-              count={completed.length}
-              className={upcoming.length ? undefined : 'mt-3 border-t'}
-            />
-            {upcoming.length ? null : <ListHead template={TEMPLATE} headers={HEADERS} />}
-            <ListTable label="Completed cycles">
-              {completed.map((cycle) => (
-                <CycleRow key={cycle.id} projectKey={projectKey} cycle={cycle} today={today} />
+            <h3 className="m-0 px-4.5 pt-4.5 pb-1.5 text-xs font-medium text-fg-3">
+              {split.current ? 'Other cycles' : 'Cycles'}
+            </h3>
+            <PlanListHead first="Cycle" date="Dates" />
+            <ul aria-label="Other cycles" className="m-0 list-none border-t border-line-soft p-0">
+              {others.map((cycle) => (
+                <CycleRow
+                  key={cycle.id}
+                  projectKey={projectKey}
+                  cycle={cycle}
+                  note={cycleNoteText(cycle, today, movedTo.get(cycle.number))}
+                  isFocused={focused === cycle.number}
+                  onFocus={() => setFocused(cycle.number)}
+                />
               ))}
-            </ListTable>
+            </ul>
           </>
         ) : null}
       </div>
     );
   };
 
+  const cadence = items ? cadenceText(items) : null;
+
   return (
     <section aria-label="Cycles" className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-bg text-fg">
       <ProjectHeader
         projectKey={projectKey}
         current="cycles"
-        subtitle={isOff ? 'cycles are off' : cyclesSubtitle(split, today, items?.length)}
         actions={
           isOff ? undefined : (
             <>
-              <SearchField
-                width={150}
-                value={query}
-                onChange={setQuery}
-                inputRef={searchRef}
-                aria-label="Search cycles"
-              />
-              <Button isDisabled={!today || !items} onPress={() => setCreating(true)}>
+              <Button variant="secondary" isDisabled={!today || !items} onPress={() => setCreating(true)}>
                 New cycle
+              </Button>
+              <Button kbd="C" aria-keyshortcuts="c" onPress={() => quickCreate?.open(projectKey)}>
+                New task
               </Button>
             </>
           )
         }
       />
+      {isOff ? null : (
+        <PageHead>
+          <PageTitle as="h2">Cycles</PageTitle>
+          <PageMeta>
+            {cadence ? <span>{cadence}</span> : null}
+            <span className="text-fg-3">Unfinished tasks move to the next cycle when one ends.</span>
+          </PageMeta>
+        </PageHead>
+      )}
       {body()}
       {today && items ? (
         <NewCycleDialog
@@ -239,108 +296,73 @@ export function CyclesScreen({ projectKey }: { projectKey: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Current cycle card
+// Current cycle card (.cyc-cur)
 // ---------------------------------------------------------------------------
 
-export function CurrentCycleCard({ projectKey, cycle }: { projectKey: string; cycle: Cycle }) {
-  const navigate = useNavigate();
-  const { counts } = cycle;
-  const length = lengthInDays(cycle.startsOn, cycle.endsOn);
-  const elapsed = elapsedDays(cycle);
-  const scope = counts.total;
-  const inProgress = counts.in_progress + counts.in_review;
-  const todo = counts.todo + counts.backlog;
-  const percent = scope ? Math.round((counts.done / scope) * 100) : 0;
-  return (
-    <section
-      aria-label={`Current cycle: Cycle ${cycle.number}`}
-      className="mx-6 mt-5 mb-2 flex shrink-0 flex-col border border-line bg-surface"
-    >
-      <div className="flex min-w-0 items-center gap-3 border-b border-line-2 px-4 py-3.5">
-        <CycleGlyph
-          state="progress"
-          progress={length ? elapsed / length : 0}
-          size={12}
-          className="text-accent"
-        />
-        <RowLink href={cycleHref(projectKey, cycle.number)} className="shrink-0 text-[15px]">
-          Cycle {cycle.number}
-        </RowLink>
-        {cycle.name ? <span className="truncate text-muted">· {cycle.name}</span> : null}
-        <Tag tone="accent">Current</Tag>
-        <span className="flex-1" />
-        <span className="shrink-0 text-muted">{formatRange(cycle.startsOn, cycle.endsOn)}</span>
-        {cycle.daysLeft != null ? <DaysLeftPill daysLeft={cycle.daysLeft} /> : null}
-        <Button
-          variant="secondary"
-          size="sm"
-          aria-label={`Open Cycle ${cycle.number}`}
-          onPress={() => void navigate({ href: cycleHref(projectKey, cycle.number) })}
-        >
-          Open
-        </Button>
-      </div>
-      <StatStrip variant="inset" aria-label={`Cycle ${cycle.number} numbers`}>
-        <StatTile label="Scope" value={scope} sub={`${counts.addedAfterStart} added after start`} />
-        <StatTile label="Done" value={counts.done} sub={`${percent}%`} />
-        <StatTile label="In progress" value={inProgress} sub={`${counts.in_review} in review`} />
-        <StatTile label="Todo" value={todo} sub={`${counts.unassigned} unassigned`} />
-        <StatTile
-          label="Agents"
-          value={counts.agents}
-          sub={`of ${scope} ${scope === 1 ? 'task' : 'tasks'}`}
-        />
-      </StatStrip>
-      <CycleBars cycle={cycle} className="border-t border-line-2 px-4 py-3" />
-    </section>
-  );
+export interface CurrentCycleCardProps {
+  projectKey: string;
+  cycle: Cycle;
+  isFocused?: boolean;
+  onFocus?: () => void;
 }
 
-/** Time and Done bars of a current cycle. */
-export function CycleBars({
-  cycle,
-  className,
-  barWidth,
-  note,
-}: {
-  cycle: Cycle;
-  className?: string;
-  /** Fixed bar width in px (the cycle page); fills the row otherwise. */
-  barWidth?: number;
-  /** Text after the Done count. */
-  note?: string;
-}) {
+export function CurrentCycleCard({ projectKey, cycle, isFocused, onFocus }: CurrentCycleCardProps) {
+  const navigate = useNavigate();
+  const href = cycleHref(projectKey, cycle.number);
   const { counts } = cycle;
-  const scope = counts.total;
-  const total = lengthInDays(cycle.startsOn, cycle.endsOn);
-  const elapsed = Math.min(elapsedDays(cycle), total);
-  // Label, bar, count (fixed width so both bars line up), then the note on the cycle page.
-  const columns = barWidth ? `48px ${barWidth}px 44px minmax(0,1fr)` : '48px minmax(0,1fr) 44px';
-  const count = 'font-mono text-[10.5px] whitespace-nowrap text-muted';
+  const split = splitOf(counts);
+  const scope = splitTotal(split);
+  const length = lengthInDays(cycle.startsOn, cycle.endsOn);
+  const added = counts.addedAfterStart;
+  const onClick = (event: MouseEvent<HTMLElement>) => {
+    if ((event.target as Element).closest('a, button')) return;
+    if (window.getSelection()?.toString()) return;
+    void navigate({ href });
+  };
   return (
-    <div
-      className={`grid items-center gap-x-3 gap-y-1.5 text-[11.5px] text-muted ${className ?? ''}`}
-      style={{ gridTemplateColumns: columns }}
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the title link is the keyboard path
+    <section
+      aria-label={`Current cycle: Cycle ${cycle.number}`}
+      onClick={onClick}
+      className={cn(
+        'mx-4.5 mt-4 mb-1.5 grid shrink-0 cursor-pointer grid-cols-[minmax(0,1fr)_auto] gap-3.5 rounded-lg bg-surface px-4.5 py-4 shadow-card',
+        isFocused && 'shadow-[0_0_0_2px_var(--accent),var(--shadow-card)]',
+      )}
     >
-      <span>Time</span>
-      <TimeBar elapsedDays={elapsed} totalDays={total} />
-      <span aria-hidden className={count}>
-        {elapsed}/{total}d
-      </span>
-      {barWidth ? <span /> : null}
-      <span>Done</span>
-      <ProgressBar
-        size="md"
-        done={counts.done}
-        inProgress={counts.in_progress + counts.in_review}
-        total={scope}
-        label="Done"
+      <div className="flex min-w-0 flex-col gap-2.5">
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <Link
+            href={href}
+            onFocus={onFocus}
+            className="shrink-0 cursor-pointer rounded-sm font-serif text-xl font-medium text-fg outline-none focus-visible:shadow-[var(--focus-ring)]"
+          >
+            {cycleTitle(cycle)}
+          </Link>
+          <Pill tone="accent" className="self-center">
+            Current
+          </Pill>
+          <span className="truncate text-sm text-fg-3">
+            {formatShortRange(cycle.startsOn, cycle.endsOn)}
+            {cycle.daysLeft != null ? ` · day ${cycleDay(cycle)} of ${length}` : ''}
+          </span>
+        </div>
+        <StatusBar split={split} label={`Cycle ${cycle.number} progress`} />
+        <StatusLegend split={split} />
+        {added ? (
+          <p className="m-0 text-xs text-fg-3">
+            {added} {added === 1 ? 'task' : 'tasks'} added after the cycle started
+          </p>
+        ) : null}
+      </div>
+      <Stats
+        className="self-start"
+        items={[
+          { value: scope, label: 'in scope' },
+          { value: counts.done, label: 'done' },
+          { value: daysAfterToday(cycle), label: daysAfterToday(cycle) === 1 ? 'day left' : 'days left' },
+        ]}
       />
-      <span aria-hidden className={count}>
-        {counts.done}/{scope}
-      </span>
-      {barWidth ? <span className="truncate">{note}</span> : null}
-    </div>
+    </section>
   );
 }
 
@@ -350,19 +372,11 @@ function CurrentCardSkeleton() {
       role="status"
       aria-busy="true"
       aria-label="Loading cycles"
-      className="mx-6 mt-5 border border-line bg-surface"
+      className="mx-4.5 mt-4 flex flex-col gap-3 rounded-lg bg-surface px-4.5 py-4 shadow-card"
     >
-      <div className="border-b border-line-2 px-4 py-3.5">
-        <Skeleton width={180} height={12} />
-      </div>
-      <div className="flex h-[72px] gap-10 p-4">
-        <Skeleton width={60} height={24} />
-        <Skeleton width={60} height={24} />
-        <Skeleton width={60} height={24} />
-      </div>
-      <div className="px-4 py-3">
-        <Skeleton height={6} />
-      </div>
+      <Skeleton width={220} height={14} />
+      <Skeleton height={8} />
+      <Skeleton width={300} height={8} />
     </div>
   );
 }
@@ -371,36 +385,59 @@ function CurrentCardSkeleton() {
 // Rows
 // ---------------------------------------------------------------------------
 
-function CycleRow({ projectKey, cycle, today }: { projectKey: string; cycle: Cycle; today: string | null }) {
+interface CycleRowProps {
+  projectKey: string;
+  cycle: Cycle;
+  note: string;
+  isFocused: boolean;
+  onFocus: () => void;
+}
+
+function CycleRow({ projectKey, cycle, note, isFocused, onFocus }: CycleRowProps) {
+  const navigate = useNavigate();
   const href = cycleHref(projectKey, cycle.number);
   const completed = cycle.state === 'completed';
-  const summary = cycle.summary;
+  const scope = completed && cycle.summary ? cycle.summary.scope : cycle.counts.total - cycle.counts.canceled;
+  const done = completed && cycle.summary ? cycle.summary.completed : cycle.counts.done;
+  const onClick = (event: MouseEvent<HTMLLIElement>) => {
+    if ((event.target as Element).closest('a, button')) return;
+    if (window.getSelection()?.toString()) return;
+    void navigate({ href });
+  };
   return (
-    <ListRow template={TEMPLATE} href={href} minHeight={44}>
-      <ListCell className="flex items-center gap-2">
-        <CycleGlyph state={completed ? 'done' : cycle.state === 'current' ? 'progress' : 'empty'} />
-        <RowLink href={href}>{cycleTitle(cycle)}</RowLink>
-      </ListCell>
-      <ListCell className="text-muted">
-        {formatRange(cycle.startsOn, cycle.endsOn, today ?? undefined)}
-      </ListCell>
-      <ListCell className="font-mono text-[10.5px] text-muted">
-        {completed && summary ? summary.scope : cycle.counts.total}
-      </ListCell>
-      <ListCell>
-        {completed ? (
-          <span className="flex items-center gap-1.5 text-[12px] whitespace-nowrap text-muted">
-            <StatusSquare status="done" />
-            {summary?.completed ?? cycle.counts.done} done
-            {summary?.rolledOver ? (
-              <span className="text-warn">· {summary.rolledOver} rolled over</span>
-            ) : null}
-          </span>
-        ) : (
-          <span className="text-faint">{today ? describeStart(cycle.startsOn, today) : ''}</span>
-        )}
-      </ListCell>
-      <RowChevron />
-    </ListRow>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the name link and J / K with Enter are the keyboard path
+    <li
+      data-focused={isFocused || undefined}
+      onClick={onClick}
+      className={cn(
+        PLAN_ROW_GRID,
+        'h-14 cursor-pointer border-b border-line-soft',
+        isFocused ? 'bg-accent-soft' : 'hover:bg-surface-hover',
+      )}
+    >
+      <PlanIcon kind="cycle" className="ml-0.5" />
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <Link
+          href={href}
+          onFocus={onFocus}
+          className="w-fit max-w-full cursor-pointer truncate rounded-sm text-md font-semibold text-fg outline-none focus-visible:shadow-[var(--focus-ring)]"
+        >
+          {cycleTitle(cycle)}
+        </Link>
+        <span className="truncate text-xs text-fg-3">{note}</span>
+      </span>
+      {completed ? (
+        <RowBar done={done} total={scope} label={`Cycle ${cycle.number} result`} />
+      ) : (
+        <RowBar done={0} total={0} label={`Cycle ${cycle.number} progress`} />
+      )}
+      <span className="truncate text-sm text-fg-2 tabular-nums">
+        {formatShortRange(cycle.startsOn, cycle.endsOn)}
+      </span>
+      <span className="text-sm text-fg-2 tabular-nums">{completed ? `${done} of ${scope}` : scope}</span>
+      <span className="justify-self-end">
+        <Pill>{completed ? 'Completed' : cycle.state === 'current' ? 'Current' : 'Upcoming'}</Pill>
+      </span>
+    </li>
   );
 }

@@ -4,7 +4,9 @@ import { useEffect, useRef } from 'react';
  * Global keyboard shortcuts.
  *
  * Keys are written as `c`, `/`, `Enter`, `Escape` (or `Esc`), `Mod+Enter`, `Shift+?`. `Mod` is ⌘ on
- * Apple platforms and Ctrl elsewhere. Plain keys never fire while the user types in a text field;
+ * Apple platforms and Ctrl elsewhere. Keys match the character typed (`event.key`), so they follow the
+ * keyboard layout; `code:BracketLeft` matches the physical key instead (`event.code`), for keys that need
+ * AltGr on some layouts (the sidebar's `[`). Plain keys never fire while the user types in a text field;
  * combos with Mod, Ctrl, Meta or Alt do. Bindings registered outside an open dialog, menu or listbox
  * do not fire for keys pressed inside it, unless `allowInOverlays` is set (dialogs set it for their
  * own shortcuts, such as Mod+Enter and I in quick create).
@@ -33,6 +35,8 @@ export interface UseHotkeysOptions {
 
 export interface ParsedHotkey {
   key: string;
+  /** Set for `code:…` bindings: the physical key, lower-cased (`bracketleft`). */
+  code?: string;
   mod: boolean;
   ctrl: boolean;
   meta: boolean;
@@ -56,8 +60,10 @@ export function parseHotkey(combo: string): ParsedHotkey {
   const parts = combo.split(/\+(?!$)/).map((part) => part.trim().toLowerCase());
   const key = parts.pop() ?? '';
   const has = (name: string) => parts.includes(name);
+  const code = key.startsWith('code:') ? key.slice('code:'.length) : undefined;
   return {
-    key: KEY_ALIASES[key] ?? key,
+    key: code ? '' : (KEY_ALIASES[key] ?? key),
+    ...(code ? { code } : {}),
     mod: has('mod'),
     ctrl: has('ctrl') || has('control'),
     meta: has('meta') || has('cmd') || has('command'),
@@ -82,6 +88,11 @@ export function matchesHotkey(
 ): boolean {
   const wantCtrl = hotkey.ctrl || (hotkey.mod && !apple);
   const wantMeta = hotkey.meta || (hotkey.mod && apple);
+  if (hotkey.code) {
+    // Physical keys: AltGr may be down on layouts where the character needs it, so only Ctrl and Meta count.
+    if (event.ctrlKey !== wantCtrl || event.metaKey !== wantMeta) return false;
+    return (event.code ?? '').toLowerCase() === hotkey.code && event.shiftKey === hotkey.shift;
+  }
   if (event.ctrlKey !== wantCtrl || event.metaKey !== wantMeta || event.altKey !== hotkey.alt) return false;
   const key = event.key.toLowerCase();
   if (key !== hotkey.key) return false;

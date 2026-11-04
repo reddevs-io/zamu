@@ -3,14 +3,23 @@ import {
   Menu as AriaMenu,
   MenuItem as AriaMenuItem,
   type MenuItemProps as AriaMenuItemProps,
+  MenuSection as AriaMenuSection,
+  Header,
   type MenuProps,
+  type MenuSectionProps,
   type PopoverProps,
   Separator,
 } from 'react-aria-components';
 import { cn, composeTw } from './cn';
+import { Kbd } from './Kbd';
 import { Popover } from './ListBox';
 
 export { MenuTrigger, SubmenuTrigger } from 'react-aria-components';
+
+/*
+ * Action menus (workspace menu, person menu, row "more" menus). Pickers with a search field, checks and
+ * number keys use PickerMenu instead. Same Margin look: margin.css .menu, .menu-i, .menu-sep, .menu-h.
+ */
 
 export interface MenuPopoverProps<T> extends MenuProps<T> {
   placement?: PopoverProps['placement'];
@@ -24,7 +33,10 @@ export function Menu<T extends object>({
 }: MenuPopoverProps<T>) {
   return (
     <Popover placement={placement} className="min-w-44">
-      <AriaMenu {...props} className={composeTw(className, 'max-h-80 overflow-auto py-1 outline-none')} />
+      <AriaMenu
+        {...props}
+        className={composeTw(className, 'flex max-h-80 flex-col gap-px overflow-auto p-1.5 outline-none')}
+      />
     </Popover>
   );
 }
@@ -35,9 +47,11 @@ export interface MenuItemProps extends Omit<AriaMenuItemProps, 'children'> {
   tone?: 'default' | 'danger';
   /** Shortcut hint shown on the right. */
   kbd?: string;
+  /** Glyph before the label. */
+  lead?: ReactNode;
 }
 
-export function MenuItem({ children, tone = 'default', kbd, ...props }: MenuItemProps) {
+export function MenuItem({ children, tone = 'default', kbd, lead, ...props }: MenuItemProps) {
   const textValue = props.textValue ?? (typeof children === 'string' ? children : undefined);
   return (
     <AriaMenuItem
@@ -45,17 +59,35 @@ export function MenuItem({ children, tone = 'default', kbd, ...props }: MenuItem
       textValue={textValue}
       className={composeTw(props.className, () =>
         cn(
-          'flex h-8 cursor-default items-center gap-2 px-3 outline-none select-none focus:bg-sel disabled:opacity-50',
+          'flex min-h-8 cursor-default items-center gap-2.25 rounded-sm px-2 whitespace-nowrap outline-none select-none',
+          'focus:bg-bg-lane disabled:text-fg-3',
           tone === 'danger' ? 'text-danger' : 'text-fg',
         ),
       )}
     >
+      {lead ? <span className="flex w-4 shrink-0 items-center justify-center">{lead}</span> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
-      {kbd ? <span className="font-mono text-[9.5px] text-faint">{kbd}</span> : null}
+      {kbd ? <Kbd aria-hidden>{kbd}</Kbd> : null}
     </AriaMenuItem>
   );
 }
 
 export function MenuSeparator() {
-  return <Separator className="my-1 h-px border-0 bg-line-2" />;
+  return <Separator className="-mx-1.5 my-1.25 h-px border-0 bg-line-soft" />;
+}
+
+export interface MenuGroupProps<T> extends Omit<MenuSectionProps<T>, 'children'> {
+  /** Section header: "Workspaces", "Theme". */
+  title?: ReactNode;
+  children: ReactNode;
+}
+
+/** A titled group of items inside a Menu. */
+export function MenuGroup<T extends object>({ title, children, className, ...props }: MenuGroupProps<T>) {
+  return (
+    <AriaMenuSection {...props} className={cn('flex flex-col gap-px', className)}>
+      {title ? <Header className="px-2 pt-1.5 pb-1 text-xs font-medium text-fg-3">{title}</Header> : null}
+      {children}
+    </AriaMenuSection>
+  );
 }

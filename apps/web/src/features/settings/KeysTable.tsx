@@ -24,8 +24,8 @@ export function KeysTable({ keys, showOwner = true, isLoading, onRevoke, renderE
         isRowHeader: true,
         cell: (key) => (
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className={cn('truncate font-semibold', key.revoked && 'text-faint')}>{key.name}</span>
-            {key.start ? <span className="font-mono text-[10px] text-faint">{key.start}…</span> : null}
+            <span className={cn('truncate font-semibold', key.revoked && 'text-fg-3')}>{key.name}</span>
+            {key.start ? <span className="font-mono text-xs text-fg-3">{key.start}…</span> : null}
           </div>
         ),
       },
@@ -39,7 +39,7 @@ export function KeysTable({ keys, showOwner = true, isLoading, onRevoke, renderE
           <MemberLabel
             name={key.owner.name}
             kind={key.owner.kind}
-            className={cn('text-[12px]', key.revoked ? 'text-faint' : 'text-muted')}
+            className={cn('text-sm', key.revoked ? 'text-fg-3' : 'text-fg-2')}
           />
         ),
       });
@@ -50,7 +50,7 @@ export function KeysTable({ keys, showOwner = true, isLoading, onRevoke, renderE
         header: 'Scope',
         width: 160,
         cell: (key) => (
-          <span className={cn('truncate text-[12px]', key.revoked ? 'text-faint' : 'text-muted')}>
+          <span className={cn('truncate text-sm', key.revoked ? 'text-fg-3' : 'text-fg-2')}>
             {scopeText(key.scope)}
           </span>
         ),
@@ -60,7 +60,7 @@ export function KeysTable({ keys, showOwner = true, isLoading, onRevoke, renderE
         header: 'Created',
         width: 70,
         cell: (key) => (
-          <span className="font-mono text-[10px] text-faint">
+          <span className="tabular-nums text-xs text-fg-3">
             <TimeText>{formatShortDate(key.createdAt)}</TimeText>
           </span>
         ),
@@ -70,7 +70,7 @@ export function KeysTable({ keys, showOwner = true, isLoading, onRevoke, renderE
         header: 'Last used',
         width: 76,
         cell: (key) => (
-          <span className="font-mono text-[10px] text-faint">
+          <span className="tabular-nums text-xs text-fg-3">
             <TimeText>{key.lastUsedAt ? formatAgo(key.lastUsedAt) : 'Never'}</TimeText>
           </span>
         ),

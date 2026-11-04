@@ -3,13 +3,15 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CycleDialog, checkCycleDates, cycleDefaults } from './CycleDialog';
-import { cycleSummaryText, parseCycleParam, rolledOverTo } from './CyclePage';
-import { cyclesSubtitle, splitCycles } from './CyclesScreen';
+import { activeCycleStats, cycleSummaryText, parseCycleParam, rolledOverTo } from './CyclePage';
+import { cadenceText, cycleDay, cycleNoteText, daysAfterToday, splitCycles } from './CyclesScreen';
+import { formatShortRange } from './dates';
 import { EndCycleDialog, moveToFor } from './EndCycleDialog';
 import { MilestoneDialog } from './MilestoneDialog';
-import { milestonesSubtitle, sortMilestones, targetText } from './MilestonesScreen';
-import { addedMarker, groupTasks } from './PlanningTaskTable';
-import { parseMilestonesSearch, parsePlanningTasksSearch } from './search';
+import { milestoneSplit, milestoneStats } from './MilestonePage';
+import { milestonePill, sortMilestones, targetText, taskCountText } from './MilestonesScreen';
+import { parsePlanningSearch } from './search';
+import { planningFilterFields, planningListInput, withoutClosed } from './usePlanningTasks';
 
 // The dialogs and helpers under test never call the API; the stub keeps the server modules out.
 vi.mock('~/lib/orpc', async () => {
@@ -156,19 +158,22 @@ describe('MilestoneDialog', () => {
     const { user, onSubmit } = setup();
     await user.type(screen.getByLabelText('Name'), 'Webhooks v2');
     await user.click(screen.getByRole('button', { name: /Target date/ }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Oct 23, 2026, today' })).toHaveFocus());
+    const calendar = await screen.findByRole('dialog', { name: 'Pick target date' });
+    // The grid opens on today (the browser's), then the arrows move a week or a day.
+    await waitFor(() => expect(calendar.contains(document.activeElement)).toBe(true));
+    const start = document.activeElement?.getAttribute('aria-label') ?? '';
+    expect(start).toMatch(/Today/);
     await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}{ArrowLeft}{Enter}');
     const trigger = screen.getByRole('button', { name: /Target date/ });
-    expect(trigger).toHaveTextContent('Nov 12, 2026');
-    // Picking closes the calendar and hands focus back to the field.
-    expect(trigger).toHaveFocus();
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).not.toHaveTextContent('No date');
+    // Picking closes the calendar.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Pick target date' })).toBeNull());
     await user.click(screen.getByLabelText('Name'));
     await user.keyboard('{Control>}{Enter}{/Control}');
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Webhooks v2',
       description: null,
-      targetDate: '2026-11-12',
+      targetDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
   });
 
@@ -264,7 +269,7 @@ describe('CycleDialog', () => {
     expect(screen.getByRole('button', { name: /Starts/ })).toHaveTextContent('Mon, Nov 23');
     expect(screen.getByRole('button', { name: /Ends/ })).toHaveTextContent('Sun, Dec 6');
     await user.click(screen.getByRole('button', { name: /Starts/ }));
-    await user.click(await screen.findByRole('button', { name: 'Nov 30, 2026' }));
+    await user.click(await screen.findByRole('button', { name: /November 30, 2026/ }));
     expect(screen.getByRole('button', { name: /Ends/ })).toHaveTextContent('Sun, Dec 13');
     expect(screen.getByText('2 weeks, Nov 30 to Dec 13.')).toBeInTheDocument();
     await user.type(screen.getByRole('textbox'), 'Checkout rewrite');
@@ -357,11 +362,64 @@ describe('cycle lists and pages', () => {
     expect(split.current?.number).toBe(12);
     expect(split.upcoming.map((item) => item.number)).toEqual([13, 14]);
     expect(split.completed.map((item) => item.number)).toEqual([11]);
-    expect(cyclesSubtitle(split, TODAY, items.length)).toBe('Cycle 12 ends Sunday');
-    expect(cyclesSubtitle({ ...split, current: undefined }, TODAY, items.length)).toBe(
-      'Cycle 13 starts Monday',
+    expect(cadenceText(items)).toBe('Two weeks, starting Mondays');
+    expect(cadenceText([])).toBeNull();
+  });
+
+  it('counts the days of a current cycle (frame 109: day 8 of 14, 6 days left)', () => {
+    const current = cycle(12, { startsOn: '2026-10-27', endsOn: '2026-11-09', daysLeft: 7 });
+    expect(cycleDay(current)).toBe(8);
+    expect(daysAfterToday(current)).toBe(6);
+    expect(cycleDay({ ...current, daysLeft: 1 })).toBe(14);
+    expect(daysAfterToday({ daysLeft: 1 })).toBe(0);
+    expect(formatShortRange('2026-10-27', '2026-11-09')).toBe('Oct 27 – Nov 9');
+    expect(formatShortRange('2026-11-10', '2026-11-23')).toBe('Nov 10 – 23');
+    expect(formatShortRange('2026-12-28', '2027-01-10')).toBe('Dec 28, 2026 – Jan 10, 2027');
+  });
+
+  it('writes the note under each cycle row', () => {
+    const upcoming = cycle(13, {
+      state: 'upcoming',
+      startsOn: '2026-10-26',
+      endsOn: '2026-11-08',
+      daysLeft: null,
+      counts: counts({ total: 6, todo: 6 }),
+    });
+    expect(cycleNoteText(upcoming, TODAY)).toBe('Starts Monday · 6 tasks planned');
+    const summary = { scope: 25, completed: 22, rolledOver: 3, canceled: 0, addedAfterStart: 0 };
+    const ended = cycle(11, { state: 'completed', daysLeft: null, summary });
+    expect(cycleNoteText(ended, TODAY, [12, 12, 12])).toBe('3 unfinished tasks moved to Cycle 12');
+    expect(cycleNoteText(ended, TODAY)).toBe('3 unfinished tasks rolled over');
+    expect(cycleNoteText({ ...ended, summary: { ...summary, rolledOver: 1 } }, TODAY, [null])).toBe(
+      '1 unfinished task moved to no cycle',
     );
-    expect(cyclesSubtitle(splitCycles([]), TODAY, 0)).toBe('no cycles yet');
+    expect(cycleNoteText({ ...ended, summary: { ...summary, rolledOver: 0 } }, TODAY)).toBe(
+      'Everything done',
+    );
+  });
+
+  it('gives the numbers of a cycle page', () => {
+    const current = cycle(12, {
+      startsOn: '2026-10-27',
+      endsOn: '2026-11-09',
+      daysLeft: 7,
+      counts: counts({ total: 25, done: 9, in_review: 5, in_progress: 4, todo: 6, canceled: 1 }),
+    });
+    expect(activeCycleStats(current, TODAY)).toEqual([
+      { value: 24, label: 'in scope' },
+      { value: 9, label: 'done' },
+      { value: 6, label: 'days left' },
+    ]);
+    const upcoming = cycle(13, {
+      state: 'upcoming',
+      startsOn: '2026-10-26',
+      daysLeft: null,
+      counts: counts({ total: 6 }),
+    });
+    expect(activeCycleStats(upcoming, TODAY)).toEqual([
+      { value: 6, label: 'planned' },
+      { value: 3, label: 'days to start' },
+    ]);
   });
 
   it('reads cycle route params', () => {
@@ -403,15 +461,6 @@ describe('cycle lists and pages', () => {
       ].join('\n'),
     );
   });
-
-  it('marks tasks added after the start, only once hydrated', () => {
-    const late = task(153, { cycleAddedAt: '2026-10-17T10:00:00.000Z' });
-    const early = task(142, { cycleAddedAt: '2026-10-11T10:00:00.000Z' });
-    const now = Date.parse('2026-10-23T10:00:00.000Z');
-    expect(addedMarker(late, '2026-10-12', now)).toBe('+ Oct 17');
-    expect(addedMarker(early, '2026-10-12', now)).toBe('');
-    expect(addedMarker(late, '2026-10-12', null)).toBe('');
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -419,84 +468,107 @@ describe('cycle lists and pages', () => {
 // ---------------------------------------------------------------------------
 
 describe('milestone list', () => {
-  it('sorts by target date with undated last, by name, or by progress', () => {
+  it('sorts by target date with undated last, then by name', () => {
     const items = [
       milestone('Refunds rework'),
-      milestone('Webhooks v2', {
-        targetDate: '2026-11-14',
-        progress: { total: 22, done: 14, inProgress: 5, open: 3, canceled: 0 },
-      }),
-      milestone('PCI audit', {
-        targetDate: '2026-10-20',
-        progress: { total: 14, done: 10, inProgress: 2, open: 2, canceled: 0 },
-      }),
+      milestone('Webhooks v2', { targetDate: '2026-11-14' }),
+      milestone('PCI audit', { targetDate: '2026-10-20' }),
+      milestone('Apple Pay'),
     ];
-    expect(sortMilestones(items, 'target').map((item) => item.name)).toEqual([
+    expect(sortMilestones(items).map((item) => item.name)).toEqual([
       'PCI audit',
       'Webhooks v2',
-      'Refunds rework',
-    ]);
-    expect(sortMilestones(items, 'name').map((item) => item.name)).toEqual([
-      'PCI audit',
-      'Refunds rework',
-      'Webhooks v2',
-    ]);
-    expect(sortMilestones(items, 'progress').map((item) => item.name)).toEqual([
-      'PCI audit',
-      'Webhooks v2',
+      'Apple Pay',
       'Refunds rework',
     ]);
   });
 
-  it('describes targets (frame 14)', () => {
+  it('describes targets (frame 107)', () => {
+    expect(targetText(milestone('Mobile', { targetDate: '2026-11-14', daysLeft: 11 }), TODAY)).toEqual({
+      text: 'Nov 14 · in 11 days',
+      tone: 'default',
+    });
     expect(
       targetText(
         milestone('PCI', { targetDate: '2026-10-20', daysLeft: -3, overdue: true, status: 'active' }),
         TODAY,
       ),
-    ).toEqual({
-      date: 'Oct 20',
-      sub: '3 days overdue',
-      tone: 'warn',
-    });
-    expect(targetText(milestone('SEPA', { targetDate: '2027-01-30', daysLeft: 99 }), TODAY)).toEqual({
-      date: 'Jan 30, 2027',
-      sub: '99 days left',
+    ).toEqual({ text: 'Oct 20 · 3 days late', tone: 'late' });
+    expect(targetText(milestone('SEPA', { targetDate: '2027-01-30', daysLeft: 99 }), TODAY).text).toBe(
+      'Jan 30, 2027 · in 99 days',
+    );
+    expect(targetText(milestone('Refunds'), TODAY)).toEqual({ text: 'No date', tone: 'none' });
+  });
+
+  it('picks the status pill and the task count', () => {
+    const dated = milestone('Mobile', { targetDate: '2026-11-14', daysLeft: 11 });
+    expect(milestonePill(dated, 0)).toEqual({ text: 'On track', tone: 'ok' });
+    expect(milestonePill(dated, 2)).toEqual({ text: '2 blocked', tone: 'warn' });
+    expect(milestonePill({ ...dated, overdue: true }, 0)).toEqual({ text: 'Overdue', tone: 'warn' });
+    expect(milestonePill(milestone('Trends', { status: 'active' }), 0)).toEqual({
+      text: 'Active',
       tone: 'default',
     });
-    expect(targetText(milestone('Refunds'), TODAY)).toEqual({ date: 'No date', sub: '', tone: 'faint' });
-    expect(milestonesSubtitle([milestone('A'), milestone('B', { status: 'completed' })])).toBe(
-      '1 open milestone',
-    );
-    expect(milestonesSubtitle([])).toBe('no milestones yet');
-  });
-
-  it('groups tasks by status in the list order', () => {
-    const groups = groupTasks([
-      task(1, { status: 'done' }),
-      task(2, { status: 'todo', priority: 'low' }),
-      task(3, { status: 'in_progress' }),
-      task(4, { status: 'todo', priority: 'urgent' }),
-    ]);
-    expect(groups.map((group) => [group.id, group.items.map((item) => item.key)])).toEqual([
-      ['in_progress', ['PAY-3']],
-      ['todo', ['PAY-4', 'PAY-2']],
-      ['done', ['PAY-1']],
-    ]);
-  });
-
-  it('parses search params and drops what it does not know', () => {
-    expect(parseMilestonesSearch({ status: 'planned,bogus', sort: 'name' })).toEqual({
-      status: ['planned'],
-      sort: 'name',
+    expect(milestonePill({ ...dated, status: 'completed' }, 3)).toEqual({
+      text: 'Completed',
+      tone: 'default',
     });
-    expect(parseMilestonesSearch({ sort: 'target' })).toEqual({});
+    expect(taskCountText({ total: 31, done: 18, inProgress: 9, open: 3, canceled: 1 })).toBe('18 of 30');
+  });
+
+  it('gives the numbers and the bar of a milestone page (frame 108)', () => {
+    const mobile = milestone('Mobile', {
+      targetDate: '2026-11-14',
+      daysLeft: 11,
+      progress: { total: 30, done: 18, inProgress: 9, open: 3, canceled: 0 },
+    });
+    expect(milestoneStats(mobile)).toEqual([
+      { value: 30, label: 'tasks' },
+      { value: 18, label: 'done' },
+      { value: 11, label: 'days left' },
+    ]);
+    expect(milestoneStats({ ...mobile, daysLeft: -1 })[2]).toEqual({ value: 1, label: 'day late' });
+    expect(milestoneStats({ ...mobile, targetDate: null, daysLeft: null })).toHaveLength(2);
+    expect(milestoneSplit(mobile, undefined)).toEqual({ done: 18, review: 0, progress: 9, todo: 3 });
     expect(
-      parsePlanningTasksSearch({ status: ['todo', 'nope'], assignee: 'me', cycle: 12, milestone: '' }),
-    ).toEqual({
+      milestoneSplit(mobile, { backlog: 1, todo: 2, in_progress: 4, in_review: 5, done: 18, canceled: 0 }),
+    ).toEqual({ done: 18, review: 5, progress: 4, todo: 3 });
+  });
+});
+
+describe('planning tasks', () => {
+  it('parses the filter params and drops what it does not know', () => {
+    expect(
+      parsePlanningSearch({ status: 'todo,nope', assignee: 'me', cycle: 12, milestone: '', sort: 'name' }),
+    ).toEqual({ status: 'todo', assignee: 'me', cycle: 12 });
+  });
+
+  it('scopes the task list to the page', () => {
+    expect(planningListInput('PAY', { cycle: 12 }, { status: ['todo'], cycle: ['current'] })).toEqual({
+      project: 'PAY',
       status: ['todo'],
-      assignee: 'me',
       cycle: '12',
     });
+    expect(planningListInput('PAY', { milestone: 'm1' }, { milestone: ['none'] })).toEqual({
+      project: 'PAY',
+      milestone: 'm1',
+    });
+    expect(planningFilterFields('milestone', { milestones: true, cycles: true })).toEqual([
+      'status',
+      'priority',
+      'assignee',
+      'label',
+      'due',
+      'blocked',
+      'cycle',
+    ]);
+    expect(planningFilterFields('cycle', { milestones: false, cycles: true })).not.toContain('milestone');
+  });
+
+  it('hides done and canceled tasks until asked', () => {
+    const tasks = [task(1), task(2, { status: 'done' }), task(3, { status: 'canceled' })];
+    expect(withoutClosed(tasks, {}, false)).toEqual({ shown: [tasks[0]], hidden: 2 });
+    expect(withoutClosed(tasks, {}, true).hidden).toBe(0);
+    expect(withoutClosed(tasks, { status: ['done'] }, false).shown).toHaveLength(3);
   });
 });

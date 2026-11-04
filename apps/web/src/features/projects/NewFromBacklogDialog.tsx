@@ -147,17 +147,16 @@ function DetectionBox({ detection, host }: { detection: BacklogDetection; host: 
     <DetectionStrip tone="healthy">
       <div className="min-w-0">
         <b className="font-semibold">
-          Found <span className="font-mono text-[11.5px]">{detection.folder}/</span> on{' '}
-          {detection.defaultBranch}
+          Found <span className="font-mono text-xs">{detection.folder}/</span> on {detection.defaultBranch}
         </b>
         {detection.config ? (
           <>
             {' '}
             ·{detection.config.projectName ? ` project “${detection.config.projectName}”,` : ''} prefix{' '}
-            <span className="font-mono text-[11px] font-medium">{detection.config.taskPrefix}</span>
+            <span className="tabular-nums text-xs font-medium">{detection.config.taskPrefix}</span>
           </>
         ) : null}
-        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10.5px] text-muted">
+        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums text-xs text-fg-2">
           <span>{count(folderCount(detection, 'tasks/'), 'task', 'tasks')}</span>
           <span>{count(folderCount(detection, 'drafts/'), 'draft', 'drafts')}</span>
           <span>{count(folderCount(detection, 'archive/tasks/', 'completed/'), 'archived', 'archived')}</span>
@@ -172,8 +171,8 @@ function DetectionBox({ detection, host }: { detection: BacklogDetection; host: 
 
 function DetectionStrip({ tone, children }: { tone: 'healthy' | 'failed' | 'reading'; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 border border-line bg-src-bg px-3 py-2.5 text-[12.5px] leading-normal">
-      <SourceStatusDot state={tone} decorative className="mt-[5px]" />
+    <div className="flex items-start gap-2.5 rounded-md border border-line bg-bg-lane px-3 py-2.5 text-sm leading-normal">
+      <SourceStatusDot state={tone} decorative className="mt-1.25" />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
@@ -388,7 +387,7 @@ export function NewFromBacklogForm({ onCancel, connections, encryptionReady, onS
             description={
               parsed ? (
                 <>
-                  Matches <span className="font-mono text-[10.5px] text-fg">{parsed.short}</span>
+                  Matches <span className="font-mono text-xs text-fg">{parsed.short}</span>
                 </>
               ) : (
                 'The URL you clone from, HTTPS or SSH.'
@@ -459,7 +458,7 @@ export function NewFromBacklogForm({ onCancel, connections, encryptionReady, onS
             mono
             autoComplete="off"
             spellCheck="false"
-            inputClassName="text-[12px] tracking-[0.04em]"
+            inputClassName="text-sm tracking-[0.04em]"
             value={shownKey}
             onChange={(raw) => {
               const next = normalizeKeyInput(raw);
@@ -467,7 +466,7 @@ export function NewFromBacklogForm({ onCancel, connections, encryptionReady, onS
               setKeyEdited(true);
               clear('key');
             }}
-            description={<span className={keyHint.warn ? 'text-warn' : undefined}>{keyHint.text}</span>}
+            description={<span className={keyHint.warn ? 'text-danger' : undefined}>{keyHint.text}</span>}
             isInvalid={Boolean(errors.key)}
             errorMessage={errors.key}
             validationBehavior="aria"
@@ -489,7 +488,7 @@ export function NewFromBacklogForm({ onCancel, connections, encryptionReady, onS
       </DialogBody>
       <DialogFooter
         start={
-          <span className="max-w-[300px] text-[11.5px] leading-snug text-muted">
+          <span className="max-w-75 text-xs leading-snug text-fg-2">
             Creates the project, then continues with mappings and a preview. Nothing is read in yet.
           </span>
         }

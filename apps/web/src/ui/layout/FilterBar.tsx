@@ -14,7 +14,7 @@ export function FilterBar({ children, end, className }: FilterBarProps) {
   return (
     <div
       className={cn(
-        'flex h-9 shrink-0 items-center gap-4 border-b border-line px-6 text-[12px] text-muted',
+        'flex h-9 shrink-0 items-center gap-4 border-b border-line-soft px-6 text-sm text-fg-3',
         className,
       )}
     >

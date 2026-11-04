@@ -11,8 +11,8 @@ export interface ChipProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'childr
 }
 
 /**
- * 18px hairline chip with a glyph and text: "◇ Webhooks v2", "○ C12". Used on board cards, rows and
- * the property grid. The full text goes into `title` when `children` is a string.
+ * 20px pill with a glyph and text, the label chip's shape on --bg-grp: "◇ Webhooks v2", "○ C12". Used on
+ * board cards, rows and the property grid. The full text goes into `title` when `children` is a string.
  */
 export function Chip({ glyph, children, maxWidth = 150, className, style, title, ...props }: ChipProps) {
   return (
@@ -21,7 +21,7 @@ export function Chip({ glyph, children, maxWidth = 150, className, style, title,
       title={title ?? (typeof children === 'string' ? children : undefined)}
       style={{ maxWidth, ...style }}
       className={cn(
-        'inline-flex h-[18px] min-w-0 shrink items-center gap-[5px] overflow-hidden border border-line px-[5px] text-[10.5px] whitespace-nowrap text-muted',
+        'inline-flex h-5 min-w-0 shrink items-center gap-1.25 overflow-hidden rounded-pill bg-bg-grp pr-1.75 pl-1.5 text-xs font-medium whitespace-nowrap text-fg-2',
         className,
       )}
     >

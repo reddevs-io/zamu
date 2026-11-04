@@ -1,214 +1,357 @@
-import { PRIORITIES, type TaskListItem, type TaskStatus } from '@pm/contracts';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import type { TaskListItem, TaskStatus } from '@pm/contracts';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { type MouseEvent, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-aria-components';
+import { togglePeek } from '~/features/peek/store';
+import { useTaskFieldKeys } from '~/features/task-fields';
+import { useNow } from '~/features/tasks/clock';
 import { atTime, formatAge } from '~/features/tasks/format';
+import { meQuery } from '~/features/tasks/queries';
 import {
-  Chip,
+  type DisplayOptions,
+  type GroupBy,
+  type GroupContext,
+  groupTasks,
+  LIST_STATUS_ORDER,
+  rememberTaskNavigation,
+  showsProperty,
+  type TaskGroup,
+  useTaskSelection,
+} from '~/features/views';
+import {
+  Avatar,
+  BlockedMarker,
   CycleGlyph,
-  type DataColumn,
-  type DataGroup,
-  DataTable,
-  MemberLabel,
+  cn,
+  DueChip,
+  LabelList,
+  localToday,
+  MilestoneGlyph,
   PriorityGlyph,
-  STATUS_LABELS,
+  Skeleton,
+  StatusGlyph,
+  SubtaskProgress,
+  useHotkeys,
 } from '~/ui';
-import { formatDay, localDay } from './dates';
+import { FoldGroup } from './parts';
 
-// Tasks of a milestone or a cycle, grouped by status in the M1 row style (frames 17 and 24). Open groups
-// are expanded; Done and Canceled are folded until someone opens them. Enter or a click opens the task.
-// The arrow keys and J/K move between tasks and skip group rows; Left and Right collapse and expand groups.
+// Tasks of a milestone or a cycle (frames 108 and 110) in the Margin list rows (margin.css .grp, .row):
+//
+//   ▾ ◐ In progress 4
+//   ▮▮▮ HBR-166  ◐ Offline cache: browse every tab…     • mobile • perf  ◔ 2/6  Nov 14  (cd)   2m
+//
+// Grouped as the person's list Display options say (status by default), with the same properties.
+// J / K or ↓ / ↑ move, X and Shift select, Space peeks, Enter or a click opens the task view (which
+// then walks this list: "3 of 12 in Cycle 12"), and the task keys (S, P, A, L …) act on the focused
+// or selected tasks. ← / → on a group row fold it.
 
-/** Group order of the task list: active work first. */
-export const STATUS_ORDER: readonly TaskStatus[] = [
-  'in_progress',
-  'in_review',
-  'todo',
-  'backlog',
-  'done',
-  'canceled',
-];
+/** Statuses whose groups start folded. */
 const FOLDED: readonly TaskStatus[] = ['done', 'canceled'];
-/** Module level, so the table does not re-render every row on each render of the page. */
-const rowClassName = () => 'cursor-pointer';
-
-const priorityRank = (item: TaskListItem) => PRIORITIES.indexOf(item.priority);
-
-/** Priority (highest first), then most recently updated, as the M1 list. */
-export function compareTasks(a: TaskListItem, b: TaskListItem): number {
-  return priorityRank(b) - priorityRank(a) || b.updatedAt.localeCompare(a.updatedAt) || b.number - a.number;
-}
-
-export function groupTasks(
-  tasks: readonly TaskListItem[],
-  statuses: readonly TaskStatus[] = STATUS_ORDER,
-): DataGroup<TaskListItem>[] {
-  const byStatus = new Map<TaskStatus, TaskListItem[]>();
-  for (const task of tasks) {
-    const bucket = byStatus.get(task.status);
-    if (bucket) bucket.push(task);
-    else byStatus.set(task.status, [task]);
-  }
-  return statuses.flatMap((status) => {
-    const items = byStatus.get(status);
-    if (!items?.length) return [];
-    return [{ id: status, label: STATUS_LABELS[status], status, items: items.sort(compareTasks) }];
-  });
-}
-
-/** "+ Oct 17" when the task joined the cycle after its first day; '' otherwise or before hydration. */
-export function addedMarker(task: TaskListItem, startsOn: string, now: number | null): string {
-  if (now == null || !task.cycleAddedAt) return '';
-  const day = localDay(Date.parse(task.cycleAddedAt));
-  return day > startsOn ? `+ ${formatDay(day)}` : '';
-}
-
-export type PlanningColumn = 'cycle' | 'added';
 
 export interface PlanningTaskTableProps {
   'aria-label': string;
+  projectKey: string;
   tasks: readonly TaskListItem[];
-  /** Third column: the task's cycle chip (milestone page) or the "+ Oct 17" marker (cycle page). */
-  extra?: PlanningColumn;
-  /** First day of the cycle, for the "+" markers. */
-  cycleStartsOn?: string;
-  /** Only these statuses, all expanded. Without it every status shows, Done and Canceled folded. */
-  statuses?: readonly TaskStatus[];
+  display: DisplayOptions;
+  /** The page as the task view names it: "Milestone", "Cycle 12". */
+  from: string;
+  /** The property the page itself stands for: never a row chip or a grouping. */
+  hide?: 'milestone' | 'cycle';
+  context?: Omit<GroupContext, 'statuses' | 'viewerId' | 'showEmptyGroups'>;
   isLoading?: boolean;
-  now: number | null;
-  onOpen: (key: string) => void;
   renderEmptyState?: () => ReactNode;
 }
 
-export function PlanningTaskTable({
-  tasks,
-  extra,
-  cycleStartsOn,
-  statuses,
-  isLoading,
-  now,
-  onOpen,
-  renderEmptyState,
-  ...props
-}: PlanningTaskTableProps) {
-  const groups = useMemo(() => groupTasks(tasks, statuses ?? STATUS_ORDER), [tasks, statuses]);
-  const statusKey = statuses?.join(',') ?? '';
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(statusKey ? [] : FOLDED));
-  const previousKey = useRef(statusKey);
-  useEffect(() => {
-    if (previousKey.current === statusKey) return;
-    previousKey.current = statusKey;
-    setCollapsed(new Set(statusKey ? [] : FOLDED));
-  }, [statusKey]);
+/** The grouping a planning page uses: the page's own field falls back to status. */
+export function planningGroupBy(groupBy: GroupBy, hide: 'milestone' | 'cycle' | undefined): GroupBy {
+  return hide && groupBy === hide ? 'status' : groupBy;
+}
 
-  const columns = useMemo<DataColumn<TaskListItem>[]>(() => {
-    const age = atTime(formatAge, now);
-    const third: DataColumn<TaskListItem>[] = !extra
-      ? []
-      : extra === 'cycle'
-        ? [
-            {
-              id: 'cycle',
-              header: 'Cycle',
-              width: 70,
-              skeleton: 40,
-              cell: (task) =>
-                task.cycle ? (
-                  <Chip glyph={<CycleGlyph />} maxWidth={70} title={cycleTitle(task.cycle)}>
-                    {`C${task.cycle.number}`}
-                  </Chip>
-                ) : null,
-            },
-          ]
-        : [
-            {
-              id: 'added',
-              header: 'Added',
-              width: 96,
-              skeleton: 0,
-              cell: (task) => {
-                const marker = cycleStartsOn ? addedMarker(task, cycleStartsOn, now) : '';
-                return marker ? (
-                  <span className="font-mono text-[10.5px] text-faint" title="Added after the cycle started">
-                    {marker}
-                  </span>
-                ) : null;
-              },
-            },
-          ];
-    return [
-      {
-        id: 'key',
-        header: 'Key',
-        width: 72,
-        isRowHeader: true,
-        skeleton: 48,
-        cell: (task) => <span className="font-mono text-[10.5px] text-muted">{task.key}</span>,
-      },
-      {
-        id: 'title',
-        header: 'Title',
-        width: '1fr',
-        isRowHeader: true,
-        cell: (task) => <span className="truncate">{task.title}</span>,
-      },
-      ...third,
-      {
-        id: 'priority',
-        header: 'Pri',
-        width: 34,
-        skeleton: 20,
-        cell: (task) => <PriorityGlyph priority={task.priority} />,
-      },
-      {
-        id: 'assignee',
-        header: 'Assignee',
-        width: 150,
-        skeleton: 80,
-        cell: (task) =>
-          task.assignee ? (
-            <MemberLabel
-              name={task.assignee.name}
-              kind={task.assignee.kind}
-              className="text-[12px] text-muted"
-            />
-          ) : null,
-      },
-      {
-        id: 'updated',
-        header: 'Upd',
-        width: 34,
-        align: 'end',
-        skeleton: 24,
-        cell: (task) => (
-          <time dateTime={task.updatedAt} className="font-mono text-[10px] whitespace-nowrap text-faint">
-            {age(task.updatedAt)}
-          </time>
-        ),
-      },
-    ];
-  }, [extra, cycleStartsOn, now]);
-
-  // Without rows the table header alone reads oddly: show the message on its own.
-  if (!isLoading && !groups.length && renderEmptyState) {
-    return <div className="min-h-0 flex-1 overflow-auto">{renderEmptyState()}</div>;
+/** Task keys in the order the rows show them (folded groups left out), each once. */
+export function visibleKeys(
+  groups: readonly TaskGroup<Pick<TaskListItem, 'key'>>[],
+  collapsed: ReadonlySet<string>,
+): string[] {
+  const seen = new Set<string>();
+  for (const group of groups) {
+    if (collapsed.has(group.key)) continue;
+    for (const task of group.tasks) seen.add(task.key);
   }
+  return [...seen];
+}
 
+/** Not a key press for the list: focus is on a control that handles Enter and Space itself. */
+function isControl(target: EventTarget | null): boolean {
   return (
-    <DataTable
-      aria-label={props['aria-label']}
-      columns={columns}
-      groups={groups}
-      getKey={(task) => task.key}
-      isLoading={isLoading}
-      skeletonRows={8}
-      onRowAction={(key) => onOpen(key)}
-      collapsedGroups={collapsed}
-      onCollapsedGroupsChange={setCollapsed}
-      renderEmptyState={renderEmptyState}
-      rowClassName={rowClassName}
-    />
+    target instanceof Element && target.closest('a, button, input, textarea, select, [role="button"]') != null
   );
 }
 
-function cycleTitle(cycle: NonNullable<TaskListItem['cycle']>): string {
-  return cycle.name ? `Cycle ${cycle.number} · ${cycle.name}` : `Cycle ${cycle.number}`;
+export function PlanningTaskTable({
+  projectKey,
+  tasks,
+  display,
+  from,
+  hide,
+  context,
+  isLoading,
+  renderEmptyState,
+  ...props
+}: PlanningTaskTableProps) {
+  const navigate = useNavigate();
+  const location = useRouterState({ select: (state) => state.location.href });
+  const viewerId = useQuery(meQuery()).data?.user.id ?? null;
+  const now = useNow();
+  const groupBy = planningGroupBy(display.groupBy, hide);
+  const groups = useMemo(
+    () =>
+      groupTasks(tasks, groupBy, {
+        ...context,
+        statuses: LIST_STATUS_ORDER,
+        viewerId,
+        showEmptyGroups: false,
+      }),
+    [tasks, groupBy, context, viewerId],
+  );
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
+    () => new Set(groupBy === 'status' ? FOLDED : []),
+  );
+  const keys = useMemo(() => visibleKeys(groups, collapsed), [groups, collapsed]);
+  const byKey = useMemo(() => new Map(tasks.map((task) => [task.key, task])), [tasks]);
+
+  const rows = useRef(new Map<string, HTMLElement>());
+  const focusedRow = useRef<HTMLElement | null>(null);
+  const selection = useTaskSelection(keys, {
+    view: from,
+    onFocusChange: (key) => {
+      if (key) rows.current.get(key)?.scrollIntoView?.({ block: 'nearest' });
+    },
+  });
+  focusedRow.current = selection.focusedKey ? (rows.current.get(selection.focusedKey) ?? null) : null;
+
+  const targets = useMemo(
+    () =>
+      selection.targetKeys.map((key) => byKey.get(key)).filter((task): task is TaskListItem => task != null),
+    [selection.targetKeys, byKey],
+  );
+  const fieldKeys = useTaskFieldKeys({ targets, anchors: focusedRow });
+
+  const remember = useCallback(
+    (key: string) => rememberTaskNavigation({ keys, from, returnTo: location }, key),
+    [keys, from, location],
+  );
+  const open = useCallback(
+    (key: string) => {
+      remember(key);
+      void navigate({ to: '/p/$projectKey/$taskKey', params: { projectKey, taskKey: key } });
+    },
+    [remember, navigate, projectKey],
+  );
+
+  const focusedKey = selection.focusedKey;
+  useHotkeys({
+    Enter: {
+      preventDefault: false,
+      handler: (event) => {
+        if (!focusedKey || isControl(event.target)) return;
+        event.preventDefault();
+        open(focusedKey);
+      },
+    },
+    Space: {
+      preventDefault: false,
+      handler: (event) => {
+        if (!focusedKey || isControl(event.target)) return;
+        event.preventDefault();
+        togglePeek({ key: focusedKey, keys, from, onMove: (key) => selection.focus(key) });
+      },
+    },
+  });
+
+  const toggleGroup = (key: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  if (isLoading && !tasks.length) {
+    return (
+      <div role="status" aria-busy="true" aria-label="Loading tasks" className="flex flex-col pt-1.5">
+        {[46, 38, 52, 30, 44, 36].map((width) => (
+          <div key={width} className="flex h-9.5 items-center gap-2.5 pr-4.5 pl-8">
+            <Skeleton width={48} height={8} />
+            <Skeleton width={13} height={13} round />
+            <Skeleton width={`${width}%`} height={8} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (!groups.length) return renderEmptyState?.() ?? null;
+
+  const age = atTime(formatAge, now);
+  const today = now == null ? undefined : localToday(new Date(now));
+
+  return (
+    <section aria-label={props['aria-label']} className="pb-6">
+      {fieldKeys.pickers}
+      {groups.map((group) => {
+        const isOpen = !collapsed.has(group.key);
+        return (
+          <section key={group.key} aria-label={`${group.label}, ${group.tasks.length}`}>
+            {groupBy === 'none' ? null : (
+              <FoldGroup
+                label={group.label}
+                count={group.tasks.length}
+                expanded={isOpen}
+                onToggle={() => toggleGroup(group.key)}
+                glyph={
+                  group.value.field === 'status' ? (
+                    <StatusGlyph status={group.value.status} decorative />
+                  ) : undefined
+                }
+              />
+            )}
+            {isOpen ? (
+              <ul className="m-0 list-none p-0">
+                {group.tasks.map((task) => (
+                  <TaskRow
+                    key={task.key}
+                    task={task}
+                    projectKey={projectKey}
+                    display={display}
+                    hide={hide}
+                    viewerId={viewerId}
+                    today={today}
+                    updated={age(task.updatedAt)}
+                    created={age(task.createdAt)}
+                    isFocused={selection.focusedKey === task.key}
+                    isSelected={selection.isSelected(task.key)}
+                    rowRef={(element) => {
+                      if (element) rows.current.set(task.key, element);
+                      else rows.current.delete(task.key);
+                    }}
+                    onClick={(event) => {
+                      if ((event.target as Element).closest('a')) return;
+                      if (window.getSelection()?.toString()) return;
+                      if (selection.handleClick(task.key, event)) return;
+                      open(task.key);
+                    }}
+                    onLinkPress={() => {
+                      selection.focus(task.key);
+                      remember(task.key);
+                    }}
+                  />
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        );
+      })}
+    </section>
+  );
+}
+
+interface TaskRowProps {
+  task: TaskListItem;
+  projectKey: string;
+  display: DisplayOptions;
+  hide: 'milestone' | 'cycle' | undefined;
+  viewerId: string | null;
+  today: string | undefined;
+  updated: string;
+  created: string;
+  isFocused: boolean;
+  isSelected: boolean;
+  rowRef: (element: HTMLLIElement | null) => void;
+  onClick: (event: MouseEvent<HTMLLIElement>) => void;
+  onLinkPress: () => void;
+}
+
+function TaskRow({
+  task,
+  projectKey,
+  display,
+  hide,
+  viewerId,
+  today,
+  updated,
+  created,
+  isFocused,
+  isSelected,
+  rowRef,
+  onClick,
+  onLinkPress,
+}: TaskRowProps) {
+  const shows = (property: Parameters<typeof showsProperty>[1]) =>
+    showsProperty(display, property, task, viewerId);
+  const subtasks = task.subtaskProgress;
+  const avatarSlot = display.properties.assignee;
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the title link and the list keys are the keyboard path
+    <li
+      ref={rowRef}
+      data-key={task.key}
+      data-focused={isFocused || undefined}
+      data-selected={isSelected || undefined}
+      onClick={onClick}
+      className={cn(
+        'relative flex h-9.5 cursor-pointer items-center gap-2.5 pr-4.5 pl-4 whitespace-nowrap',
+        isFocused || isSelected ? 'bg-accent-soft' : 'hover:bg-surface-hover',
+        isFocused && 'shadow-[inset_2px_0_0_var(--accent)]',
+      )}
+    >
+      {display.properties.priority ? <PriorityGlyph priority={task.priority} context="compact" /> : null}
+      {shows('key') ? (
+        <span className="w-15.5 shrink-0 text-xs font-medium text-fg-3 tabular-nums">{task.key}</span>
+      ) : null}
+      <StatusGlyph status={task.status} />
+      <Link
+        href={`/p/${encodeURIComponent(projectKey)}/${encodeURIComponent(task.key)}`}
+        onPress={onLinkPress}
+        className="min-w-0 flex-1 cursor-pointer truncate font-[450] text-fg outline-none focus-visible:underline"
+      >
+        {task.title}
+        {isSelected ? <span className="sr-only"> (selected)</span> : null}
+      </Link>
+      <span className="flex shrink-0 items-center gap-2">
+        {shows('blocked') && task.blocked ? <BlockedMarker /> : null}
+        {shows('labels') && task.labels?.length ? <LabelList labels={task.labels} max={2} /> : null}
+        {shows('subtasks') && subtasks && subtasks.total > 0 ? (
+          <SubtaskProgress done={subtasks.done} total={subtasks.total} />
+        ) : null}
+        {shows('due') && task.dueDate ? (
+          <DueChip dueDate={task.dueDate} status={task.status} {...(today ? { today } : {})} />
+        ) : null}
+        {hide !== 'milestone' && shows('milestone') && task.milestone ? (
+          <span className="inline-flex max-w-40 items-center gap-1.5 text-xs text-fg-2">
+            <MilestoneGlyph className="text-fg-3" />
+            <span className="truncate">{task.milestone.name}</span>
+          </span>
+        ) : null}
+        {hide !== 'cycle' && shows('cycle') && task.cycle ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-fg-2">
+            <CycleGlyph className="text-fg-3" />
+            Cycle {task.cycle.number}
+          </span>
+        ) : null}
+        {shows('created') ? <span className="text-xs text-fg-3 tabular-nums">{created}</span> : null}
+        {avatarSlot ? (
+          shows('assignee') && task.assignee ? (
+            <Avatar name={task.assignee.name} kind={task.assignee.kind} size={18} />
+          ) : (
+            <span aria-hidden className="size-4.5 shrink-0" />
+          )
+        ) : null}
+        {shows('updated') ? (
+          <time dateTime={task.updatedAt} className="w-10 text-right text-xs text-fg-3 tabular-nums">
+            {updated}
+          </time>
+        ) : null}
+      </span>
+    </li>
+  );
 }

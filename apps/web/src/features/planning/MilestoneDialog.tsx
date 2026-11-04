@@ -6,7 +6,6 @@ import {
   type MilestoneWithProgress,
 } from '@pm/contracts';
 import { type FormEvent, useRef, useState } from 'react';
-import { Heading } from 'react-aria-components';
 import {
   Banner,
   Button,
@@ -28,8 +27,9 @@ import { addDays, endOfMonth, endOfQuarter } from './dates';
 import { fieldErrors, type WriteFailure } from './errors';
 import { useSubmitHint } from './submit-hint';
 
-// New milestone (frame 16) and Edit milestone. Name, Markdown description, target date with quick
-// picks; Edit adds the status and Delete. The host does the request and returns what went wrong.
+// New milestone and Edit milestone, on the Margin dialog: serif title, name, Markdown description,
+// target date with quick picks; Edit adds the status and Delete. The host does the request and returns
+// what went wrong.
 
 export type MilestoneField = 'name' | 'description' | 'targetDate';
 const FIELDS: readonly MilestoneField[] = ['name', 'description', 'targetDate'];
@@ -47,7 +47,7 @@ export interface MilestoneDialogProps {
   projectKey: string;
   /** Edit this milestone; without it the dialog creates one. */
   milestone?: MilestoneWithProgress;
-  /** Today in the server's time zone, for the calendar and the quick picks. */
+  /** Today in the server's time zone, for the quick picks. */
   today: string;
   /** Saves; resolves to null on success or to the error to show. */
   onSubmit: (values: MilestoneValues) => Promise<WriteFailure<MilestoneField> | null>;
@@ -62,7 +62,7 @@ export function MilestoneDialog({ isOpen, onClose, ...props }: MilestoneDialogPr
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      width={560}
+      width={520}
       top={100}
     >
       <Dialog>
@@ -166,11 +166,8 @@ function MilestoneForm({ onCancel, projectKey, milestone, today, onSubmit, onDel
 
   return (
     <form noValidate onSubmit={onFormSubmit} className="flex min-h-0 flex-1 flex-col">
-      <DialogHeader>
-        <span className="font-mono text-[10.5px] text-muted">{projectKey}</span>
-        <Heading slot="title" className="m-0 text-[13px] font-semibold">
-          {isEdit ? 'Edit milestone' : 'New milestone'}
-        </Heading>
+      <DialogHeader title={isEdit ? 'Edit milestone' : 'New milestone'}>
+        <span className="text-sm text-fg-3 tabular-nums">{projectKey}</span>
       </DialogHeader>
       <DialogBody>
         {failure ? <Banner>{failure}</Banner> : null}
@@ -193,13 +190,12 @@ function MilestoneForm({ onCancel, projectKey, milestone, today, onSubmit, onDel
         <TextArea
           label={
             <>
-              Description <span className="font-normal text-faint">optional, Markdown</span>
+              Description <span className="font-normal text-fg-3">optional, Markdown</span>
             </>
           }
           name="description"
           inputRef={descriptionRef}
-          rows={2}
-          inputClassName="min-h-[64px]"
+          rows={3}
           placeholder="What does done look like?"
           value={description}
           onChange={(value) => {
@@ -219,10 +215,8 @@ function MilestoneForm({ onCancel, projectKey, milestone, today, onSubmit, onDel
               setTargetDate(value);
               setErrors((current) => ({ ...current, targetDate: undefined }));
             }}
-            today={today}
             quickPicks={quickPicks(today)}
             width={220}
-            inline
             errorMessage={errors.targetDate}
           />
           {isEdit ? (
@@ -233,7 +227,7 @@ function MilestoneForm({ onCancel, projectKey, milestone, today, onSubmit, onDel
               onChange={(key) => {
                 if (key != null) setStatus(key as MilestoneStatus);
               }}
-              className="w-[180px]"
+              className="w-45"
             />
           ) : null}
         </div>
@@ -241,9 +235,9 @@ function MilestoneForm({ onCancel, projectKey, milestone, today, onSubmit, onDel
       {confirmDelete ? (
         <DialogFooter
           start={
-            <span className="text-[12px] text-fg">
+            <span className="text-sm text-fg">
               Delete {milestone?.name}?{' '}
-              <span className="text-muted">
+              <span className="text-fg-2">
                 {taskCount
                   ? `Its ${taskCount} ${taskCount === 1 ? 'task loses' : 'tasks lose'} the milestone.`
                   : 'It has no tasks.'}
@@ -254,7 +248,7 @@ function MilestoneForm({ onCancel, projectKey, milestone, today, onSubmit, onDel
           <Button variant="secondary" onPress={() => setConfirmDelete(false)}>
             Keep it
           </Button>
-          <Button variant="destructive" size="md" isPending={pending} onPress={() => void remove()}>
+          <Button variant="danger" isPending={pending} onPress={() => void remove()}>
             Delete milestone
           </Button>
         </DialogFooter>
@@ -263,12 +257,12 @@ function MilestoneForm({ onCancel, projectKey, milestone, today, onSubmit, onDel
           start={
             isEdit ? (
               onDelete ? (
-                <Button variant="destructive" onPress={() => setConfirmDelete(true)}>
+                <Button variant="destructive" size="md" onPress={() => setConfirmDelete(true)}>
                   Delete
                 </Button>
               ) : null
             ) : (
-              <span className="text-[11.5px] text-muted">
+              <span className="text-xs text-fg-3">
                 Starts as Planned. It turns Active when a task in it starts.
               </span>
             )

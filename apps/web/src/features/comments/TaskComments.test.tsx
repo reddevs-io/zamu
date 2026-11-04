@@ -13,14 +13,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuickCreateProvider, useQuickCreate } from '~/features/shell/quick-create';
 import { createFakeApi, FAKE_MILESTONES, FAKE_PEOPLE, type FakeApi } from '~/features/tasks/fake-api';
 import { QuickCreateDialog } from '~/features/tasks/QuickCreateDialog';
-import { TaskDetailPane } from '~/features/tasks/TaskDetailPane';
 import { TaskPage } from '~/features/tasks/TaskPage';
+import { rememberTaskNavigation } from '~/features/views';
 import { Button, UIProvider } from '~/ui';
 import { clearCommentDrafts } from './CommentComposer';
 import { resetTimelinePreferences } from './TaskTimeline';
 
-// Component tests of the task timeline, the comment composer and the milestone and cycle fields, against
-// the in-memory /api/v1 client inside a real TanStack router.
+// Component tests of the task view (M5-13): the history, the comment box, the properties and their
+// pickers, the title and description keys, J / K and Esc, and quick create, against the in-memory
+// /api/v1 client inside a real TanStack router.
 
 configure({ asyncUtilTimeout: 5000 });
 vi.setConfig({ testTimeout: 30_000 });
@@ -61,19 +62,16 @@ function renderApp(url: string) {
       </UIProvider>
     ),
   });
-  // Stand-in for the list: the pane alone, for PAY-1 or ?task=.
+  // Stand-in for the list: the New button and the search it was opened with.
   const list = createRoute({
     getParentRoute: () => root,
     path: '/p/$projectKey/',
     component: function ListRoute() {
       const { projectKey } = list.useParams();
-      const search = list.useSearch() as { task?: string };
       return (
         <>
           <NewTaskButton projectKey={projectKey} />
-          <section aria-label="Task detail" className="flex flex-col">
-            <TaskDetailPane projectKey={projectKey} taskKey={search.task ?? 'PAY-1'} onClose={() => {}} />
-          </section>
+          <p>List of {projectKey}</p>
         </>
       );
     },
@@ -106,8 +104,8 @@ function renderApp(url: string) {
   return { router, queryClient };
 }
 
-const pane = () => screen.getByRole('region', { name: 'Task detail' });
-const history = () => screen.getByRole('region', { name: 'Activity and comments' });
+const history = () => screen.getByRole('region', { name: 'Activity' });
+const properties = () => screen.getByRole('complementary', { name: 'Properties' });
 const comment = (author: string) =>
   within(history()).getAllByRole('article', { name: `Comment by ${author}` });
 const composer = () => screen.getByRole('textbox', { name: 'Comment' });
@@ -115,12 +113,13 @@ const fake = () => api.current as FakeApi;
 
 beforeEach(() => {
   api.current = createFakeApi();
+  window.sessionStorage.clear();
   clearCommentDrafts();
   resetTimelinePreferences();
 });
 
-describe('timeline', () => {
-  it('shows activity and comments in time order, with chips, edited and deleted states', async () => {
+describe('history', () => {
+  it('shows activity and comments in time order, with agent, edited and deleted states', async () => {
     renderApp('/p/PAY/PAY-1');
     const anaComment = await waitFor(() => {
       const [found] = comment('Ana Ruiz');
@@ -128,18 +127,17 @@ describe('timeline', () => {
       return found;
     });
 
-    // One-line activity, then the comments; the agent comment carries "for Ana Ruiz".
-    expect(within(history()).getByText('created the task')).toBeInTheDocument();
+    expect(within(history()).getByText('created this task')).toBeInTheDocument();
     const [tomas] = comment('Tomás Berg');
     expect(within(tomas as HTMLElement).getByText('· edited')).toBeInTheDocument();
     const [claude] = comment('claude-dev');
-    expect(within(claude as HTMLElement).getByText('for Ana Ruiz')).toBeInTheDocument();
+    expect(claude).toHaveAttribute('data-agent');
+    expect(within(claude as HTMLElement).getByText('acting for Ana')).toBeInTheDocument();
     expect(within(claude as HTMLElement).getByText('4xx stops retrying')).toBeInTheDocument();
     expect(within(history()).getByText(/Comment deleted by Tomás Berg/)).toBeInTheDocument();
 
-    // Mention chip, kept http link, dropped javascript: link.
-    const chip = anaComment.querySelector('[data-mention="agent"]');
-    expect(chip).toHaveTextContent('claude-dev');
+    // Mention, kept http link, dropped javascript: link.
+    expect(anaComment.querySelector('[data-mention]')).toHaveTextContent('@claude-dev');
     expect(within(anaComment).getByRole('link', { name: 'docs' })).toHaveAttribute(
       'href',
       'https://example.com/retry',
@@ -147,7 +145,6 @@ describe('timeline', () => {
     expect(within(anaComment).queryByRole('link', { name: 'bad' })).not.toBeInTheDocument();
     expect(anaComment).toHaveTextContent('bad');
 
-    // Order: Tomás (32m) before Ana (28m) before claude-dev (3m).
     const authors = within(history())
       .getAllByRole('article')
       .map((element) => element.getAttribute('aria-label'));
@@ -170,21 +167,48 @@ describe('timeline', () => {
       createdAt: new Date(Date.now() - 120_000).toISOString(),
     });
     renderApp('/p/PAY/PAY-1');
-    const line = await within(
-      await screen.findByRole('region', { name: 'Activity and comments' }),
-    ).findByText('Cycle 12 ended. Moved to Cycle 13.');
+    const line = await within(await screen.findByRole('region', { name: 'Activity' })).findByText(
+      'Cycle 12 ended. Moved to Cycle 13.',
+    );
     expect(line.closest('[data-activity]')).toHaveAttribute('data-activity', 'cycle.ended');
   });
 
-  it('filters to comments with "Comments only"', async () => {
+  it('shows comments only with Comments', async () => {
     const user = userEvent.setup();
     renderApp('/p/PAY/PAY-1');
-    await within(await screen.findByRole('region', { name: 'Activity and comments' })).findByText(
-      'created the task',
+    await within(await screen.findByRole('region', { name: 'Activity' })).findByText('created this task');
+    await user.click(within(history()).getByRole('button', { name: 'Comments' }));
+    expect(within(history()).getByRole('button', { name: 'Comments' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
-    await user.click(within(history()).getByRole('switch', { name: 'Comments only' }));
-    expect(within(history()).queryByText('created the task')).not.toBeInTheDocument();
+    expect(within(history()).queryByText('created this task')).not.toBeInTheDocument();
     expect(comment('claude-dev')).toHaveLength(1);
+    await user.click(within(history()).getByRole('button', { name: 'All' }));
+    expect(within(history()).getByText('created this task')).toBeInTheDocument();
+  });
+
+  it('folds long histories under "N earlier · Show all"', async () => {
+    for (let index = 0; index < 30; index++) {
+      fake().activity.push({
+        id: `40000000-0000-4000-8000-${String(500 + index).padStart(12, '0')}`,
+        type: 'task.updated',
+        taskKey: 'PAY-1',
+        actor: FAKE_PEOPLE.ana,
+        onBehalfOf: null,
+        changes: [{ field: 'priority', from: 'none', to: 'high' }],
+        createdAt: new Date(Date.now() - 60_000 + index).toISOString(),
+      });
+    }
+    const user = userEvent.setup();
+    renderApp('/p/PAY/PAY-1');
+    const more = await within(await screen.findByRole('region', { name: 'Activity' })).findByRole('button', {
+      name: /earlier · Show all/,
+    });
+    expect(within(history()).getAllByRole('listitem')).toHaveLength(15);
+    expect(more.textContent).toMatch(/^\d+ earlier · Show all$/);
+    await user.click(more);
+    expect(within(history()).getAllByRole('listitem').length).toBeGreaterThan(30);
   });
 });
 
@@ -245,11 +269,12 @@ describe('author-only actions', () => {
   });
 });
 
-describe('composer', () => {
-  it('focuses with M, mentions with @ and Enter, and sends with Ctrl+Enter', async () => {
+describe('comment box', () => {
+  it('opens with M, mentions with @ and Enter, and sends with Ctrl+Enter', async () => {
     const user = userEvent.setup();
     renderApp('/p/PAY/PAY-1');
     await waitFor(() => expect(comment('Ana Ruiz')).toHaveLength(1));
+    expect(screen.getByRole('button', { name: 'Leave a comment' })).toBeInTheDocument();
 
     await user.keyboard('m');
     await waitFor(() => expect(composer()).toHaveFocus());
@@ -258,7 +283,7 @@ describe('composer', () => {
     const picker = await screen.findByRole('listbox', { name: 'Mention' });
     const options = within(picker).getAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual([expect.stringContaining('claude-dev')]);
-    expect(options[0]).toHaveTextContent('agent · for Ana Ruiz');
+    expect(options[0]).toHaveTextContent('for Ana');
     expect(composer()).toHaveAttribute('aria-activedescendant', options[0]?.id);
 
     await user.keyboard('{Enter}');
@@ -274,17 +299,19 @@ describe('composer', () => {
         body: `Thanks ${link}for the tests`,
       }),
     );
-    await waitFor(() => expect(composer()).toHaveValue(''));
+    // Sent: the box closes again.
+    await screen.findByRole('button', { name: 'Leave a comment' });
     await waitFor(() => expect(comment('Ana Ruiz')).toHaveLength(2));
     const sent = comment('Ana Ruiz')[1] as HTMLElement;
-    expect(sent.querySelector('[data-mention="agent"]')).toHaveTextContent('claude-dev');
+    expect(sent.querySelector('[data-mention]')).toHaveTextContent('@claude-dev');
   });
 
   it('filters the picker as you type and closes it with Esc', async () => {
     const user = userEvent.setup();
     renderApp('/p/PAY/PAY-1');
     await waitFor(() => expect(comment('Ana Ruiz')).toHaveLength(1));
-    await user.click(composer());
+    await user.click(screen.getByRole('button', { name: 'Leave a comment' }));
+    await waitFor(() => expect(composer()).toHaveFocus());
     await user.keyboard('@');
     const picker = await screen.findByRole('listbox', { name: 'Mention' });
     expect(within(picker).getAllByRole('option')).toHaveLength(3);
@@ -311,9 +338,9 @@ describe('composer', () => {
       release = resolve;
     });
 
-    await user.click(composer());
+    await user.keyboard('m');
+    await waitFor(() => expect(composer()).toHaveFocus());
     await user.keyboard('Looks good{Control>}{Enter}{/Control}');
-    // Sending state.
     expect(await screen.findByText('Sending…')).toBeInTheDocument();
     await act(async () => release());
 
@@ -324,73 +351,121 @@ describe('composer', () => {
     fake().control.failComments = false;
     fake().control.holdComments = null;
     await user.click(screen.getByRole('button', { name: /Try again/ }));
-    await waitFor(() => expect(composer()).toHaveValue(''));
+    await screen.findByRole('button', { name: 'Leave a comment' });
     expect(fake().calls.comments.filter((call) => call.op === 'create')).toHaveLength(2);
     await waitFor(() => expect(comment('Ana Ruiz')).toHaveLength(2));
   });
 
-  it('switches to Preview with Shift+P outside the text box', async () => {
+  it('shows the Markdown in Preview and drops the text on Cancel', async () => {
     const user = userEvent.setup();
     renderApp('/p/PAY/PAY-1');
     await waitFor(() => expect(comment('Ana Ruiz')).toHaveLength(1));
-    await user.click(composer());
-    await user.keyboard('Some **bold** P');
-    expect(composer()).toHaveValue('Some **bold** P');
-    await user.click(document.body);
-    await user.keyboard('{Shift>}P{/Shift}');
+    await user.keyboard('m');
+    await waitFor(() => expect(composer()).toHaveFocus());
+    await user.keyboard('Some **bold**');
+    await user.click(screen.getByRole('tab', { name: 'Preview' }));
     const preview = await screen.findByRole('tabpanel');
     expect(within(preview).getByText('bold').tagName).toBe('STRONG');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(await screen.findByRole('button', { name: 'Leave a comment' }));
+    await waitFor(() => expect(composer()).toHaveValue(''));
   });
 });
 
-describe('milestone and cycle fields', () => {
-  it('sets the milestone from the pane with Shift+M', async () => {
-    const user = userEvent.setup();
-    renderApp('/p/PAY');
-    await within(await screen.findByRole('region', { name: 'Task detail' })).findByRole('heading', {
-      name: 'Task number 1',
-    });
-    await within(pane()).findByRole('button', { name: 'Milestone: none' });
-
-    await user.keyboard('{Shift>}M{/Shift}');
-    const menu = await screen.findByRole('menu', { name: /^Milestone/ });
-    expect(within(menu).getByRole('menuitemradio', { name: /No milestone/ })).toBeInTheDocument();
-    await user.click(within(menu).getByRole('menuitemradio', { name: /Webhooks v2/ }));
-
-    await waitFor(() =>
-      expect(fake().calls.update).toContainEqual({ key: 'PAY-1', milestone: FAKE_MILESTONES.webhooks }),
-    );
-    expect(await within(pane()).findByRole('button', { name: 'Milestone: Webhooks v2' })).toHaveTextContent(
-      '50%',
-    );
-  });
-
-  it('sets and clears the cycle on the task page', async () => {
+describe('properties', () => {
+  it('lists every field with placeholders and opens a picker from its row or its key', async () => {
     const user = userEvent.setup();
     renderApp('/p/PAY/PAY-2');
-    const trigger = await screen.findByRole('button', { name: 'Cycle: none' });
-    await user.click(trigger);
-    const menu = await screen.findByRole('menu', { name: /^Cycle/ });
-    expect(within(menu).getByRole('menuitemradio', { name: /Cycle 12/ })).toHaveTextContent(
-      'current · 4d left',
-    );
-    await user.click(within(menu).getByRole('menuitemradio', { name: /Cycle 13/ }));
-    await waitFor(() => expect(fake().calls.update).toContainEqual({ key: 'PAY-2', cycle: 13 }));
-    await screen.findByRole('button', { name: 'Cycle: Cycle 13' });
+    const props = await screen.findByRole('complementary', { name: 'Properties' });
+    await within(props).findByRole('button', { name: 'Cycle' });
+    for (const placeholder of ['Add labels', 'Set due date', 'Add to cycle']) {
+      expect(within(props).getByText(placeholder)).toBeInTheDocument();
+    }
+    expect(within(props).getByText('Parent')).toBeInTheDocument();
 
-    await user.keyboard('{Shift>}C{/Shift}');
-    const again = await screen.findByRole('menu', { name: /^Cycle/ });
-    await user.click(within(again).getByRole('menuitemradio', { name: /No cycle/ }));
-    await waitFor(() => expect(fake().calls.update).toContainEqual({ key: 'PAY-2', cycle: null }));
+    await user.click(within(props).getByRole('button', { name: 'Cycle' }));
+    const cycles = await screen.findByRole('dialog', { name: 'Cycle' });
+    await user.click(within(cycles).getByRole('menuitemradio', { name: /Cycle 13/ }));
+    await waitFor(() =>
+      expect(fake().calls.update).toContainEqual(expect.objectContaining({ key: 'PAY-2', cycle: 13 })),
+    );
+    await within(properties()).findByText('Cycle 13');
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Cycle' })).not.toBeInTheDocument());
+    await user.keyboard('s');
+    const statuses = await screen.findByRole('dialog', { name: 'Status' });
+    await user.click(within(statuses).getByRole('menuitemradio', { name: /Done/ }));
+    await waitFor(() =>
+      expect(fake().calls.update).toContainEqual(expect.objectContaining({ key: 'PAY-2', status: 'done' })),
+    );
   });
 
-  it('hides the fields when the project does not use them', async () => {
+  it('hides milestone and cycle when the project does not use them', async () => {
     api.current = createFakeApi({ usesMilestones: false, usesCycles: false });
     renderApp('/p/PAY/PAY-1');
     await waitFor(() => expect(comment('Ana Ruiz')).toHaveLength(1));
-    expect(screen.getByText('Assignee')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Milestone:/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Cycle:/ })).not.toBeInTheDocument();
+    expect(within(properties()).getByRole('button', { name: 'Assignee' })).toBeInTheDocument();
+    expect(within(properties()).queryByRole('button', { name: 'Milestone' })).not.toBeInTheDocument();
+    expect(within(properties()).queryByRole('button', { name: 'Cycle' })).not.toBeInTheDocument();
+  });
+
+  it('shows labels, due date, subtasks, blockers and the reverse relation', async () => {
+    api.current = createFakeApi({ fields: true });
+    renderApp('/p/PAY/PAY-1');
+    const props = await screen.findByRole('complementary', { name: 'Properties' });
+    await within(props).findByText('payouts');
+    expect(within(props).getByText('backend')).toBeInTheDocument();
+    expect(within(props).getByText('In 2 days')).toBeInTheDocument();
+    const subtasks = screen.getByRole('region', { name: 'Subtasks' });
+    expect(within(subtasks).getByRole('link', { name: /PAY-5/ })).toBeInTheDocument();
+    expect(within(subtasks).getByRole('button', { name: /Add subtask/ })).toBeInTheDocument();
+  });
+});
+
+describe('title, description and navigation', () => {
+  it('edits the title with E and the description with D', async () => {
+    const user = userEvent.setup();
+    renderApp('/p/PAY/PAY-1');
+    await screen.findByRole('heading', { level: 1, name: /Task number 1/ });
+    await waitFor(() => expect(comment('Ana Ruiz')).toHaveLength(1));
+    await user.keyboard('e');
+    const title = await screen.findByRole('textbox', { name: 'Title' });
+    await user.clear(title);
+    await user.type(title, 'Retry webhooks{Enter}');
+    await waitFor(() =>
+      expect(fake().calls.update).toContainEqual(
+        expect.objectContaining({ key: 'PAY-1', title: 'Retry webhooks' }),
+      ),
+    );
+
+    await user.keyboard('d');
+    const description = await screen.findByRole('textbox', { name: 'Description' });
+    await user.clear(description);
+    await user.type(description, 'Six attempts.');
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() =>
+      expect(fake().calls.update).toContainEqual(
+        expect.objectContaining({ key: 'PAY-1', description: 'Six attempts.' }),
+      ),
+    );
+  });
+
+  it('walks the list it came from with J and K and goes back with Esc', async () => {
+    const user = userEvent.setup();
+    rememberTaskNavigation({ keys: ['PAY-3', 'PAY-1', 'PAY-2'], from: 'List', returnTo: '/p/PAY?q=retry' });
+    const { router } = renderApp('/p/PAY/PAY-1');
+    expect(await screen.findByText('2 of 3 in List')).toBeInTheDocument();
+    await screen.findByRole('heading', { level: 1, name: /Task number 1/ });
+    await user.keyboard('j');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY/PAY-2'));
+    expect(await screen.findByText('3 of 3 in List')).toBeInTheDocument();
+    await screen.findByRole('heading', { level: 1, name: /Task number 2/ });
+    await user.keyboard('k');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY/PAY-1'));
+    await screen.findByRole('heading', { level: 1, name: /Task number 1/ });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/p/PAY'));
+    expect(router.state.location.search).toMatchObject({ q: 'retry', focus: 'PAY-1' });
   });
 });
 
@@ -400,11 +475,8 @@ describe('quick create', () => {
     renderApp('/p/PAY/cycles/13');
     await user.click(await screen.findByRole('button', { name: 'New' }));
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    expect(await within(dialog).findByRole('button', { name: 'Cycle: Cycle 13' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Milestone: none' })).toBeInTheDocument();
-    expect(
-      within(dialog).getByText('Milestone and cycle default to the page you opened this from.'),
-    ).toBeVisible();
+    expect(await within(dialog).findByRole('button', { name: 'Cycle' })).toHaveTextContent('Cycle 13');
+    expect(within(dialog).getByRole('button', { name: 'Milestone' })).toHaveTextContent('Milestone');
 
     await user.type(within(dialog).getByRole('textbox', { name: 'Title' }), 'Alert merchants');
     await user.keyboard('{Control>}{Enter}{/Control}');
@@ -415,23 +487,62 @@ describe('quick create', () => {
 
   it('prefills the milestone from the list filter and lets Shift+C pick a cycle', async () => {
     const user = userEvent.setup();
-    renderApp(`/p/PAY?task=PAY-2&milestone=${FAKE_MILESTONES.pci}`);
+    renderApp(`/p/PAY?milestone=${FAKE_MILESTONES.pci}`);
     await user.click(await screen.findByRole('button', { name: 'New' }));
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    expect(await within(dialog).findByRole('button', { name: 'Milestone: PCI audit' })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('button', { name: 'Milestone' })).toHaveTextContent('PCI audit');
 
     // Shift+C works once focus leaves the title field.
     await user.click(within(dialog).getByText('New task'));
     await user.keyboard('{Shift>}C{/Shift}');
-    const menu = await screen.findByRole('menu', { name: /^Cycle/ });
+    const menu = await screen.findByRole('dialog', { name: 'Cycle' });
     await user.click(within(menu).getByRole('menuitemradio', { name: /Cycle 12/ }));
     await waitFor(() =>
-      expect(within(dialog).getByRole('button', { name: 'Cycle: Cycle 12' })).toBeInTheDocument(),
+      expect(within(dialog).getByRole('button', { name: 'Cycle' })).toHaveTextContent('Cycle 12'),
     );
 
     await user.type(within(dialog).getByRole('textbox', { name: 'Title' }), 'Audit logs');
     await user.keyboard('{Control>}{Enter}{/Control}');
     await waitFor(() => expect(fake().calls.create).toHaveLength(1));
     expect(fake().calls.create[0]).toMatchObject({ milestone: FAKE_MILESTONES.pci, cycle: 12 });
+  });
+
+  it('sets priority, labels, due date and parent, and keeps going with Create more', async () => {
+    api.current = createFakeApi({ fields: true });
+    const user = userEvent.setup();
+    renderApp('/p/PAY');
+    await user.click(await screen.findByRole('button', { name: 'New' }));
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await user.type(within(dialog).getByRole('textbox', { name: 'Title' }), 'Show fees');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Priority' }));
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Priority' })).getByRole('menuitemradio', {
+        name: /High/,
+      }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Labels' }));
+    const labels = await screen.findByRole('dialog', { name: 'Labels' });
+    await user.click(await within(labels).findByRole('menuitemcheckbox', { name: /payouts/ }));
+    await user.keyboard('{Escape}');
+    await user.click(within(dialog).getByRole('button', { name: 'More properties' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Parent' }));
+    const parents = await screen.findByRole('dialog', { name: 'Parent' });
+    await user.click(await within(parents).findByRole('menuitemradio', { name: /Task number 1/ }));
+
+    await user.click(within(dialog).getByRole('switch', { name: 'Create more' }));
+    await user.click(within(dialog).getByRole('button', { name: /Create task/ }));
+    await waitFor(() => expect(fake().calls.create).toHaveLength(1));
+    expect(fake().calls.create[0]).toMatchObject({
+      project: 'PAY',
+      title: 'Show fees',
+      priority: 'high',
+      labels: ['payouts'],
+      parent: 'PAY-1',
+    });
+    // A subtask without an assignee takes its parent's: none is sent.
+    expect(fake().calls.create[0]).not.toHaveProperty('assignee');
+    expect(await within(dialog).findByText(/^Created PAY-/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox', { name: 'Title' })).toHaveValue('');
   });
 });

@@ -107,7 +107,7 @@ function RowMenu({
         iconOnly
         size="sm"
         aria-label={`Actions for ${label}`}
-        className="text-[16px] text-faint"
+        className="text-lg text-fg-3"
       >
         ⋯
       </Button>
@@ -137,7 +137,7 @@ function WhoCell({ row }: { row: MemberRow }) {
         <Avatar name={invitation.email} initials={emailInitials(invitation.email)} size="md" decorative />
         <div className="min-w-0">
           <div className="truncate font-semibold">{invitation.email}</div>
-          <div className="truncate text-[12px] text-muted">
+          <div className="truncate text-sm text-fg-2">
             <TimeText>
               {`Invited ${formatShortDate(invitation.createdAt)} · link ${formatExpiry(invitation.expiresAt)}`}
             </TimeText>
@@ -154,7 +154,7 @@ function WhoCell({ row }: { row: MemberRow }) {
       <Avatar name={member.name} kind={member.kind} size="md" decorative />
       <div className="min-w-0">
         <div className="truncate font-semibold">{member.name}</div>
-        <div className="truncate text-[12px] text-muted">{sub}</div>
+        <div className="truncate text-sm text-fg-2">{sub}</div>
       </div>
     </div>
   );
@@ -192,7 +192,7 @@ export function MembersTable({ rows, isAdmin, meId, isLoading, onAction }: Membe
         header: 'Role',
         width: 80,
         cell: (row) => (
-          <span className="text-muted">
+          <span className="text-fg-2">
             {ROLE_LABELS[row.type === 'member' ? row.member.role : row.invitation.role]}
           </span>
         ),
@@ -203,7 +203,7 @@ export function MembersTable({ rows, isAdmin, meId, isLoading, onAction }: Membe
         width: 170,
         cell: (row) =>
           row.type === 'member' && row.member.responsible ? (
-            <MemberLabel name={row.member.responsible.name} className="text-[12px] text-muted" />
+            <MemberLabel name={row.member.responsible.name} className="text-sm text-fg-2" />
           ) : null,
       },
       {
@@ -211,7 +211,7 @@ export function MembersTable({ rows, isAdmin, meId, isLoading, onAction }: Membe
         header: 'Last active',
         width: 84,
         cell: (row) => (
-          <span className="font-mono text-[10px] text-faint">
+          <span className="tabular-nums text-xs text-fg-3">
             <TimeText>{lastActive(row)}</TimeText>
           </span>
         ),
@@ -241,7 +241,7 @@ export function MembersTable({ rows, isAdmin, meId, isLoading, onAction }: Membe
       rowHeight={53}
       isLoading={isLoading}
       skeletonRows={6}
-      renderEmptyState={() => <p className="m-0 px-6 py-5 text-muted">Nobody here yet.</p>}
+      renderEmptyState={() => <p className="m-0 px-6 py-5 text-fg-2">Nobody here yet.</p>}
     />
   );
 }

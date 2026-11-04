@@ -195,7 +195,7 @@ export function ConnectionsView({
           />
         )}
         {view === 'list' && !canManage ? (
-          <p className="m-0 max-w-[760px] px-6 pt-4 text-[12.5px] leading-[1.55] text-muted">
+          <p className="m-0 max-w-190 px-6 pt-4 text-sm leading-normal text-fg-2">
             Only owners and admins can add, change or delete connections. Tokens are never shown, to anyone,
             after they are saved.
           </p>
@@ -217,16 +217,14 @@ function EmptyConnections({
 }) {
   return (
     <div className="px-12 py-14">
-      <div className="flex max-w-[480px] flex-col items-start gap-3">
-        <h2 className="m-0 text-[17px] leading-[1.15] font-semibold tracking-[-0.01em]">
-          No git connections yet
-        </h2>
-        <p className="m-0 leading-[1.55] text-muted">
+      <div className="flex max-w-120 flex-col items-start gap-3">
+        <h2 className="m-0 text-lg leading-tight font-semibold tracking-[-0.01em]">No git connections yet</h2>
+        <p className="m-0 leading-normal text-fg-2">
           A connection lets projects read files from GitHub, GitLab or a Gitea/Forgejo server with an access
           token. Projects use it to mirror or import a Backlog.md folder. One connection can serve every
           project on the same account.
         </p>
-        <p className="m-0 text-[12px] leading-[1.55] text-faint">
+        <p className="m-0 text-sm leading-normal text-fg-3">
           The token only needs read access. You add webhooks yourself, so the app never asks for admin rights.
         </p>
         {canManage ? (
@@ -234,7 +232,7 @@ function EmptyConnections({
             Add connection
           </Button>
         ) : (
-          <p className="m-0 text-[12.5px] text-muted">Ask an owner or admin to add one.</p>
+          <p className="m-0 text-sm text-fg-2">Ask an owner or admin to add one.</p>
         )}
       </div>
     </div>
@@ -242,7 +240,7 @@ function EmptyConnections({
 }
 
 const th = 'h-7 border-b border-line p-0 text-left align-middle';
-const td = 'h-14 border-b border-line-2 p-0 align-middle';
+const td = 'h-14 border-b border-line-soft p-0 align-middle';
 
 function ConnectionsTable({
   items,
@@ -272,14 +270,14 @@ function ConnectionsTable({
     >
       <colgroup>
         <col />
-        <col className="w-[132px]" />
-        <col className="w-[162px]" />
-        <col className="w-[108px]" />
-        <col className="w-[202px]" />
-        {canManage ? <col className="w-[128px]" /> : null}
+        <col className="w-33" />
+        <col className="w-40.5" />
+        <col className="w-27" />
+        <col className="w-50.5" />
+        {canManage ? <col className="w-32" /> : null}
       </colgroup>
       <thead>
-        <tr className="caps">
+        <tr className="text-xs font-medium text-fg-3">
           <th className={`${th} ${gutter}`}>Connection</th>
           <th className={th}>Provider</th>
           <th className={th}>Status</th>
@@ -324,25 +322,23 @@ function ConnectionsTable({
                     <ProviderBadge provider={connection.provider} decorative />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{connection.name}</span>
-                      <span className="block truncate font-mono text-[10.5px] text-faint">
-                        {connection.host}
-                      </span>
+                      <span className="block truncate font-mono text-xs text-fg-3">{connection.host}</span>
                     </span>
                   </span>
                 </td>
-                <td className={`${td} text-muted`}>{PROVIDER_LABELS[connection.provider]}</td>
+                <td className={`${td} text-fg-2`}>{PROVIDER_LABELS[connection.provider]}</td>
                 <td className={td}>
                   {testingId === connection.id ? (
-                    <span className="text-[12px] text-muted">Testing…</span>
+                    <span className="text-sm text-fg-2">Testing…</span>
                   ) : (
                     <ConnectionStatusTag status={connection.status} />
                   )}
                 </td>
-                <td className={`${td} font-mono text-[10px] text-faint`}>
+                <td className={`${td} tabular-nums text-xs text-fg-3`}>
                   {connection.checkedAt && now !== null ? checkedText(connection.checkedAt, now) : ''}
                 </td>
                 <td className={`${td} ${gutter}`}>
-                  <span className="flex flex-wrap items-center gap-1 text-[12px] text-muted">
+                  <span className="flex flex-wrap items-center gap-1 text-sm text-fg-2">
                     {connection.usedBy.length ? (
                       <>
                         {connection.usedBy.map((project) => (
@@ -356,11 +352,11 @@ function ConnectionsTable({
                           </Link>
                         ))}
                         {connection.usedBy.some((project) => project.paused) ? (
-                          <span className="text-[11.5px] text-warn">mirror paused</span>
+                          <span className="text-xs text-danger">mirror paused</span>
                         ) : null}
                       </>
                     ) : (
-                      <span className="text-faint">No projects</span>
+                      <span className="text-fg-3">No projects</span>
                     )}
                   </span>
                 </td>
@@ -377,7 +373,7 @@ function ConnectionsTable({
                           iconOnly
                           aria-label={`More actions for ${connection.name}`}
                         >
-                          <span aria-hidden className="text-[16px] leading-none">
+                          <span aria-hidden className="text-lg leading-none">
                             ⋯
                           </span>
                         </Button>

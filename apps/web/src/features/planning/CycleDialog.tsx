@@ -1,6 +1,6 @@
 import { type Cycle, CycleName, MAX_CYCLE_DAYS } from '@pm/contracts';
 import { type FormEvent, useId, useRef, useState } from 'react';
-import { TextField as AriaTextField, Heading, Input } from 'react-aria-components';
+import { TextField as AriaTextField, Input } from 'react-aria-components';
 import {
   Banner,
   Button,
@@ -28,7 +28,7 @@ import {
 import type { WriteFailure } from './errors';
 import { useSubmitHint } from './submit-hint';
 
-// New cycle (frame 28) and Edit cycle. The name is optional and reads "Cycle 15 · …"; the dates are
+// New cycle and Edit cycle, on the Margin dialog. The name is optional and reads "Cycle 15 · …"; the dates are
 // prefilled from the last cycle (the day after it ends, same length) or, for the first cycle, two weeks
 // from next Monday, as core does when they are omitted.
 
@@ -107,7 +107,7 @@ export function CycleDialog({ isOpen, onClose, ...props }: CycleDialogProps) {
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      width={520}
+      width={500}
       top={110}
     >
       <Dialog>
@@ -182,11 +182,8 @@ function CycleForm({ onCancel, projectKey, number, defaults, cycle, today, onSub
 
   return (
     <form noValidate onSubmit={onFormSubmit} className="flex min-h-0 flex-1 flex-col">
-      <DialogHeader>
-        <span className="font-mono text-[10.5px] text-muted">{projectKey}</span>
-        <Heading slot="title" className="m-0 text-[13px] font-semibold">
-          {isEdit ? `Edit Cycle ${number}` : 'New cycle'}
-        </Heading>
+      <DialogHeader title={isEdit ? `Edit Cycle ${number}` : 'New cycle'}>
+        <span className="text-sm text-fg-3 tabular-nums">{projectKey}</span>
       </DialogHeader>
       <DialogBody>
         {failure ? <Banner>{failure}</Banner> : null}
@@ -203,15 +200,16 @@ function CycleForm({ onCancel, projectKey, number, defaults, cycle, today, onSub
           className="flex flex-col gap-1.5"
         >
           <Label>
-            Name <span className="font-normal text-faint">optional</span>
+            Name <span className="font-normal text-fg-3">optional</span>
           </Label>
           <div
             className={cn(
-              'flex h-[38px] items-center gap-1.5 border bg-surface px-3 focus-within:halo',
-              errors.name ? 'border-danger' : 'border-line',
+              'flex h-9 items-center gap-1.5 rounded-sm border bg-surface px-2.75 text-md',
+              'focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--accent-soft)]',
+              errors.name ? 'border-danger shadow-[0_0_0_3px_var(--danger-soft)]' : 'border-line',
             )}
           >
-            <span id={prefixId} className="shrink-0 font-mono text-[11px] text-muted">
+            <span id={prefixId} className="shrink-0 text-fg-2 tabular-nums">
               Cycle {number} ·
             </span>
             <Input
@@ -219,7 +217,7 @@ function CycleForm({ onCancel, projectKey, number, defaults, cycle, today, onSub
               aria-describedby={prefixId}
               autoComplete="off"
               placeholder="What is this cycle about?"
-              className="h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-faint"
+              className="h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-3"
             />
           </div>
           <FieldError>{errors.name}</FieldError>
@@ -236,7 +234,6 @@ function CycleForm({ onCancel, projectKey, number, defaults, cycle, today, onSub
               if (keep >= 1) setEndsOn(addDays(value, keep - 1));
               clearDateErrors();
             }}
-            today={today}
             format={formatWeekdayDay}
             isDisabled={datesLocked}
             errorMessage={errors.startsOn}
@@ -249,13 +246,12 @@ function CycleForm({ onCancel, projectKey, number, defaults, cycle, today, onSub
               setEndsOn(value);
               clearDateErrors();
             }}
-            today={today}
             format={formatWeekdayDay}
             isDisabled={datesLocked}
             errorMessage={errors.endsOn}
           />
         </div>
-        {hint ? <p className="m-0 text-[11.5px] text-muted">{hint}</p> : null}
+        {hint ? <p className="m-0 text-xs text-fg-3">{hint}</p> : null}
       </DialogBody>
       <DialogFooter>
         <Button variant="secondary" onPress={onCancel}>

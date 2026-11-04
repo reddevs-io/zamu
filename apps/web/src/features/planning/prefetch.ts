@@ -1,12 +1,13 @@
 import type { CycleSelector } from '@pm/contracts';
 import type { QueryClient } from '@tanstack/react-query';
 import { membersQuery, projectsQuery, taskListQuery } from '~/features/tasks/queries';
-import { taskFilters } from './PlanningFilters';
+import { defaultDisplayOptions, type TaskFilter } from '~/features/views';
 import { cycleQuery, cyclesQuery, milestoneQuery, milestonesQuery } from './queries';
-import type { PlanningTasksSearch } from './search';
+import { planningListInput } from './usePlanningTasks';
 
 // Route loaders of the milestone and cycle screens. The server awaits them so the first HTML has the
-// data; in the browser they run in the background.
+// data; in the browser they run in the background. Task lists use the default Display options: the
+// person's own live in localStorage, which the server cannot read.
 
 export function prefetchMilestones(queryClient: QueryClient, projectKey: string) {
   return Promise.all([
@@ -15,15 +16,29 @@ export function prefetchMilestones(queryClient: QueryClient, projectKey: string)
   ]);
 }
 
+function prefetchPlanningTasks(
+  queryClient: QueryClient,
+  projectKey: string,
+  scope: { milestone: string } | { cycle: number },
+  filter: TaskFilter,
+) {
+  return Promise.all([
+    queryClient.prefetchQuery(
+      taskListQuery(planningListInput(projectKey, scope, filter, defaultDisplayOptions('list'))),
+    ),
+    queryClient.prefetchQuery(taskListQuery(planningListInput(projectKey, scope, {}))),
+  ]);
+}
+
 export function prefetchMilestone(
   queryClient: QueryClient,
   projectKey: string,
   id: string,
-  search: PlanningTasksSearch,
+  filter: TaskFilter,
 ) {
   return Promise.all([
     queryClient.prefetchQuery(milestoneQuery(id)),
-    queryClient.prefetchQuery(taskListQuery({ project: projectKey, milestone: id, ...taskFilters(search) })),
+    prefetchPlanningTasks(queryClient, projectKey, { milestone: id }, filter),
     queryClient.prefetchQuery(projectsQuery()),
     queryClient.prefetchQuery(membersQuery()),
   ]);
@@ -36,10 +51,18 @@ export function prefetchCycles(queryClient: QueryClient, projectKey: string) {
   ]);
 }
 
-export function prefetchCycle(queryClient: QueryClient, projectKey: string, selector: CycleSelector) {
+export function prefetchCycle(
+  queryClient: QueryClient,
+  projectKey: string,
+  selector: CycleSelector,
+  filter: TaskFilter = {},
+) {
   return Promise.all([
     queryClient.prefetchQuery(cycleQuery(projectKey, selector)),
     queryClient.prefetchQuery(cyclesQuery(projectKey)),
+    ...(typeof selector === 'number'
+      ? [prefetchPlanningTasks(queryClient, projectKey, { cycle: selector }, filter)]
+      : []),
     queryClient.prefetchQuery(projectsQuery()),
     queryClient.prefetchQuery(membersQuery()),
   ]);

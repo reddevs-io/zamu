@@ -7,6 +7,7 @@ import {
 } from 'react-aria-components';
 import { cn, composeTw } from './cn';
 import { type FieldChromeProps, FieldDescription, FieldError, fieldStack, inputBase, Label } from './Field';
+import { CaretGlyph } from './Glyphs';
 import { ListBox, type OptionItem, OptionLead, OptionRow, Popover } from './ListBox';
 
 type SelectionMode = 'single' | 'multiple';
@@ -16,13 +17,13 @@ export interface SelectProps<M extends SelectionMode = 'single'>
     FieldChromeProps {
   items: readonly OptionItem[];
   /**
-   * `field`: 38px input look with label (forms).
-   * `chip`: 28px bordered chip (quick create).
+   * `field`: 36px input look with label (forms; design "Select").
+   * `chip`: 28px pill property button (quick create): outlined while empty, filled on --bg-lane once set.
    * `filter`: "Status Any" text trigger for the FilterBar; `label` is the prefix.
    * `cell`: 28px full-width trigger inside a table row (Backlog.md mappings); pair it with `aria-label`.
    */
   variant?: 'field' | 'chip' | 'filter' | 'cell';
-  /** `cell` only: `warn` draws the --warn border on --warn-bg (a fallback value). */
+  /** `cell` only: `warn` draws the --danger border on --danger-soft (a fallback value). */
   tone?: 'default' | 'warn';
   /** `cell` only: note before the ▾, for example "by name" or "fallback". */
   trailing?: ReactNode;
@@ -36,7 +37,7 @@ export interface SelectProps<M extends SelectionMode = 'single'>
 
 function Summary({ selected, placeholder }: { selected: OptionItem[]; placeholder: string }) {
   const [first] = selected;
-  if (!first) return <span className="truncate text-faint">{placeholder}</span>;
+  if (!first) return <span className="truncate text-fg-3">{placeholder}</span>;
   if (selected.length > 1) {
     return <span className="truncate">{selected.map((item) => item.label).join(', ')}</span>;
   }
@@ -62,6 +63,9 @@ export function Select<M extends SelectionMode = 'single'>({
   ...props
 }: SelectProps<M>) {
   const fallback = placeholder ?? (variant === 'filter' ? 'Any' : 'Select');
+  // The chip fills in once it holds a value (controlled or initial value; RAC has no render prop for it).
+  const current = props.value ?? props.defaultValue ?? props.selectedKey ?? props.defaultSelectedKey;
+  const hasValue = current != null && (!Array.isArray(current) || current.length > 0);
   const ariaLabel = props['aria-label'] ?? (typeof label === 'string' ? label : undefined);
 
   const value = (
@@ -96,7 +100,7 @@ export function Select<M extends SelectionMode = 'single'>({
         {...props}
         className={composeTw(props.className, 'inline-flex')}
       >
-        <AriaButton className="inline-flex h-7 max-w-64 cursor-pointer items-center gap-1 text-[12px] whitespace-nowrap text-muted outline-none hover:text-fg focus-visible:focus-ring">
+        <AriaButton className="inline-flex h-7 max-w-64 cursor-pointer items-center gap-1 rounded-sm text-sm whitespace-nowrap text-fg-2 outline-none hover:text-fg focus-visible:shadow-[var(--focus-ring)]">
           <span>{label}</span>
           {value}
         </AriaButton>
@@ -115,17 +119,15 @@ export function Select<M extends SelectionMode = 'single'>({
         <AriaButton
           data-tone={tone}
           className={cn(
-            'box-border flex h-7 w-full min-w-0 cursor-pointer items-center gap-[7px] overflow-hidden border px-2 text-left text-[12.5px] whitespace-nowrap text-fg outline-none',
-            tone === 'warn' ? 'border-warn bg-warn-bg' : 'border-line bg-surface hover:border-muted',
-            'focus-visible:halo pressed:halo aria-expanded:halo',
+            'box-border flex h-7 w-full min-w-0 cursor-pointer items-center gap-1.75 overflow-hidden rounded-sm border px-2 text-left text-sm whitespace-nowrap text-fg outline-none',
+            tone === 'warn' ? 'border-danger bg-danger-soft' : 'border-line bg-surface hover:border-fg-3',
+            'focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] aria-expanded:border-accent aria-expanded:shadow-[0_0_0_3px_var(--accent-soft)]',
             triggerClassName,
           )}
         >
-          <span className="flex min-w-0 flex-1 items-center gap-[7px]">{value}</span>
+          <span className="flex min-w-0 flex-1 items-center gap-1.75">{value}</span>
           {trailing}
-          <span aria-hidden className="text-[10px] text-faint">
-            ▾
-          </span>
+          <CaretGlyph />
         </AriaButton>
         {popover}
       </AriaSelect>
@@ -139,7 +141,15 @@ export function Select<M extends SelectionMode = 'single'>({
         {...props}
         className={composeTw(props.className, 'inline-flex')}
       >
-        <AriaButton className="inline-flex h-7 max-w-64 cursor-pointer items-center gap-[7px] border border-line bg-surface px-2.5 text-[12.5px] whitespace-nowrap text-fg outline-none hover:bg-band focus-visible:focus-ring">
+        <AriaButton
+          className={({ isHovered }) =>
+            cn(
+              'inline-flex h-7 max-w-64 cursor-pointer items-center gap-1.5 rounded-pill border px-2.5 text-sm font-medium whitespace-nowrap outline-none focus-visible:shadow-[var(--focus-ring)]',
+              hasValue ? 'border-transparent bg-bg-lane text-fg' : 'border-line text-fg-2',
+              isHovered && (hasValue ? 'bg-line-soft' : 'bg-bg-lane text-fg'),
+            )
+          }
+        >
           {value}
         </AriaButton>
         {popover}
@@ -155,13 +165,11 @@ export function Select<M extends SelectionMode = 'single'>({
           <AriaButton
             className={cn(
               inputBase,
-              'flex h-[38px] cursor-pointer items-center gap-2 text-left pressed:halo focus-visible:halo',
+              'flex h-9 cursor-pointer items-center gap-2 text-left font-medium aria-expanded:border-accent aria-expanded:shadow-[0_0_0_3px_var(--accent-soft)]',
             )}
           >
             <span className="flex min-w-0 flex-1 items-center gap-2">{value}</span>
-            <span aria-hidden className="text-[10px] text-faint">
-              ▾
-            </span>
+            <CaretGlyph />
           </AriaButton>
           {description && !isInvalid ? <FieldDescription>{description}</FieldDescription> : null}
           <FieldError>{errorMessage as ReactNode}</FieldError>

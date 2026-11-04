@@ -1,16 +1,21 @@
 import type { StatusCounts, TaskListItem, TaskStatus } from '@pm/contracts';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
-import { boardInput, type TaskListFilters } from '~/features/tasks/search';
+import { taskListQuery } from '~/features/tasks/queries';
+import { type DisplayOptions, hideOldDone, type TaskFilter } from '~/features/views';
 import { cardsOf } from './board-cache';
-import { boardColumnQuery } from './queries';
+import { boardColumnInput, boardColumnQuery, boardListInput } from './queries';
 
-// Data of the board: one infinite query per open column. Folded columns do not load; their count comes
-// from the counts every page carries (they cover all statuses under the filters).
+// Data of the board. Status columns: one infinite query per open column; folded columns do not load,
+// their count comes from the counts every page carries (they cover all statuses under the filters).
+// Other groupings (priority, assignee, …): every task under the filter in one list, grouped on the client.
 
 export interface ColumnState {
   status: TaskStatus;
+  /** Loaded cards, Done and Canceled ones past "Hide done tasks after" left out. */
   cards: TaskListItem[];
+  /** Loaded cards before that, for the "N more" count. */
+  loaded: number;
   /** Loaded and counted: the column has more pages. */
   hasMore: boolean;
   isLoading: boolean;
@@ -33,28 +38,42 @@ export interface BoardData {
 
 type ColumnQuery = ReturnType<typeof useColumn>;
 
-function useColumn(projectKey: string, filters: TaskListFilters, status: TaskStatus, enabled: boolean) {
-  return useInfiniteQuery({ ...boardColumnQuery(boardInput(projectKey, filters, status)), enabled });
+interface ColumnArgs {
+  projectKey: string;
+  filter: TaskFilter;
+  options: DisplayOptions;
+}
+
+function useColumn({ projectKey, filter, options }: ColumnArgs, status: TaskStatus, enabled: boolean) {
+  return useInfiniteQuery({
+    ...boardColumnQuery(boardColumnInput(projectKey, filter, options, status)),
+    enabled,
+  });
 }
 
 /**
- * Loads the open columns. `loadAll` keeps fetching pages until every card is loaded (swimlanes need
- * every card to group them).
+ * Loads the open status columns. `loadAll` keeps fetching pages until every card is loaded (swimlanes
+ * need every card to group them). `enabled` false loads nothing (the board groups by another field).
  */
 export function useBoardData(
   projectKey: string,
-  filters: TaskListFilters,
-  open: ReadonlySet<TaskStatus>,
+  filter: TaskFilter,
+  options: DisplayOptions,
+  openStatuses: ReadonlySet<TaskStatus>,
   loadAll: boolean,
+  enabled = true,
 ): BoardData {
+  const args = { projectKey, filter, options };
+  const open = enabled ? openStatuses : NONE;
   // A fixed number of hooks, one per status, so the hook order never changes.
-  const backlog = useColumn(projectKey, filters, 'backlog', open.has('backlog'));
+  const backlog = useColumn(args, 'backlog', open.has('backlog'));
   // With every column folded, todo still loads: its pages carry the counts of all columns.
-  const todo = useColumn(projectKey, filters, 'todo', open.has('todo') || open.size === 0);
-  const inProgress = useColumn(projectKey, filters, 'in_progress', open.has('in_progress'));
-  const inReview = useColumn(projectKey, filters, 'in_review', open.has('in_review'));
-  const done = useColumn(projectKey, filters, 'done', open.has('done'));
-  const canceled = useColumn(projectKey, filters, 'canceled', open.has('canceled'));
+  const todo = useColumn(args, 'todo', enabled && (open.has('todo') || open.size === 0));
+  const inProgress = useColumn(args, 'in_progress', open.has('in_progress'));
+  const inReview = useColumn(args, 'in_review', open.has('in_review'));
+  const done = useColumn(args, 'done', open.has('done'));
+  const canceled = useColumn(args, 'canceled', open.has('canceled'));
+  const hideAfter = options.hideDoneAfterDays;
 
   const queries: [TaskStatus, ColumnQuery][] = [
     ['backlog', backlog],
@@ -89,9 +108,11 @@ export function useBoardData(
       if (!open.has(status)) continue;
       if (query.data) anyData = true;
       if (query.isError && !query.data) error ??= query.error;
+      const loaded = cardsOf(query.data);
       columns[status] = {
         status,
-        cards: cardsOf(query.data),
+        cards: status === 'done' || status === 'canceled' ? hideOldDone(loaded, hideAfter) : loaded,
+        loaded: loaded.length,
         hasMore: Boolean(query.hasNextPage),
         isLoading: query.isPending && query.fetchStatus !== 'idle',
         isFetchingMore: query.isFetchingNextPage,
@@ -110,5 +131,37 @@ export function useBoardData(
         for (const [status, query] of queries) if (open.has(status)) void query.refetch();
       },
     };
-  }, [dataKey, stateKey, open]);
+  }, [dataKey, stateKey, open, hideAfter]);
+}
+
+const NONE: ReadonlySet<TaskStatus> = new Set();
+
+export interface GroupedBoardData {
+  /** Every task under the filter, in the display options' order. */
+  tasks: TaskListItem[];
+  /** Tasks under the filter, per status (for the header's count). */
+  counts: StatusCounts | undefined;
+  isLoading: boolean;
+  error: unknown;
+  refetch: () => void;
+}
+
+/** Every task of the board in one list, for columns by priority, assignee, milestone, cycle or label. */
+export function useGroupedBoardData(
+  projectKey: string,
+  filter: TaskFilter,
+  options: DisplayOptions,
+  enabled: boolean,
+): GroupedBoardData {
+  const query = useQuery({ ...taskListQuery(boardListInput(projectKey, filter, options)), enabled });
+  const hideAfter = options.hideDoneAfterDays;
+  const items = query.data?.items;
+  const tasks = useMemo(() => hideOldDone(items ?? [], hideAfter), [items, hideAfter]);
+  return {
+    tasks,
+    counts: query.data?.counts,
+    isLoading: enabled && query.isPending,
+    error: query.isError && !query.data ? query.error : null,
+    refetch: () => void query.refetch(),
+  };
 }

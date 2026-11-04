@@ -1,7 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { InviteForm, SetupForm, SignInForm, WorkspaceForm, WRONG_CREDENTIALS } from './forms';
+import {
+  InviteForm,
+  SetupForm,
+  SignInForm,
+  signInError,
+  TOO_MANY_ATTEMPTS,
+  WorkspaceForm,
+  WRONG_CREDENTIALS,
+} from './forms';
 
 function sso(result: string | null = null) {
   return { label: 'Continue with Authentik', onPress: vi.fn().mockResolvedValue(result) };
@@ -39,11 +47,14 @@ describe('SignInForm', () => {
   it('hides the SSO button unless an OIDC sign-in is provided', () => {
     const { rerender } = render(<SignInForm onSubmit={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /Continue with/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('or with email')).not.toBeInTheDocument();
+    expect(screen.queryByText('or')).not.toBeInTheDocument();
     rerender(<SignInForm onSubmit={vi.fn()} sso={{ label: 'Continue with SSO', onPress: vi.fn() }} />);
-    expect(screen.getByRole('button', { name: 'Continue with SSO' })).toBeInTheDocument();
-    expect(screen.getByText('or with email')).toBeInTheDocument();
+    const ssoButton = screen.getByRole('button', { name: 'Continue with SSO' });
+    expect(screen.getByText('or')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    // Frame 128: the SSO button sits under the form, after the divider.
+    const signIn = screen.getByRole('button', { name: 'Sign in' });
+    expect(signIn.compareDocumentPosition(ssoButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('starts SSO and shows a banner when the redirect cannot start', async () => {
@@ -60,12 +71,37 @@ describe('SignInForm', () => {
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
-    expect(screen.queryByText('or with email')).not.toBeInTheDocument();
+    expect(screen.queryByText('or')).not.toBeInTheDocument();
   });
 
   it('shows the error an SSO redirect came back with', () => {
     render(<SignInForm onSubmit={vi.fn()} sso={sso()} initialError="Sign-in was cancelled." />);
     expect(screen.getByRole('alert')).toHaveTextContent('Sign-in was cancelled.');
+  });
+});
+
+describe('signInError', () => {
+  it('maps what Better Auth answered to the error the form shows', () => {
+    expect(signInError({ code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 })).toEqual({ kind: 'credentials' });
+    expect(signInError({ status: 401 })).toEqual({ kind: 'credentials' });
+    // Rate limit: a short window, no "N tries left" copy.
+    expect(signInError({ status: 429, message: 'Too many requests' })).toEqual({
+      kind: 'other',
+      message: TOO_MANY_ATTEMPTS,
+    });
+    expect(signInError({ code: 'PASSWORD_LOGIN_DISABLED', status: 403 })).toEqual({
+      kind: 'other',
+      message: 'Password sign-in is turned off. Use single sign-on.',
+    });
+    expect(signInError({ status: 500 })).toEqual({ kind: 'other', message: "Couldn't sign in. Try again." });
+  });
+
+  it('shows the rate limit message in the banner without marking a field', async () => {
+    render(<SignInForm onSubmit={vi.fn().mockResolvedValue(signInError({ status: 429 }))} />);
+    await userEvent.type(screen.getByLabelText('Email'), 'ana@reddevs.io');
+    await userEvent.type(screen.getByLabelText('Password'), 'some-password{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent(TOO_MANY_ATTEMPTS);
+    expect(screen.getByLabelText('Password')).not.toHaveAttribute('aria-invalid');
   });
 });
 

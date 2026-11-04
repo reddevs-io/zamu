@@ -53,7 +53,7 @@ export function ScopeFields({ value, onChange, projects, projectsError }: ScopeF
           >
             {projects.map((project) => (
               <Checkbox key={project.id} value={project.id} className="min-w-0">
-                <span className="font-mono text-[10.5px]">{project.key}</span>
+                <span className="font-medium tabular-nums text-xs">{project.key}</span>
                 <span className="truncate">{project.name}</span>
               </Checkbox>
             ))}

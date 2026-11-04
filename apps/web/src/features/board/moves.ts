@@ -1,17 +1,18 @@
 import { ORPCError } from '@orpc/client';
-import {
-  type AssigneeRef,
-  type MilestoneRef,
-  TASK_CHANGED,
-  type Task,
-  type TaskListItem,
-  type TaskStatus,
-} from '@pm/contracts';
+import { TASK_CHANGED, type Task, type TaskListItem, type TaskStatus } from '@pm/contracts';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
+import { dismissFieldToast, showFieldToast } from '~/features/task-fields/toast';
 import { describeError } from '~/features/tasks/errors';
+import {
+  applyTaskPatch,
+  inversePatch,
+  type TaskPatch,
+  toListItem,
+  toUpdateInput,
+} from '~/features/tasks/queries';
 import { client, orpc } from '~/lib/orpc';
-import { STATUS_LABELS } from '~/ui';
+import { PRIORITY_LABELS, STATUS_LABELS } from '~/ui';
 import {
   cardsOf,
   findCard,
@@ -24,19 +25,28 @@ import {
 import { placementBetween } from './layout';
 import { boardQueries, invalidateBoard } from './queries';
 
-// Card moves: one PATCH per move with status, position and ifUpdatedAt. The board changes at once;
-// the server's answer confirms it, or the card goes back (a TASK_CHANGED conflict puts it where the
-// current task says). Moves run one after another, so a quick second move sends the updatedAt the
-// first one returned. Ctrl/Cmd+Z undoes the last moves, newest first.
+// Card moves between status columns: one PATCH per move with the status, the position (manual order)
+// and ifUpdatedAt, plus the lane's field on a swimlane board. The board changes at once; the server's
+// answer confirms it, or the card goes back (a TASK_CHANGED conflict puts it where the current task says).
+// Moves run one after another, so a quick second move sends the updatedAt the first one returned.
+//
+// Each move shows the shared field toast (features/task-fields/toast.tsx) with its Undo, so the board
+// and the pickers have one Undo and one ⌘Z: the most recent change wins.
 
-/** Changes the lane of a card on a swimlane board, together with the move. */
-export type LanePatch = { assignee: AssigneeRef | null } | { milestone: MilestoneRef | null };
+/** Fields a move into a swimlane (or a column of another grouping) sets with the status. */
+export type MovePatch = Pick<TaskPatch, 'priority' | 'assignee' | 'milestone' | 'cycle'>;
 
 export interface MoveIntent {
   key: string;
   to: TaskStatus;
   placement: Placement;
-  lane?: LanePatch;
+  /** The lane's field (swimlanes). */
+  patch?: MovePatch;
+  /**
+   * Send the position (manual order, default true). Off when the column is ordered by priority, due date
+   * or time: the server's order places the card, and its rank stays as it was.
+   */
+  sendPosition?: boolean;
   /** Drag or keyboard: only the wording of the conflict note differs. */
   via: 'drag' | 'keyboard';
 }
@@ -51,15 +61,8 @@ interface MoveRecord {
   isUndo: boolean;
   /** Set when an earlier failed move of the same card cancels this one. */
   cancelled: boolean;
-}
-
-export interface MoveToast {
-  id: number;
-  /** "PAY-140 moved to In review". */
-  text: string;
-  /** Read to screen readers after the text: ", position 1 of 3". */
-  detail: string;
-  canUndo: boolean;
+  /** The toast that announced it. */
+  toastId?: number;
 }
 
 export interface MoveProblem {
@@ -71,12 +74,17 @@ export interface MoveProblem {
   retry: () => void;
 }
 
+export interface MoveAnnouncement {
+  id: number;
+  /** For screen readers: "PAY-140 is now 2 of 5 in In review." */
+  text: string;
+}
+
 const label = (status: TaskStatus) => STATUS_LABELS[status];
 
 /** A full task as a board card. */
 export function toCard(task: Task | TaskListItem): TaskListItem {
-  const { description: _d, createdBy: _c, createdOnBehalfOf: _o, ...card } = task as Task;
-  return card;
+  return toListItem(task);
 }
 
 /** The card's home column (the cached column of its status) and its neighbours there. */
@@ -128,8 +136,12 @@ function patchTaskCache(queryClient: QueryClient, key: string, card: TaskListIte
   if (task) queryClient.setQueryData(queryKey, { ...task, ...card });
 }
 
+const hasPatch = (patch: MovePatch | undefined): patch is MovePatch =>
+  patch != null && Object.keys(patch).length > 0;
+
 function samePlace(card: TaskListItem, previous: string | null, next: string | null, intent: MoveIntent) {
-  if (intent.lane || card.status !== intent.to) return false;
+  if (hasPatch(intent.patch) || card.status !== intent.to) return false;
+  if (intent.sendPosition === false) return true;
   const placement = intent.placement;
   if (placement === 'top') return previous === null;
   if (placement === 'rank') return true;
@@ -137,20 +149,26 @@ function samePlace(card: TaskListItem, previous: string | null, next: string | n
   return placement.after === card.key || placement.after === previous;
 }
 
+/** ", assigned to Ana Ruiz", ", no milestone": what the lane part of a move changed. */
+function patchWords(patch: MovePatch | undefined): string {
+  if (!patch) return '';
+  const parts: string[] = [];
+  if (patch.assignee !== undefined)
+    parts.push(patch.assignee ? `assigned to ${patch.assignee.name}` : 'unassigned');
+  if (patch.milestone !== undefined)
+    parts.push(patch.milestone ? `in ${patch.milestone.name}` : 'no milestone');
+  if (patch.cycle !== undefined) parts.push(patch.cycle ? `in Cycle ${patch.cycle.number}` : 'no cycle');
+  if (patch.priority !== undefined)
+    parts.push(patch.priority === 'none' ? 'no priority' : `${PRIORITY_LABELS[patch.priority]} priority`);
+  return parts.length ? `, ${parts.join(', ')}` : '';
+}
+
 function moveText(intent: MoveIntent, before: TaskListItem, isUndo: boolean): string {
-  const lane =
-    intent.lane && 'assignee' in intent.lane
-      ? intent.lane.assignee
-        ? `, assigned to ${intent.lane.assignee.name}`
-        : ', unassigned'
-      : intent.lane && 'milestone' in intent.lane
-        ? intent.lane.milestone
-          ? `, in ${intent.lane.milestone.name}`
-          : ', no milestone'
-        : '';
-  if (isUndo) return `${intent.key} moved back to ${label(intent.to)}${lane}`;
-  if (before.status === intent.to && !intent.lane) return `${intent.key} moved within ${label(intent.to)}`;
-  return `${intent.key} moved to ${label(intent.to)}${lane}`;
+  const lane = patchWords(intent.patch);
+  if (isUndo) return `Moved ${intent.key} back to ${label(intent.to)}${lane}`;
+  if (before.status === intent.to && !hasPatch(intent.patch))
+    return `Moved ${intent.key} within ${label(intent.to)}`;
+  return `Moved ${intent.key} to ${label(intent.to)}${lane}`;
 }
 
 function conflictTask(error: unknown): Task | null {
@@ -165,13 +183,18 @@ export interface BoardMoves {
   /** Undoes the newest move still on the stack. Returns the card's key, or null when nothing moved. */
   undo: () => string | null;
   canUndo: boolean;
-  toast: MoveToast | null;
-  dismissToast: () => void;
+  /** The last move, for a screen reader live region. */
+  announcement: MoveAnnouncement | null;
   problem: MoveProblem | null;
   dismissProblem: () => void;
 }
 
-export function useBoardMoves(projectKey: string): BoardMoves {
+export interface BoardMovesOptions {
+  /** Called with the card's key after an Undo from the toast put it back (to keep the keyboard on it). */
+  onUndone?: (key: string) => void;
+}
+
+export function useBoardMoves(projectKey: string, { onUndone }: BoardMovesOptions = {}): BoardMoves {
   const queryClient = useQueryClient();
   const queue = useRef<Promise<void>>(Promise.resolve());
   const pending = useRef(0);
@@ -180,10 +203,12 @@ export function useBoardMoves(projectKey: string): BoardMoves {
   const undoStack = useRef<MoveRecord[]>([]);
   /** updatedAt of each card as the server last returned it, for ifUpdatedAt. */
   const serverUpdatedAt = useRef(new Map<string, string>());
-  const toastId = useRef(0);
-  const [toast, setToast] = useState<MoveToast | null>(null);
+  const announceId = useRef(0);
+  const [announcement, setAnnouncement] = useState<MoveAnnouncement | null>(null);
   const [problem, setProblem] = useState<MoveProblem | null>(null);
   const [canUndo, setCanUndo] = useState(false);
+  const onUndoneRef = useRef(onUndone);
+  onUndoneRef.current = onUndone;
 
   const syncUndo = useCallback(() => setCanUndo(undoStack.current.length > 0), []);
 
@@ -201,21 +226,21 @@ export function useBoardMoves(projectKey: string): BoardMoves {
     }
   }, [queryClient, projectKey]);
 
-  // `move` and `send` call each other (retry); refs keep both current.
+  // `move`, `send` and `undoRecord` call each other (retry, the toast's Undo); refs keep them current.
   const moveRef = useRef<(intent: MoveIntent, isUndo?: boolean) => boolean>(() => false);
+  const undoRecordRef = useRef<(record: MoveRecord) => string | null>(() => null);
 
   const send = useCallback(
     async (record: MoveRecord) => {
       const { intent, before } = record;
       if (record.cancelled) return;
-      const lane = intent.lane;
       try {
         const task = await client.tasks.update({
-          key: intent.key,
+          ...toUpdateInput({ key: intent.key, patch: intent.patch ?? {} }),
           ...(intent.to !== before.status ? { status: intent.to } : {}),
-          ...(typeof intent.placement === 'object' ? { position: intent.placement } : {}),
-          ...(lane && 'assignee' in lane ? { assignee: lane.assignee?.id ?? null } : {}),
-          ...(lane && 'milestone' in lane ? { milestone: lane.milestone?.id ?? null } : {}),
+          ...(intent.sendPosition !== false && typeof intent.placement === 'object'
+            ? { position: intent.placement }
+            : {}),
           ifUpdatedAt: serverUpdatedAt.current.get(intent.key) ?? before.updatedAt,
         });
         serverUpdatedAt.current.set(task.key, task.updatedAt);
@@ -227,7 +252,7 @@ export function useBoardMoves(projectKey: string): BoardMoves {
             ...data,
             pages: data.pages.map((page) => ({
               ...page,
-              items: page.items.map((item) => (item.key === card.key ? card : item)),
+              items: page.items.map((item) => (item.key === card.key ? { ...item, ...card } : item)),
             })),
           });
         }
@@ -248,7 +273,10 @@ export function useBoardMoves(projectKey: string): BoardMoves {
         if (current)
           queryClient.setQueryData(orpc.tasks.get.queryKey({ input: { key: current.key } }), current);
         else patchTaskCache(queryClient, intent.key, truth);
-        setToast(null);
+        for (const other of [record, ...records.current]) {
+          if (other.intent.key === intent.key && other.toastId !== undefined)
+            dismissFieldToast(other.toastId);
+        }
         const where =
           truth.status === intent.to && before.status === intent.to
             ? `Couldn't move ${intent.key}. It went back to its place in ${label(truth.status)}.`
@@ -275,12 +303,12 @@ export function useBoardMoves(projectKey: string): BoardMoves {
       if (!located) return false;
       const { card, previous, next } = located;
       if (samePlace(card, previous, next, intent)) return false;
-      const moved: TaskListItem = {
-        ...card,
-        status: intent.to,
-        ...(intent.lane && 'assignee' in intent.lane ? { assignee: intent.lane.assignee } : {}),
-        ...(intent.lane && 'milestone' in intent.lane ? { milestone: intent.lane.milestone } : {}),
-      };
+      // Touched now, as the server will say: "Hide done tasks after" and the time orders keep it in view.
+      const moved = applyTaskPatch(
+        { ...card, status: intent.to },
+        intent.patch ?? {},
+        new Date().toISOString(),
+      );
       void queryClient.cancelQueries({ queryKey: orpc.tasks.list.key() });
       placeCard(queryClient, projectKey, moved, intent.placement, card.status);
       patchTaskCache(queryClient, intent.key, moved);
@@ -292,13 +320,24 @@ export function useBoardMoves(projectKey: string): BoardMoves {
         syncUndo();
       }
       setProblem(null);
-      const position = positionOf(queryClient, projectKey, intent.key, intent.to);
-      toastId.current++;
-      setToast({
-        id: toastId.current,
+      record.toastId = showFieldToast({
         text: moveText(intent, card, isUndo),
-        detail: position ? `, position ${position.position} of ${position.total}` : '',
-        canUndo: !isUndo,
+        ...(isUndo
+          ? {}
+          : {
+              undo: () => {
+                const key = undoRecordRef.current(record);
+                if (key) onUndoneRef.current?.(key);
+              },
+            }),
+      });
+      const position = positionOf(queryClient, projectKey, intent.key, intent.to);
+      announceId.current++;
+      setAnnouncement({
+        id: announceId.current,
+        text: position
+          ? `${intent.key} is now ${position.position} of ${position.total} in ${label(intent.to)}.`
+          : `${intent.key} is now in ${label(intent.to)}.`,
       });
 
       pending.current++;
@@ -315,35 +354,42 @@ export function useBoardMoves(projectKey: string): BoardMoves {
   );
   moveRef.current = move;
 
+  /** Puts one move back: the card returns to its status, its place and its lane's old value. */
+  const undoRecord = useCallback(
+    (record: MoveRecord): string | null => {
+      const index = undoStack.current.indexOf(record);
+      if (index < 0) return null;
+      undoStack.current.splice(index, 1);
+      syncUndo();
+      const { before, intent } = record;
+      const patch = hasPatch(intent.patch) ? (inversePatch(before, intent.patch) as MovePatch) : undefined;
+      const moved = move(
+        {
+          key: before.key,
+          to: before.status,
+          placement: placementBetween(record.previous, record.next),
+          ...(patch ? { patch } : {}),
+          ...(intent.sendPosition === false ? { sendPosition: false } : {}),
+          via: 'keyboard',
+        },
+        true,
+      );
+      return moved ? before.key : null;
+    },
+    [move, syncUndo],
+  );
+  undoRecordRef.current = undoRecord;
+
   const undo = useCallback((): string | null => {
-    const record = undoStack.current.pop();
-    syncUndo();
-    if (!record) return null;
-    const { before, intent } = record;
-    const lane: LanePatch | undefined = intent.lane
-      ? 'assignee' in intent.lane
-        ? { assignee: before.assignee }
-        : { milestone: before.milestone }
-      : undefined;
-    const moved = move(
-      {
-        key: before.key,
-        to: before.status,
-        placement: placementBetween(record.previous, record.next),
-        ...(lane ? { lane } : {}),
-        via: 'keyboard',
-      },
-      true,
-    );
-    return moved ? before.key : null;
-  }, [move, syncUndo]);
+    const record = undoStack.current.at(-1);
+    return record ? undoRecord(record) : null;
+  }, [undoRecord]);
 
   return {
     move,
     undo,
     canUndo,
-    toast,
-    dismissToast: useCallback(() => setToast(null), []),
+    announcement,
     problem,
     dismissProblem: useCallback(() => setProblem(null), []),
   };

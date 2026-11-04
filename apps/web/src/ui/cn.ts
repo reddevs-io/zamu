@@ -1,7 +1,30 @@
 import { composeRenderProps } from 'react-aria-components';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+import { createTV } from 'tailwind-variants';
 
-export { tv, type VariantProps } from 'tailwind-variants';
+export type { VariantProps } from 'tailwind-variants';
+
+/*
+ * tailwind-merge has to know the Margin scales from app.css, or it treats `text-md` as a colour, keeps both
+ * `rounded-sm` and `rounded-pill`, and drops `shadow-pop` next to a shadow colour. The names match the
+ * `@theme inline reference` block in app.css.
+ */
+const twMergeConfig = {
+  extend: {
+    theme: {
+      text: ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl'],
+      leading: ['tight', 'ui', 'prose'],
+      radius: ['sm', 'md', 'lg', 'pill'],
+      shadow: ['card', 'pop', 'lift'],
+      font: ['sans', 'serif', 'mono'],
+    },
+  },
+};
+
+const twMerge = extendTailwindMerge(twMergeConfig);
+
+/** tailwind-variants with the same merge config as `cn`. */
+export const tv = createTV({ twMergeConfig });
 
 type ClassValue = string | false | null | undefined | 0;
 

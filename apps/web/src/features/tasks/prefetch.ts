@@ -1,47 +1,71 @@
-import { parseBacklogId, safeParseTaskKey } from '@pm/contracts';
+import { parseBacklogId, safeParseTaskKey, TASK_STATUSES } from '@pm/contracts';
 import type { QueryClient } from '@tanstack/react-query';
-import { boardColumnQuery } from '~/features/board/queries';
+import { boardColumnInput, boardColumnQuery } from '~/features/board/queries';
+import { labelsQuery } from '~/features/labels/queries';
+import { defaultDisplayOptions } from '~/features/views/display-options';
 import { orpc } from '~/lib/orpc';
 import { isClientError } from './errors';
 import { backlogHistoryQuery } from './MirroredTask';
 import { membersQuery, meQuery, projectsQuery, taskListQuery, taskQuery, timelineQuery } from './queries';
 import {
   BOARD_FOLDED,
-  boardInput,
-  boardStatuses,
-  eagerStatuses,
-  filtersOf,
-  listInput,
+  listMainInput,
   type TaskListSearch,
+  taskFilterOf,
+  withProjectFeatures,
 } from './search';
 
 // Route loaders start these requests. The server awaits them so the first HTML already has the list
 // (or the board); in the browser they run in the background, so moving the selection never waits on a
-// loader.
+// loader. Each request is the one the screen makes with the default display options (the server can't
+// read the options saved in local storage), so a fresh page reuses the answer instead of asking again.
 
 export function prefetchTaskList(queryClient: QueryClient, projectKey: string, search: TaskListSearch) {
-  const filters = filtersOf(search);
   return Promise.all([
-    ...(search.view === 'board'
+    search.view === 'board'
       ? prefetchBoard(queryClient, projectKey, search)
-      : [queryClient.prefetchQuery(taskListQuery(listInput(projectKey, filters, eagerStatuses(filters))))]),
+      : prefetchList(queryClient, projectKey, search),
     queryClient.prefetchQuery(projectsQuery()),
     queryClient.prefetchQuery(membersQuery()),
-    search.task ? queryClient.prefetchQuery(taskQuery(search.task)) : null,
-    // The detail pane shows the timeline (activity and comments) of the selected task.
-    search.task ? queryClient.prefetchQuery(timelineQuery(search.task)) : null,
+    prefetchLabels(queryClient, projectKey),
   ]);
 }
 
-/** The columns a fresh board shows open: all but Done and Canceled, and Backlog while a task is open. */
+/**
+ * The list's main request (TaskListScreen): the eager groups under the filter. Milestone and cycle
+ * filters only count while the project uses them, so it reads the project first (cached by the shell).
+ */
+async function prefetchList(queryClient: QueryClient, projectKey: string, search: TaskListSearch) {
+  const projects = await queryClient.ensureQueryData(projectsQuery()).catch(() => null);
+  const project = projects?.items.find((item) => item.key === projectKey);
+  const filter = withProjectFeatures(taskFilterOf(search), project);
+  const input = listMainInput(projectKey, filter, defaultDisplayOptions('list'), search.hidden === 'only');
+  await queryClient.prefetchQuery(taskListQuery(input));
+}
+
+/** The columns a fresh board shows open (BoardScreen): all but Done and Canceled, or the filtered ones. */
 function prefetchBoard(queryClient: QueryClient, projectKey: string, search: TaskListSearch) {
-  const filters = filtersOf(search);
-  const open = boardStatuses(filters).filter(
-    (status) => (filters.status || !BOARD_FOLDED.includes(status)) && !(search.task && status === 'backlog'),
+  const filter = taskFilterOf(search);
+  const options = defaultDisplayOptions('board');
+  const open = TASK_STATUSES.filter((status) =>
+    filter.status?.length ? filter.status.includes(status) : !BOARD_FOLDED.includes(status),
   );
-  return open.map((status) =>
-    queryClient.prefetchInfiniteQuery(boardColumnQuery(boardInput(projectKey, filters, status))),
+  return Promise.all(
+    open.map((status) =>
+      queryClient.prefetchInfiniteQuery(
+        boardColumnQuery(boardColumnInput(projectKey, filter, options, status)),
+      ),
+    ),
   );
+}
+
+/**
+ * The project's labels, so L opens the label picker filled. Browser only: the first HTML doesn't need
+ * them, and the server answer stays as small as before.
+ */
+export function prefetchLabels(queryClient: QueryClient, projectKey: string | undefined) {
+  if (import.meta.env.SSR || !projectKey) return null;
+  return queryClient.prefetchQuery(labelsQuery(projectKey.toUpperCase()));
 }
 
 export function prefetchTaskPage(queryClient: QueryClient, taskKey: string) {
@@ -55,6 +79,7 @@ export function prefetchTaskPage(queryClient: QueryClient, taskKey: string) {
     queryClient.prefetchQuery(projectsQuery()),
     queryClient.prefetchQuery(membersQuery()),
     queryClient.prefetchQuery(meQuery()),
+    prefetchLabels(queryClient, safeParseTaskKey(taskKey.toUpperCase())?.projectKey),
   ]);
 }
 

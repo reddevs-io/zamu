@@ -8,10 +8,11 @@ import {
 import type { z } from 'zod';
 import { retryOnce, withTimeout } from '~/features/tasks/errors';
 import { REQUEST_TIMEOUT_MS } from '~/features/tasks/queries';
+import { type DisplayOptions, displayListInput, type TaskFilter, toListTasksInput } from '~/features/views';
 import { client, orpc } from '~/lib/orpc';
 
-// One query per board column: tasks.list with order=board and one status, 50 cards per page, more on
-// scroll. The keys sit under orpc.tasks.list.key(), so every task change that invalidates lists (the
+// One query per status column: tasks.list with one status and the display options' sort (and topLevel
+// while subtasks are hidden), 50 cards per page, more on scroll. The keys sit under orpc.tasks.list.key(), so every task change that invalidates lists (the
 // panel, quick create) refreshes the board too. They end with BOARD_TAG so board code can find them.
 
 export const BOARD_PAGE_SIZE = 50;
@@ -23,6 +24,25 @@ export type BoardInput = Omit<z.input<typeof ListTasksInput>, 'limit' | 'cursor'
 };
 
 export type BoardColumnData = InfiniteData<TaskListPage, unknown>;
+
+/**
+ * The tasks.list input of one status column: the filter (its status part is the column), the display
+ * options' order and subtask choice. Route loaders can prefetch with the default display options.
+ */
+export function boardColumnInput(
+  projectKey: string,
+  filter: TaskFilter,
+  options: DisplayOptions,
+  status: TaskStatus,
+): BoardInput {
+  const { status: _status, ...rest } = toListTasksInput(filter);
+  return { project: [projectKey], order: 'board', ...rest, ...displayListInput(options), status: [status] };
+}
+
+/** The tasks.list input of a board grouped by another field: every task under the filter, loaded at once. */
+export function boardListInput(projectKey: string, filter: TaskFilter, options: DisplayOptions) {
+  return { project: projectKey, ...toListTasksInput(filter), ...displayListInput(options) };
+}
 
 export function boardColumnKey(input: BoardInput): QueryKey {
   return [...orpc.tasks.list.key({ type: 'infinite', input }), BOARD_TAG];
@@ -57,23 +77,28 @@ function sameColumn(a: BoardInput, b: BoardInput): boolean {
   return a.project.join(',') === b.project.join(',') && a.status.join(',') === b.status.join(',');
 }
 
-/** Every cached board column of a project, with its status. */
+/**
+ * Every cached board column of a project, with its status. Columns on screen come first: columns of
+ * other display options (another order, subtasks shown) stay cached and are kept in step, but the
+ * board's own order decides where a card is.
+ */
 export function boardQueries(
   queryClient: QueryClient,
   projectKey: string,
-): { queryKey: QueryKey; status: TaskStatus; data: BoardColumnData }[] {
-  const found = queryClient.getQueriesData<BoardColumnData>({
+): { queryKey: QueryKey; status: TaskStatus; data: BoardColumnData; active: boolean }[] {
+  const found = queryClient.getQueryCache().findAll({
     queryKey: orpc.tasks.list.key(),
     predicate: (query) => query.queryKey.at(-1) === BOARD_TAG,
   });
-  const result: { queryKey: QueryKey; status: TaskStatus; data: BoardColumnData }[] = [];
-  for (const [queryKey, data] of found) {
-    const input = inputOf(queryKey);
+  const result: { queryKey: QueryKey; status: TaskStatus; data: BoardColumnData; active: boolean }[] = [];
+  for (const query of found) {
+    const data = query.state.data as BoardColumnData | undefined;
+    const input = inputOf(query.queryKey);
     const status = input?.status[0];
     if (!data || !status || !input?.project.includes(projectKey)) continue;
-    result.push({ queryKey, status, data });
+    result.push({ queryKey: query.queryKey, status, data, active: query.getObserversCount() > 0 });
   }
-  return result;
+  return result.sort((a, b) => Number(b.active) - Number(a.active));
 }
 
 /** Refetches the project's board columns (after moves settle). */

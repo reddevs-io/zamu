@@ -74,7 +74,7 @@ function FileList({
         <SectionCaption label={label} count={files.length} />
         <span className="flex-1" />
         {files.length > FIRST_FILES ? (
-          <Button variant="ghost" size="sm" className="h-5 px-0 text-[12px]" onPress={() => setAll(!all)}>
+          <Button variant="ghost" size="sm" className="h-5 px-0 text-sm" onPress={() => setAll(!all)}>
             {all ? 'Show fewer' : `Show all ${n(files.length)}`}
           </Button>
         ) : null}
@@ -150,19 +150,19 @@ export function PreviewStep({ mode, projectKey, projectName, preview }: PreviewS
           }
         />
         {preview.sample.length ? (
-          <ul className="m-0 list-none border border-line bg-surface p-0">
+          <ul className="m-0 list-none overflow-hidden rounded-md border border-line bg-surface p-0">
             {preview.sample.map((row) => (
               <li
                 key={row.backlogId}
-                className="grid h-8 grid-cols-[120px_18px_104px_minmax(0,1fr)_120px] items-center gap-2.5 border-b border-line-2 px-3 text-[12.5px] last:border-b-0"
+                className="grid h-8 grid-cols-[120px_18px_104px_minmax(0,1fr)_120px] items-center gap-2.5 border-b border-line-soft px-3 text-sm last:border-b-0"
               >
-                <span className="truncate font-mono text-[11px] text-muted">{row.backlogId}</span>
-                <span aria-hidden className="text-center text-faint">
+                <span className="truncate tabular-nums text-xs text-fg-2">{row.backlogId}</span>
+                <span aria-hidden className="text-center text-fg-3">
                   →
                 </span>
-                <span className="truncate font-mono text-[11px] font-medium">{row.key}</span>
+                <span className="truncate tabular-nums text-xs font-medium">{row.key}</span>
                 <span className="truncate">{row.title}</span>
-                <span className="flex items-center gap-[7px] text-muted">
+                <span className="flex items-center gap-1.75 text-fg-2">
                   <StatusSquare status={row.status} className="shrink-0" />
                   <span className="truncate">
                     {STATUS_LABELS[row.status]}
@@ -199,9 +199,7 @@ export function PreviewStep({ mode, projectKey, projectName, preview }: PreviewS
           ) : null}
         </div>
       ) : (
-        <p className="m-0 text-[12.5px] text-muted">
-          Every file reads cleanly and every value has a mapping.
-        </p>
+        <p className="m-0 text-sm text-fg-2">Every file reads cleanly and every value has a mapping.</p>
       )}
     </>
   );

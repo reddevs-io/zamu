@@ -1,6 +1,7 @@
-// Project settings, Backlog.md (frames 2b to 2o): not set up, mirroring, refreshing, warnings with the
-// paged problem list, failed, paused, imported with its history, the member view and loading. Owners
-// and admins refresh (⇧R), open the webhook setup, edit mappings in the setup route and detach.
+// Project settings, Backlog.md (M3 frames 2b to 2o, on the M5 settings page and Margin components):
+// not set up, mirroring, refreshing, warnings with the paged problem list, failed, paused, imported with
+// its history, the member view and loading. Owners and admins refresh (⇧R), open the webhook setup,
+// edit mappings in the setup route and detach.
 import {
   type BacklogMappingsView,
   type BacklogProblem,
@@ -66,6 +67,7 @@ import {
   statusHeading,
   webhookText,
 } from './format';
+import { SettingsPage } from './ProjectSettingsLayout';
 import { hasTasksQuery, loadProblemPage, useDetach, useSetConnection } from './queries';
 import { UseConnectionDialog } from './UseConnectionDialog';
 import { WebhookDialog } from './WebhookDialog';
@@ -91,7 +93,19 @@ export interface BacklogSettingsProps {
  * The Backlog.md section. The status and Refresh now are the project header's (one cache for the
  * header button and this page); the header leaves ⇧R to this page here.
  */
-export function BacklogSettings({ projectKey, webhookOpen, onWebhookOpenChange }: BacklogSettingsProps) {
+export function BacklogSettings(props: BacklogSettingsProps) {
+  return (
+    <SettingsPage
+      title="Backlog.md"
+      description="Where this project reads its tasks from, how values map, and how it stays in step."
+      className="max-w-239"
+    >
+      <BacklogSettingsBody {...props} />
+    </SettingsPage>
+  );
+}
+
+function BacklogSettingsBody({ projectKey, webhookOpen, onWebhookOpenChange }: BacklogSettingsProps) {
   const project = useProjectSummary(projectKey);
   const me = useQuery(meQuery());
   const canManage = isAdminRole(me.data?.role);
@@ -235,34 +249,34 @@ export function NoSource({
   }
 
   return (
-    <div className="flex max-w-[600px] flex-col items-start gap-3 pt-3">
-      <h2 className="m-0 text-[19px] leading-tight font-semibold tracking-[-0.015em]">
+    <div className="flex flex-col items-start gap-3">
+      <h3 className="m-0 font-serif text-xl leading-tight font-medium text-fg">
         Bring in tasks from Backlog.md
-      </h2>
-      <p className="m-0 leading-[1.55] text-muted">
+      </h3>
+      <p className="m-0 leading-prose text-fg-2">
         If the repository keeps tasks as Markdown files in a <InlineCode>backlog/</InlineCode> folder, this
         project can read them from the default branch.
       </p>
       <div className="grid w-full grid-cols-2 gap-4">
-        <div className="flex flex-col items-start gap-1.5 border border-line p-3.5">
+        <div className="flex flex-col items-start gap-1.5 rounded-lg border border-line-soft bg-surface p-3.5">
           <b className="font-semibold">Mirror</b>
-          <span className="text-[12px] leading-normal text-muted">
+          <span className="text-sm leading-normal text-fg-2">
             Keeps following the repository. Agents keep editing the files; the project updates on every push.
             Comments and cycles stay editable here.
           </span>
           {action('mirror', 'Set up a mirror', 'primary')}
         </div>
-        <div className="flex flex-col items-start gap-1.5 border border-line p-3.5">
+        <div className="flex flex-col items-start gap-1.5 rounded-lg border border-line-soft bg-surface p-3.5">
           <b className="font-semibold">Import once</b>
-          <span className="text-[12px] leading-normal text-muted">
+          <span className="text-sm leading-normal text-fg-2">
             Reads the files one time, then the project is yours to edit. Use it to move off Backlog.md.
           </span>
           {action('import', 'Import', 'secondary')}
         </div>
       </div>
-      <span className="text-[11.5px] text-muted">{note}</span>
+      <span className="text-xs text-fg-3">{note}</span>
       {!canManage ? (
-        <span className="text-[11.5px] text-muted">Only owners and admins can set up Backlog.md.</span>
+        <span className="text-xs text-fg-3">Only owners and admins can set up Backlog.md.</span>
       ) : null}
     </div>
   );
@@ -368,7 +382,7 @@ export function BacklogStatusView({
           <>
             <SourceStatusDot state={queued && !reading ? 'reading' : sourceDot(status.state)} decorative />
             <b className="font-semibold">{heading.title}</b>
-            {heading.note ? <span className="text-[12px] text-faint">{heading.note}</span> : null}
+            {heading.note ? <span className="text-sm text-fg-3">{heading.note}</span> : null}
           </>
         }
         actions={
@@ -393,8 +407,7 @@ export function BacklogStatusView({
       {reading && status.headCommit ? (
         <NoticeStrip marker={<SourceStatusDot state="reading" decorative />}>
           <span>
-            Reading commit{' '}
-            <span className="font-mono text-[11px] text-fg">{shortCommit(status.headCommit)}</span>
+            Reading commit <span className="font-mono text-xs text-fg">{shortCommit(status.headCommit)}</span>
             {status.defaultBranch ? <> at the head of {status.defaultBranch}</> : null}. Tasks update when the
             whole folder is read.
           </span>
@@ -404,15 +417,20 @@ export function BacklogStatusView({
       <MappingsSection status={status} canEdit={canAct} />
       {detached ? <HistorySection status={status} projectName={projectName} /> : null}
       {canAct && status.mode === 'mirror' ? (
-        <div className="flex items-center gap-4 border border-line px-4 py-3.5">
-          <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+        <div className="flex items-center gap-3.5 rounded-md border border-[color-mix(in_oklch,var(--danger)_35%,transparent)] p-3.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <b className="font-semibold">Stop mirroring and detach</b>
-            <span className="text-[12px] leading-normal text-muted">
+            <span className="text-sm leading-normal text-fg-2">
               Every task and milestone becomes editable here and the mirror stops for good. Use it when you
               move off Backlog.md.
             </span>
           </div>
-          <Button variant="destructive" size="md" onPress={onDetach}>
+          <Button
+            variant="destructive"
+            size="md"
+            className="border-[color-mix(in_oklch,var(--danger)_40%,transparent)]"
+            onPress={onDetach}
+          >
             Detach…
           </Button>
         </div>
@@ -423,7 +441,10 @@ export function BacklogStatusView({
 
 function NeutralBanner({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div role="note" className="flex items-center gap-3 border border-line bg-band px-3.5 py-2.5 text-fg">
+    <div
+      role="note"
+      className="flex items-center gap-2.5 rounded-md bg-bg-lane px-3 py-2.5 text-sm text-fg-2"
+    >
       <SourceStatusDot state="paused" decorative />
       <div className="min-w-0 flex-1 leading-normal">{children}</div>
       {action}
@@ -443,8 +464,11 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section aria-label={props['aria-label']} className="flex flex-col border border-line bg-surface">
-      <div className="flex min-h-[53px] items-center gap-2.5 border-b border-line-2 px-4 py-3">
+    <section
+      aria-label={props['aria-label']}
+      className="flex flex-col rounded-lg border border-line-soft bg-surface"
+    >
+      <div className="flex min-h-12 items-center gap-2.5 border-b border-line-soft px-4 py-2.5">
         {title}
         {actions ? <span className="ml-auto flex items-center gap-2">{actions}</span> : null}
       </div>
@@ -453,7 +477,7 @@ function Section({
   );
 }
 
-const mono = 'font-mono text-[11.5px]';
+const mono = 'font-mono text-xs';
 
 function sourceFacts(
   status: BacklogSourceStatus,
@@ -476,7 +500,7 @@ function sourceFacts(
         {repo.short}
       </Link>
     ) : (
-      <span className="text-muted">{status.repository ?? 'None. Add it under General.'}</span>
+      <span className="text-fg-2">{status.repository ?? 'None. Add it under General.'}</span>
     ),
   });
   if (!detached) {
@@ -493,7 +517,7 @@ function sourceFacts(
           ) : null}
         </span>
       ) : (
-        <span className="text-muted">Deleted. Pick another connection to resume.</span>
+        <span className="text-fg-2">Deleted. Pick another connection to resume.</span>
       ),
     });
   }
@@ -503,9 +527,9 @@ function sourceFacts(
     value: (
       <span>
         <span className={mono}>{status.defaultBranch ?? 'default branch'}</span>{' '}
-        <span className="text-faint">(default branch)</span> ·{' '}
+        <span className="text-fg-3">(default branch)</span> ·{' '}
         <span className={mono}>{status.folder ? `${status.folder}/` : 'not found yet'}</span>{' '}
-        <span className="text-faint">({status.folderOverride ? 'set by hand' : 'found automatically'})</span>
+        <span className="text-fg-3">({status.folderOverride ? 'set by hand' : 'found automatically'})</span>
       </span>
     ),
   });
@@ -531,10 +555,10 @@ function sourceFacts(
           ) : (
             <span className={mono}>{shortCommit(read.commit)}</span>
           )}{' '}
-          {read.commitTitle ? <span className="text-faint">{read.commitTitle}</span> : null}
+          {read.commitTitle ? <span className="text-fg-3">{read.commitTitle}</span> : null}
         </span>
       ) : (
-        <span className="text-muted">Not read yet</span>
+        <span className="text-fg-2">Not read yet</span>
       ),
   });
   if (!detached && status.mode === 'mirror') {
@@ -623,10 +647,10 @@ function ProblemsSection({ status }: { status: BacklogSourceStatus }) {
   return (
     <section aria-label="Problems in the last refresh" className="flex flex-col gap-2">
       <div className="flex items-baseline gap-2.5">
-        <h2 className="caps m-0">Problems in the last refresh</h2>
-        <span className="font-mono text-[10px] text-faint">{count}</span>
+        <h3 className="m-0 text-md font-semibold text-fg">Problems in the last refresh</h3>
+        <span className="text-sm text-fg-3 tabular-nums">{count}</span>
         {count ? (
-          <span className="ml-auto text-[11.5px] text-muted">
+          <span className="ml-auto text-xs text-fg-3">
             Skipped files keep their last good version, if they had one.
           </span>
         ) : null}
@@ -702,7 +726,7 @@ function MappingsSection({ status, canEdit }: { status: BacklogSourceStatus; can
   const detached = isDetached(status);
   const people = assigneeItems(mappings);
   const empty = (what: string) => (
-    <p className="m-0 py-1.5 text-[12.5px] text-muted">No {what} seen in the files.</p>
+    <p className="m-0 py-1.5 text-sm text-fg-2">No {what} seen in the files.</p>
   );
   return (
     <Section
@@ -710,7 +734,7 @@ function MappingsSection({ status, canEdit }: { status: BacklogSourceStatus; can
       title={
         <>
           <b className="font-semibold">Mappings</b>
-          <span className="text-[12px] text-faint">
+          <span className="text-sm text-fg-3">
             {detached ? 'used for the import' : 'applied on every refresh'}
           </span>
         </>
@@ -727,7 +751,7 @@ function MappingsSection({ status, canEdit }: { status: BacklogSourceStatus; can
       }
     >
       <Tabs defaultSelectedKey="status">
-        <div className="border-b border-line-2">
+        <div className="border-b border-line-soft">
           <TabList aria-label="Mapping kind">
             <Tab id="status" count={mappings.status.length} className="h-8">
               Status
@@ -815,7 +839,7 @@ function HistorySection({ status, projectName }: { status: BacklogSourceStatus; 
       title={
         <>
           <b className="font-semibold">History</b>
-          <span className="text-[12px] text-faint">project-level entries</span>
+          <span className="text-sm text-fg-3">project-level entries</span>
         </>
       }
     >
@@ -823,17 +847,17 @@ function HistorySection({ status, projectName }: { status: BacklogSourceStatus; 
         {status.history.map((entry) => (
           <li
             key={entry.id}
-            className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 text-[12.5px] text-muted"
+            className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 text-sm text-fg-2"
           >
             {entry.actor ? (
-              <span aria-hidden className="size-[7px] justify-self-center rounded-full bg-line" />
+              <span aria-hidden className="size-1.75 justify-self-center rounded-full bg-line" />
             ) : (
               <SystemActorDot />
             )}
             <span className="min-w-0 [&_b]:font-semibold [&_b]:text-fg">
               {historyText(entry, projectName)}
             </span>
-            <span className="font-mono text-[10px] text-faint">
+            <span className="text-xs text-fg-3 tabular-nums">
               {now === null ? '' : stampText(entry.createdAt, now)}
             </span>
           </li>
@@ -860,7 +884,7 @@ function historyText(entry: ProjectActivity, projectName: string): ReactNode {
         {entry.originRef ? (
           <>
             {' '}
-            <span className="font-mono text-[11px] text-fg">{shortCommit(entry.originRef)}</span>
+            <span className="font-mono text-xs text-fg">{shortCommit(entry.originRef)}</span>
           </>
         ) : null}
       </>
@@ -883,8 +907,8 @@ function historyText(entry: ProjectActivity, projectName: string): ReactNode {
 export function BacklogSkeleton() {
   return (
     <div aria-busy className="flex flex-col gap-4">
-      <div className="flex flex-col border border-line bg-surface">
-        <div className="border-b border-line-2 px-4 py-3">
+      <div className="flex flex-col rounded-lg border border-line-soft bg-surface">
+        <div className="border-b border-line-soft px-4 py-3">
           <Skeleton width={140} />
         </div>
         <div className="flex flex-col gap-3 px-4 py-3.5">
@@ -896,8 +920,8 @@ export function BacklogSkeleton() {
           ))}
         </div>
       </div>
-      <div className="flex flex-col border border-line bg-surface">
-        <div className="border-b border-line-2 px-4 py-3">
+      <div className="flex flex-col rounded-lg border border-line-soft bg-surface">
+        <div className="border-b border-line-soft px-4 py-3">
           <Skeleton width={100} />
         </div>
         <div className="flex flex-col gap-3 px-4 py-3.5">

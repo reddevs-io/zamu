@@ -53,7 +53,7 @@ export interface CycleGlyphProps {
   className?: string;
 }
 
-/** Circle: outline (empty), pie (progress), full disc in --done (done). */
+/** Circle: outline (empty), pie (progress), full disc in --status-done (done). */
 export function CycleGlyph({ state = 'empty', progress = 0.5, size = 9, label, className }: CycleGlyphProps) {
   const share = state === 'done' ? 1 : state === 'progress' ? clamp01(progress) : 0;
   const style = { width: size, height: size, '--p': `${Math.round(share * 1000) / 10}%` } as CSSProperties;
@@ -65,7 +65,7 @@ export function CycleGlyph({ state = 'empty', progress = 0.5, size = 9, label, c
       className={cn(
         'inline-block shrink-0 rounded-full border-[1.5px] border-current',
         state !== 'empty' && 'bg-[conic-gradient(currentColor_0_var(--p),transparent_0)]',
-        state === 'done' && 'text-done',
+        state === 'done' && 'text-status-done',
         className,
       )}
     />
@@ -87,7 +87,7 @@ export function NoneGlyph({ shape = 'square', size = 9, className }: NoneGlyphPr
       data-glyph="none"
       style={{ width: size, height: size }}
       className={cn(
-        'inline-block shrink-0 border-[1.5px] border-dashed border-faint',
+        'inline-block shrink-0 border-[1.5px] border-dashed border-fg-3',
         shape === 'circle' && 'rounded-full',
         className,
       )}

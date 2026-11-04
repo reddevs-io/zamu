@@ -1,20 +1,13 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { MilestonesScreen } from '~/features/planning/MilestonesScreen';
 import { prefetchMilestones, settleOnServer } from '~/features/planning/prefetch';
-import { parseMilestonesSearch } from '~/features/planning/search';
 
-// Milestones of one project: /p/PAY/milestones?status=planned&sort=name.
+// Milestones of one project: /p/PAY/milestones.
 export const Route = createFileRoute('/_app/p/$projectKey/milestones/')({
-  validateSearch: parseMilestonesSearch,
-  beforeLoad: ({ params, search }) => {
+  beforeLoad: ({ params }) => {
     const upper = params.projectKey.toUpperCase();
     if (upper !== params.projectKey) {
-      throw redirect({
-        to: '/p/$projectKey/milestones',
-        params: { projectKey: upper },
-        search,
-        replace: true,
-      });
+      throw redirect({ to: '/p/$projectKey/milestones', params: { projectKey: upper }, replace: true });
     }
   },
   loader: ({ context, params }) => settleOnServer(prefetchMilestones(context.queryClient, params.projectKey)),
@@ -24,6 +17,5 @@ export const Route = createFileRoute('/_app/p/$projectKey/milestones/')({
 
 function MilestonesRoute() {
   const { projectKey } = Route.useParams();
-  const search = Route.useSearch();
-  return <MilestonesScreen projectKey={projectKey} search={search} />;
+  return <MilestonesScreen projectKey={projectKey} />;
 }

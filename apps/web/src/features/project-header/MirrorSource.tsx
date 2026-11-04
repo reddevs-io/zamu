@@ -1,24 +1,14 @@
 import type { BacklogSourceStatus, ProjectWithCounts } from '@pm/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Dialog, Link } from 'react-aria-components';
+import { Button as AriaButton, Dialog, Link } from 'react-aria-components';
 import { errorMessage, unwrap } from '~/features/settings/result';
 import { useNow } from '~/features/tasks/clock';
 import { retryOnce } from '~/features/tasks/errors';
 import { formatAge } from '~/features/tasks/format';
 import { meQuery } from '~/features/tasks/queries';
 import { orpc } from '~/lib/orpc';
-import {
-  Button,
-  DialogTrigger,
-  type Fact,
-  FactList,
-  Kbd,
-  Popover,
-  SourceButton,
-  SourceStatusDot,
-  useHotkeys,
-} from '~/ui';
+import { Button, DialogTrigger, type Fact, FactList, Kbd, Popover, SourceStatusDot, useHotkeys } from '~/ui';
 import {
   describeProblems,
   plural,
@@ -30,8 +20,8 @@ import {
 } from './mirror';
 import { projectViewHref } from './tabs';
 
-// The Backlog.md source button of a mirrored project's header (frames 4a, 4c, 4e) and its status
-// popover: state, source, last refresh, next check, problems, Refresh now (⇧R) and a link to the
+// The Backlog.md sync status in a mirrored project's header (M5 frame 003: "● Backlog.md synced 38 min ago")
+// and its status popover: state, source, last refresh, next check, problems, Refresh now (⇧R) and a link to the
 // Backlog.md settings. The full status comes from GET /projects/{key}/backlog, loaded when the popover
 // opens or the mirror failed (the button and the failed banner need the time and the error).
 
@@ -112,7 +102,7 @@ export function useRefreshNow(projectKey: string) {
   };
 }
 
-/** Faint note on the button: "3m ago", "31 problems", "failed 14m ago", "refreshing", "paused". */
+/** Faint note on the button: "synced 3m ago", "31 problems", "failed 14m ago", "refreshing", "paused". */
 function buttonNote(summary: Summary, status: BacklogSourceStatus | undefined, now: number | null) {
   const at = (value: string | null | undefined) =>
     value && now != null ? formatAge(value, new Date(now)) : '';
@@ -130,7 +120,7 @@ function buttonNote(summary: Summary, status: BacklogSourceStatus | undefined, n
       return plural(problemCount(summary.problems), 'problem');
     default: {
       const age = at(summary.lastReadAt);
-      return age === 'now' ? 'just now' : age ? `${age} ago` : '';
+      return age === 'now' ? 'synced just now' : age ? `synced ${age} ago` : '';
     }
   }
 }
@@ -146,7 +136,7 @@ function lastRefreshText(summary: Summary, now: number | null) {
       {[when, trigger].filter(Boolean).join(' ')}
       {summary.lastReadCommit ? (
         <>
-          , commit <span className="font-mono text-[11px]">{summary.lastReadCommit.slice(0, 7)}</span>
+          , commit <span className="font-mono text-xs">{summary.lastReadCommit.slice(0, 7)}</span>
         </>
       ) : null}
     </>
@@ -201,7 +191,7 @@ export function MirrorSourceButton({ project, refreshHotkey = true }: MirrorSour
       id: 'source',
       label: 'Source',
       value: (
-        <span className="font-mono text-[11px] break-words">
+        <span className="font-mono text-xs break-words">
           {[repository ?? 'No repository', branch].filter(Boolean).join(' · ')}
         </span>
       ),
@@ -221,7 +211,7 @@ export function MirrorSourceButton({ project, refreshHotkey = true }: MirrorSour
     id: 'problems',
     label: 'Problems',
     value: problems ? (
-      <span className="text-warn">{describeProblems(summary.problems, status?.problems.items)}</span>
+      <span className="text-danger">{describeProblems(summary.problems, status?.problems.items)}</span>
     ) : (
       'None'
     ),
@@ -237,26 +227,29 @@ export function MirrorSourceButton({ project, refreshHotkey = true }: MirrorSour
         if (!open) refresh.reset();
       }}
     >
-      <SourceButton
-        state={sourceDotState(shownSummary.state)}
-        note={buttonNote(shownSummary, status, now)}
+      <AriaButton
         aria-label={`Backlog.md: ${SOURCE_TITLES[state]}`}
         aria-keyshortcuts={canRefresh ? 'Shift+R' : undefined}
-      />
-      <Popover placement="bottom end" className="w-[380px] min-w-0">
+        className="inline-flex h-7.5 shrink-0 cursor-pointer items-center gap-1.75 rounded-md px-2 text-sm whitespace-nowrap text-fg-3 outline-none hover:bg-bg-lane focus-visible:shadow-[var(--focus-ring)] aria-expanded:bg-bg-lane"
+      >
+        <SourceStatusDot state={sourceDotState(shownSummary.state)} decorative />
+        <b className="font-medium text-fg-2">Backlog.md</b>
+        <span>{buttonNote(shownSummary, status, now)}</span>
+      </AriaButton>
+      <Popover placement="bottom end" className="w-95 min-w-0">
         <Dialog aria-label="Backlog.md mirror" className="outline-none">
-          <div className="flex items-center gap-2 border-b border-line-2 px-3 py-2.5">
+          <div className="flex items-center gap-2 border-b border-line-soft px-3 py-2.5">
             <SourceStatusDot state={sourceDotState(state)} decorative />
             <b className="font-semibold">{SOURCE_TITLES[state]}</b>
             <span className="flex-1" />
             {canRefresh ? <Kbd aria-hidden>⇧R</Kbd> : null}
           </div>
           <FactList size="sm" labelWidth={96} className="px-3 py-2.5" items={facts} />
-          {refresh.error ? <p className="m-0 px-3 pb-2 text-[12px] text-danger">{refresh.error}</p> : null}
-          <div className="flex items-center gap-2 border-t border-line-2 px-3 py-2">
+          {refresh.error ? <p className="m-0 px-3 pb-2 text-sm text-danger">{refresh.error}</p> : null}
+          <div className="flex items-center gap-2 border-t border-line-soft px-3 py-2">
             <Link
               href={settingsHref}
-              className="cursor-pointer text-[12px] text-muted outline-none hover:text-fg hover:underline focus-visible:focus-ring"
+              className="cursor-pointer text-sm text-fg-3 outline-none hover:text-fg hover:underline focus-visible:shadow-[var(--focus-ring)]"
             >
               Open Backlog.md settings
             </Link>
@@ -271,7 +264,7 @@ export function MirrorSourceButton({ project, refreshHotkey = true }: MirrorSour
                 {refresh.isRefreshing ? 'Refreshing…' : 'Refresh now'}
               </Button>
             ) : (
-              <span className="text-[11.5px] text-faint">Owners and admins can refresh.</span>
+              <span className="text-xs text-fg-3">Owners and admins can refresh.</span>
             )}
           </div>
         </Dialog>

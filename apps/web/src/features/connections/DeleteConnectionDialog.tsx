@@ -7,7 +7,7 @@ import { deleteSentence } from './format';
 
 /** Filled danger look for the confirming button of an irreversible action. */
 export const filledDanger =
-  'h-8 border-danger bg-danger px-3 text-on-accent hover:border-danger hover:bg-danger hover:text-on-accent';
+  'h-8 border-danger bg-danger px-3 text-accent-ink hover:border-danger hover:bg-danger hover:text-accent-ink';
 
 export interface DeleteConnectionDialogProps {
   /** null: closed. */
@@ -61,21 +61,21 @@ function DeleteContent({
       <DialogHeader title={`Delete ${connection.name}?`} showEsc={false} />
       <DialogBody className="gap-3">
         {error ? <Banner>{error}</Banner> : null}
-        <p className="m-0 leading-[1.55]">{deleteSentence(projects.length)}</p>
+        <p className="m-0 leading-normal">{deleteSentence(projects.length)}</p>
         {projects.length ? (
           <ul
             aria-label="Projects that pause"
             className="m-0 flex list-none flex-wrap items-center gap-x-2 gap-y-1 p-0"
           >
             {projects.map((project) => (
-              <li key={project.key} className="flex items-center gap-1 text-[12px] text-muted">
+              <li key={project.key} className="flex items-center gap-1 text-sm text-fg-2">
                 <ProjectKeyChip projectKey={project.key} />
                 {project.name}
               </li>
             ))}
           </ul>
         ) : null}
-        <span className="text-[11.5px] text-muted">
+        <span className="text-xs text-fg-2">
           Revoke the token at {connection.host} too if nothing else uses it.
         </span>
       </DialogBody>
@@ -99,7 +99,7 @@ function DeleteContent({
 /** Project key in a hairline box (.cn-key). */
 export function ProjectKeyChip({ projectKey }: { projectKey: string }) {
   return (
-    <span className="box-border inline-flex h-[18px] items-center border border-line px-[5px] font-mono text-[10px] text-fg">
+    <span className="box-border inline-flex h-4.5 items-center rounded-sm border border-line px-1.25 font-medium tabular-nums text-xs text-fg">
       {projectKey}
     </span>
   );
