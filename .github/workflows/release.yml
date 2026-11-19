@@ -1,9 +1,9 @@
-# Releases: an X.Y.Z tag (no pre-release suffix) runs CI on the tag, pushes the image to
-# ghcr.io/reddevs-io/zamu (:<tag> and :latest) and bumps the image tag for zamu.example.com in gitops
-# (apps/zamu/cluster-production.yaml). ArgoCD (ApplicationSet apps-cluster-production) rolls it out.
+# Releases: an X.Y.Z tag (no pre-release suffix) runs CI on the tag and pushes the image to
+# ghcr.io/reddevs-io/zamu (:<tag> and :latest). Deploying an instance is up to whoever runs it; this workflow
+# deploys nothing.
 #
 # workflow_dispatch builds and pushes an existing tag by hand, for example the first push that creates the ghcr
-# package. It deploys only when the "deploy" input is checked, and moves :latest only for an X.Y.Z tag.
+# package. It moves :latest only for an X.Y.Z tag.
 name: Release
 
 on:
@@ -16,10 +16,6 @@ on:
         description: Existing git tag to build and push (X.Y.Z, or X.Y.Z-suffix for a pre-release)
         type: string
         required: true
-      deploy:
-        description: Also deploy it to production (bumps the image tag in gitops)
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -99,48 +95,3 @@ jobs:
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.version=${{ needs.meta.outputs.tag }}
             org.opencontainers.image.revision=${{ steps.checkout.outputs.commit }}
-
-  # GITOPS_TOKEN is a gitops (GitLab) token allowed to push to main, stored as a secret of the production
-  # environment. The worker and the migrate initJob inherit .image, so one tag covers all three roles.
-  deploy-production:
-    needs: [meta, release-image]
-    if: github.event_name == 'push' || inputs.deploy
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions: {}
-    environment:
-      name: production
-      url: https://zamu.example.com
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    env:
-      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
-      GITOPS_REPO: gitlab.com/example/gitops.git
-      VALUES_FILE: apps/zamu/cluster-production.yaml
-      IMAGE_TAG: ${{ needs.meta.outputs.tag }}
-    steps:
-      # The runner image ships git and yq (mikefarah v4).
-      - name: Bump the image tag in gitops
-        run: |
-          if [[ -z "$GITOPS_TOKEN" ]]; then
-            echo "::error::the GITOPS_TOKEN secret is not set"
-            exit 1
-          fi
-          git config --global user.name "zamu-ci"
-          git config --global user.email "ci@reddevs.io"
-          git clone --quiet "https://oauth2:${GITOPS_TOKEN}@${GITOPS_REPO}" gitops
-          cd gitops
-          yq -i '.image.tag = strenv(IMAGE_TAG)' "$VALUES_FILE"
-          if git diff --quiet; then
-            echo "image tag ${IMAGE_TAG} already deployed, nothing to do"
-            exit 0
-          fi
-          git commit -am "zamu: ${IMAGE_TAG}"
-          # Push to main, rebasing over concurrent deploy commits.
-          for _ in 1 2 3; do
-            git push origin HEAD:main && exit 0
-            git pull --rebase origin main || exit 1
-          done
-          echo "could not push after 3 attempts"
-          exit 1
