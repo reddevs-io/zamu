@@ -1,6 +1,6 @@
 // Development data: a workspace with projects PAY and WEB, a few tasks, the agent claude-dev acting
 // for the admin, fresh API keys, and with `backlog` the mirrored Backlog.md project BACK. Everything goes
-// through @pm/auth and @pm/core, like real use, except backdating one task for the dashboard's Stalled group.
+// through @zamu/auth and @zamu/core, like real use, except backdating one task for the dashboard's Stalled group.
 // Re-running is safe: existing projects and the agent are kept, and new keys are issued each time.
 import {
   AcceptInvitationError,
@@ -8,8 +8,8 @@ import {
   bootstrapAdmin,
   getActorFromRequest,
   isFirstRun,
-} from '@pm/auth';
-import type { CreateTaskInput, Priority, TaskStatus } from '@pm/contracts';
+} from '@zamu/auth';
+import type { CreateTaskInput, Priority, TaskStatus } from '@zamu/contracts';
 import {
   type Actor,
   addCalendarDays,
@@ -28,7 +28,7 @@ import {
   todayIn,
   toWorkspaceRole,
   updateTask,
-} from '@pm/core';
+} from '@zamu/core';
 import type { z } from 'zod';
 import { seedBacklogProject } from './seed-backlog';
 

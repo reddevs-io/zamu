@@ -1,6 +1,6 @@
 // New key: name, access and permission, for yourself or for an agent. On success the parent shows
 // the key in the reveal-once dialog.
-import type { ApiKeyCreated } from '@pm/contracts';
+import type { ApiKeyCreated } from '@zamu/contracts';
 import { type FormEvent, useState } from 'react';
 import { Banner, Button, Dialog, DialogBody, DialogFooter, DialogHeader, Modal, TextField } from '~/ui';
 import { errorMessage, SettingsError } from './result';

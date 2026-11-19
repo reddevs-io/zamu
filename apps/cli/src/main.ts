@@ -27,10 +27,11 @@ const SORT_HELP = 'priority, due (soonest first), updated, created (newest first
 const LABEL_HELP = 'label name; repeatable or comma-separated, missing labels are created';
 const BLOCKER_HELP = 'task key of the same project it waits on; repeatable or comma-separated';
 const COLOR_HELP = 'palette colour, 1 to 9';
-const PROJECT_HELP = "project key, e.g. PAY (default: PM_PROJECT, .pm.json or this clone's linked project)";
+const PROJECT_HELP =
+  "project key, e.g. PAY (default: ZAMU_PROJECT, .zamu.json or this clone's linked project)";
 const TASK_KEY_HELP = 'e.g. PAY-142, a subtask key like PAY-786.1, or a Backlog.md id like BACK-786.1';
 const TASK_PROJECT_HELP =
-  "project to look a Backlog.md id up in (default: PM_PROJECT, .pm.json or this clone's linked project)";
+  "project to look a Backlog.md id up in (default: ZAMU_PROJECT, .zamu.json or this clone's linked project)";
 
 /** True when --json appears before a `--` separator. */
 function wantsJson(argv: readonly string[]): boolean {
@@ -40,18 +41,18 @@ function wantsJson(argv: readonly string[]): boolean {
 
 export function buildProgram(context: CommandContext): Command {
   const { io } = context;
-  const program = new Command('pm');
+  const program = new Command('zamu');
 
   // Settings set here are copied to every subcommand created afterwards.
   program
-    .description('Command-line client for project-management. Every command takes --json.')
+    .description('Command-line client for Zamu. Every command takes --json.')
     .version(pkg.version, '-v, --version')
     .exitOverride()
     .showHelpAfterError(context.json ? false : '(add --help for usage)')
     .configureOutput({
       writeOut: (text) => io.stdout(text),
       writeErr: (text) => io.stderr(text),
-      // With --json the error goes to stdout as pm.v1.error instead.
+      // With --json the error goes to stdout as zamu.v1.error instead.
       outputError: (text, write) => {
         if (!context.json) write(text);
       },
@@ -63,29 +64,29 @@ export function buildProgram(context: CommandContext): Command {
     .addHelpText(
       'after',
       `
-Credentials: pm login stores the server URL and key in $XDG_CONFIG_HOME/pm/config.json
-(~/.config/pm/config.json). PM_URL and PM_KEY override it.
+Credentials: zamu login stores the server URL and key in $XDG_CONFIG_HOME/zamu/config.json
+(~/.config/zamu/config.json). ZAMU_URL and ZAMU_KEY override it.
 
-Project: commands that need one take --project, then PM_PROJECT, then the nearest .pm.json, then
-the project linked to this clone's git remote (pm link). pm whoami shows which one applies here.
+Project: commands that need one take --project, then ZAMU_PROJECT, then the nearest .zamu.json, then
+the project linked to this clone's git remote (zamu link). zamu whoami shows which one applies here.
 
 Tasks: a task key is PAY-142, or PAY-786.1 for a subtask. In a project mirrored from Backlog.md, its
 Backlog.md id (BACK-786.1) works too, and the fields Backlog.md owns change in the files, not here.
 Subtasks, blockers and parents are tasks of the same project; subtasks go one level deep.
 
-Labels: per project, by name (case-insensitive). pm tasks create and update create missing ones.
+Labels: per project, by name (case-insensitive). zamu tasks create and update create missing ones.
 
 Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog.md conflict.`,
     );
 
-  const leaf = (command: Command) => command.option('--json', 'print the versioned JSON result (pm.v1.*)');
+  const leaf = (command: Command) => command.option('--json', 'print the versioned JSON result (zamu.v1.*)');
 
   leaf(
     program
       .command('login')
       .description('check an API key against the server and store it')
-      .requiredOption('--key <key>', 'API key (pm_live_...); "-" reads it from stdin')
-      .option('--url <server>', 'server URL (default: PM_URL, the stored URL, or http://localhost:3000)'),
+      .requiredOption('--key <key>', 'API key (zamu_live_...); "-" reads it from stdin')
+      .option('--url <server>', 'server URL (default: ZAMU_URL, the stored URL, or http://localhost:3000)'),
   ).action((options: { key: string; url?: string }) => login(context, options));
 
   leaf(program.command('logout').description('remove the stored URL and key')).action(() => logout(context));
@@ -97,18 +98,18 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
   leaf(
     program
       .command('link')
-      .description("link a project to this clone's git remote, so pm picks it in every clone")
-      .option('--project <KEY>', 'project to link (default: PM_PROJECT or .pm.json)')
+      .description("link a project to this clone's git remote, so zamu picks it in every clone")
+      .option('--project <KEY>', 'project to link (default: ZAMU_PROJECT or .zamu.json)')
       .option('--force', 'replace a different repository already linked to the project')
       .option('--clear', "unlink the project's repository (default project: this clone's)")
-      .option('--file', 'write .pm.json at the repository root instead of linking on the server')
-      .option('--here', 'with --file: write .pm.json in this folder (monorepo subprojects)'),
+      .option('--file', 'write .zamu.json at the repository root instead of linking on the server')
+      .option('--here', 'with --file: write .zamu.json in this folder (monorepo subprojects)'),
   ).action((options) => link(context, options));
 
   leaf(
     program
       .command('agents')
-      .description('write pm usage instructions into AGENTS.md (or CLAUDE.md) between pm markers')
+      .description('write zamu usage instructions into AGENTS.md (or CLAUDE.md) between two markers')
       .option('--file <path>', 'file to write (default: AGENTS.md, else CLAUDE.md, at the repository root)')
       .option('--project <KEY>', "project to name in the instructions (default: this clone's)")
       .option('--print', 'print the instructions instead of writing a file'),
@@ -247,7 +248,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
   leaf(
     labels
       .command('create')
-      .description('create a label (tasks create missing labels too: pm tasks update KEY --label name)')
+      .description('create a label (tasks create missing labels too: zamu tasks update KEY --label name)')
       .argument('<name...>', 'label name, up to 40 characters, unique in the project ignoring case')
       .option('--project <KEY>', PROJECT_HELP)
       .option('--color <n>', `${COLOR_HELP} (default: the least used one)`),
@@ -294,7 +295,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
     comments
       .command('edit')
       .description('replace the body of your own comment')
-      .argument('<comment-id>', 'id from pm comments list or pm tasks show')
+      .argument('<comment-id>', 'id from zamu comments list or zamu tasks show')
       .argument('<body>', 'new Markdown body (quote it); "-" reads it from stdin'),
   ).action((id: string, body: string) => editComment(context, id, body));
 
@@ -302,7 +303,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
     comments
       .command('delete')
       .description('delete your own comment (the timeline keeps a placeholder)')
-      .argument('<comment-id>', 'id from pm comments list or pm tasks show'),
+      .argument('<comment-id>', 'id from zamu comments list or zamu tasks show'),
   ).action((id: string) => deleteComment(context, id));
 
   const milestones = program.command('milestones').description('list, create and update milestones');
@@ -394,7 +395,7 @@ Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog
   return program;
 }
 
-/** Runs one pm invocation and returns its exit code. `argv` excludes node and the script path. */
+/** Runs one zamu invocation and returns its exit code. `argv` excludes node and the script path. */
 export async function main(argv: readonly string[], io: CliIo): Promise<number> {
   const context = createContext(io, wantsJson(argv));
   const program = buildProgram(context);

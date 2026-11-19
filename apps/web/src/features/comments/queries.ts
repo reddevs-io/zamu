@@ -1,5 +1,5 @@
-import type { Comment, Timeline, TimelineItem } from '@pm/contracts';
 import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Comment, Timeline, TimelineItem } from '@zamu/contracts';
 import { client, orpc } from '~/lib/orpc';
 
 // Comment writes for the task timeline. Each answer from the server goes straight into the cached

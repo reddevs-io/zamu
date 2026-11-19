@@ -1,4 +1,4 @@
-import type { TaskStatus } from '@pm/contracts';
+import type { TaskStatus } from '@zamu/contracts';
 import { useSyncExternalStore } from 'react';
 
 // The last tasks a person opened, for the palette's Recent section. Kept in localStorage per person,
@@ -14,7 +14,7 @@ export interface RecentTask {
 export const RECENT_LIMIT = 5;
 
 export function recentStorageKey(userId: string): string {
-  return `pm.palette.recent:${userId}`;
+  return `zamu.palette.recent:${userId}`;
 }
 
 const listeners = new Set<() => void>();

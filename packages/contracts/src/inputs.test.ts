@@ -819,7 +819,12 @@ describe('git connection inputs', () => {
         name: ' Forgejo at home ',
         token: ' 0123abcd \n',
       }),
-    ).toEqual({ provider: 'gitea', host: 'git.home.example.com', name: 'Forgejo at home', token: '0123abcd' });
+    ).toEqual({
+      provider: 'gitea',
+      host: 'git.home.example.com',
+      name: 'Forgejo at home',
+      token: '0123abcd',
+    });
   });
 
   it('refuses bad providers, names and tokens', () => {
@@ -946,7 +951,7 @@ describe('Backlog.md setup and settings inputs', () => {
     });
     expect(
       DetectBacklogRepositoryInput.parse({
-        repository: 'http://localhost:3300/pm-admin/notes-sync',
+        repository: 'http://localhost:3300/zamu-admin/notes-sync',
         connectionId,
         folderOverride: './docs/backlog/',
       }).folderOverride,

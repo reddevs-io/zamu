@@ -1,6 +1,6 @@
-import type { AgentCreated, ApiKeyCreated, Member } from '@pm/contracts';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { AgentCreated, ApiKeyCreated, Member } from '@zamu/contracts';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Button } from '~/ui';
@@ -14,8 +14,8 @@ const projects = [
   { id: '20000000-0000-4000-8000-000000000001', key: 'PAY', name: 'Payments' },
   { id: '20000000-0000-4000-8000-000000000002', key: 'WEB', name: 'Web app' },
 ];
-const SECRET = 'pm_live_7Hq2mV9xKc4TzR8bN3wLp6Ye1Ua5Fj0D';
-const SERVER = 'https://pm.example.test';
+const SECRET = 'zamu_live_7Hq2mV9xKc4TzR8bN3wLp6Ye1Ua5Fj0D';
+const SERVER = 'https://zamu.example.test';
 
 function createdKey(
   owner: { id: string; name: string },
@@ -112,7 +112,7 @@ describe('AgentCreation', () => {
       const reveal = await screen.findByRole('alertdialog');
       expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
       expect(reveal).toHaveTextContent('Key created for docs-bot');
-      expect(reveal).toHaveTextContent(`pm login --key ${SECRET} --url ${SERVER}`);
+      expect(reveal).toHaveTextContent(`zamu login --key ${SECRET} --url ${SERVER}`);
       expect(reveal).toHaveTextContent('Scope: PAY, read and write. Acts for Ana Ruiz.');
       expect(screen.getByRole('button', { name: 'Copy API key' })).toBeInTheDocument();
 

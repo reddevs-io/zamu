@@ -1,6 +1,6 @@
 // Dev seed, M3: the mirrored demo project "Payments API" (key BACK). Its Backlog.md folder lives in
 // this file and is served by an in-memory git provider, so the seed needs no git host and no test
-// code. Everything else goes through @pm/core like real use: createConnection (the token check runs
+// code. Everything else goes through @zamu/core like real use: createConnection (the token check runs
 // against the in-memory provider), detectBacklog for the prefilled mappings, startBacklog, then two
 // refreshes of the real engine: the first read, and a second commit that changes a status, removes
 // a file (hidden task), adds a status with no mapping and a file that does not parse (warnings).
@@ -18,7 +18,7 @@ import {
   type ProviderFactory,
   refreshBacklogSource,
   startBacklog,
-} from '@pm/core';
+} from '@zamu/core';
 
 type GitProvider = ReturnType<ProviderFactory>;
 type TreeEntry = Awaited<ReturnType<GitProvider['listTree']>>[number];

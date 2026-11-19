@@ -1,5 +1,5 @@
-import type { ListTasksInput, TaskListItem } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { ListTasksInput, TaskListItem } from '@zamu/contracts';
 import { useMemo, useState } from 'react';
 import type { z } from 'zod';
 import { useProjectSummary } from '~/features/project-header';

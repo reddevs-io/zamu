@@ -1,6 +1,6 @@
-import type { GitConnection, GitConnectionList } from '@pm/contracts';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { GitConnection, GitConnectionList } from '@zamu/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsError } from '../settings/result';
 import { ConnectionDialog } from './ConnectionDialog';

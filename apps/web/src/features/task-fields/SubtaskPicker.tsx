@@ -1,5 +1,5 @@
-import type { Task, TaskListItem } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { Task, TaskListItem } from '@zamu/contracts';
 import { useState } from 'react';
 import { relatedOf, taskQuery, useCreateTask } from '~/features/tasks/queries';
 import {

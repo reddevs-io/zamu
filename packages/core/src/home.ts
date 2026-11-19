@@ -1,5 +1,5 @@
 // Home (M5): what needs attention, grouped by why, across every project the actor can read. It
-// replaces the dashboard and My tasks. Rules: the Home contract in @pm/contracts (entities.ts) and
+// replaces the dashboard and My tasks. Rules: the Home contract in @zamu/contracts (entities.ts) and
 // the "M5-05 Home data" brief of the M5 plan.
 //
 // Grouping. A tab's groups are HOME_GROUPS_BY_TAB[tab]; one SQL CASE puts each candidate task in
@@ -55,8 +55,8 @@ import {
   type TaskListItem,
   type TaskStatus,
   type UserRef,
-} from '@pm/contracts';
-import type { Db } from '@pm/db';
+} from '@zamu/contracts';
+import type { Db } from '@zamu/db';
 import { type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type ActivityRow, toActivities } from './activity';

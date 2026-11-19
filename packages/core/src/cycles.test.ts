@@ -1,5 +1,5 @@
-import type { Project, TASK_STATUSES } from '@pm/contracts';
-import { type Db, schema } from '@pm/db';
+import type { Project, TASK_STATUSES } from '@zamu/contracts';
+import { type Db, schema } from '@zamu/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listTaskActivity } from './activity';

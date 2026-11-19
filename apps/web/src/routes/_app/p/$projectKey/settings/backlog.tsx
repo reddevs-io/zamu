@@ -32,7 +32,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/settings/backlog')({
         if (project?.backlog) await queryClient.prefetchQuery(backlogStatusQuery(params.projectKey));
       })(),
     ),
-  head: ({ params }) => ({ meta: [{ title: `Backlog.md · ${params.projectKey} · project-management` }] }),
+  head: ({ params }) => ({ meta: [{ title: `Backlog.md · ${params.projectKey} · Zamu` }] }),
   component: BacklogRoute,
 });
 

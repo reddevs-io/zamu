@@ -1,4 +1,4 @@
-import { type BacklogSourceStatus, parseRepositoryUrl } from '@pm/contracts';
+import { type BacklogSourceStatus, parseRepositoryUrl } from '@zamu/contracts';
 import type { ReactNode } from 'react';
 import { Link } from 'react-aria-components';
 import { buttonStyles, InlineCode, PROVIDER_LABELS, SourceStatusDot, StepMarker } from '~/ui';
@@ -181,14 +181,14 @@ export function ReadStep({ status, projectName, settingsHref, webhookHref, expec
           <span className="text-sm leading-normal text-fg-2">
             {isImport ? (
               <>
-                The tasks live here now. <InlineCode>pm</InlineCode> reads, creates and updates them; edits to{' '}
-                <Mono>{folder}/</Mono> no longer reach this project.
+                The tasks live here now. <InlineCode>zamu</InlineCode> reads, creates and updates them; edits
+                to <Mono>{folder}/</Mono> no longer reach this project.
               </>
             ) : (
               <>
-                They keep editing <InlineCode>{folder}/</InlineCode> as before. <InlineCode>pm</InlineCode>{' '}
-                can read the tasks and comment, and <InlineCode>pm backlog refresh</InlineCode> pulls changes
-                right away.
+                They keep editing <InlineCode>{folder}/</InlineCode> as before. <InlineCode>zamu</InlineCode>{' '}
+                can read the tasks and comment, and <InlineCode>zamu backlog refresh</InlineCode> pulls
+                changes right away.
               </>
             )}
           </span>

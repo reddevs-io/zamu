@@ -1,5 +1,5 @@
-// Runs the built `pm` CLI as a separate process, the way an agent would, with its own config directory so the
-// user's real ~/.config/pm is never read or written.
+// Runs the built `zamu` CLI as a separate process, the way an agent would, with its own config directory so the
+// user's real ~/.config/zamu is never read or written.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,7 +17,7 @@ export function createCli() {
   let configHome: string | undefined;
   return {
     run(args: string[], env: Record<string, string> = {}): CliResult {
-      configHome ??= mkdtempSync(join(tmpdir(), 'pm-e2e-cli-'));
+      configHome ??= mkdtempSync(join(tmpdir(), 'zamu-e2e-cli-'));
       const result = spawnSync(process.execPath, [cliPath, ...args], {
         encoding: 'utf8',
         timeout: 30_000,

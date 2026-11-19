@@ -1,4 +1,4 @@
-import type { Member } from '@pm/contracts';
+import type { Member } from '@zamu/contracts';
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Tab as AriaTab,

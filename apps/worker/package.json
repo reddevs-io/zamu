@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@opentelemetry/api": "1.10.0",
-    "@pm/core": "workspace:*",
-    "@pm/db": "workspace:*",
+    "@zamu/core": "workspace:*",
+    "@zamu/db": "workspace:*",
     "pg-boss": "12.38.0",
     "tsx": "4.23.15"
   }

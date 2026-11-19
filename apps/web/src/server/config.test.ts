@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { checkServerConfig, readServerConfig, ServerConfigError, type ServerEnv } from './config';
 
 const BASE: ServerEnv = {
-  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/pm',
+  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/zamu',
   BETTER_AUTH_SECRET: 'a'.repeat(32),
   BETTER_AUTH_URL: 'https://projects.example.com/',
 };
 
 const SSO: ServerEnv = {
-  OIDC_ISSUER: 'https://auth.example.com/application/o/pm/',
-  OIDC_CLIENT_ID: 'pm',
+  OIDC_ISSUER: 'https://auth.example.com/application/o/zamu/',
+  OIDC_CLIENT_ID: 'zamu',
   OIDC_CLIENT_SECRET: 'secret',
 };
 

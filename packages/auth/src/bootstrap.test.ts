@@ -1,5 +1,5 @@
-import { schema } from '@pm/db';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+import { schema } from '@zamu/db';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { getActorFromRequest } from './actor';

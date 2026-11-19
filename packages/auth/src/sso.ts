@@ -2,7 +2,7 @@
 // for who gets in: which identities may create an account, link to an existing one, and which role
 // they get in the workspace.
 import type { AsyncLocalStorage } from 'node:async_hooks';
-import { type Db, schema, type Tx } from '@pm/db';
+import { type Db, schema, type Tx } from '@zamu/db';
 import type { BetterAuthOptions, BetterAuthPlugin } from 'better-auth';
 import { APIError, getOAuthState } from 'better-auth/api';
 import { type GenericOAuthUserInfo, genericOAuth } from 'better-auth/plugins/generic-oauth';
@@ -48,7 +48,7 @@ export interface SsoIntentData {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Domain of the placeholder emails agents get (see @pm/core createAgent). */
+/** Domain of the placeholder emails agents get (see @zamu/core createAgent). */
 const AGENT_EMAIL_DOMAIN = '@agents.invalid';
 
 function trimSlash(url: string): string {
@@ -71,7 +71,7 @@ function displayName(profile: GenericOAuthUserInfo): string {
  */
 function oauth2CallbackAlias(): BetterAuthPlugin {
   return {
-    id: 'pm-oauth2-callback-alias',
+    id: 'zamu-oauth2-callback-alias',
     onRequest: async (request) => {
       const url = new URL(request.url);
       const marker = `/oauth2/callback/${OIDC_PROVIDER_ID}`;

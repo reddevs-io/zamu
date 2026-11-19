@@ -1,5 +1,5 @@
 // API keys table: name and prefix, owner, scope, dates, and Revoke (or the Revoked tag).
-import type { ApiKeySummary } from '@pm/contracts';
+import type { ApiKeySummary } from '@zamu/contracts';
 import { type ReactNode, useMemo } from 'react';
 import { Button, cn, type DataColumn, DataTable, MemberLabel, Tag } from '~/ui';
 import { formatAgo, formatShortDate, scopeText } from './format';

@@ -13,20 +13,21 @@ import { fileURLToPath } from 'node:url';
 
 export const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
-/** Compose project name: containers are pm-e2e-web-1 and so on, the volume is pm-e2e_pgdata. */
-export const composeProject = process.env.E2E_COMPOSE_PROJECT ?? 'pm-e2e';
+/** Compose project name: containers are zamu-e2e-web-1 and so on, the volume is zamu-e2e_pgdata. */
+export const composeProject = process.env.E2E_COMPOSE_PROJECT ?? 'zamu-e2e';
 
 /** Host port the web container is published on. */
 export const port = process.env.E2E_PORT ?? '3100';
 
 /**
- * URL the browser and the CLI use. In GitLab CI the stack runs on the docker:dind service, so the job sets
- * E2E_BASE_URL=http://docker:3100. Better Auth's base URL must match it, so the stack gets the same value.
+ * URL the browser and the CLI use. On a GitHub Actions runner the stack runs on the runner host, so the default
+ * works. When the Docker daemon is on another host, E2E_BASE_URL points there (for example
+ * http://docker:3100). Better Auth's base URL must match it, so the stack gets the same value.
  */
 export const baseURL = (process.env.E2E_BASE_URL ?? `http://localhost:${port}`).replace(/\/$/, '');
 
 /** Image built and run by the stack. Shares the tag with nothing else, so a run never replaces another image. */
-export const image = process.env.PM_IMAGE ?? 'project-management:e2e';
+export const image = process.env.ZAMU_IMAGE ?? 'zamu:e2e';
 
 /**
  * Network alias of each Forgejo on a stack network (see forgejo.ts): one per Backlog.md spec, and the upgrade
@@ -87,7 +88,7 @@ export function createStack(options: StackOptions): Stack {
           // Shell values win over the repository's .env, which compose also reads.
           env: {
             ...process.env,
-            PM_IMAGE: stack.image,
+            ZAMU_IMAGE: stack.image,
             PORT: stack.port,
             BETTER_AUTH_URL: stack.baseURL,
             PUBLIC_URL: stack.baseURL,
@@ -95,7 +96,7 @@ export function createStack(options: StackOptions): Stack {
               process.env.E2E_BETTER_AUTH_SECRET ?? 'e2e-only-secret-never-used-in-production-0123456789',
             POSTGRES_USER: 'postgres',
             POSTGRES_PASSWORD: 'postgres',
-            POSTGRES_DB: 'project_management',
+            POSTGRES_DB: 'zamu',
             APP_ENCRYPTION_KEY: encryptionKey,
             GIT_ALLOW_PRIVATE_HOSTS: 'true',
             GIT_HTTP_HOSTS: Object.values(forgejoAliases).join(','),

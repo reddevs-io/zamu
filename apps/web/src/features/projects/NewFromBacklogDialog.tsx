@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import {
   type BacklogDetection,
   type BacklogMode,
@@ -5,8 +6,7 @@ import {
   type GitConnection,
   PROJECT_KEY_PATTERN,
   parseRepositoryUrl,
-} from '@pm/contracts';
-import { useQuery } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { connectionReads, pickConnection } from '~/features/backlog-setup/connections';

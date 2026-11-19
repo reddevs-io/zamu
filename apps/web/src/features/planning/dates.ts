@@ -1,4 +1,4 @@
-import type { Cycle } from '@pm/contracts';
+import type { Cycle } from '@zamu/contracts';
 
 // Calendar days for milestones and cycles. Dates are CalendarDate strings ("2026-11-14") with no time
 // or zone; arithmetic runs in UTC so a day is always 24 hours. "Today" comes from the server when it can

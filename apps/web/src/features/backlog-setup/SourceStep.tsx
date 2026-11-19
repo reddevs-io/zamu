@@ -4,7 +4,7 @@ import {
   type GitConnection,
   PROJECT_KEY_PATTERN,
   parseRepositoryUrl,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type FormEvent, useState } from 'react';
 import { errorMessage } from '~/features/settings/result';
 import {
@@ -169,7 +169,7 @@ function KeyNote({ detection, projectKey }: { detection: BacklogDetection; proje
     return (
       <NoticeStrip marker={<span className="w-2 text-center text-fg-3">i</span>}>
         <span>
-          <Mono>{from}</Mono> becomes <Mono>{to}</Mono>. Search and <InlineCode>pm</InlineCode> accept both.
+          <Mono>{from}</Mono> becomes <Mono>{to}</Mono>. Search and <InlineCode>zamu</InlineCode> accept both.
           To keep them identical, change the project key to {prefix} in General first.
         </span>
       </NoticeStrip>
@@ -179,7 +179,7 @@ function KeyNote({ detection, projectKey }: { detection: BacklogDetection; proje
   return (
     <DetailBox tone="warn">
       The task prefix <Mono>{prefix}</Mono> {why} (2 to 6 letters). Tasks get the key {projectKey}:{' '}
-      <Mono>{from}</Mono> becomes <Mono>{to}</Mono>. Search and <InlineCode>pm</InlineCode> still accept{' '}
+      <Mono>{from}</Mono> becomes <Mono>{to}</Mono>. Search and <InlineCode>zamu</InlineCode> still accept{' '}
       {from}.
     </DetailBox>
   );

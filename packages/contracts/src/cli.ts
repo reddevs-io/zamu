@@ -23,15 +23,15 @@ import {
 import { ProjectKey, ProjectKeyInput } from './primitives';
 import { Problem } from './problem';
 
-// Versioned `pm ... --json` output. Every result is { "schema": "pm.v1.<name>", "data": ... }.
-// Adding optional fields keeps v1. Removing or renaming fields, or changing a type, needs pm.v2.
+// Versioned `zamu ... --json` output. Every result is { "schema": "zamu.v1.<name>", "data": ... }.
+// Adding optional fields keeps v1. Removing or renaming fields, or changing a type, needs zamu.v2.
 
 export const CLI_SCHEMA_VERSION = 'v1';
 
 export const CLI_PROJECT_SOURCES = ['flag', 'env', 'file', 'remote'] as const;
 /**
- * Where pm took the project from when a command needs one: --project, PM_PROJECT, the nearest
- * .pm.json, or the project whose repository matches the clone's git remote.
+ * Where zamu took the project from when a command needs one: --project, ZAMU_PROJECT, the nearest
+ * .zamu.json, or the project whose repository matches the clone's git remote.
  */
 export const CliProjectSource = z.enum(CLI_PROJECT_SOURCES);
 export type CliProjectSource = z.infer<typeof CliProjectSource>;
@@ -39,46 +39,46 @@ export type CliProjectSource = z.infer<typeof CliProjectSource>;
 export const CliResolvedProject = z.object({
   key: ProjectKey,
   source: CliProjectSource,
-  /** The .pm.json path (file) or the remote URL (remote); null otherwise. */
+  /** The .zamu.json path (file) or the remote URL (remote); null otherwise. */
   from: z.string().nullable(),
 });
 export type CliResolvedProject = z.output<typeof CliResolvedProject>;
 
-export const PROJECT_FILE_NAME = '.pm.json';
+export const PROJECT_FILE_NAME = '.zamu.json';
 
-/** Contents of .pm.json, committed at the repository root or in a monorepo subfolder. */
+/** Contents of .zamu.json, committed at the repository root or in a monorepo subfolder. */
 export const ProjectFile = z.strictObject({ project: ProjectKeyInput });
 export type ProjectFile = z.output<typeof ProjectFile>;
 
 export const CLI_LINK_ACTIONS = ['linked', 'replaced', 'unchanged', 'cleared', 'created', 'updated'] as const;
 
 /**
- * How pm backlog refresh ended: queued (no --wait), finished (the run ended within the wait), or
+ * How zamu backlog refresh ended: queued (no --wait), finished (the run ended within the wait), or
  * timeout (--wait gave up after 5 minutes; the run may still finish).
  */
 export const CLI_BACKLOG_REFRESH_OUTCOMES = ['queued', 'finished', 'timeout'] as const;
 export const CliBacklogRefreshOutcome = z.enum(CLI_BACKLOG_REFRESH_OUTCOMES);
 export type CliBacklogRefreshOutcome = z.infer<typeof CliBacklogRefreshOutcome>;
 
-/** Longest --wait of pm backlog refresh, in milliseconds. */
+/** Longest --wait of zamu backlog refresh, in milliseconds. */
 export const CLI_BACKLOG_REFRESH_WAIT_MS = 5 * 60 * 1000;
 
 /** Data schema for each CLI result name. */
 export const cliDataSchemas = {
-  /** pm login */
+  /** zamu login */
   login: z.object({ url: z.url(), me: Me }),
-  /** pm logout */
+  /** zamu logout */
   logout: z.object({ url: z.url().nullable() }),
-  /** pm whoami. `project` (M2.1) is the project commands use here, or null. */
+  /** zamu whoami. `project` (M2.1) is the project commands use here, or null. */
   whoami: Me.extend({ project: CliResolvedProject.nullable().optional() }),
-  /** pm projects list */
+  /** zamu projects list */
   'projects.list': ProjectList,
-  /** pm projects delete <KEY> --confirm <KEY> (0.6.0) */
+  /** zamu projects delete <KEY> --confirm <KEY> (0.6.0) */
   'projects.delete': z.object({ deleted: ProjectKey }),
-  /** pm tasks list [--mine] [--project ...] [--milestone ...] [--cycle ...] */
+  /** zamu tasks list [--mine] [--project ...] [--milestone ...] [--cycle ...] */
   'tasks.list': TaskListPage,
   /**
-   * pm tasks show. `activity` is the M1 field and stays for v1 readers; `timeline` (M2) holds
+   * zamu tasks show. `activity` is the M1 field and stays for v1 readers; `timeline` (M2) holds
    * activity and comments in one list, oldest first.
    */
   'tasks.show': z.object({
@@ -86,34 +86,34 @@ export const cliDataSchemas = {
     activity: z.array(Activity),
     timeline: z.array(TimelineItem).optional(),
   }),
-  /** pm tasks create */
+  /** zamu tasks create */
   'tasks.create': Task,
-  /** pm tasks update */
+  /** zamu tasks update */
   'tasks.update': Task,
-  /** pm comments list */
+  /** zamu comments list */
   'comments.list': CommentList,
-  /** pm comments add */
+  /** zamu comments add */
   'comments.add': Comment,
-  /** pm comments edit */
+  /** zamu comments edit */
   'comments.edit': Comment,
-  /** pm comments delete: the comment as it is after the soft delete (body null). */
+  /** zamu comments delete: the comment as it is after the soft delete (body null). */
   'comments.delete': Comment,
-  /** pm milestones list */
+  /** zamu milestones list */
   'milestones.list': MilestoneList,
-  /** pm milestones create */
+  /** zamu milestones create */
   'milestones.create': MilestoneWithProgress,
-  /** pm milestones update */
+  /** zamu milestones update */
   'milestones.update': MilestoneWithProgress,
-  /** pm cycles list */
+  /** zamu cycles list */
   'cycles.list': CycleList,
-  /** pm cycles create */
+  /** zamu cycles create */
   'cycles.create': Cycle,
-  /** pm cycles current: null when the project has no current cycle. */
+  /** zamu cycles current: null when the project has no current cycle. */
   'cycles.current': Cycle.nullable(),
-  /** pm cycles end: the completed cycle with its summary and rollovers. */
+  /** zamu cycles end: the completed cycle with its summary and rollovers. */
   'cycles.end': CycleDetail,
   /**
-   * pm link: `target` server sets or clears the project's repository; file writes .pm.json.
+   * zamu link: `target` server sets or clears the project's repository; file writes .zamu.json.
    * `repository` is the short form (host/path) of the linked repository, null once cleared.
    */
   link: z.object({
@@ -121,10 +121,10 @@ export const cliDataSchemas = {
     target: z.enum(['server', 'file']),
     action: z.enum(CLI_LINK_ACTIONS),
     repository: z.string().nullable(),
-    /** The .pm.json path for target file, else null. */
+    /** The .zamu.json path for target file, else null. */
     file: z.string().nullable(),
   }),
-  /** pm agents: `file` is null with --print. `block` is the text between the pm markers. */
+  /** zamu agents: `file` is null with --print. `block` is the text between the two markers. */
   agents: z.object({
     file: z.string().nullable(),
     action: z.enum(['created', 'updated', 'unchanged', 'printed']),
@@ -132,27 +132,27 @@ export const cliDataSchemas = {
     block: z.string(),
   }),
   /**
-   * pm backlog status [--problems]: the source status. Without --problems, problems.items holds
+   * zamu backlog status [--problems]: the source status. Without --problems, problems.items holds
    * the first page only.
    */
   'backlog.status': BacklogSourceStatus,
   /**
-   * pm backlog refresh [--wait]: the refresh request, and with --wait the status after the run
+   * zamu backlog refresh [--wait]: the refresh request, and with --wait the status after the run
    * (null without --wait).
    */
   'backlog.refresh': BacklogRefreshResult.extend({
     outcome: CliBacklogRefreshOutcome,
     status: BacklogSourceStatus.nullable(),
   }),
-  /** pm dashboard [--everyone] */
+  /** zamu dashboard [--everyone] */
   dashboard: Dashboard,
-  /** pm labels list (M5) */
+  /** zamu labels list (M5) */
   'labels.list': LabelList,
-  /** pm labels create (M5) */
+  /** zamu labels create (M5) */
   'labels.create': LabelWithUsage,
-  /** pm labels update (M5) */
+  /** zamu labels update (M5) */
   'labels.update': LabelWithUsage,
-  /** pm labels delete <name> --confirm (M5): the label as it was, and how many tasks lost it. */
+  /** zamu labels delete <name> --confirm (M5): the label as it was, and how many tasks lost it. */
   'labels.delete': z.object({
     deleted: Label,
     usageCount: z.number().int().nonnegative(),
@@ -164,10 +164,10 @@ export const cliDataSchemas = {
 export type CliResultName = keyof typeof cliDataSchemas;
 export const CLI_RESULT_NAMES = Object.keys(cliDataSchemas) as CliResultName[];
 
-export type CliSchemaId<N extends CliResultName = CliResultName> = `pm.${typeof CLI_SCHEMA_VERSION}.${N}`;
+export type CliSchemaId<N extends CliResultName = CliResultName> = `zamu.${typeof CLI_SCHEMA_VERSION}.${N}`;
 
 export function cliSchemaId<N extends CliResultName>(name: N): CliSchemaId<N> {
-  return `pm.${CLI_SCHEMA_VERSION}.${name}`;
+  return `zamu.${CLI_SCHEMA_VERSION}.${name}`;
 }
 
 function envelope<N extends CliResultName>(name: N) {

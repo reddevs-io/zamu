@@ -16,8 +16,8 @@ import {
   PreviewBacklogInput,
   type Project,
   StartBacklogInput,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import {
   GitHostRefused,
   GitNotFound,
@@ -26,7 +26,7 @@ import {
   GitUnauthorized,
   GitUnreachable,
   hostnameOf,
-} from '@pm/git-providers';
+} from '@zamu/git-providers';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, can } from '../authz';

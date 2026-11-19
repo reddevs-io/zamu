@@ -1,7 +1,8 @@
 // /settings/members: people and agents with tabs, invite person, add agent, row actions.
-import type { Member } from '@pm/contracts';
+
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import type { Member } from '@zamu/contracts';
 import { useCallback, useMemo, useState } from 'react';
 import { Banner, Button, copyText, PageHeader, Tab, TabList, TabPanel, Tabs } from '~/ui';
 import { ConfirmDialog } from './ConfirmDialog';

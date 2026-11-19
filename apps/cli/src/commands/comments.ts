@@ -1,11 +1,11 @@
-// pm comments list | add | edit | delete.
+// zamu comments list | add | edit | delete.
 import {
   type Comment,
   CreateCommentInput,
   DeleteCommentInput,
   ListCommentsInput,
   UpdateCommentInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type CommandContext, emit } from '../context';
 import { commentAuthor, commentBlock } from '../format';
 import { parseInput, readText, taskRef, withTaskRef } from './shared';

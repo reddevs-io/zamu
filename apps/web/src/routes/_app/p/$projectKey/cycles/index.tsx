@@ -11,7 +11,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/cycles/')({
     }
   },
   loader: ({ context, params }) => settleOnServer(prefetchCycles(context.queryClient, params.projectKey)),
-  head: ({ params }) => ({ meta: [{ title: `Cycles · ${params.projectKey} · project-management` }] }),
+  head: ({ params }) => ({ meta: [{ title: `Cycles · ${params.projectKey} · Zamu` }] }),
   component: CyclesRoute,
 });
 

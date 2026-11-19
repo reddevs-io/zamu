@@ -1,6 +1,6 @@
-import type { Task } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
+import type { Task } from '@zamu/contracts';
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button as AriaButton,

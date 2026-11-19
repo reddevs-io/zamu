@@ -1,4 +1,4 @@
-import { PRIORITIES, type StatusCounts, type TaskListItem, type TaskStatus } from '@pm/contracts';
+import { PRIORITIES, type StatusCounts, type TaskListItem, type TaskStatus } from '@zamu/contracts';
 import {
   type GroupBy,
   type GroupContext,

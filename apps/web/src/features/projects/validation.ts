@@ -4,7 +4,7 @@ import {
   ProjectRepository,
   REPOSITORY_URL_HINT,
   suggestProjectKey,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 
 // Validation of the New project dialog. The contract schema is the source of truth; this module only
 // turns its issues into one message per field and keeps the copy short.

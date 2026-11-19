@@ -1,5 +1,5 @@
 // Display text for the settings screens: dates, "last active", key scopes, counts.
-import type { ApiKeyScopeView, WorkspaceRole } from '@pm/contracts';
+import type { ApiKeyScopeView, WorkspaceRole } from '@zamu/contracts';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;

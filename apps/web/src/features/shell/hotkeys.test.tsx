@@ -124,10 +124,10 @@ describe('useShellHotkeys', () => {
     // A German layout types ü on the key next to P: the physical key still counts.
     fireEvent.keyDown(document.body, { key: 'ü', code: 'BracketLeft' });
     expect(screen.getByLabelText('sidebar')).toHaveTextContent('collapsed');
-    expect(window.localStorage.getItem('pm.sidebar.collapsed:u1')).toBe('1');
+    expect(window.localStorage.getItem('zamu.sidebar.collapsed:u1')).toBe('1');
     fireEvent.keyDown(document.body, { key: '[', code: 'BracketLeft' });
     expect(screen.getByLabelText('sidebar')).toHaveTextContent('expanded');
-    expect(window.localStorage.getItem('pm.sidebar.collapsed:u1')).toBeNull();
+    expect(window.localStorage.getItem('zamu.sidebar.collapsed:u1')).toBeNull();
   });
 
   it('? opens the shortcut list', async () => {
@@ -190,7 +190,7 @@ describe('sidebar state', () => {
   });
 
   it('starts from the saved choice', () => {
-    window.localStorage.setItem('pm.sidebar.collapsed:u1', '1');
+    window.localStorage.setItem('zamu.sidebar.collapsed:u1', '1');
     render(<Probe />, { wrapper: Providers });
     expect(screen.getByLabelText('sidebar')).toHaveTextContent('collapsed');
   });
@@ -203,7 +203,7 @@ describe('sidebar state', () => {
       fireEvent.keyDown(document.body, { key: '[', code: 'BracketLeft' });
     });
     expect(screen.getByLabelText('sidebar')).toHaveTextContent('expanded');
-    expect(window.localStorage.getItem('pm.sidebar.collapsed:u1')).toBeNull();
+    expect(window.localStorage.getItem('zamu.sidebar.collapsed:u1')).toBeNull();
   });
 });
 

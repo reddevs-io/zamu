@@ -1,4 +1,4 @@
-import type { BacklogMappingsView } from '@pm/contracts';
+import type { BacklogMappingsView } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   agentNameFrom,

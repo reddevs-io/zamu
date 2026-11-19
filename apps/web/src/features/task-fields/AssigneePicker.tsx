@@ -1,5 +1,5 @@
-import type { AssigneeRef, Member } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { AssigneeRef, Member } from '@zamu/contracts';
 import { membersQuery, meQuery } from '~/features/tasks/queries';
 import { Avatar, PickerMenu, type PickerMenuItem, type PickerMenuSection, UnassignedAvatar } from '~/ui';
 import { useFieldChange } from './apply';

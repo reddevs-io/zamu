@@ -5,7 +5,7 @@ import { getAuthContext } from '~/lib/session';
 
 /**
  * Public sign-up is closed: accounts come from first-run setup and invitation accept, both server
- * functions. @pm/auth refuses HTTP sign-up too; this also covers paths Better Auth does not know.
+ * functions. @zamu/auth refuses HTTP sign-up too; this also covers paths Better Auth does not know.
  */
 function isSignUp(request: Request): boolean {
   const { pathname } = new URL(request.url);

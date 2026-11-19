@@ -748,7 +748,7 @@ export type ListApiKeysInput = z.output<typeof ListApiKeysInput>;
 // ---------------------------------------------------------------------------
 
 /**
- * Same value as MIN_PASSWORD_LENGTH in @pm/auth, which Better Auth enforces. @pm/auth does not
+ * Same value as MIN_PASSWORD_LENGTH in @zamu/auth, which Better Auth enforces. @zamu/auth does not
  * depend on this package, so a web test keeps the two equal.
  */
 export const MIN_PASSWORD_LENGTH = 12;

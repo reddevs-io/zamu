@@ -1,4 +1,4 @@
-import type { BacklogMappingsView, Priority, TaskStatus } from '@pm/contracts';
+import type { BacklogMappingsView, Priority, TaskStatus } from '@zamu/contracts';
 import type { ReactNode } from 'react';
 import { Avatar, Button, cn, initialsFor, MappingRow, MappingTable } from '~/ui';
 import {

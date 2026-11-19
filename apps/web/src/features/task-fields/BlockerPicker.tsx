@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client';
-import { OPEN_TASK_STATUSES, type RelatedTask, type Task, type TaskListItem } from '@pm/contracts';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { OPEN_TASK_STATUSES, type RelatedTask, type Task, type TaskListItem } from '@zamu/contracts';
 import { useRef, useState } from 'react';
 import { relatedOf, taskQuery } from '~/features/tasks/queries';
 import { orpc } from '~/lib/orpc';

@@ -1,6 +1,6 @@
 // The caller: user, workspace, role and how far their credentials reach; their preferences.
-import { Me, UpdateMeInput } from '@pm/contracts';
-import { schema } from '@pm/db';
+import { Me, UpdateMeInput } from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { eq, inArray } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, isSession } from './authz';

@@ -1,4 +1,4 @@
-import { cycleLengthDays, type ProjectWithCounts } from '@pm/contracts';
+import { cycleLengthDays, type ProjectWithCounts } from '@zamu/contracts';
 
 // Links to a project's pages and the current cycle's note. (M5 dropped the M4 header tabs: the sidebar
 // lists a project's pages.)

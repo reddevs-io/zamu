@@ -14,7 +14,7 @@ import {
   TASK_STATUSES,
   type TaskListItem,
   type TaskStatus,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 
 // The filter model shared by the list, the board and Home (frames 013, 046, 047), its URL form and
 // its tasks.list / home.get input.

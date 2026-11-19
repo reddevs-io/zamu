@@ -1,4 +1,4 @@
-import { type GetHomeInput, HOME_TABS, type HomeTab, ProjectKey } from '@pm/contracts';
+import { type GetHomeInput, HOME_TABS, type HomeTab, ProjectKey } from '@zamu/contracts';
 import { parseTaskFilter, type TaskFilter, taskFilterSearch } from '~/features/views';
 
 // URL state of Home (/): ?tab=everyone&project=PAY,WEB&label=backend&priority=urgent,high

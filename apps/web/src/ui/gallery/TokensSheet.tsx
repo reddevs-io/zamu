@@ -322,7 +322,7 @@ export function TokensSheet() {
           </Switch>
         </div>
         <Banner>Error banner</Banner>
-        <CodeBlock>pm tasks list --project PAY --json</CodeBlock>
+        <CodeBlock>zamu tasks list --project PAY --json</CodeBlock>
         <div className="flex flex-col gap-2">
           <Skeleton width="80%" />
           <Skeleton width="55%" />

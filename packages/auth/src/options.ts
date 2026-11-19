@@ -5,7 +5,7 @@ import type { SsoConfig } from './config';
 import { SSO_ACCOUNT_OPTIONS, ssoPlugins } from './sso';
 
 /** Prefix of every API key, so keys are recognisable in logs and secret scanners. */
-export const API_KEY_PREFIX = 'pm_live_';
+export const API_KEY_PREFIX = 'zamu_live_';
 
 /** Minimum password length, shared with the setup and invitation forms. */
 export const MIN_PASSWORD_LENGTH = 12;
@@ -39,8 +39,8 @@ export function authPlugins({ sso, baseUrl }: { sso?: SsoConfig | null; baseUrl?
       enableMetadata: true,
       requireName: true,
       maximumNameLength: 100,
-      // Keep the first 12 characters ("pm_live_4kQz") so keys can be told apart in lists.
-      startingCharactersConfig: { shouldStore: true, charactersLength: 12 },
+      // Keep the first 14 characters ("zamu_live_4kQz") so keys can be told apart in lists.
+      startingCharactersConfig: { shouldStore: true, charactersLength: 14 },
       // The plugin defaults to 10 requests per day per key, which would break agents and the CLI.
       rateLimit: { enabled: false },
       // Keys never turn into Better Auth sessions; getActorFromRequest resolves them instead.
@@ -65,7 +65,7 @@ export function authOptions({
   ipAddressHeaders?: string[] | null;
 }) {
   return {
-    appName: 'project-management',
+    appName: 'Zamu',
     secret,
     baseURL: baseUrl,
     emailAndPassword: {

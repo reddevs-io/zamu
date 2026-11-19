@@ -1,5 +1,5 @@
 {
-  "name": "@pm/core",
+  "name": "@zamu/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@opentelemetry/api": "1.10.0",
-    "@pm/auth": "workspace:*",
-    "@pm/backlog-md": "workspace:*",
-    "@pm/contracts": "workspace:*",
-    "@pm/db": "workspace:*",
-    "@pm/git-providers": "workspace:*",
+    "@zamu/auth": "workspace:*",
+    "@zamu/backlog-md": "workspace:*",
+    "@zamu/contracts": "workspace:*",
+    "@zamu/db": "workspace:*",
+    "@zamu/git-providers": "workspace:*",
     "better-auth": "1.7.12",
     "drizzle-orm": "1.0.0-rc.5",
     "pg-boss": "12.38.0",

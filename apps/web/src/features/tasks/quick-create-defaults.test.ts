@@ -1,4 +1,4 @@
-import type { Cycle, MilestoneWithProgress } from '@pm/contracts';
+import type { Cycle, MilestoneWithProgress } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { describeActivity, describeCycleEnded, formatDateRange } from './format';
 import { planningDefaultsFrom, resolveCycleDefault, resolveMilestoneDefault } from './quick-create-defaults';

@@ -1,4 +1,4 @@
-import type { Db } from '@pm/db';
+import type { Db } from '@zamu/db';
 import { z } from 'zod';
 
 // Read-only lookups for the signed-out screens. Server-only: called from server function handlers.

@@ -1,5 +1,5 @@
 // State shared by the commands of one invocation, and the single place that prints results.
-import { type CliData, type CliResultName, type cliDataSchemas, cliOutput } from '@pm/contracts';
+import { type CliData, type CliResultName, type cliDataSchemas, cliOutput } from '@zamu/contracts';
 import type { z } from 'zod';
 import { type ApiClient, createApiClient } from './client';
 import { resolveCredentials } from './config';
@@ -14,7 +14,7 @@ export interface CommandContext {
   json: boolean;
   /** Server the command talks to, once known (named in network errors). */
   url?: string;
-  /** Client with the resolved credentials (PM_URL / PM_KEY, else the config file). */
+  /** Client with the resolved credentials (ZAMU_URL / ZAMU_KEY, else the config file). */
   client: () => Promise<ApiClient>;
   /**
    * What the command works on, set by commands before they call the API. A Backlog.md mirror error
@@ -69,12 +69,12 @@ export function emit<N extends CliResultName>(
   else context.io.stdout(human((output as { data: CliData<N> }).data));
 }
 
-/** Prints a failure: pm.v1.error on stdout with --json, a message on stderr otherwise. */
+/** Prints a failure: zamu.v1.error on stdout with --json, a message on stderr otherwise. */
 export function reportError(context: CommandContext, error: CliError): void {
   if (context.json) {
     printJson(context, cliOutput('error', error.problem));
     return;
   }
-  const lines = error.lines ?? [`pm: ${error.message}`, ...error.hints.map((hint) => `  ${hint}`)];
+  const lines = error.lines ?? [`zamu: ${error.message}`, ...error.hints.map((hint) => `  ${hint}`)];
   context.io.stderr(`${lines.join('\n')}\n`);
 }

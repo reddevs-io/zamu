@@ -1,7 +1,8 @@
 // "Use another connection" on a paused mirror (frame 2i): read the repository through another git
 // connection of the workspace. The source resumes when the new connection works.
-import { type BacklogSourceStatus, parseRepositoryUrl } from '@pm/contracts';
+
 import { useQuery } from '@tanstack/react-query';
+import { type BacklogSourceStatus, parseRepositoryUrl } from '@zamu/contracts';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-aria-components';
 import {

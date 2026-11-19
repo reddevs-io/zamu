@@ -1,5 +1,5 @@
-import type { Member } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { Member } from '@zamu/contracts';
 import { AgentCreation } from '~/features/settings/CreationFlows';
 import { membersQuery, meQuery, projectsQuery, useCreateAgent } from '~/features/settings/queries';
 import type { AgentSuggestion } from './agent-suggestions';

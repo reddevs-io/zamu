@@ -1,6 +1,6 @@
-// Webhook acceptance for each provider, with signatures from @pm/git-providers' signWebhook.
-import { schema } from '@pm/db';
-import { type ProviderKind, signWebhook } from '@pm/git-providers';
+// Webhook acceptance for each provider, with signatures from @zamu/git-providers' signWebhook.
+import { schema } from '@zamu/db';
+import { type ProviderKind, signWebhook } from '@zamu/git-providers';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BACKLOG_REFRESH } from '../jobs';

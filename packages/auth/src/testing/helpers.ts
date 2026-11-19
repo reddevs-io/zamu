@@ -1,5 +1,5 @@
-// Shared fixtures for @pm/auth tests.
-import type { Db } from '@pm/db';
+// Shared fixtures for @zamu/auth tests.
+import type { Db } from '@zamu/db';
 import { createAuth } from '../auth';
 
 export const TEST_SECRET = 'test-secret-test-secret-test-secret-0123';

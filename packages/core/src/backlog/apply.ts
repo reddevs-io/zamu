@@ -3,8 +3,8 @@
 // activity from the Backlog.md actor (origin backlog, origin_ref = commit) and the source state.
 // Rows are written directly with Drizzle; services' owned-field locks do not apply to the refresh
 // itself.
-import type { BacklogMode, BacklogTrigger } from '@pm/contracts';
-import { schema, type Tx } from '@pm/db';
+import type { BacklogMode, BacklogTrigger } from '@zamu/contracts';
+import { schema, type Tx } from '@zamu/db';
 import { and, eq, inArray, notInArray, type SQL, sql } from 'drizzle-orm';
 import {
   recordActivities,

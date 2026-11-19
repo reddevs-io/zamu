@@ -1,9 +1,9 @@
-import { MIN_PASSWORD_LENGTH } from '@pm/contracts';
+import { MIN_PASSWORD_LENGTH } from '@zamu/contracts';
 import type { z } from 'zod';
 
 // Form helpers shared by the sign-in, setup and invitation screens. The schemas (SignInFields,
 // AccountFields, WorkspaceFields, SetupInput, InviteFields, AcceptInvitationInput) and their
-// messages live in @pm/contracts. Client-safe: no server imports here.
+// messages live in @zamu/contracts. Client-safe: no server imports here.
 
 export type FieldErrors<T> = Partial<Record<keyof T & string, string>>;
 

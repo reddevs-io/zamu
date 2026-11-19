@@ -13,7 +13,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/settings/labels')({
   },
   loader: ({ context: { queryClient }, params }) =>
     settleOnServer(queryClient.prefetchQuery(labelsQuery(params.projectKey))),
-  head: ({ params }) => ({ meta: [{ title: `Labels · ${params.projectKey} · project-management` }] }),
+  head: ({ params }) => ({ meta: [{ title: `Labels · ${params.projectKey} · Zamu` }] }),
   component: LabelsRoute,
 });
 

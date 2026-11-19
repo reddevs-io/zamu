@@ -4,8 +4,8 @@
 // parseJobPayload and schedules the entries of JOB_SCHEDULES. Producers call enqueue(boss, tx, ...)
 // inside the Drizzle transaction of the write that triggers the job, so the job row only exists if
 // that transaction commits.
-import { BacklogTrigger } from '@pm/contracts';
-import type { Tx } from '@pm/db';
+import { BacklogTrigger } from '@zamu/contracts';
+import type { Tx } from '@zamu/db';
 import { sql } from 'drizzle-orm';
 import { fromDrizzle, type PgBoss, type Db as PgBossDb, type Queue, type SendOptions } from 'pg-boss';
 import { z } from 'zod';

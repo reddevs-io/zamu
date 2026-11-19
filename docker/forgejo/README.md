@@ -1,16 +1,16 @@
 # Test Forgejo
 
-A throwaway Forgejo 17 for the `@pm/git-providers` integration tests and the M3 end-to-end tests.
+A throwaway Forgejo 17 for the `@zamu/git-providers` integration tests and the M3 end-to-end tests.
 
 ```sh
 eval "$(FORGEJO_PORT=3300 docker/forgejo/setup.sh)"   # sets FORGEJO_URL, FORGEJO_USER, FORGEJO_PASSWORD, FORGEJO_TOKEN
 docker/forgejo/teardown.sh                            # removes the container and its data
 ```
 
-- `setup.sh` starts the container, waits for `/api/healthz`, then creates the admin `pm-admin` with
+- `setup.sh` starts the container, waits for `/api/healthz`, then creates the admin `zamu-admin` with
   a random password and an access token with every scope through the `forgejo admin` CLI. It prints
   the values as `KEY=value` lines on stdout; everything else goes to stderr.
-- `FORGEJO_PROJECT` (default `pm-forgejo`) names the compose project, so parallel runs need
+- `FORGEJO_PROJECT` (default `zamu-forgejo`) names the compose project, so parallel runs need
   different values. Pass the same value to `teardown.sh`.
 - `FORGEJO_TREES_PER_PAGE` (default 10) caps tree listing pages, so small fixtures still exercise
   pagination.

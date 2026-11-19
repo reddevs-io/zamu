@@ -2,8 +2,8 @@
 // maps this decision to a response. Unknown id or a bad signature: 404 with no detail. Detached:
 // 410. Pushes to other branches and other events: 204. A push to the default branch: 202 and a
 // refresh (trigger webhook). Every accepted delivery sets webhook_last_at.
-import { schema } from '@pm/db';
-import { PROVIDER_KINDS, type ProviderKind, verifyWebhook, type WebhookHeaders } from '@pm/git-providers';
+import { schema } from '@zamu/db';
+import { PROVIDER_KINDS, type ProviderKind, verifyWebhook, type WebhookHeaders } from '@zamu/git-providers';
 import { eq } from 'drizzle-orm';
 import type { DbContext, GitContext } from '../context';
 import { clockNow } from '../cycles';

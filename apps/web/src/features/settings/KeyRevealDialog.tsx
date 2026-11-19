@@ -1,6 +1,6 @@
 // "Key created" dialog: shows a new API key's secret once. It can only be closed with "I copied the
 // key" (no scrim click, no Esc); the parent then drops the secret, and nothing can fetch it again.
-import type { ApiKeyCreated } from '@pm/contracts';
+import type { ApiKeyCreated } from '@zamu/contracts';
 import { Banner, Button, CodeBlock, Dialog, DialogBody, DialogFooter, DialogHeader, Modal } from '~/ui';
 import { scopeSentence } from './format';
 
@@ -37,7 +37,7 @@ function RevealContent({
 }) {
   const { key, actsFor } = revealed;
   const url = serverUrl ?? (typeof window === 'undefined' ? undefined : window.location.origin);
-  const login = `pm login --key ${key.key}${url ? ` --url ${url}` : ''}`;
+  const login = `zamu login --key ${key.key}${url ? ` --url ${url}` : ''}`;
   return (
     <Dialog role="alertdialog">
       <DialogHeader title={`Key created for ${key.owner.name}`} showEsc={false} />

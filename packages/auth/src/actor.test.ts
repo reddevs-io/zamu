@@ -1,12 +1,12 @@
-import { createDb, type Db, type DbHandle, schema } from '@pm/db';
-import { sharedTestDatabaseUrl } from '@pm/db/test';
+import { createDb, type Db, type DbHandle, schema } from '@zamu/db';
+import { sharedTestDatabaseUrl } from '@zamu/db/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bearerApiKey, getActorFromRequest } from './actor';
 import { type ApiKeyMetadata, parseApiKeyMetadata } from './api-key';
 import { cookieHeaders, testAuth } from './testing/helpers';
 
-// Runs on the shared database from @pm/db's globalSetup; every row here uses fresh ids and emails.
+// Runs on the shared database from @zamu/db's globalSetup; every row here uses fresh ids and emails.
 describe('getActorFromRequest', () => {
   let db: Db;
   let pool: DbHandle['pool'];
@@ -61,7 +61,7 @@ describe('getActorFromRequest', () => {
   it('resolves an agent key with project scope and the responsible human', async () => {
     const metadata: ApiKeyMetadata = { workspaceId, projects: [projectId], access: 'read' };
     const created = await createKey(agent.id, metadata);
-    expect(created.key.startsWith('pm_live_')).toBe(true);
+    expect(created.key.startsWith('zamu_live_')).toBe(true);
 
     const [stored] = await db.select().from(schema.apikey).where(eq(schema.apikey.id, created.id));
     expect(stored?.key).not.toBe(created.key);
@@ -100,7 +100,7 @@ describe('getActorFromRequest', () => {
   });
 
   it('returns null for unknown, disabled, unscoped or foreign-workspace keys', async () => {
-    expect(await getActorFromRequest({ auth, db }, bearer('pm_live_not-a-real-key'))).toBeNull();
+    expect(await getActorFromRequest({ auth, db }, bearer('zamu_live_not-a-real-key'))).toBeNull();
 
     const disabled = await createKey(agent.id, { workspaceId, projects: 'all', access: 'read' });
     await db.update(schema.apikey).set({ enabled: false }).where(eq(schema.apikey.id, disabled.id));
@@ -124,11 +124,11 @@ describe('getActorFromRequest', () => {
     expect(await getActorFromRequest({ auth, db }, bearer(created.key))).toBeNull();
   });
 
-  it('returns null without credentials and ignores non-pm bearer tokens', async () => {
+  it('returns null without credentials and ignores non-zamu bearer tokens', async () => {
     expect(await getActorFromRequest({ auth, db }, { headers: new Headers() })).toBeNull();
     expect(await getActorFromRequest({ auth, db }, bearer('some-jwt-token'))).toBeNull();
-    expect(bearerApiKey(new Headers({ authorization: 'bearer pm_live_abc' }))).toBe('pm_live_abc');
-    expect(bearerApiKey(new Headers({ authorization: 'Basic pm_live_abc' }))).toBeNull();
+    expect(bearerApiKey(new Headers({ authorization: 'bearer zamu_live_abc' }))).toBe('zamu_live_abc');
+    expect(bearerApiKey(new Headers({ authorization: 'Basic zamu_live_abc' }))).toBeNull();
   });
 
   it('resolves a session, falling back to the oldest membership', async () => {

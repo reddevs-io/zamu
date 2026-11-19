@@ -1,11 +1,11 @@
-// pm milestones list | create | update.
+// zamu milestones list | create | update.
 import {
   CreateMilestoneInput,
   ListMilestonesInput,
   MilestoneId,
   type MilestoneWithProgress,
   UpdateMilestoneInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type CommandContext, emit } from '../context';
 import { fields, milestoneStatusLabel, progressLabel, table } from '../format';
 import { requireProject, resolveProject } from '../project';
@@ -43,7 +43,7 @@ function milestoneSummary(context: CommandContext, verb: string, milestone: Mile
 }
 
 // ---------------------------------------------------------------------------
-// pm milestones list
+// zamu milestones list
 // ---------------------------------------------------------------------------
 
 export async function listMilestones(context: CommandContext, options: { project?: string }): Promise<void> {
@@ -70,7 +70,7 @@ export async function listMilestones(context: CommandContext, options: { project
 }
 
 // ---------------------------------------------------------------------------
-// pm milestones create
+// zamu milestones create
 // ---------------------------------------------------------------------------
 
 export interface CreateMilestoneOptions {
@@ -100,7 +100,7 @@ export async function createMilestone(
 }
 
 // ---------------------------------------------------------------------------
-// pm milestones update
+// zamu milestones update
 // ---------------------------------------------------------------------------
 
 export interface UpdateMilestoneOptions {

@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import {
   CYCLE_CURRENT,
   CYCLE_NEXT,
@@ -11,8 +12,7 @@ import {
   TASK_STATUSES,
   type TaskStatus,
   type UserKind,
-} from '@pm/contracts';
-import { useQuery } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import { useMemo } from 'react';
 import { labelsQuery } from '~/features/labels/queries';
 import { membersQuery, meQuery } from '~/features/tasks/queries';

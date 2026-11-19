@@ -4,7 +4,7 @@ import {
   type TaskListItem,
   type TaskSort,
   type TaskStatus,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { BoardColumnData } from './queries';
 
 // Pure edits of one cached board column (an infinite query: pages of cards in rank order). Moves are

@@ -3,9 +3,9 @@ import { useMemo, useSyncExternalStore } from 'react';
 // Navigation memory (plan call 6, shortcuts.md "Task view"): when a task is opened from a view, the
 // view's task keys in order and its name are kept in sessionStorage (per tab), so the task view can
 // walk them with J / K and show "12 of 40 in List".
-//   sessionStorage pm:task-nav:v1 = { keys: [...], from: "List", returnTo?: "/p/PAY?status=todo" }
+//   sessionStorage zamu:task-nav:v1 = { keys: [...], from: "List", returnTo?: "/p/PAY?status=todo" }
 
-export const TASK_NAV_STORAGE_KEY = 'pm:task-nav:v1';
+export const TASK_NAV_STORAGE_KEY = 'zamu:task-nav:v1';
 /** Longer lists keep the keys around the opened task. */
 const MAX_KEYS = 2000;
 

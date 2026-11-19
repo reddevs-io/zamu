@@ -1,4 +1,4 @@
-import type { Activity, ProjectActivity, Task, TaskListItem, TaskOwnedField } from '@pm/contracts';
+import type { Activity, ProjectActivity, Task, TaskListItem, TaskOwnedField } from '@zamu/contracts';
 
 // Mirrored tasks: which fields Backlog.md owns, the history sentences for Backlog.md and project-level
 // entries, the comment box note, and the fields of "From the file".

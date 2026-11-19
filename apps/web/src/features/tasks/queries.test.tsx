@@ -1,6 +1,6 @@
-import type { Home, TaskListItem, TaskListPage, TaskStatus } from '@pm/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { Home, TaskListItem, TaskListPage, TaskStatus } from '@zamu/contracts';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { orpc } from '~/lib/orpc';

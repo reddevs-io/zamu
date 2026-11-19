@@ -1,4 +1,4 @@
-// pm labels list | create | update | delete (M5), and the label name lookups pm tasks list uses.
+// zamu labels list | create | update | delete (M5), and the label name lookups zamu tasks list uses.
 import {
   CreateLabelInput,
   DeleteLabelInput,
@@ -7,7 +7,7 @@ import {
   type LabelWithUsage,
   ListLabelsInput,
   UpdateLabelInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { ApiClient } from '../client';
 import { type CommandContext, emit } from '../context';
 import { notFoundError, usageError } from '../errors';
@@ -51,7 +51,7 @@ async function findLabel(client: ApiClient, project: string, value: string): Pro
 }
 
 /**
- * Label filter of pm tasks list: names (ignoring case) or ids to the ids the API takes. With several
+ * Label filter of zamu tasks list: names (ignoring case) or ids to the ids the API takes. With several
  * projects a name matches in each project that has it; a name no project has is a usage error
  * listing the labels there.
  */
@@ -65,7 +65,7 @@ export async function resolveLabelIds(
   if (names.length === 0) return ids;
   if (!projects?.length) {
     throw usageError(
-      `--label "${names[0]}" needs --project to look the name up (or run pm in a clone linked to a project).`,
+      `--label "${names[0]}" needs --project to look the name up (or run zamu in a clone linked to a project).`,
     );
   }
   const keys = projects.map((project) => project.trim().toUpperCase());
@@ -106,7 +106,7 @@ function labelSummary(context: CommandContext, verb: string, project: string, la
 }
 
 // ---------------------------------------------------------------------------
-// pm labels list
+// zamu labels list
 // ---------------------------------------------------------------------------
 
 export async function listLabels(context: CommandContext, options: { project?: string }): Promise<void> {
@@ -131,7 +131,7 @@ export async function listLabels(context: CommandContext, options: { project?: s
 }
 
 // ---------------------------------------------------------------------------
-// pm labels create
+// zamu labels create
 // ---------------------------------------------------------------------------
 
 export async function createLabel(
@@ -153,7 +153,7 @@ export async function createLabel(
 }
 
 // ---------------------------------------------------------------------------
-// pm labels update
+// zamu labels update
 // ---------------------------------------------------------------------------
 
 export async function updateLabel(
@@ -182,11 +182,11 @@ export async function updateLabel(
 }
 
 // ---------------------------------------------------------------------------
-// pm labels delete
+// zamu labels delete
 // ---------------------------------------------------------------------------
 
 /**
- * pm labels delete <name> --confirm <name>. Without --confirm, or with another name, nothing is
+ * zamu labels delete <name> --confirm <name>. Without --confirm, or with another name, nothing is
  * sent: deleting takes the label off every task.
  */
 export async function deleteLabel(

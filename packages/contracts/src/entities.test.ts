@@ -294,10 +294,10 @@ describe('round trip', () => {
 
   it('never lets the secret into a key summary', () => {
     expect(ApiKeySummary.parse(apiKeyCreatedFixture)).not.toHaveProperty('key');
-    expect(ApiKeyCreated.parse(apiKeyCreatedFixture).key).toMatch(/^pm_live_/);
+    expect(ApiKeyCreated.parse(apiKeyCreatedFixture).key).toMatch(/^zamu_live_/);
   });
 
-  it('rejects a created key without the pm_live_ prefix', () => {
+  it('rejects a created key without the zamu_live_ prefix', () => {
     expect(
       ApiKeyCreated.safeParse({ ...apiKeyCreatedFixture, key: 'sk_live_abcdefghijklmnopqrst' }).success,
     ).toBe(false);

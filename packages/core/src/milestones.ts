@@ -13,8 +13,8 @@ import {
   type MilestoneProgress,
   MilestoneWithProgress,
   UpdateMilestoneInput,
-} from '@pm/contracts';
-import { type DbOrTx, schema, type Tx } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema, type Tx } from '@zamu/db';
 import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type ActivityEntry, recordActivities } from './activity';

@@ -1,4 +1,4 @@
-// pm commands end to end, in-process: the real /api/v1 handler from apps/web on a throwaway Postgres
+// zamu commands end to end, in-process: the real /api/v1 handler from apps/web on a throwaway Postgres
 // database with the dev seed (PAY with 11 tasks, WEB with 4) and its M2 planning data in PAY: the
 // milestones "Webhooks v2" (PAY-1..5) and "PCI audit" (PAY-6..7), the current Cycle 1 (PAY-1..6) and the
 // upcoming Cycle 2 (PAY-7..8), and three comments on PAY-1. Every --json result is checked against
@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type CliResultName, parseCliOutput } from '@pm/contracts';
+import { type CliResultName, parseCliOutput } from '@zamu/contracts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type Actor, createApiKey, revokeApiKey } from '../../../packages/core/src/index';
 import { createTestDatabase, type TestDatabase } from '../../../packages/db/test/index';
@@ -19,7 +19,7 @@ import { seedDevData } from '../../web/src/server/seed';
 import type { CliIo, FetchLike } from '../src/io';
 import { main } from '../src/main';
 
-const URL = 'http://pm.test';
+const URL = 'http://zamu.test';
 const SECRET = 'test-secret-test-secret-test-secret-0123';
 
 let database: TestDatabase;
@@ -47,7 +47,7 @@ interface RunResult {
   stderr: string;
 }
 
-async function pm(args: string[], options: RunOptions = {}): Promise<RunResult> {
+async function zamu(args: string[], options: RunOptions = {}): Promise<RunResult> {
   const out: string[] = [];
   const err: string[] = [];
   const io: CliIo = {
@@ -65,9 +65,9 @@ async function pm(args: string[], options: RunOptions = {}): Promise<RunResult> 
   return { code, stdout: out.join(''), stderr: err.join('') };
 }
 
-/** Runs with PM_URL and PM_KEY set (the way agents in CI call pm). */
+/** Runs with ZAMU_URL and ZAMU_KEY set (the way agents in CI call zamu). */
 function as(key: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
-  return pm(args, { ...options, env: { PM_URL: URL, PM_KEY: key, ...options.env } });
+  return zamu(args, { ...options, env: { ZAMU_URL: URL, ZAMU_KEY: key, ...options.env } });
 }
 
 function parsed<N extends CliResultName>(result: RunResult, name: N) {
@@ -122,65 +122,65 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'pm-cli-home-'));
+  home = await mkdtemp(join(tmpdir(), 'zamu-cli-home-'));
   configHome = join(home, 'xdg');
   return () => rm(home, { recursive: true, force: true });
 });
 
-describe('pm login, whoami, logout', () => {
+describe('zamu login, whoami, logout', () => {
   it('validates the key with GET /me and stores url and key with mode 0600', async () => {
-    const login = await pm(['login', '--key', keys.agent, '--url', `${URL}/`, '--json']);
+    const login = await zamu(['login', '--key', keys.agent, '--url', `${URL}/`, '--json']);
     expect(login.code, login.stderr).toBe(0);
     const out = parsed(login, 'login');
     expect(out.data.url).toBe(URL);
     expect(out.data.me.user).toMatchObject({ name: agentName, kind: 'agent', email: null });
     expect(out.data.me.user.responsible?.name).toBe(adminName);
 
-    const path = join(configHome, 'pm', 'config.json');
+    const path = join(configHome, 'zamu', 'config.json');
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({ url: URL, key: keys.agent });
     expect((await stat(path)).mode & 0o777).toBe(0o600);
-    expect((await stat(join(configHome, 'pm'))).mode & 0o777).toBe(0o700);
+    expect((await stat(join(configHome, 'zamu'))).mode & 0o777).toBe(0o700);
 
-    const whoami = await pm(['whoami', '--json']);
+    const whoami = await zamu(['whoami', '--json']);
     expect(whoami.code, whoami.stderr).toBe(0);
     const me = parsed(whoami, 'whoami');
     expect(me.data.auth).toEqual({ method: 'api_key', scope: { projects: 'all', access: 'write' } });
 
-    const human = await pm(['whoami']);
+    const human = await zamu(['whoami']);
     expect(human.stdout).toContain(`${agentName} for ${adminName} (agent)`);
     expect(human.stdout).toMatch(/Access\s+API key: all projects, write/);
     expect(human.stdout).toMatch(new RegExp(`Server\\s+${URL}`));
 
-    const logout = await pm(['logout', '--json']);
+    const logout = await zamu(['logout', '--json']);
     expect(logout.code).toBe(0);
     expect(parsed(logout, 'logout').data).toEqual({ url: URL });
     await expect(stat(path)).rejects.toThrow();
 
-    const again = await pm(['logout', '--json']);
+    const again = await zamu(['logout', '--json']);
     expect(parsed(again, 'logout').data).toEqual({ url: null });
   });
 
   it('falls back to ~/.config when XDG_CONFIG_HOME is unset, and reads the key from stdin', async () => {
-    const login = await pm(['login', '--key', '-', '--url', URL], {
+    const login = await zamu(['login', '--key', '-', '--url', URL], {
       env: { XDG_CONFIG_HOME: undefined },
       stdin: `${keys.admin}\n`,
     });
     expect(login.code, login.stderr).toBe(0);
     expect(login.stdout).toContain(`Logged in as ${adminName}`);
-    const path = join(home, '.config', 'pm', 'config.json');
+    const path = join(home, '.config', 'zamu', 'config.json');
     expect(JSON.parse(await readFile(path, 'utf8')).key).toBe(keys.admin);
   });
 
   it('refuses a revoked key with exit code 2 and stores nothing', async () => {
-    const result = await pm(['login', '--key', keys.revoked, '--url', URL, '--json']);
+    const result = await zamu(['login', '--key', keys.revoked, '--url', URL, '--json']);
     const error = expectFailure(result, 2, 'UNAUTHORIZED');
     expect(error.status).toBe(401);
     expect(error.requestId).toEqual(expect.any(String));
-    await expect(stat(join(configHome, 'pm', 'config.json'))).rejects.toThrow();
+    await expect(stat(join(configHome, 'zamu', 'config.json'))).rejects.toThrow();
   });
 
   it('rejects a malformed key before calling the server (exit 1)', async () => {
-    const result = await pm(['login', '--key', 'not-a-key', '--json'], {
+    const result = await zamu(['login', '--key', 'not-a-key', '--json'], {
       fetch: () => {
         throw new Error('must not be called');
       },
@@ -189,23 +189,23 @@ describe('pm login, whoami, logout', () => {
   });
 
   it('exits 2 when no credentials exist', async () => {
-    const result = await pm(['whoami']);
+    const result = await zamu(['whoami']);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('Not logged in');
     expect(result.stdout).toBe('');
   });
 
-  it('lets PM_URL and PM_KEY override the stored config', async () => {
-    expect((await pm(['login', '--key', keys.agent, '--url', URL])).code).toBe(0);
+  it('lets ZAMU_URL and ZAMU_KEY override the stored config', async () => {
+    expect((await zamu(['login', '--key', keys.agent, '--url', URL])).code).toBe(0);
     const result = await as(keys.admin, ['whoami', '--json']);
     expect(parsed(result, 'whoami').data.user.name).toBe(adminName);
-    // PM_API_KEY (what the dev seed prints) works too.
-    const seedStyle = await pm(['whoami', '--json'], { env: { PM_URL: URL, PM_API_KEY: keys.admin } });
+    // ZAMU_API_KEY (what the dev seed prints) works too.
+    const seedStyle = await zamu(['whoami', '--json'], { env: { ZAMU_URL: URL, ZAMU_API_KEY: keys.admin } });
     expect(parsed(seedStyle, 'whoami').data.user.name).toBe(adminName);
   });
 });
 
-describe('pm projects list', () => {
+describe('zamu projects list', () => {
   it('lists projects with open counts', async () => {
     const result = await as(keys.agent, ['projects', 'list', '--json']);
     expect(result.code, result.stderr).toBe(0);
@@ -221,7 +221,7 @@ describe('pm projects list', () => {
   });
 });
 
-describe('pm projects delete', () => {
+describe('zamu projects delete', () => {
   /** A fetch that records every request and answers none. */
   function recording() {
     const requests: string[] = [];
@@ -241,7 +241,7 @@ describe('pm projects delete', () => {
       const { requests, fetch } = recording();
       const human = await as(keys.admin, args, { fetch });
       expect(human.code, args.join(' ')).toBe(1);
-      expect(human.stderr).toBe('pm: Pass --confirm PAY to delete project PAY.\n');
+      expect(human.stderr).toBe('zamu: Pass --confirm PAY to delete project PAY.\n');
       expect(human.stdout).toBe('');
       const json = await as(keys.admin, [...args, '--json'], { fetch });
       const error = expectFailure(json, 1, 'BAD_REQUEST');
@@ -269,7 +269,7 @@ describe('pm projects delete', () => {
 
     const json = await admin(['projects', 'delete', 'GONE', '--confirm', 'GONE', '--json']);
     expect(json.code, json.stderr).toBe(0);
-    expect(JSON.parse(json.stdout)).toEqual({ schema: 'pm.v1.projects.delete', data: { deleted: 'GONE' } });
+    expect(JSON.parse(json.stdout)).toEqual({ schema: 'zamu.v1.projects.delete', data: { deleted: 'GONE' } });
     expect(parsed(json, 'projects.delete').data).toEqual({ deleted: 'GONE' });
 
     const listed = parsed(await admin(['projects', 'list', '--json']), 'projects.list');
@@ -290,18 +290,18 @@ describe('pm projects delete', () => {
       'FORBIDDEN',
     );
     const human = await as(keys.agent, ['projects', 'delete', 'PAY', '--confirm', 'PAY']);
-    expect(human.stderr).toContain('pm: Only owners and admins can delete a project.');
+    expect(human.stderr).toContain('zamu: Only owners and admins can delete a project.');
   });
 
   it('is in the help', async () => {
-    const help = await pm(['projects', '--help']);
+    const help = await zamu(['projects', '--help']);
     expect(help.stdout).toMatch(/delete \[options\] <KEY>/);
-    const leafHelp = await pm(['projects', 'delete', '--help']);
+    const leafHelp = await zamu(['projects', 'delete', '--help']);
     expect(leafHelp.stdout).toContain('--confirm <KEY>');
   });
 });
 
-describe('pm tasks list', () => {
+describe('zamu tasks list', () => {
   it('lists a project with counts, task keys first', async () => {
     const result = await as(keys.agent, ['tasks', 'list', '--project', 'pay', '--json']);
     expect(result.code, result.stderr).toBe(0);
@@ -410,7 +410,7 @@ describe('pm tasks list', () => {
   });
 });
 
-describe('pm tasks show', () => {
+describe('zamu tasks show', () => {
   it('shows a task with its activity, agents "for" their human', async () => {
     const list = parsed(
       await as(keys.agent, ['tasks', 'list', '--project', 'PAY', '--status', 'in_review', '--json']),
@@ -437,12 +437,12 @@ describe('pm tasks show', () => {
     expectFailure(await as(keys.agent, ['tasks', 'show', 'PAY-9999', '--json']), 3, 'NOT_FOUND');
     const human = await as(keys.agent, ['tasks', 'show', 'PAY-9999']);
     expect(human.code).toBe(3);
-    expect(human.stderr).toMatch(/^pm: /);
+    expect(human.stderr).toMatch(/^zamu: /);
     expectFailure(await as(keys.agent, ['tasks', 'show', 'PAY142', '--json']), 1, 'BAD_REQUEST');
   });
 });
 
-describe('pm tasks create and update', () => {
+describe('zamu tasks create and update', () => {
   it('creates a task with a description from stdin, assigned by name', async () => {
     const result = await as(
       keys.agent,
@@ -572,7 +572,7 @@ function day(days = 0): string {
   return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
-describe('pm tasks list across projects, milestones and cycles', () => {
+describe('zamu tasks list across projects, milestones and cycles', () => {
   it('lists every readable project without --project, or several with it', async () => {
     const all = parsed(
       await as(keys.agent, ['tasks', 'list', '--limit', '200', '--json']),
@@ -674,7 +674,7 @@ describe('pm tasks list across projects, milestones and cycles', () => {
   });
 });
 
-describe('pm tasks create and update with milestones and cycles', () => {
+describe('zamu tasks create and update with milestones and cycles', () => {
   it('creates a task in a milestone (by name) and the next cycle', async () => {
     const result = await as(keys.agent, [
       'tasks',
@@ -773,7 +773,7 @@ describe('pm tasks create and update with milestones and cycles', () => {
   });
 });
 
-describe('pm tasks show timeline', () => {
+describe('zamu tasks show timeline', () => {
   it('prints comments inline with activity, oldest first', async () => {
     const result = await as(keys.agent, ['tasks', 'show', 'PAY-1', '--json']);
     expect(result.code, result.stderr).toBe(0);
@@ -819,7 +819,7 @@ describe('pm tasks show timeline', () => {
   });
 });
 
-describe('pm comments', () => {
+describe('zamu comments', () => {
   it('adds a comment from stdin with a mention, lists, edits and deletes it', async () => {
     const added = await as(keys.agent, ['comments', 'add', 'pay-2', '-', '--json'], {
       stdin: 'Picked this up. @ana@example.com can you review?\n',
@@ -904,7 +904,7 @@ describe('pm comments', () => {
   });
 });
 
-describe('pm milestones', () => {
+describe('zamu milestones', () => {
   it('lists milestones with progress, overdue first by target date', async () => {
     const result = await as(keys.agent, ['milestones', 'list', '--project', 'pay', '--json']);
     expect(result.code, result.stderr).toBe(0);
@@ -1073,7 +1073,7 @@ describe('pm milestones', () => {
   });
 });
 
-describe('pm cycles', () => {
+describe('zamu cycles', () => {
   it('lists cycles and shows the current one', async () => {
     const result = await as(keys.agent, ['cycles', 'list', '--project', 'PAY', '--json']);
     expect(result.code, result.stderr).toBe(0);
@@ -1275,25 +1275,25 @@ describe('output conventions', () => {
 
     const json = await as(keys.agent, ['whoami', '--json'], { tty: true });
     expect(json.stdout.split('\n').length).toBeGreaterThan(3);
-    expect(parseCliOutput(JSON.parse(json.stdout), 'whoami').schema).toBe('pm.v1.whoami');
+    expect(parseCliOutput(JSON.parse(json.stdout), 'whoami').schema).toBe('zamu.v1.whoami');
   });
 
   it('prints help and version with exit 0, unknown commands with exit 1', async () => {
-    const help = await pm(['--help']);
+    const help = await zamu(['--help']);
     expect(help.code).toBe(0);
     expect(help.stdout).toContain(
       'Exit codes: 0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog.md conflict.',
     );
-    const version = await pm(['--version']);
+    const version = await zamu(['--version']);
     expect(version.code).toBe(0);
     expect(version.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
-    const unknown = await pm(['frobnicate']);
+    const unknown = await zamu(['frobnicate']);
     expect(unknown.code).toBe(1);
     expect(unknown.stderr).toContain("unknown command 'frobnicate'");
   });
 });
 
-describe('pm dashboard', () => {
+describe('zamu dashboard', () => {
   it('reads GET /dashboard for Mine and Everyone', async () => {
     const mine = parsed(await as(keys.agent, ['dashboard', '--json']), 'dashboard').data;
     expect(mine.scope).toBe('mine');
@@ -1335,14 +1335,14 @@ describe('repository link (M2.1)', () => {
     await as(keys.admin, ['link', '--clear', '--project', 'PAY']);
   });
 
-  it('pm link links PAY to the remote, and commands in any clone of it use PAY', async () => {
+  it('zamu link links PAY to the remote, and commands in any clone of it use PAY', async () => {
     const repo = await clone('payments', SSH);
     const before = await as(keys.agent, ['milestones', 'list', '--json'], { cwd: repo });
     expect(expectFailure(before, 1, 'BAD_REQUEST').detail).toBe(
       'No project given, and no project you can read is linked to gitlab.example.com/team/payments.',
     );
     const beforeHuman = await as(keys.agent, ['milestones', 'list'], { cwd: repo });
-    expect(beforeHuman.stderr).toContain('pm link --project KEY');
+    expect(beforeHuman.stderr).toContain('zamu link --project KEY');
 
     const linked = await as(keys.agent, ['link', '--project', 'pay', '--json'], { cwd: repo });
     expect(linked.code, linked.stdout).toBe(0);
@@ -1410,7 +1410,7 @@ describe('repository link (M2.1)', () => {
     );
     const takenHuman = await as(keys.agent, ['link', '--project', 'WEB'], { cwd: repo });
     expect(takenHuman.stderr).toMatch(
-      /^pm: Payments \(PAY\) already uses gitlab\.example\.com\/team\/payments\. A repository can belong to one project\.\n {2}Request id: /,
+      /^zamu: Payments \(PAY\) already uses gitlab\.example\.com\/team\/payments\. A repository can belong to one project\.\n {2}Request id: /,
     );
 
     const fork = await clone('payments-fork', 'https://github.com/someone/payments-fork.git');
@@ -1436,15 +1436,15 @@ describe('repository link (M2.1)', () => {
     await as(keys.agent, ['link', '--project', 'PAY'], { cwd: repo });
   });
 
-  it('takes --project, then PM_PROJECT, then .pm.json, then the remote', async () => {
+  it('takes --project, then ZAMU_PROJECT, then .zamu.json, then the remote', async () => {
     const repo = await clone('payments-3', SSH);
     const sub = join(repo, 'src');
     const remote = parsed(await as(keys.agent, ['whoami', '--json'], { cwd: sub }), 'whoami');
     expect(remote.data.project?.source).toBe('remote');
 
-    await writeFile(join(sub, '.pm.json'), '{ "project": "web" }\n');
+    await writeFile(join(sub, '.zamu.json'), '{ "project": "web" }\n');
     const file = parsed(await as(keys.agent, ['whoami', '--json'], { cwd: join(sub, 'deep') }), 'whoami');
-    expect(file.data.project).toEqual({ key: 'WEB', source: 'file', from: join(sub, '.pm.json') });
+    expect(file.data.project).toEqual({ key: 'WEB', source: 'file', from: join(sub, '.zamu.json') });
     const milestones = parsed(
       await as(keys.agent, ['milestones', 'list', '--json'], { cwd: sub }),
       'milestones.list',
@@ -1459,44 +1459,46 @@ describe('repository link (M2.1)', () => {
     expect(viaLink.data.project).toMatchObject({ key: 'WEB', source: 'file' });
 
     const env = parsed(
-      await as(keys.agent, ['whoami', '--json'], { cwd: sub, env: { PM_PROJECT: 'pay' } }),
+      await as(keys.agent, ['whoami', '--json'], { cwd: sub, env: { ZAMU_PROJECT: 'pay' } }),
       'whoami',
     );
     expect(env.data.project).toEqual({ key: 'PAY', source: 'env', from: null });
     const flag = parsed(
       await as(keys.agent, ['cycles', 'list', '--project', 'WEB', '--json'], {
         cwd: sub,
-        env: { PM_PROJECT: 'PAY' },
+        env: { ZAMU_PROJECT: 'PAY' },
       }),
       'cycles.list',
     );
     expect(flag.data.items.length).toBeGreaterThan(0);
     expect(flag.data.items.every((c) => c.project.key === 'WEB')).toBe(true);
 
-    await writeFile(join(sub, '.pm.json'), '{ "project": "WEB", "url": "https://pm.example.com" }');
+    await writeFile(join(sub, '.zamu.json'), '{ "project": "WEB", "url": "https://zamu.example.com" }');
     const extra = await as(keys.agent, ['whoami', '--json'], { cwd: sub });
     expect(expectFailure(extra, 1, 'BAD_REQUEST').detail).toBe(
-      `${join(sub, '.pm.json')} is not a valid pm project file.`,
+      `${join(sub, '.zamu.json')} is not a valid zamu project file.`,
     );
-    await writeFile(join(sub, '.pm.json'), '{ project: WEB }');
+    await writeFile(join(sub, '.zamu.json'), '{ project: WEB }');
     expect(
       expectFailure(await as(keys.agent, ['whoami', '--json'], { cwd: sub }), 1, 'BAD_REQUEST').detail,
-    ).toBe(`${join(sub, '.pm.json')} is not valid JSON.`);
+    ).toBe(`${join(sub, '.zamu.json')} is not valid JSON.`);
     const badEnv = await as(keys.agent, ['whoami', '--json'], {
       cwd: repo,
-      env: { PM_PROJECT: 'not a key' },
+      env: { ZAMU_PROJECT: 'not a key' },
     });
-    expect(expectFailure(badEnv, 1, 'BAD_REQUEST').detail).toBe('PM_PROJECT is not a project key: not a key');
+    expect(expectFailure(badEnv, 1, 'BAD_REQUEST').detail).toBe(
+      'ZAMU_PROJECT is not a project key: not a key',
+    );
 
     // Outside any repository nothing names a project.
     const outside = await as(keys.agent, ['cycles', 'list']);
     expect(outside.code).toBe(1);
-    expect(outside.stderr).toContain('pm: No project given. Pass --project KEY.');
+    expect(outside.stderr).toContain('zamu: No project given. Pass --project KEY.');
     expect(parsed(await as(keys.agent, ['whoami', '--json']), 'whoami').data.project).toBeNull();
     expect((await as(keys.agent, ['whoami'])).stdout).toMatch(/Project\s+none here/);
   });
 
-  it('pm link --file writes .pm.json at the repository root, or here with --here', async () => {
+  it('zamu link --file writes .zamu.json at the repository root, or here with --here', async () => {
     const repo = await clone('monorepo');
     const sub = join(repo, 'src');
     const created = await as(keys.agent, ['link', '--file', '--project', 'web', '--json'], { cwd: sub });
@@ -1505,15 +1507,15 @@ describe('repository link (M2.1)', () => {
       target: 'file',
       action: 'created',
       repository: null,
-      file: join(repo, '.pm.json'),
+      file: join(repo, '.zamu.json'),
     });
-    expect(JSON.parse(await readFile(join(repo, '.pm.json'), 'utf8'))).toEqual({ project: 'WEB' });
+    expect(JSON.parse(await readFile(join(repo, '.zamu.json'), 'utf8'))).toEqual({ project: 'WEB' });
     const same = await as(keys.agent, ['link', '--file'], { cwd: sub });
-    expect(same.stdout).toBe('../.pm.json already names WEB.\n');
+    expect(same.stdout).toBe('../.zamu.json already names WEB.\n');
 
     const here = await as(keys.agent, ['link', '--file', '--here', '--project', 'PAY'], { cwd: sub });
     expect(here.stdout).toBe(
-      'Wrote .pm.json: pm uses PAY in this folder and below. Commit it so every clone gets it.\n',
+      'Wrote .zamu.json: zamu uses PAY in this folder and below. Commit it so every clone gets it.\n',
     );
     expect(
       parsed(await as(keys.agent, ['whoami', '--json'], { cwd: join(sub, 'deep') }), 'whoami').data.project
@@ -1540,11 +1542,11 @@ describe('repository link (M2.1)', () => {
     const local = await clone('local-remote', '/srv/git/payments.git');
     const unlinkable = await as(keys.agent, ['link', '--project', 'PAY', '--json'], { cwd: local });
     expect(expectFailure(unlinkable, 1, 'BAD_REQUEST').detail).toBe(
-      'The remote origin (/srv/git/payments.git) is not a URL pm can link.',
+      'The remote origin (/srv/git/payments.git) is not a URL zamu can link.',
     );
   });
 
-  it('pm agents writes a marked block into AGENTS.md and replaces only that block', async () => {
+  it('zamu agents writes a marked block into AGENTS.md and replaces only that block', async () => {
     const repo = await clone('agents', SSH);
     const created = await as(keys.agent, ['agents', '--json'], { cwd: join(repo, 'src') });
     const out = parsed(created, 'agents').data;
@@ -1552,14 +1554,14 @@ describe('repository link (M2.1)', () => {
     const first = await readFile(join(repo, 'AGENTS.md'), 'utf8');
     expect(first).toBe(`${out.block}\n`);
     expect(first).toMatch(
-      /^<!-- pm:start \(written by pm agents; run it again to update\) -->\n## Tasks: the pm CLI\n/,
+      /^<!-- zamu:start \(written by zamu agents; run it again to update\) -->\n## Tasks: the zamu CLI\n/,
     );
     expect(first).toContain('Tasks for this repository are in project PAY.');
-    expect(first).toContain('`pm tasks show PAY-12 --json`');
-    expect(first.trimEnd().endsWith('<!-- pm:end -->')).toBe(true);
+    expect(first).toContain('`zamu tasks show PAY-12 --json`');
+    expect(first.trimEnd().endsWith('<!-- zamu:end -->')).toBe(true);
 
     const unchanged = await as(keys.agent, ['agents'], { cwd: repo });
-    expect(unchanged.stdout).toBe('AGENTS.md already has the current pm instructions.\n');
+    expect(unchanged.stdout).toBe('AGENTS.md already has the current zamu instructions.\n');
 
     // Hand-written text around the block survives; the block is rewritten in place.
     await writeFile(
@@ -1567,11 +1569,11 @@ describe('repository link (M2.1)', () => {
       `# Repo rules\n\nUse pnpm.\n\n${first}\n## More\n\nKeep this.\n`,
     );
     const updated = await as(keys.agent, ['agents', '--project', 'web'], { cwd: repo });
-    expect(updated.stdout).toBe('Wrote pm instructions for WEB into AGENTS.md.\n');
+    expect(updated.stdout).toBe('Wrote zamu instructions for WEB into AGENTS.md.\n');
     const second = await readFile(join(repo, 'AGENTS.md'), 'utf8');
-    expect(second.startsWith('# Repo rules\n\nUse pnpm.\n\n<!-- pm:start')).toBe(true);
-    expect(second.endsWith('<!-- pm:end -->\n\n## More\n\nKeep this.\n')).toBe(true);
-    expect(second.match(/<!-- pm:start/g)).toHaveLength(1);
+    expect(second.startsWith('# Repo rules\n\nUse pnpm.\n\n<!-- zamu:start')).toBe(true);
+    expect(second.endsWith('<!-- zamu:end -->\n\n## More\n\nKeep this.\n')).toBe(true);
+    expect(second.match(/<!-- zamu:start/g)).toHaveLength(1);
     expect(second).toContain('project WEB');
 
     // Only CLAUDE.md: the block goes there. --file picks any file.
@@ -1579,7 +1581,7 @@ describe('repository link (M2.1)', () => {
     await writeFile(join(claude, 'CLAUDE.md'), '# Notes\n');
     const intoClaude = parsed(await as(keys.agent, ['agents', '--json'], { cwd: claude }), 'agents').data;
     expect(intoClaude).toMatchObject({ file: join(claude, 'CLAUDE.md'), action: 'updated', project: null });
-    expect(await readFile(join(claude, 'CLAUDE.md'), 'utf8')).toMatch(/^# Notes\n\n<!-- pm:start/);
+    expect(await readFile(join(claude, 'CLAUDE.md'), 'utf8')).toMatch(/^# Notes\n\n<!-- zamu:start/);
     const custom = parsed(
       await as(keys.agent, ['agents', '--file', 'docs/AI.md', '--json'], { cwd: repo }),
       'agents',
@@ -1587,26 +1589,26 @@ describe('repository link (M2.1)', () => {
     expect(custom.data).toMatchObject({ file: join(repo, 'docs', 'AI.md'), action: 'created' });
   });
 
-  it('pm agents --print works without credentials and without a project', async () => {
+  it('zamu agents --print works without credentials and without a project', async () => {
     const repo = await clone('offline', SSH);
-    const printed = await pm(['agents', '--print'], { cwd: repo });
+    const printed = await zamu(['agents', '--print'], { cwd: repo });
     expect(printed.code, printed.stderr).toBe(0);
     expect(printed.stdout).toContain('Pass --project KEY to commands that work on one project.');
-    expect(printed.stdout).toContain('`pm tasks create "Title" --project KEY --description -`');
+    expect(printed.stdout).toContain('`zamu tasks create "Title" --project KEY --description -`');
     expect(printed.stderr).toBe('');
-    const json = parsed(await pm(['agents', '--print', '--json'], { cwd: repo }), 'agents');
+    const json = parsed(await zamu(['agents', '--print', '--json'], { cwd: repo }), 'agents');
     expect(json.data).toMatchObject({ file: null, action: 'printed', project: null });
     await expect(stat(join(repo, 'AGENTS.md'))).rejects.toThrow();
 
     // With a key the server refuses, the lookup is skipped with a note and the block still prints.
     const refused = await as(keys.revoked, ['agents', '--print'], { cwd: repo });
     expect(refused.code).toBe(0);
-    expect(refused.stderr).toContain('pm: could not look up the project of this clone');
+    expect(refused.stderr).toContain('zamu: could not look up the project of this clone');
   });
 });
 
 // Runs last: it ends PAY's current cycle, which the tests above read.
-describe('pm cycles end (default target)', () => {
+describe('zamu cycles end (default target)', () => {
   it('ends the current cycle and moves unfinished tasks to the next one', async () => {
     const human = await as(keys.agent, ['cycles', 'end', '--project', 'PAY']);
     expect(human.code, human.stderr).toBe(0);

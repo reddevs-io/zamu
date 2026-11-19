@@ -1,4 +1,4 @@
-// pm cycles list | create | current | end.
+// zamu cycles list | create | current | end.
 import {
   CreateCycleInput,
   type Cycle,
@@ -6,7 +6,7 @@ import {
   CycleList,
   EndCycleInput,
   ListCyclesInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type CommandContext, emit } from '../context';
 import { cycleDates, cycleLabel, cycleStateLabel, fields, formatTime, statusLabel, table } from '../format';
 import { requireProject } from '../project';
@@ -58,7 +58,7 @@ function cycleFields(context: CommandContext, cycle: Cycle): string {
 }
 
 // ---------------------------------------------------------------------------
-// pm cycles list
+// zamu cycles list
 // ---------------------------------------------------------------------------
 
 export async function listCycles(context: CommandContext, options: { project?: string }): Promise<void> {
@@ -86,7 +86,7 @@ export async function listCycles(context: CommandContext, options: { project?: s
 }
 
 // ---------------------------------------------------------------------------
-// pm cycles create
+// zamu cycles create
 // ---------------------------------------------------------------------------
 
 export interface CreateCycleOptions {
@@ -112,7 +112,7 @@ export async function createCycle(context: CommandContext, options: CreateCycleO
 }
 
 // ---------------------------------------------------------------------------
-// pm cycles current
+// zamu cycles current
 // ---------------------------------------------------------------------------
 
 export async function currentCycle(context: CommandContext, options: { project?: string }): Promise<void> {
@@ -130,7 +130,7 @@ export async function currentCycle(context: CommandContext, options: { project?:
 }
 
 // ---------------------------------------------------------------------------
-// pm cycles end
+// zamu cycles end
 // ---------------------------------------------------------------------------
 
 export interface EndCycleOptions {

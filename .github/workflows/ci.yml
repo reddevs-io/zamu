@@ -1,0 +1,153 @@
+# CI for Zamu: runs on pull requests and on pushes to main. release.yml calls it with the release tag as `ref`
+# before it builds and pushes the image.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to check out (for example refs/tags/0.8.0). Empty means the ref of the event.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# One group per pull request, so a new push cancels the run it supersedes. Pushes to main and release calls get
+# a group per commit and are never cancelled. In a called workflow github.workflow is the caller's name, which
+# keeps a release's group apart from the CI run on the same commit.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm typecheck
+
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zamu
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # Test-only values, not secrets. The tests create throwaway databases on the TEST_DATABASE_URL server.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/zamu
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      BETTER_AUTH_SECRET: ci-only-secret-not-used-outside-tests-0123456789
+      BETTER_AUTH_URL: http://localhost:3000
+      PUBLIC_URL: http://localhost:3000
+    steps:
+      # The runner image ships git, which the CLI tests use to create clones.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # The web build lets the startup tests spawn the built server (PM-1); without it they are skipped.
+      - run: pnpm --filter web build
+      - run: pnpm test
+
+  # Builds the image, starts the self-hosting stack with docker compose and waits for /api/healthz.
+  docker-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BETTER_AUTH_SECRET: ci-only-secret-not-used-outside-ci-0123456789abcdef
+      ZAMU_IMAGE: zamu:ci-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - run: docker compose build
+      - run: docker compose up -d
+      - name: Wait for /api/healthz
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/healthz; then echo; echo "healthy after ${attempt} attempts"; exit 0; fi
+            sleep 2
+          done
+          echo "web did not become healthy"
+          docker compose ps -a
+          docker compose logs
+          exit 1
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v --remove-orphans
+
+  # End-to-end tests: Playwright against the docker compose stack on the runner's Docker (see e2e/stack.ts), at
+  # http://localhost:3100. Runs after docker-build, so a broken image fails fast and cheap.
+  # The upgrade spec builds the older releases (0.1.1, 0.3.0, 0.6.0) from their git tags with git archive, so
+  # the checkout needs the full history and tags. That takes a few minutes per image.
+  e2e:
+    needs: docker-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # The version matches @playwright/test from the lockfile.
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - name: Upload the Playwright report and test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+      # Annotations and a job summary only (no check run), so the job needs no checks: write.
+      - name: Publish the JUnit results
+        if: always()
+        uses: mikepenz/action-junit-report@a16be3a69023e9bd7e748ede768b3282ea7b30ce # v6.7.1
+        with:
+          report_paths: test-results/junit.xml
+          annotate_only: true
+          detailed_summary: true

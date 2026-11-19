@@ -1,5 +1,5 @@
-// pm link: links the project to this clone's repository on the server (so pm finds the project in
-// every clone of it), unlinks it with --clear, or writes .pm.json with --file.
+// zamu link: links the project to this clone's repository on the server (so zamu finds the project in
+// every clone of it), unlinks it with --clear, or writes .zamu.json with --file.
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import {
@@ -11,7 +11,7 @@ import {
   parseRepositoryUrl,
   sameRepository,
   UpdateProjectInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { ApiClient } from '../client';
 import { type CommandContext, emit } from '../context';
 import { notFoundError, usageError } from '../errors';
@@ -49,14 +49,14 @@ function printLink(context: CommandContext, data: CliData<'link'>, previous: str
   const key = style.bold(data.project);
   switch (data.action) {
     case 'linked':
-      return `Linked ${key} to ${data.repository}. pm now picks ${data.project} in clones of it.\n`;
+      return `Linked ${key} to ${data.repository}. zamu now picks ${data.project} in clones of it.\n`;
     case 'replaced':
       return `Linked ${key} to ${data.repository} (was ${previous}).\n`;
     case 'cleared':
       return `Unlinked ${key} from ${previous}. In clones of it, pass --project ${data.project} again.\n`;
     case 'created':
     case 'updated':
-      return `Wrote ${data.file}: pm uses ${key} in this folder and below. Commit it so every clone gets it.\n`;
+      return `Wrote ${data.file}: zamu uses ${key} in this folder and below. Commit it so every clone gets it.\n`;
     default:
       return data.target === 'file'
         ? `${data.file} already names ${key}.\n`
@@ -87,19 +87,19 @@ async function linkRemote(context: CommandContext, options: LinkOptions): Promis
       inRepo ? 'This clone has no git remote to link.' : 'This folder is not inside a git repository.',
       undefined,
       [
-        "Run pm link in a clone with an origin remote, or set the repository in the project's settings on the web.",
+        "Run zamu link in a clone with an origin remote, or set the repository in the project's settings on the web.",
       ],
     );
   }
   const repository = parseRepositoryUrl(remote.url);
   if (!repository) {
-    throw usageError(`The remote ${remote.name} (${remote.url}) is not a URL pm can link.`, undefined, [
-      'pm links HTTPS and SSH remotes, like https://host/owner/repo or git@host:owner/repo.',
+    throw usageError(`The remote ${remote.name} (${remote.url}) is not a URL zamu can link.`, undefined, [
+      'zamu links HTTPS and SSH remotes, like https://host/owner/repo or git@host:owner/repo.',
     ]);
   }
   // The remote is what is being linked, so it cannot also pick the project.
   const resolved = await resolveProject(context, options.project, { remote: false });
-  if (!resolved) throw usageError('Name the project to link: pm link --project KEY');
+  if (!resolved) throw usageError('Name the project to link: zamu link --project KEY');
   const key = projectKey(resolved.key);
 
   const client = await context.client();
@@ -128,7 +128,7 @@ async function linkRemote(context: CommandContext, options: LinkOptions): Promis
 /** Removes the project's repository. Without --project, the project of this clone. */
 async function clearLink(context: CommandContext, options: LinkOptions): Promise<void> {
   const resolved = await resolveProject(context, options.project);
-  if (!resolved) throw usageError('Name the project to unlink: pm link --clear --project KEY');
+  if (!resolved) throw usageError('Name the project to unlink: zamu link --clear --project KEY');
   const key = projectKey(resolved.key);
   const client = await context.client();
   const current = await readableProject(client, key);
@@ -150,11 +150,11 @@ async function clearLink(context: CommandContext, options: LinkOptions): Promise
   );
 }
 
-/** Writes .pm.json at the git root, or in the working directory with --here. */
+/** Writes .zamu.json at the git root, or in the working directory with --here. */
 async function linkFile(context: CommandContext, options: LinkOptions): Promise<void> {
   const { io } = context;
   const resolved = await resolveProject(context, options.project);
-  if (!resolved) throw usageError('Name the project for .pm.json: pm link --file --project KEY');
+  if (!resolved) throw usageError('Name the project for .zamu.json: zamu link --file --project KEY');
   const key = projectKey(resolved.key);
   // Catch a mistyped key now rather than on the next command.
   await readableProject(await context.client(), key);

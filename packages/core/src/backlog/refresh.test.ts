@@ -1,8 +1,8 @@
 // Refresh engine on Postgres with a fake provider serving in-memory repositories and the
 // parser's fixture folders.
-import { BacklogBlock, formatTaskKey } from '@pm/contracts';
-import { schema } from '@pm/db';
-import { GitUnauthorized } from '@pm/git-providers';
+import { BacklogBlock, formatTaskKey } from '@zamu/contracts';
+import { schema } from '@zamu/db';
+import { GitUnauthorized } from '@zamu/git-providers';
 import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { runJob } from '../job-handlers';

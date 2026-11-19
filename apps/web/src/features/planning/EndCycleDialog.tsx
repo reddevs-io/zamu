@@ -1,4 +1,4 @@
-import { type Cycle, PRIORITIES, type TaskListItem } from '@pm/contracts';
+import { type Cycle, PRIORITIES, type TaskListItem } from '@zamu/contracts';
 import { useState } from 'react';
 import {
   Avatar,

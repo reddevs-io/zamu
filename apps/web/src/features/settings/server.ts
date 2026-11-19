@@ -1,7 +1,10 @@
 // TanStack Start server functions for the settings screens. Members, invitations, agents and keys are
-// not part of /api/v1 in M1, so the screens call @pm/core through these thin adapters: validate the
+// not part of /api/v1 in M1, so the screens call @zamu/core through these thin adapters: validate the
 // input with the contract schema, build the actor from the request, call core, return the result.
 // Handler bodies (and the server-only imports they use) are stripped from the client bundle.
+
+import { createServerFn } from '@tanstack/react-start';
+import { getRequestHeaders } from '@tanstack/react-start/server';
 import {
   CancelInvitationInput,
   CreateAgentInput,
@@ -10,7 +13,7 @@ import {
   ListApiKeysInput,
   RemoveMemberInput,
   RevokeApiKeyInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import {
   type Actor,
   type CoreContext,
@@ -22,9 +25,7 @@ import {
   listInvitations,
   removeMember,
   revokeApiKey,
-} from '@pm/core';
-import { createServerFn } from '@tanstack/react-start';
-import { getRequestHeaders } from '@tanstack/react-start/server';
+} from '@zamu/core';
 import { getServerContext } from '../../server/context';
 import { runForRequest } from './adapter';
 

@@ -24,7 +24,7 @@ import type {
 } from '../entities';
 
 // Valid sample values for every entity schema, typed as server-side inputs (Dates allowed).
-// Import from '@pm/contracts/testing/fixtures' in tests of other packages.
+// Import from '@zamu/contracts/testing/fixtures' in tests of other packages.
 
 const at = (iso: string) => new Date(iso);
 
@@ -275,7 +275,7 @@ export const invitationFixture = {
   role: 'member',
   status: 'pending',
   invitedBy: ana,
-  link: 'https://pm.example.com/invite/0190a1b2-0000-4000-8000-00000000f0f0',
+  link: 'https://zamu.example.com/invite/0190a1b2-0000-4000-8000-00000000f0f0',
   expiresAt: at('2026-10-28T09:00:00.000Z'),
   createdAt: at('2026-10-21T09:00:00.000Z'),
 } satisfies z.input<typeof Invitation>;
@@ -283,7 +283,7 @@ export const invitationFixture = {
 export const apiKeySummaryFixture = {
   id: '0190a1b2-0000-7000-8000-00000000e0e0',
   name: 'claude-dev on Ana’s laptop',
-  start: 'pm_live_4kQz',
+  start: 'zamu_live_4kQz',
   owner: claudeDev,
   scope: { projects: [{ id: projectId, key: 'PAY', name: 'Payments' }], access: 'write' },
   revoked: false,
@@ -294,7 +294,7 @@ export const apiKeySummaryFixture = {
 
 export const apiKeyCreatedFixture = {
   ...apiKeySummaryFixture,
-  key: 'pm_live_7Hq2mV9xKc4TzR8bN3wLp6Ye1Ua5Fj0D',
+  key: 'zamu_live_7Hq2mV9xKc4TzR8bN3wLp6Ye1Ua5Fj0D',
 } satisfies z.input<typeof ApiKeyCreated>;
 
 export const meFixture = {

@@ -1,4 +1,12 @@
 import {
+  type InfiniteData,
+  type QueryClient,
+  type QueryKey,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
   type AssigneeRef,
   type BulkUpdateTasksInput,
   type CreateTaskInput,
@@ -19,15 +27,7 @@ import {
   type TaskListPage,
   type TaskStatus,
   type UpdateTaskInput,
-} from '@pm/contracts';
-import {
-  type InfiniteData,
-  type QueryClient,
-  type QueryKey,
-  queryOptions,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
+} from '@zamu/contracts';
 import type { z } from 'zod';
 // Pure helpers only (no runtime import of board/queries, which imports this module).
 import {

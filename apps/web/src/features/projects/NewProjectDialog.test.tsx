@@ -1,6 +1,6 @@
-import { REPOSITORY_URL_HINT } from '@pm/contracts';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { REPOSITORY_URL_HINT } from '@zamu/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { NewProjectDialog, type NewProjectDialogProps } from './NewProjectDialog';
 
@@ -108,7 +108,7 @@ describe('NewProjectDialog', () => {
     const { user, repository } = setup();
     expect(repository()).toHaveAttribute('placeholder', 'https://gitlab.com/team/repo.git');
     expect(repository()).toHaveAccessibleDescription(
-      'The URL you clone from, HTTPS or SSH. Inside a clone of it, pm picks this project without --project.',
+      'The URL you clone from, HTTPS or SSH. Inside a clone of it, zamu picks this project without --project.',
     );
     await user.type(repository(), 'git@gitlab.com:reddevs/billing.git');
     expect(repository()).toHaveAccessibleDescription(

@@ -55,7 +55,7 @@ export const BACKLOG_FILE_KINDS = [
 export type BacklogFileKind = (typeof BACKLOG_FILE_KINDS)[number];
 
 /**
- * backlog_source.mappings. The contract shape (BacklogMappings in @pm/contracts) validates it on
+ * backlog_source.mappings. The contract shape (BacklogMappings in @zamu/contracts) validates it on
  * every write; the database only stores it.
  */
 export interface StoredBacklogMappings {
@@ -145,7 +145,7 @@ export const backlogSource = pgTable(
     lastTrigger: text('last_trigger', { enum: BACKLOG_TRIGGERS }),
     /** Why the last refresh failed or the source paused. Never contains a token. */
     lastError: text('last_error'),
-    /** Value fallbacks and other warnings of the last read (BacklogProblem[] in @pm/contracts). */
+    /** Value fallbacks and other warnings of the last read (BacklogProblem[] in @zamu/contracts). */
     warnings: jsonb('warnings').$type<Record<string, unknown>[]>().default([]).notNull(),
     /** Random, URL-safe: POST /api/webhooks/backlog/{webhookId}. Kept after detach (the URL answers 410). */
     webhookId: text('webhook_id').notNull(),

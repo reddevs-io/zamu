@@ -1,8 +1,9 @@
 // "New secret" in the webhook dialog (PM-9): a confirm dialog, then a new webhook secret for the
 // mirror. The URL stays; the old secret stops working at once. The new secret is shown once from
 // component state, never kept in the mutation cache.
-import type { BacklogWebhookSecret } from '@pm/contracts';
+
 import { useQueryClient } from '@tanstack/react-query';
+import type { BacklogWebhookSecret } from '@zamu/contracts';
 import { ConfirmDialog } from '~/ui';
 import { errorMessage, unwrap } from '../settings/result';
 import { webhookInfoQuery } from './queries';

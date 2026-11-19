@@ -1,4 +1,4 @@
-import type { BacklogMode, BacklogPreview, BacklogProblem } from '@pm/contracts';
+import type { BacklogMode, BacklogPreview, BacklogProblem } from '@zamu/contracts';
 import { useState } from 'react';
 import {
   Button,

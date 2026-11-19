@@ -1,4 +1,4 @@
-// pm dashboard [--everyone]: the action queue, the project rows and the agents in one screen.
+// zamu dashboard [--everyone]: the action queue, the project rows and the agents in one screen.
 import type {
   Dashboard,
   DashboardProject,
@@ -7,7 +7,7 @@ import type {
   MentionItem,
   ReviewItem,
   StalledItem,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type CommandContext, emit } from '../context';
 import { elapsed, type GridColumn, grid, personLabel, type Style } from '../format';
 

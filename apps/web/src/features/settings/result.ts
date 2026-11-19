@@ -1,7 +1,7 @@
 // What settings server functions return, and how the browser turns failures back into errors.
 // Server functions return failures as data instead of throwing, so the code, message and field
 // issues of core's errors reach the browser intact. This module is safe for the client bundle.
-import type { ProblemCode, ProblemIssue } from '@pm/contracts';
+import type { ProblemCode, ProblemIssue } from '@zamu/contracts';
 
 export interface SettingsFailure {
   code: ProblemCode;

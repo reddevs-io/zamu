@@ -18,8 +18,8 @@ import {
 import { dockerAvailable } from './docker';
 
 const scripts = join(import.meta.dirname, '../../../../docker/forgejo');
-const project = `pm-forgejo-it-${process.pid}`;
-const owner = 'pm-admin';
+const project = `zamu-forgejo-it-${process.pid}`;
+const owner = 'zamu-admin';
 const repo = 'backlog-fixture';
 const path = `${owner}/${repo}`;
 const secret = `whsec-${process.pid}-integration`;

@@ -1,5 +1,5 @@
-import type { ProjectBacklogSummary, Task } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { ProjectBacklogSummary, Task } from '@zamu/contracts';
 import { useState } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import { orpc } from '~/lib/orpc';

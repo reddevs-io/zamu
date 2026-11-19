@@ -24,8 +24,8 @@ import {
   type StalledItem,
   type TaskStatus,
   type UserRef,
-} from '@pm/contracts';
-import type { Db } from '@pm/db';
+} from '@zamu/contracts';
+import type { Db } from '@zamu/db';
 import { type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize } from './authz';

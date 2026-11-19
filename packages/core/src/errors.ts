@@ -1,8 +1,8 @@
 // Typed errors thrown by core services. Adapters map them to Problem responses by `code`
 // (NotFound 404, Forbidden 403, Conflict 409, TaskChanged 409, Invalid 422); see PROBLEM_STATUS in
-// @pm/contracts.
-import type { MirroredProblemExtensions, ProblemCode, ProblemIssue, Task } from '@pm/contracts';
-import { toProblemIssues } from '@pm/contracts';
+// @zamu/contracts.
+import type { MirroredProblemExtensions, ProblemCode, ProblemIssue, Task } from '@zamu/contracts';
+import { toProblemIssues } from '@zamu/contracts';
 import { ZodError } from 'zod';
 
 export type CoreErrorCode = Extract<

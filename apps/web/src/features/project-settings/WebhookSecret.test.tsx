@@ -1,9 +1,10 @@
 // PM-9: "New secret" in the webhook dialog, the confirmation, the new secret shown once, and the
 // banner when the stored secret can't be read. The server functions are stubbed; core has its own tests.
-import type { BacklogWebhookInfo } from '@pm/contracts';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { BacklogWebhookInfo } from '@zamu/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SettingsResult } from '../settings/result';
 import { BacklogStatusView } from './BacklogSettings';
@@ -28,7 +29,7 @@ vi.mock('~/lib/orpc', async () => {
   return { client, orpc: createTanstackQueryUtils(client as never) };
 });
 
-const URL = 'https://pm.example.com/api/webhooks/backlog/hook-id-0123456789abcdef';
+const URL = 'https://zamu.example.com/api/webhooks/backlog/hook-id-0123456789abcdef';
 const OLD = 'old-secret-0123456789abcdefghijklmnopqrstu';
 const NEW = 'new-secret-0123456789abcdefghijklmnopqrstu';
 

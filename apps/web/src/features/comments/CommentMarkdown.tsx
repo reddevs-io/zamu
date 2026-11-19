@@ -1,4 +1,4 @@
-import type { UserRef } from '@pm/contracts';
+import type { UserRef } from '@zamu/contracts';
 import { createContext, useContext, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';

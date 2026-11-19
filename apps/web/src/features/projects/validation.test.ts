@@ -1,4 +1,4 @@
-import { REPOSITORY_URL_HINT } from '@pm/contracts';
+import { REPOSITORY_URL_HINT } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { normalizeKeyInput, repositoryError, suggestKey, validateNewProject } from './validation';
 

@@ -1,7 +1,7 @@
 // The web server's pg-boss producer against a fresh database (pg-boss installs its schema on the
 // first enqueue when the worker has not run yet).
-import { BACKLOG_REFRESH } from '@pm/core';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+import { BACKLOG_REFRESH } from '@zamu/core';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createJobProducer, type JobProducer } from './jobs';
 

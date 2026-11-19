@@ -1,5 +1,5 @@
-import type { Dashboard, DashboardScope } from '@pm/contracts';
-import { schema } from '@pm/db';
+import type { Dashboard, DashboardScope } from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Actor } from './authz';

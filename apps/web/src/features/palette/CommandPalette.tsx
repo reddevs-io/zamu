@@ -1,6 +1,6 @@
-import type { TaskListItem } from '@pm/contracts';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
+import type { TaskListItem } from '@zamu/contracts';
 import {
   type KeyboardEvent,
   type ReactNode,

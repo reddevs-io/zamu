@@ -128,7 +128,7 @@ In the web app, the task view shows one small Backlog.md badge, which links to t
 only when you point at it or try to change it, and the pickers open read-only. The board does not let a
 mirrored card move to another column. New task is disabled and says that tasks are created in Backlog.md.
 Changes to several tasks at once (the action bar, `POST /api/v1/tasks/bulk`) work in native projects only.
-The API and `pm` refuse the same changes with `409` and the codes `TASK_MIRRORED`, `MILESTONE_MIRRORED`,
+The API and `zamu` refuse the same changes with `409` and the codes `TASK_MIRRORED`, `MILESTONE_MIRRORED`,
 `PROJECT_MIRRORED` or `LABEL_MIRRORED`, naming the field, the file and a `backlog` command that makes the
 change.
 
@@ -180,8 +180,8 @@ A mirrored task keeps its Backlog.md number. In a project with the key `PAY`:
 Zero padding is dropped. Drafts have their own numbering in Backlog.md, so they get numbers above the
 highest task number on the first read and keep them afterwards.
 
-The Backlog.md ID works wherever a task key does, in URLs, the API and `pm`, ignoring case:
-`pm tasks show BACK-786.1`. IDs such as `TASK-12` can repeat across projects; pass `--project` (or the API's
+The Backlog.md ID works wherever a task key does, in URLs, the API and `zamu`, ignoring case:
+`zamu tasks show BACK-786.1`. IDs such as `TASK-12` can repeat across projects; pass `--project` (or the API's
 `project` parameter) when an ID alone is ambiguous.
 
 ## Refreshes
@@ -190,11 +190,11 @@ A refresh reads the default branch at its head commit, downloads only the files 
 applies every change in one database transaction. A refresh starts when:
 - the git host sends a push webhook for the default branch (see below);
 - someone presses Refresh now in the project header's Backlog.md popover or in Settings > Backlog.md (⇧R);
-- an agent runs `pm backlog refresh`;
+- an agent runs `zamu backlog refresh`;
 - the hourly check runs, at 15 minutes past each hour (UTC). It stops early when the head has not moved.
 
 Webhook pushes within a minute of each other collapse into one refresh, so a burst of pushes costs one read.
-Refresh now and `pm backlog refresh` start right away, also when a webhook refresh is waiting for its slot:
+Refresh now and `zamu backlog refresh` start right away, also when a webhook refresh is waiting for its slot:
 they take its place. Open pages pick up a finished refresh the next time they load their data; reload the
 page to see it at once.
 
@@ -285,11 +285,11 @@ An import is a mirror that detaches right after its first read.
 ## Delete a mirrored project
 
 Owners and admins delete a project in its Settings > General > Delete this project, or with
-`pm projects delete PAY --confirm PAY`. It removes the tasks, comments, history, milestones, cycles and the
+`zamu projects delete PAY --confirm PAY`. It removes the tasks, comments, history, milestones, cycles and the
 Backlog.md mirror; the files in the repository are untouched. There is no undo: a database backup is the
 only way back. The webhook URL answers `404` afterwards, so remove the webhook on the git host.
 
 ## Agents in a mirrored project
 
-Agents keep working in the files with the `backlog` CLI and push as usual. `pm` reads the tasks, comments
+Agents keep working in the files with the `backlog` CLI and push as usual. `zamu` reads the tasks, comments
 on them and sets cycles. See [agents.md](agents.md#backlogmd-mirrors).

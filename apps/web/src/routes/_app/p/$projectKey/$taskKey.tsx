@@ -13,7 +13,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/$taskKey')({
     }
   },
   loader: ({ context, params }) => settleOnServer(prefetchTaskPage(context.queryClient, params.taskKey)),
-  head: ({ params }) => ({ meta: [{ title: `${params.taskKey} · project-management` }] }),
+  head: ({ params }) => ({ meta: [{ title: `${params.taskKey} · Zamu` }] }),
   component: TaskPageRoute,
 });
 

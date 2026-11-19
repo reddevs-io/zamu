@@ -1,6 +1,6 @@
 // Reads a Backlog.md folder through a git provider: finds the folder, lists it at one commit,
 // reads the config and downloads only the files whose blob changed since the last read. Parsing
-// goes through @pm/backlog-md; the result feeds the planner (./plan).
+// goes through @zamu/backlog-md; the result feeds the planner (./plan).
 import {
   type BacklogConfig,
   classifyPath,
@@ -9,12 +9,12 @@ import {
   parseMilestone,
   parseRootConfig,
   parseTask,
-} from '@pm/backlog-md';
+} from '@zamu/backlog-md';
 // Not re-exported by the package index.
-import { ROOT_CONFIG_PATH } from '@pm/backlog-md/folder';
-import type { BacklogConfigSummary, BacklogFolderCount, BacklogFolderSource } from '@pm/contracts';
-import { parseRepositoryUrl } from '@pm/contracts';
-import type { GitProvider, TreeEntry } from '@pm/git-providers';
+import { ROOT_CONFIG_PATH } from '@zamu/backlog-md/folder';
+import type { BacklogConfigSummary, BacklogFolderCount, BacklogFolderSource } from '@zamu/contracts';
+import { parseRepositoryUrl } from '@zamu/contracts';
+import type { GitProvider, TreeEntry } from '@zamu/git-providers';
 import type { ContentFileKind, ExistingFile, ExistingMilestone, ExistingTask, PlanFile } from './plan';
 import { readStoredBlock } from './plan';
 

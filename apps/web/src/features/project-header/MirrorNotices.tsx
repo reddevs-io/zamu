@@ -1,4 +1,4 @@
-import type { ProjectWithCounts } from '@pm/contracts';
+import type { ProjectWithCounts } from '@zamu/contracts';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { useNow } from '~/features/tasks/clock';
@@ -150,7 +150,7 @@ export function MirrorEmptyState({ project }: { project: ProjectWithCounts }) {
 /** A detach this recent still gets its toast on the project's task views. */
 const DETACH_TOAST_WINDOW_MS = 10 * 60_000;
 const DETACH_TOAST_MS = 8_000;
-const seenKey = (projectKey: string, detachedAt: string) => `pm.detached-toast:${projectKey}:${detachedAt}`;
+const seenKey = (projectKey: string, detachedAt: string) => `zamu.detached-toast:${projectKey}:${detachedAt}`;
 
 /**
  * "Payments is detached from Backlog.md. Everything is editable here now." once per browser session,

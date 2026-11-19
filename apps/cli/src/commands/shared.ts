@@ -9,7 +9,7 @@ import {
   MilestoneList,
   type ProblemIssue,
   UserId,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { z } from 'zod';
 import type { ApiClient } from '../client';
 import type { CommandContext } from '../context';
@@ -79,7 +79,7 @@ export async function resolveAssignee(
   if (lower === ASSIGNEE_ME) return ASSIGNEE_ME;
   if (lower === ASSIGNEE_AGENTS) {
     if (allowAgents) return ASSIGNEE_AGENTS;
-    throw usageError('--assignee agents only filters pm tasks list. Name one agent instead.');
+    throw usageError('--assignee agents only filters zamu tasks list. Name one agent instead.');
   }
   if (UserId.safeParse(trimmed).success) return trimmed;
 
@@ -155,7 +155,7 @@ export interface TaskRef {
 
 /**
  * The reference for a task argument. App keys (PAY-786.1) name their project. A Backlog.md id
- * (BACK-786.1) is looked up in the project from --project, PM_PROJECT or .pm.json when its prefix
+ * (BACK-786.1) is looked up in the project from --project, ZAMU_PROJECT or .zamu.json when its prefix
  * is not that project's key. The git remote needs a server call, so withTaskRef tries it only when
  * the lookup without a project fails.
  */

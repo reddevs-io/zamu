@@ -1,6 +1,6 @@
-import type { CreateProjectFromBacklogInput } from '@pm/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
+import type { CreateProjectFromBacklogInput } from '@zamu/contracts';
 import { createProjectFromBacklogFn, detectBacklogRepositoryFn } from '~/features/backlog/server';
 import {
   type DetectRepository,

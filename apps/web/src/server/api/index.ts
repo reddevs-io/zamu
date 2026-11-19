@@ -1,6 +1,6 @@
 // Public surface of the /api/v1 server: the HTTP handler, the router and a server-side client.
 import { createRouterClient, type RouterClient } from '@orpc/server';
-import type { CoreContext } from '@pm/core';
+import type { CoreContext } from '@zamu/core';
 import { getServerContext } from '../context';
 import { type ApiFetchHandler, createApiFetchHandler } from './handler';
 import { type ApiRouter, router } from './router';

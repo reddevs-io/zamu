@@ -1,4 +1,4 @@
-// Public API of @pm/db.
+// Public API of @zamu/db.
 export * from './client';
 export { migrate, migrationsFolder } from './migrate';
 export { relations } from './relations';

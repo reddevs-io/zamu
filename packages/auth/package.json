@@ -1,5 +1,5 @@
 {
-  "name": "@pm/auth",
+  "name": "@zamu/auth",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@better-auth/api-key": "1.7.12",
-    "@pm/db": "workspace:*",
+    "@zamu/db": "workspace:*",
     "better-auth": "1.7.12",
     "drizzle-orm": "1.0.0-rc.5"
   },

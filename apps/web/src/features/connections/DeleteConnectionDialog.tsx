@@ -1,5 +1,5 @@
 // Delete a git connection (frame 1f): names the projects whose mirrors pause.
-import type { GitConnection } from '@pm/contracts';
+import type { GitConnection } from '@zamu/contracts';
 import { useState } from 'react';
 import { Banner, Button, Dialog, DialogBody, DialogFooter, DialogHeader, Modal } from '~/ui';
 import { errorMessage } from '../settings/result';

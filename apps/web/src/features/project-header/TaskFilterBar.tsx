@@ -1,5 +1,5 @@
-import { FILTER_NONE, type Priority, type TaskStatus } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import { FILTER_NONE, type Priority, type TaskStatus } from '@zamu/contracts';
 import { useMemo } from 'react';
 import { membersQuery } from '~/features/tasks/queries';
 import type { BoardLanes, CycleFilterValue, TaskListSearch, TaskView } from '~/features/tasks/search';

@@ -24,8 +24,8 @@ import { cpSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { createDb, type DbHandle, migrationsFolder, relations } from '@pm/db';
-import { createDatabase, dropDatabase, withDatabase } from '@pm/db/admin';
+import { createDb, type DbHandle, migrationsFolder, relations } from '@zamu/db';
+import { createDatabase, dropDatabase, withDatabase } from '@zamu/db/admin';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate as drizzleMigrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Actor } from '../src/authz';
@@ -566,7 +566,7 @@ async function main() {
   if (!target) throw new Error(`no migration ending in ${NEW_MIGRATION_SUFFIX} in ${migrationsFolder}`);
   const previous = migrations.filter((name) => name < target);
 
-  const folder = mkdtempSync(join(tmpdir(), 'pm-stress-migrations-'));
+  const folder = mkdtempSync(join(tmpdir(), 'zamu-stress-migrations-'));
   for (const name of previous) cpSync(join(migrationsFolder, name), join(folder, name), { recursive: true });
 
   console.log(`database ${databaseName}; migrating to ${previous.at(-1)}`);

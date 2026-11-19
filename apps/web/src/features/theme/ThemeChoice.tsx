@@ -1,5 +1,5 @@
 import { ORPCError } from '@orpc/client';
-import type { Theme } from '@pm/contracts';
+import type { Theme } from '@zamu/contracts';
 import { describeError } from '~/features/tasks/errors';
 import { Toast } from '~/ui';
 import { useSetTheme, useUserTheme } from './theme';

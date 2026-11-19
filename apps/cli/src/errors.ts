@@ -1,4 +1,4 @@
-// Every failure the CLI reports becomes a CliError: a Problem (printed as pm.v1.error with --json)
+// Every failure the CLI reports becomes a CliError: a Problem (printed as zamu.v1.error with --json)
 // plus the process exit code. Scripts and agents branch on the exit code, so it is part of the
 // stable interface:
 //   0 ok, 1 usage, 2 auth, 3 not found, 4 forbidden, 5 server, 6 Backlog.md conflict.
@@ -12,7 +12,7 @@ import {
   type ProblemIssue,
   problem,
   toProblemIssues,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { ZodError } from 'zod';
 
 export const EXIT = {
@@ -40,7 +40,7 @@ export class CliError extends Error {
   readonly hints: string[];
   /**
    * The whole human rendering, when the error has its own layout (the Backlog.md mirror errors).
-   * Replaces `pm: <message>` and the hints.
+   * Replaces `zamu: <message>` and the hints.
    */
   lines?: string[];
 
@@ -130,7 +130,7 @@ export interface MirroredContext {
  *   error: PAY-786 is mirrored from Backlog.md, so its status can't change here (task_mirrored).
  *     file:  backlog/tasks/back-786 - Retry-failed-webhook-deliveries.md (main)
  *     edit the file and push, or run: backlog task edit 786 -s Done
- *     still allowed here: comments (pm comments add PAY-786) and cycles (pm tasks update PAY-786 --cycle 4)
+ *     still allowed here: comments (zamu comments add PAY-786) and cycles (zamu tasks update PAY-786 --cycle 4)
  *
  * The file line needs `file`; the hint line reads "edit the file and push, or run:" when the hint
  * is a Backlog.md command and there is a file, "run:" without a file, and the hint as written when
@@ -148,9 +148,9 @@ export function mirroredLines(body: Problem, context: MirroredContext = {}): str
   }
   if (body.code === 'TASK_MIRRORED' && context.taskKey) {
     const key = context.taskKey;
-    const allowed = [`comments (pm comments add ${key})`];
+    const allowed = [`comments (zamu comments add ${key})`];
     if (context.usesCycles !== false) {
-      allowed.push(`cycles (pm tasks update ${key} --cycle ${context.cycle ?? '<number>'})`);
+      allowed.push(`cycles (zamu tasks update ${key} --cycle ${context.cycle ?? '<number>'})`);
     }
     lines.push(`  still allowed here: ${allowed.join(' and ')}`);
   }
@@ -219,14 +219,14 @@ export function toCliError(error: unknown, url?: string): CliError {
       status === 401
         ? 'The server did not accept the API key. It may be revoked, expired or mistyped.'
         : undefined;
-    if (status === 401) hints.unshift('Run pm login --key <key> with a valid key, or fix PM_KEY.');
+    if (status === 401) hints.unshift('Run zamu login --key <key> with a valid key, or fix ZAMU_KEY.');
     return new CliError(body, exitCodeForStatus(status), hints, message);
   }
 
   if (error instanceof ZodError) {
     // A response that does not match the contract: the server and the CLI disagree on the API.
     return serverError(
-      `The server sent a response this version of pm does not understand: ${error.issues[0]?.message ?? 'invalid data'}`,
+      `The server sent a response this version of zamu does not understand: ${error.issues[0]?.message ?? 'invalid data'}`,
     );
   }
 

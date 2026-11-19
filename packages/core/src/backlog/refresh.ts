@@ -2,10 +2,10 @@
 // difference in one transaction. Runs take a Postgres advisory lock on the source, so a second
 // worker skips. Also the enqueue helper every trigger uses, and the hourly poll.
 // Steps and states: M3 plan, section 5 "Refresh".
-import type { BacklogState, BacklogTrigger } from '@pm/contracts';
-import { BacklogMappings, BacklogProblem } from '@pm/contracts';
-import { type Db, type DbHandle, type DbOrTx, schema, type Tx } from '@pm/db';
-import { GitNotFound, type GitProvider, GitRateLimited } from '@pm/git-providers';
+import type { BacklogState, BacklogTrigger } from '@zamu/contracts';
+import { BacklogMappings, BacklogProblem } from '@zamu/contracts';
+import { type Db, type DbHandle, type DbOrTx, schema, type Tx } from '@zamu/db';
+import { GitNotFound, type GitProvider, GitRateLimited } from '@zamu/git-providers';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbContext, GitContext } from '../context';
@@ -55,7 +55,7 @@ export interface RefreshContext extends DbContext, GitContext {
  * singletonKey = source id on a stately queue: at most one queued run per source; with the
  * 60-second debounce slot a burst of triggers collapses into one run, and a trigger during a
  * running refresh queues exactly one more. Returns the job id, or null when a queued run already
- * covers this trigger. An asked refresh (Refresh now, pm backlog refresh) replaces a queued run that
+ * covers this trigger. An asked refresh (Refresh now, zamu backlog refresh) replaces a queued run that
  * waits for the next slot and returns the new run's id, so it starts as soon as nothing else runs.
  */
 export async function enqueueBacklogRefresh(
@@ -67,7 +67,7 @@ export async function enqueueBacklogRefresh(
 ): Promise<string | null> {
   if (!ctx.jobs) throw new Error('Backlog.md refreshes need the job queue in the core context');
   // A delayed retry (rate limits) skips the debounce slot, which would replace its start time.
-  // Someone who asked for a refresh (setup, Refresh now, pm backlog refresh) skips it too: the
+  // Someone who asked for a refresh (setup, Refresh now, zamu backlog refresh) skips it too: the
   // stately queue still keeps at most one queued run per source, but they never wait for the
   // next minute: a queued webhook or poll run waiting for its slot gives way to theirs (PM-10).
   // Setup creates the source, so nothing can be queued for it yet. Webhooks and the poll keep the

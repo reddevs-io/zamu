@@ -1,4 +1,4 @@
-import type { CreateProjectInput } from '@pm/contracts';
+import type { CreateProjectInput } from '@zamu/contracts';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import {
   Banner,

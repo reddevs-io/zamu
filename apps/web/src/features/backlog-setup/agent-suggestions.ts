@@ -1,4 +1,4 @@
-import { AGENT_NAME_PATTERN, type BacklogMappingsView, type Member } from '@pm/contracts';
+import { AGENT_NAME_PATTERN, type BacklogMappingsView, type Member } from '@zamu/contracts';
 
 // Assignee values that name a coding agent with no member here ("@claude" with no agent called
 // claude). The Mappings step suggests creating the agent; the Add agent dialog takes the name. When

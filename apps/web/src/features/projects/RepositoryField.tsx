@@ -1,4 +1,4 @@
-import { parseRepositoryUrl } from '@pm/contracts';
+import { parseRepositoryUrl } from '@zamu/contracts';
 import type { ReactNode, Ref } from 'react';
 import { InlineCode, TextField } from '~/ui';
 
@@ -16,7 +16,7 @@ function Short({ children }: { children: ReactNode }) {
 export function emptyRepositoryHint(): ReactNode {
   return (
     <>
-      The URL you clone from, HTTPS or SSH. Inside a clone of it, pm picks this project without{' '}
+      The URL you clone from, HTTPS or SSH. Inside a clone of it, zamu picks this project without{' '}
       <InlineCode className={codeClass}>--project</InlineCode>.
     </>
   );
@@ -38,7 +38,7 @@ export function newRepositoryHint(value: string): ReactNode {
   return matchHint(value) ?? emptyRepositoryHint();
 }
 
-/** Project settings: also mentions `pm link`, and says what saving an emptied field does. */
+/** Project settings: also mentions `zamu link`, and says what saving an emptied field does. */
 export function editRepositoryHint(
   value: string,
   project: { key: string; repository: string | null },
@@ -47,7 +47,7 @@ export function editRepositoryHint(
     const old = parseRepositoryUrl(project.repository)?.short ?? project.repository;
     return (
       <>
-        Saving unlinks <Short>{old}</Short>. In that clone, pm commands need{' '}
+        Saving unlinks <Short>{old}</Short>. In that clone, zamu commands need{' '}
         <InlineCode className={codeClass}>--project {project.key}</InlineCode> again.
       </>
     );
@@ -55,7 +55,7 @@ export function editRepositoryHint(
   const linkHint = (
     <>
       {' '}
-      From a clone, <InlineCode className={codeClass}>pm link --project {project.key}</InlineCode> sets it
+      From a clone, <InlineCode className={codeClass}>zamu link --project {project.key}</InlineCode> sets it
       too.
     </>
   );

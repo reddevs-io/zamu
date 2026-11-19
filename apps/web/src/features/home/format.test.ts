@@ -1,4 +1,4 @@
-import type { HomeAgentAction, HomeDeadline, HomeItem, TaskListItem, UserRef } from '@pm/contracts';
+import type { HomeAgentAction, HomeDeadline, HomeItem, TaskListItem, UserRef } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   actionText,

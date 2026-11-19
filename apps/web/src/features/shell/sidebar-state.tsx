@@ -17,7 +17,7 @@ import {
 export const NARROW_QUERY = '(max-width: 1099px)';
 
 export function sidebarStorageKey(userId: string): string {
-  return `pm.sidebar.collapsed:${userId}`;
+  return `zamu.sidebar.collapsed:${userId}`;
 }
 
 function readSaved(userId: string | undefined): boolean {

@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import {
   type Activity,
   BACKLOG_ACTOR_NAME,
@@ -5,8 +6,7 @@ import {
   type Member,
   type ProjectActivity,
   type UserRef,
-} from '@pm/contracts';
-import { useQuery } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading } from 'react-aria-components';
 import { useNow } from '~/features/tasks/clock';

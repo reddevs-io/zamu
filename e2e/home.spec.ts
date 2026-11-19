@@ -1,7 +1,7 @@
 // Home end to end (it replaces the M4 dashboard and My tasks in 0.7.0): signing in lands on "/", and the old
 // pages redirect there; an agent moves a task to In review and mentions its person from the CLI; both show in
 // the person's Mine tab and the sidebar count matches GET /home/counts; the person opens the mention from Home
-// with the keyboard, answers it in the task view and it leaves Mentions; the Everyone tab; `pm dashboard
+// with the keyboard, answers it in the task view and it leaves Mentions; the Everyone tab; `zamu dashboard
 // --json` with the agent's key still agrees with the API. The tests build on each other, so they share one
 // page and run in order. The spec sets the server up when it runs first, else it signs in as the admin from
 // the other specs.
@@ -18,7 +18,7 @@ const agentName = 'dash-agent';
 type DashboardGroupName = 'review' | 'mentions' | 'stalled' | 'deadlines';
 type DashboardTotals = Record<DashboardGroupName, number>;
 
-/** The parts of pm.v1.dashboard (GET /api/v1/dashboard) the spec reads. The CLI keeps it in 0.7.0. */
+/** The parts of zamu.v1.dashboard (GET /api/v1/dashboard) the spec reads. The CLI keeps it in 0.7.0. */
 interface Dashboard {
   scope: 'mine' | 'everyone';
   groups: Record<DashboardGroupName, { total: number; items: { task?: { key: string } }[] }>;
@@ -167,7 +167,7 @@ test('the agent moves a task to In review and mentions its person from the CLI',
     '--json',
   ]);
   expect(update.code, update.stdout + update.stderr).toBe(0);
-  expect(parseJson<{ key: string; status: string }>(update, 'pm.v1.tasks.update')).toMatchObject({
+  expect(parseJson<{ key: string; status: string }>(update, 'zamu.v1.tasks.update')).toMatchObject({
     key: reviewTask.key,
     status: 'in_review',
   });
@@ -180,7 +180,7 @@ test('the agent moves a task to In review and mentions its person from the CLI',
     '--json',
   ]);
   expect(add.code, add.stdout + add.stderr).toBe(0);
-  const comment = parseJson<{ body: string }>(add, 'pm.v1.comments.add');
+  const comment = parseJson<{ body: string }>(add, 'zamu.v1.comments.add');
   expect(comment.body).toMatch(new RegExp(`\\[@${admin.name}\\]\\(mention:[^)]+\\)$`));
 });
 
@@ -267,7 +267,7 @@ test('the Everyone tab counts the whole workspace; the sidebar keeps the Mine co
   await expect(group('Needs your review')).toBeVisible();
 });
 
-test('pm dashboard --json with the agent key matches the API for that key', async () => {
+test('zamu dashboard --json with the agent key matches the API for that key', async () => {
   const agentApi = await request.newContext({
     baseURL,
     extraHTTPHeaders: { authorization: `Bearer ${agentKey}` },
@@ -277,7 +277,7 @@ test('pm dashboard --json with the agent key matches the API for that key', asyn
       const args = scope === 'everyone' ? ['dashboard', '--everyone', '--json'] : ['dashboard', '--json'];
       const result = cli.run(args);
       expect(result.code, result.stdout + result.stderr).toBe(0);
-      const fromCli = parseJson<Dashboard>(result, 'pm.v1.dashboard');
+      const fromCli = parseJson<Dashboard>(result, 'zamu.v1.dashboard');
       expect(fromCli.scope).toBe(scope);
 
       const fromApi = await api<Dashboard>(agentApi, 'GET', `/dashboard?scope=${scope}`);
@@ -287,7 +287,7 @@ test('pm dashboard --json with the agent key matches the API for that key', asyn
     }
 
     // For an agent's key, Mine is the agent's own tasks: its task in review is there.
-    const mine = parseJson<Dashboard>(cli.run(['dashboard', '--json']), 'pm.v1.dashboard');
+    const mine = parseJson<Dashboard>(cli.run(['dashboard', '--json']), 'zamu.v1.dashboard');
     expect(mine.groups.review.items.map((item) => item.task?.key)).toContain(reviewTask.key);
 
     const text = cli.run(['dashboard']);

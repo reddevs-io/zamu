@@ -1,4 +1,4 @@
-import type { BacklogSourceStatus } from '@pm/contracts';
+import type { BacklogSourceStatus } from '@zamu/contracts';
 
 // Where a source's first read stands. Shared by the Read step, the polling query and the step list.
 

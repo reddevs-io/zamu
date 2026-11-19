@@ -1,8 +1,8 @@
 // The web server's pg-boss producer: core services that enqueue jobs (Backlog.md setup, Refresh now,
-// pm backlog refresh, push webhooks) get it as `ctx.jobs`. It only sends; the worker (apps/worker)
+// zamu backlog refresh, push webhooks) get it as `ctx.jobs`. It only sends; the worker (apps/worker)
 // runs the jobs. pg-boss starts on the first enqueue, so requests that enqueue nothing never open
 // its pool. Framework-free: the server context, scripts and tests import it.
-import { createJobQueue, ensureQueues, type JobQueue } from '@pm/core';
+import { createJobQueue, ensureQueues, type JobQueue } from '@zamu/core';
 import { PgBoss } from 'pg-boss';
 
 export interface JobProducer extends JobQueue {
@@ -15,7 +15,7 @@ export interface JobProducerOptions {
   onError?: (error: Error) => void;
 }
 
-const APPLICATION_NAME = 'pm-web/pg-boss';
+const APPLICATION_NAME = 'zamu-web/pg-boss';
 
 export function createJobProducer(databaseUrl: string, options: JobProducerOptions = {}): JobProducer {
   const onError = options.onError ?? ((error) => console.error('server: pg-boss error:', error.message));

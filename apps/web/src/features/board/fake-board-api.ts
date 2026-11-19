@@ -10,7 +10,7 @@ import {
   type TaskListItem,
   type TaskListPage,
   type TaskStatus,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 
 // In-memory /api/v1 client for the board's component tests: board order (rank) or a `sort`, one status
 // per request (or all), topLevel and parent, cursor pagination, moves with position and the ifUpdatedAt

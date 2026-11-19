@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { schema } from '@pm/db';
+import { schema } from '@zamu/db';
 import {
   type CreateProviderOptions,
   GitHostRefused,
@@ -10,7 +10,7 @@ import {
   GitUnexpected,
   GitUnreachable,
   type LookupFn,
-} from '@pm/git-providers';
+} from '@zamu/git-providers';
 import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { ProviderFactory } from './context';

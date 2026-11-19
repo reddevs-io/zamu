@@ -1,5 +1,5 @@
-import { getActorFromRequest } from '@pm/auth';
-import { schema } from '@pm/db';
+import { getActorFromRequest } from '@zamu/auth';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApiKey, listApiKeys, readKeyMetadata, revokeApiKey } from './api-keys';
@@ -36,8 +36,10 @@ describe('API keys', () => {
       revoked: false,
       lastUsedAt: null,
     });
-    // `start` is what Better Auth stores for recognition (its length is an @pm/auth option).
+    // `start` is what Better Auth stores for recognition (its length is an @zamu/auth option).
     expect(created.start && created.key.startsWith(created.start)).toBe(true);
+    // 14 characters: the zamu_live_ prefix and four random ones.
+    expect(created.start).toHaveLength(14);
 
     const [row] = await ctx.db.select().from(schema.apikey).where(eq(schema.apikey.id, created.id));
     expect(readKeyMetadata(row?.metadata)).toEqual({

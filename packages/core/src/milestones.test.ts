@@ -1,4 +1,4 @@
-import { type Db, schema } from '@pm/db';
+import { type Db, schema } from '@zamu/db';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listTaskActivity } from './activity';

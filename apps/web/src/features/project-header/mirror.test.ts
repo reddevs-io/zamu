@@ -1,4 +1,4 @@
-import type { ProjectBacklogSummary, TaskListItem } from '@pm/contracts';
+import type { ProjectBacklogSummary, TaskListItem } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { buildHiddenGroup, HIDDEN_GROUP_LABEL } from '~/features/tasks/groups';
 import { hasFilters, hiddenStatuses, listInput, parseTaskListSearch } from '~/features/tasks/search';

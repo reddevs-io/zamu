@@ -164,7 +164,7 @@ describe('board', () => {
       await within(column(/^Canceled, 0 tasks$/)).findByText(/No tasks in Canceled\./),
     ).toBeInTheDocument();
     // Remembered for the board.
-    expect(window.localStorage.getItem(`pm:board-columns:v1:${BOARD_PEOPLE.ANA.id}:PAY:status`)).toBe(
+    expect(window.localStorage.getItem(`zamu:board-columns:v1:${BOARD_PEOPLE.ANA.id}:PAY:status`)).toBe(
       '{"canceled":false}',
     );
   });

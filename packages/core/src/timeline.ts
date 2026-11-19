@@ -1,5 +1,5 @@
 // The task timeline: activity entries and comments in one list, oldest first.
-import { formatTaskKey, ListTaskTimelineInput, type Timeline, type TimelineItem } from '@pm/contracts';
+import { formatTaskKey, ListTaskTimelineInput, type Timeline, type TimelineItem } from '@zamu/contracts';
 import type { z } from 'zod';
 import { loadTaskActivityRows, toActivities } from './activity';
 import type { Actor } from './authz';

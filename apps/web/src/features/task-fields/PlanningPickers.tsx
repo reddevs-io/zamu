@@ -1,4 +1,4 @@
-import type { Cycle, CycleRef, MilestoneRef, MilestoneWithProgress } from '@pm/contracts';
+import type { Cycle, CycleRef, MilestoneRef, MilestoneWithProgress } from '@zamu/contracts';
 import { useNow } from '~/features/tasks/clock';
 import { formatCalendarDay } from '~/features/tasks/format';
 import {

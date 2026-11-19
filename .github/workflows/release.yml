@@ -1,0 +1,97 @@
+# Releases: an X.Y.Z tag (no pre-release suffix) runs CI on the tag and pushes the image to
+# ghcr.io/reddevs-io/zamu (:<tag> and :latest). Deploying an instance is up to whoever runs it; this workflow
+# deploys nothing.
+#
+# workflow_dispatch builds and pushes an existing tag by hand, for example the first push that creates the ghcr
+# package. It moves :latest only for an X.Y.Z tag.
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing git tag to build and push (X.Y.Z, or X.Y.Z-suffix for a pre-release)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  IMAGE: ghcr.io/reddevs-io/zamu
+
+jobs:
+  # Resolves the tag (the pushed one, or the dispatch input) and checks its format before anything runs.
+  meta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      latest: ${{ steps.tag.outputs.latest }}
+    steps:
+      - name: Check the tag
+        id: tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            latest=true
+          elif [[ "$EVENT" == workflow_dispatch && "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z.-]+$ ]]; then
+            latest=false
+          else
+            echo "::error::not a release tag: ${TAG}"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "latest=${latest}" >> "$GITHUB_OUTPUT"
+          echo "release ${TAG} (latest: ${latest})"
+
+  ci:
+    needs: meta
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: refs/tags/${{ needs.meta.outputs.tag }}
+    permissions:
+      contents: read
+
+  release-image:
+    needs: [meta, ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Path context (the checkout), not the default git context, so a dispatch builds the tag and not the branch.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ needs.meta.outputs.tag }}
+            ${{ needs.meta.outputs.latest == 'true' && format('{0}:latest', env.IMAGE) || '' }}
+          labels: |
+            org.opencontainers.image.title=Zamu
+            org.opencontainers.image.source=https://github.com/reddevs-io/zamu
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ needs.meta.outputs.tag }}
+            org.opencontainers.image.revision=${{ steps.checkout.outputs.commit }}

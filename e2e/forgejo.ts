@@ -2,8 +2,8 @@
 // project and attached to the end-to-end stack's network under an alias (stack.forgejoAliases). The app reaches
 // it as http://<alias>:3000 and Forgejo delivers webhooks to http://web:3000.
 //
-// The spec process talks to Forgejo through `docker exec … curl` instead of the published port: in GitLab CI the
-// containers run on the docker:dind service, where Forgejo's port (bound to 127.0.0.1) is out of reach.
+// The spec process talks to Forgejo through `docker exec … curl` instead of the published port: Forgejo binds it
+// to 127.0.0.1 of the Docker host, which is out of reach when the daemon runs on another host (E2E_BASE_URL).
 import { execFileSync, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { readdirSync, readFileSync, statSync } from 'node:fs';

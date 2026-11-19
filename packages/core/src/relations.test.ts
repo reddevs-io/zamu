@@ -1,6 +1,6 @@
 // M5 relations: blockers with the loop check, parents and subtasks one level deep, and the
 // fields a task view shows for them.
-import { schema } from '@pm/db';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listTaskActivity } from './activity';

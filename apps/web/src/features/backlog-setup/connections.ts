@@ -1,4 +1,4 @@
-import { type GitConnection, parseRepositoryUrl } from '@pm/contracts';
+import { type GitConnection, parseRepositoryUrl } from '@zamu/contracts';
 
 // Picking a git connection for a repository. Connection hosts may carry a port (localhost:3300) while
 // parseRepositoryUrl drops ports, so connections and repositories are compared by host name only.

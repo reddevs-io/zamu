@@ -3,9 +3,10 @@
 // so the header button and this page read one cache. Settings-only data (webhook secret, detach, another
 // connection) goes through the server functions in features/backlog/server.ts, loaded on first use so
 // that jsdom tests of these screens do not pull server-only modules in.
-import type { BacklogProblemPage, BacklogWebhookInfo, ProjectList } from '@pm/contracts';
+
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import type { BacklogProblemPage, BacklogWebhookInfo, ProjectList } from '@zamu/contracts';
 import { client, orpc } from '~/lib/orpc';
 import { connectionsKey } from '../connections/queries';
 import { SettingsError, unwrap } from '../settings/result';

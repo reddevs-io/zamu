@@ -4,7 +4,7 @@ An AI coding agent is a member of the workspace, like a person. It has its own n
 and it always acts for one person, its responsible human. Everything the agent changes shows up as
 "claude-dev for Ana Ruiz", in the web app and in the CLI.
 
-Agents work through the `pm` CLI. The full command reference is in [apps/cli/README.md](../apps/cli/README.md);
+Agents work through the `zamu` CLI. The full command reference is in [apps/cli/README.md](../apps/cli/README.md);
 this page covers the setup and what an agent's environment needs.
 
 ## Add an agent
@@ -14,7 +14,7 @@ Admins add agents in Settings > Members > Add agent:
 2. Pick the responsible human. The agent acts for this person.
 3. Choose the scope of its first key (see below).
 4. Create agent. A dialog shows the key once. Copy it with the copy button, or copy the
-   `pm login --key ... --url ...` line under it, then close with "I copied the key".
+   `zamu login --key ... --url ...` line under it, then close with "I copied the key".
 
 The server keeps only a hash of the key. If you lose it, revoke it and create a new one.
 
@@ -34,8 +34,8 @@ Give each agent the narrowest key that does the job: an agent that works on one 
 that project only. Creating projects needs a key with whole-workspace access and write permission.
 
 Deleting a project is for owners and admins only, never agents: in the project's Settings > General, or
-with `pm projects delete PAY --confirm PAY` and a person's key with whole-workspace access and write
-permission. Without `--confirm`, or with another key in it, pm exits with code 1 and sends nothing. An
+with `zamu projects delete PAY --confirm PAY` and a person's key with whole-workspace access and write
+permission. Without `--confirm`, or with another key in it, zamu exits with code 1 and sends nothing. An
 agent's key gets exit code 4, and an unknown project exits with 3. There is no undo. Keys scoped to a
 deleted project keep their other projects; a key that covered only deleted projects stays, with no
 projects, until you revoke it.
@@ -46,71 +46,71 @@ Removing an agent from the workspace disables all of its keys.
 
 People can create keys for themselves in Settings > My keys, for their own scripts.
 
-## Use pm in an agent's environment
+## Use zamu in an agent's environment
 
-The agent's machine needs Node 24 and the CLI. Until `pm` is on npm, build it from this repository:
+The agent's machine needs Node 24 and the CLI. Until `zamu` is on npm, build it from this repository:
 
 ```sh
 pnpm install
-pnpm --filter @pm/cli build
-alias pm="node $PWD/apps/cli/dist/index.js"
+pnpm --filter @zamu/cli build
+alias zamu="node $PWD/apps/cli/dist/index.js"
 ```
 
-Then give the agent two environment variables instead of running `pm login`:
+Then give the agent two environment variables instead of running `zamu login`:
 
-| Variable | Value                                                        |
-| -------- | ------------------------------------------------------------ |
-| `PM_URL` | The server URL, the same as `BETTER_AUTH_URL` on the server. |
-| `PM_KEY` | The agent's API key (`pm_live_...`).                         |
+| Variable   | Value                                                        |
+| ---------- | ------------------------------------------------------------ |
+| `ZAMU_URL` | The server URL, the same as `BETTER_AUTH_URL` on the server. |
+| `ZAMU_KEY` | The agent's API key (`zamu_live_...`).                       |
 
-They override the config file that `pm login` writes, so the agent's key never mixes with a person's login on
-the same machine. Store `PM_KEY` as a secret in the agent's runner or CI settings, never in the repository.
+They override the config file that `zamu login` writes, so the agent's key never mixes with a person's login on
+the same machine. Store `ZAMU_KEY` as a secret in the agent's runner or CI settings, never in the repository.
 
 Check the setup:
 
 ```sh
-$ pm whoami
+$ zamu whoami
 claude-dev for Ana Ruiz (agent)
 Workspace  Reddevs
 Role       member
 Access     API key: all projects, write
-Server     https://pm.example.com
+Server     https://zamu.example.com
 Project    PAY (from git remote gitlab.com/reddevs/payments)
 ```
 
 ## Link the repository to its project
 
 Link each project to the repository its code lives in, once. Then an agent working in any clone of it
-can leave out `--project`: pm finds the project from the clone's git remote.
+can leave out `--project`: zamu finds the project from the clone's git remote.
 
 ```sh
 cd payments                 # a clone of gitlab.com/reddevs/payments
-pm link --project PAY       # or set Repository in the project's settings on the web
-pm agents                   # write the pm instructions into AGENTS.md, naming PAY
-git add AGENTS.md && git commit -m "Add pm instructions for agents"
+zamu link --project PAY       # or set Repository in the project's settings on the web
+zamu agents                   # write the zamu instructions into AGENTS.md, naming PAY
+git add AGENTS.md && git commit -m "Add zamu instructions for agents"
 ```
 
-`pm link` needs a key that can edit the project. A repository belongs to one project; linking it to a
+`zamu link` needs a key that can edit the project. A repository belongs to one project; linking it to a
 second one fails with exit code 1 and names the first. HTTPS and SSH URLs of the same repository match.
 
-Other ways to set the project, in the order pm checks them: `--project`, the `PM_PROJECT` variable, the
-nearest committed `.pm.json` (`{ "project": "PAY" }`, written by `pm link --file`; useful when one
-repository holds several projects, one file per subfolder), then the linked remote. `pm whoami` shows
+Other ways to set the project, in the order zamu checks them: `--project`, the `ZAMU_PROJECT` variable, the
+nearest committed `.zamu.json` (`{ "project": "PAY" }`, written by `zamu link --file`; useful when one
+repository holds several projects, one file per subfolder), then the linked remote. `zamu whoami` shows
 which one applies in the current folder.
 
-`pm agents` puts a short block between `<!-- pm:start ... -->` and `<!-- pm:end -->` in `AGENTS.md`, or in
+`zamu agents` puts a short block between `<!-- zamu:start ... -->` and `<!-- zamu:end -->` in `AGENTS.md`, or in
 `CLAUDE.md` when only that exists. It covers the loop below, `--json` and the exit codes. Run it again
-after upgrading pm; it replaces only its own block. `pm agents --print` shows the block without writing it.
+after upgrading zamu; it replaces only its own block. `zamu agents --print` shows the block without writing it.
 
 A typical loop for an agent:
 
 ```sh
-pm dashboard --json                     # reviews, mentions of the agent, stalled work, deadlines
-pm tasks list --mine --status todo --cycle current --json
-pm tasks update PAY-142 --status in_progress
-pm tasks show PAY-142 --json
-pm comments add PAY-142 "Tests pass. Ready for review, @ana@example.com"
-pm tasks update PAY-142 --status in_review
+zamu dashboard --json                     # reviews, mentions of the agent, stalled work, deadlines
+zamu tasks list --mine --status todo --cycle current --json
+zamu tasks update PAY-142 --status in_progress
+zamu tasks show PAY-142 --json
+zamu comments add PAY-142 "Tests pass. Ready for review, @ana@example.com"
+zamu tasks update PAY-142 --status in_review
 ```
 
 `--mine` lists the tasks assigned to the key's owner across every project the key can read. Add `--project`
@@ -138,11 +138,11 @@ Agents comment on tasks the way people do, and the comment shows in the task's h
 "claude-dev for Ana Ruiz". The body is Markdown, up to 20,000 characters.
 
 ```sh
-pm comments add PAY-142 "Picked this up. @ana@example.com, I will open the MR today."
-pnpm test 2>&1 | tail -20 | pm comments add PAY-142 -     # "-" reads the body from stdin
-pm comments list PAY-142
-pm comments edit 01a16848-b25a-7da5-aceb-752a314e6b85 "Fixed: the MR is !42."
-pm comments delete 01a16848-b25a-7da5-aceb-752a314e6b85
+zamu comments add PAY-142 "Picked this up. @ana@example.com, I will open the MR today."
+pnpm test 2>&1 | tail -20 | zamu comments add PAY-142 -     # "-" reads the body from stdin
+zamu comments list PAY-142
+zamu comments edit 01a16848-b25a-7da5-aceb-752a314e6b85 "Fixed: the MR is !42."
+zamu comments delete 01a16848-b25a-7da5-aceb-752a314e6b85
 ```
 
 Mention someone with `@` and their email (`@ana@example.com`) or an agent's name (`@claude-dev`). The
@@ -152,10 +152,10 @@ stays plain text. Mentions send no notification yet.
 
 Only the author can edit or delete a comment. That holds for agents too: the agent's responsible human
 cannot edit the agent's comments, and an agent trying to delete a person's comment gets exit code 4.
-Deleting leaves "Comment deleted by ..." in the history. Comment ids are in `pm comments list`, in
-`pm tasks show` and in the `--json` output.
+Deleting leaves "Comment deleted by ..." in the history. Comment ids are in `zamu comments list`, in
+`zamu tasks show` and in the `--json` output.
 
-`pm tasks show PAY-142` prints the history: activity on one line each, comments as indented blocks with
+`zamu tasks show PAY-142` prints the history: activity on one line each, comments as indented blocks with
 their id.
 
 ## Milestones and cycles
@@ -167,11 +167,11 @@ its settings (General) in the web app; the data stays and comes back when you tu
 Milestones go by name or id. Names are unique in a project and the CLI ignores case:
 
 ```sh
-pm milestones list --project PAY
-pm milestones create --project PAY "Payout reports" --target 2026-12-04
-pm tasks update PAY-142 --milestone "payout reports"
-pm tasks list --project PAY --milestone "Payout reports"
-pm milestones update "payout reports" --project PAY --status completed
+zamu milestones list --project PAY
+zamu milestones create --project PAY "Payout reports" --target 2026-12-04
+zamu tasks update PAY-142 --milestone "payout reports"
+zamu tasks list --project PAY --milestone "Payout reports"
+zamu milestones update "payout reports" --project PAY --status completed
 ```
 
 A milestone starts as Planned and turns Active by itself when one of its tasks moves to In progress or In
@@ -181,31 +181,31 @@ project's milestones, so an agent can retry with the right one.
 Cycles go by number, or by `current` and `next`:
 
 ```sh
-pm cycles current --project PAY
-pm tasks list --mine --cycle current
-pm tasks update PAY-142 --cycle next
-pm cycles create --project PAY                   # the day after the last cycle, same length
-pm cycles end --project PAY                      # ends the current cycle early
+zamu cycles current --project PAY
+zamu tasks list --mine --cycle current
+zamu tasks update PAY-142 --cycle next
+zamu cycles create --project PAY                   # the day after the last cycle, same length
+zamu cycles end --project PAY                      # ends the current cycle early
 ```
 
-`pm cycles current --json` prints `"data": null` with exit code 0 when no cycle is running. When a cycle
+`zamu cycles current --json` prints `"data": null` with exit code 0 when no cycle is running. When a cycle
 ends, early by hand or at midnight after its end date (in the server's `APP_TIME_ZONE`), its unfinished
 tasks move to the next cycle; the server creates one with the same length when none is planned.
-`pm cycles end --move-to none` takes them out of cycles instead. `--milestone none` and `--cycle none`
-clear the field on `pm tasks update` and filter tasks without one on `pm tasks list`.
+`zamu cycles end --move-to none` takes them out of cycles instead. `--milestone none` and `--cycle none`
+clear the field on `zamu tasks update` and filter tasks without one on `zamu tasks list`.
 
 ## Labels, due dates, blockers and subtasks
 
-Native tasks have four more fields since 0.7.0. Agents set them with the same `pm tasks` commands; the
+Native tasks have four more fields since 0.7.0. Agents set them with the same `zamu tasks` commands; the
 full option list is in the [CLI reference](../apps/cli/README.md#labels-due-dates-subtasks-and-blockers).
 
 ```sh
-pm tasks create --project PAY "Refund email" --parent PAY-142 --label email --due 2026-11-20
-pm tasks update PAY-150 --blocked-by PAY-142 --label backend --remove-label triage
-pm tasks list --project PAY --due overdue --sort due
-pm tasks list --project PAY --blocked
-pm tasks list --parent PAY-142                 # the subtasks of PAY-142
-pm labels list --project PAY                   # with how many tasks use each label
+zamu tasks create --project PAY "Refund email" --parent PAY-142 --label email --due 2026-11-20
+zamu tasks update PAY-150 --blocked-by PAY-142 --label backend --remove-label triage
+zamu tasks list --project PAY --due overdue --sort due
+zamu tasks list --project PAY --blocked
+zamu tasks list --parent PAY-142                 # the subtasks of PAY-142
+zamu labels list --project PAY                   # with how many tasks use each label
 ```
 
 - **Labels** belong to a project. Names are unique in the project, ignoring case, and up to 40 characters.
@@ -214,12 +214,12 @@ pm labels list --project PAY                   # with how many tasks use each la
   date, in the server's `APP_TIME_ZONE`. `--due none` clears it.
 - **Blocked by** lists tasks of the same project. A task is blocked while any of its blockers is open. It is
   a marker only: nothing stops a blocked task from moving. A blocker that would close a loop fails with exit
-  code 1: `pm: Can't add: PAY-150 already waits on PAY-142.` (`DEPENDENCY_LOOP`).
+  code 1: `zamu: Can't add: PAY-150 already waits on PAY-142.` (`DEPENDENCY_LOOP`).
 - **Subtasks** go one level deep and stay in the parent's project (`SUBTASK_DEPTH`, `NOT_SAME_PROJECT`). A
   new subtask takes the parent's assignee unless you pass `--assignee`. The parent shows its progress as done
   of total, canceled subtasks left out.
 
-`pm tasks show` prints them, and `pm tasks list` adds DUE, LABELS, PARENT, SUBTASKS and BLOCKED columns when
+`zamu tasks show` prints them, and `zamu tasks list` adds DUE, LABELS, PARENT, SUBTASKS and BLOCKED columns when
 a row has a value for them. Mark your task blocked instead of leaving it In progress with no word: the
 person sees it on Home under Blocked.
 
@@ -234,19 +234,19 @@ In a mirrored project:
 - Change a task by editing its file in `backlog/` (or the folder the project reads) and pushing to the default
   branch, for example `backlog task edit 786 -s "In Progress"`. Changes on other branches show up once they
   are merged.
-- `pm` reads the tasks, comments on them and sets their cycle. Every command that takes a task key also takes
-  the Backlog.md ID: `pm tasks show BACK-786.1`. IDs such as `TASK-12` can repeat across projects; add
-  `--project` when pm asks for it.
-- `pm` refuses to change the title, description, status, priority, assignee, milestone, labels, due date,
+- `zamu` reads the tasks, comments on them and sets their cycle. Every command that takes a task key also takes
+  the Backlog.md ID: `zamu tasks show BACK-786.1`. IDs such as `TASK-12` can repeat across projects; add
+  `--project` when zamu asks for it.
+- `zamu` refuses to change the title, description, status, priority, assignee, milestone, labels, due date,
   blockers or parent of a mirrored task, to create tasks, to change milestones, and to rename or delete a
   label read from the files. It exits with code 6 and says where the change belongs:
 
   ```text
-  $ pm tasks update PAY-786 --status done
+  $ zamu tasks update PAY-786 --status done
   error: PAY-786 is mirrored from Backlog.md, so its status can't change here (task_mirrored).
     file:  backlog/tasks/back-786 - Retry-failed-webhook-deliveries-with-exponential-backoff.md (main)
     edit the file and push, or run: backlog task edit 786 -s Done
-    still allowed here: comments (pm comments add PAY-786) and cycles (pm tasks update PAY-786 --cycle 4)
+    still allowed here: comments (zamu comments add PAY-786) and cycles (zamu tasks update PAY-786 --cycle 4)
   ```
 
   With `--json`, the error is the server's problem, with `field`, `file`, `backlogId` and `hint` (the
@@ -256,35 +256,35 @@ After a push, the project usually catches up within seconds through the git host
 needs the change right away, for example before it reads the task back, it asks for a refresh and waits:
 
 ```sh
-pm backlog refresh --wait --json   # reads the default branch now and waits for the result, up to 5 minutes
-pm backlog status                  # mode, state, branch, folder, last read and its commit, counts
-pm backlog status --problems       # every file skipped or read with a warning, and every unmapped value
+zamu backlog refresh --wait --json   # reads the default branch now and waits for the result, up to 5 minutes
+zamu backlog status                  # mode, state, branch, folder, last read and its commit, counts
+zamu backlog status --problems       # every file skipped or read with a warning, and every unmapped value
 ```
 
-`pm backlog refresh` needs a key that can write the project. With `--wait` it exits 0 whatever the read
+`zamu backlog refresh` needs a key that can write the project. With `--wait` it exits 0 whatever the read
 found, so check `data.status.state` in the JSON: `healthy`, `warnings` (some files were skipped or values fell
-back; `pm backlog status --problems` lists them), `failed` or `paused`. It exits with code 6 when the mirror
+back; `zamu backlog status --problems` lists them), `failed` or `paused`. It exits with code 6 when the mirror
 is paused (`BACKLOG_PAUSED`: the git connection is missing, rejected or unreachable; an admin fixes it in the
 web app) or detached (`BACKLOG_DETACHED`).
 
-A task whose file is deleted from the default branch is hidden, not deleted: it leaves `pm tasks list`, and
-`pm tasks show` marks it "Hidden". It comes back with the same key when a file with its ID returns.
+A task whose file is deleted from the default branch is hidden, not deleted: it leaves `zamu tasks list`, and
+`zamu tasks show` marks it "Hidden". It comes back with the same key when a file with its ID returns.
 
-Once a project is detached from Backlog.md, or was imported once, its tasks behave like any other: `pm`
+Once a project is detached from Backlog.md, or was imported once, its tasks behave like any other: `zamu`
 creates and updates them, and edits to the files no longer reach the project. Agents should stop editing
 `backlog/` then.
 
 ## Dashboard
 
-`pm dashboard` shows what needs someone now, across every project the key can read. In the web app, Home
-replaced the Dashboard page in 0.7.0; `pm dashboard` keeps its four groups and its `pm.v1.dashboard` output,
+`zamu dashboard` shows what needs someone now, across every project the key can read. In the web app, Home
+replaced the Dashboard page in 0.7.0; `zamu dashboard` keeps its four groups and its `zamu.v1.dashboard` output,
 so scripts written for 0.6.0 keep working. Home's own data is `GET /api/v1/home` (see the
 [API reference](api.md#home)).
 
 ```sh
-pm dashboard               # Mine: your tasks, your agents' tasks and mentions of you
-pm dashboard --everyone    # the whole workspace
-pm dashboard --json        # { schema: 'pm.v1.dashboard', data: Dashboard }
+zamu dashboard               # Mine: your tasks, your agents' tasks and mentions of you
+zamu dashboard --everyone    # the whole workspace
+zamu dashboard --json        # { schema: 'zamu.v1.dashboard', data: Dashboard }
 ```
 
 The output starts with the action queue, in four groups:
@@ -310,20 +310,20 @@ When you need input from a person, mention your responsible person in a comment 
 it on their Home, under Mentions. It stays there until they comment on the task or change it.
 
 ```sh
-pm comments add PAY-142 "Refunds over 500 EUR: one approval or two? @ana@example.com"
-pm tasks update PAY-142 --status in_review    # your task in review shows on their Home too
+zamu comments add PAY-142 "Refunds over 500 EUR: one approval or two? @ana@example.com"
+zamu tasks update PAY-142 --status in_review    # your task in review shows on their Home too
 ```
 
-Your own dashboard works the same way: `pm dashboard` lists the comments that mention you and your tasks
+Your own dashboard works the same way: `zamu dashboard` lists the comments that mention you and your tasks
 in review or stalled, so check it when you start a session.
 
-### pm.v1.dashboard
+### zamu.v1.dashboard
 
-`pm dashboard --json` prints the body of `GET /api/v1/dashboard?scope=mine|everyone`:
+`zamu dashboard --json` prints the body of `GET /api/v1/dashboard?scope=mine|everyone`:
 
 ```json
 {
-  "schema": "pm.v1.dashboard",
+  "schema": "zamu.v1.dashboard",
   "data": {
     "scope": "mine",
     "generatedAt": "2026-10-23T17:12:30.413Z",
@@ -360,61 +360,61 @@ Each group has `total`, which counts every item, and `items`, up to 50 of them. 
 Every command takes `--json` and prints one line with a versioned envelope:
 
 ```json
-{ "schema": "pm.v1.<command>", "data": {} }
+{ "schema": "zamu.v1.<command>", "data": {} }
 ```
 
-Check `schema` before reading `data`. Within `pm.v1`, fields are only added, never removed or changed; a
-breaking change ships as `pm.v2`. The Zod schemas live in `packages/contracts` (`cliDataSchemas` in
+Check `schema` before reading `data`. Within `zamu.v1`, fields are only added, never removed or changed; a
+breaking change ships as `zamu.v2`. The Zod schemas live in `packages/contracts` (`cliDataSchemas` in
 `src/cli.ts`, entities in `src/entities.ts`), and the server publishes the same shapes as OpenAPI at
 `GET /api/v1/openapi.json`.
 
-| Schema                    | `data`                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------- |
-| `pm.v1.login`             | `{ url, me }`                                                                |
-| `pm.v1.logout`            | `{ url }` (null when nothing was stored)                                     |
-| `pm.v1.whoami`            | `{ user, workspace, role, auth: { method, scope }, project }`                |
-| `pm.v1.dashboard`         | `{ scope, generatedAt, groups, projects, agents }` (see Dashboard above)     |
-| `pm.v1.projects.list`     | `{ items: Project[] }` with open counts per status                           |
-| `pm.v1.projects.delete`   | `{ deleted }`: the key of the deleted project                                |
-| `pm.v1.tasks.list`        | `{ items: TaskListItem[], nextCursor, counts }`                              |
-| `pm.v1.tasks.show`        | `{ task: Task, activity: Activity[], timeline: TimelineEntry[] }`            |
-| `pm.v1.tasks.create`      | `Task`                                                                       |
-| `pm.v1.tasks.update`      | `Task`                                                                       |
-| `pm.v1.comments.list`     | `{ items: Comment[] }`                                                       |
-| `pm.v1.comments.add`      | `Comment`                                                                    |
-| `pm.v1.comments.edit`     | `Comment`                                                                    |
-| `pm.v1.comments.delete`   | `Comment`, with `body` null and `deletedAt` set                              |
-| `pm.v1.milestones.list`   | `{ items: Milestone[] }` with progress counts                                |
-| `pm.v1.milestones.create` | `Milestone`                                                                  |
-| `pm.v1.milestones.update` | `Milestone`                                                                  |
-| `pm.v1.cycles.list`       | `{ items: Cycle[] }` with state, days left and counts                        |
-| `pm.v1.cycles.create`     | `Cycle`                                                                      |
-| `pm.v1.cycles.current`    | `Cycle`, or `null` when no cycle is running                                  |
-| `pm.v1.cycles.end`        | `Cycle` with its summary, plus `rollovers`: the tasks that moved and where   |
-| `pm.v1.labels.list`       | `{ items: Label[] }` with `usageCount` per label                             |
-| `pm.v1.labels.create`     | `Label` with `usageCount`                                                    |
-| `pm.v1.labels.update`     | `Label` with `usageCount`                                                    |
-| `pm.v1.labels.delete`     | `{ deleted: Label, usageCount }`: the label as it was, and how many lost it  |
-| `pm.v1.backlog.status`    | `BacklogSourceStatus`: mode, state, source, last read, counts, problems      |
-| `pm.v1.backlog.refresh`   | The refresh request plus `outcome` and, with `--wait`, the final `status`    |
-| `pm.v1.link`              | `{ project, target, action, repository, file }`                              |
-| `pm.v1.agents`            | `{ file, action, project, block }`                                           |
-| `pm.v1.error`             | RFC 9457 problem: `{ type, title, status, code, detail, requestId, issues }` |
+| Schema                      | `data`                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `zamu.v1.login`             | `{ url, me }`                                                                |
+| `zamu.v1.logout`            | `{ url }` (null when nothing was stored)                                     |
+| `zamu.v1.whoami`            | `{ user, workspace, role, auth: { method, scope }, project }`                |
+| `zamu.v1.dashboard`         | `{ scope, generatedAt, groups, projects, agents }` (see Dashboard above)     |
+| `zamu.v1.projects.list`     | `{ items: Project[] }` with open counts per status                           |
+| `zamu.v1.projects.delete`   | `{ deleted }`: the key of the deleted project                                |
+| `zamu.v1.tasks.list`        | `{ items: TaskListItem[], nextCursor, counts }`                              |
+| `zamu.v1.tasks.show`        | `{ task: Task, activity: Activity[], timeline: TimelineEntry[] }`            |
+| `zamu.v1.tasks.create`      | `Task`                                                                       |
+| `zamu.v1.tasks.update`      | `Task`                                                                       |
+| `zamu.v1.comments.list`     | `{ items: Comment[] }`                                                       |
+| `zamu.v1.comments.add`      | `Comment`                                                                    |
+| `zamu.v1.comments.edit`     | `Comment`                                                                    |
+| `zamu.v1.comments.delete`   | `Comment`, with `body` null and `deletedAt` set                              |
+| `zamu.v1.milestones.list`   | `{ items: Milestone[] }` with progress counts                                |
+| `zamu.v1.milestones.create` | `Milestone`                                                                  |
+| `zamu.v1.milestones.update` | `Milestone`                                                                  |
+| `zamu.v1.cycles.list`       | `{ items: Cycle[] }` with state, days left and counts                        |
+| `zamu.v1.cycles.create`     | `Cycle`                                                                      |
+| `zamu.v1.cycles.current`    | `Cycle`, or `null` when no cycle is running                                  |
+| `zamu.v1.cycles.end`        | `Cycle` with its summary, plus `rollovers`: the tasks that moved and where   |
+| `zamu.v1.labels.list`       | `{ items: Label[] }` with `usageCount` per label                             |
+| `zamu.v1.labels.create`     | `Label` with `usageCount`                                                    |
+| `zamu.v1.labels.update`     | `Label` with `usageCount`                                                    |
+| `zamu.v1.labels.delete`     | `{ deleted: Label, usageCount }`: the label as it was, and how many lost it  |
+| `zamu.v1.backlog.status`    | `BacklogSourceStatus`: mode, state, source, last read, counts, problems      |
+| `zamu.v1.backlog.refresh`   | The refresh request plus `outcome` and, with `--wait`, the final `status`    |
+| `zamu.v1.link`              | `{ project, target, action, repository, file }`                              |
+| `zamu.v1.agents`            | `{ file, action, project, block }`                                           |
+| `zamu.v1.error`             | RFC 9457 problem: `{ type, title, status, code, detail, requestId, issues }` |
 
 Statuses are `backlog`, `todo`, `in_progress`, `in_review`, `done`, `canceled`. Priorities are `none`, `low`,
 `medium`, `high`, `urgent`. Timestamps are ISO 8601 in UTC; dates such as `targetDate`, `startsOn` and
 `dueDate` are `YYYY-MM-DD`. `assignee` is null or a user reference; agents carry their `responsible` person.
 `milestone`, `cycle`, `dueDate` and `parent` are null when the task has none. `rank` orders the cards inside
 a board column. Since 0.7.0 tasks also carry `labels` (`{ id, name, color, source }`), `dueDate`,
-`subtaskProgress` (`{ done, total }`) and `blocked`; `pm tasks show` adds `parent`, `subtasks`, `blockedBy`
+`subtaskProgress` (`{ done, total }`) and `blocked`; `zamu tasks show` adds `parent`, `subtasks`, `blockedBy`
 and `blocks`, where a blocker you can't see is `null` ("Removed task"). List rows carry `parentKey` instead
 of `parent`.
 
-`pm tasks list --project PAY --json`:
+`zamu tasks list --project PAY --json`:
 
 ```json
 {
-  "schema": "pm.v1.tasks.list",
+  "schema": "zamu.v1.tasks.list",
   "data": {
     "items": [
       {
@@ -452,11 +452,11 @@ of `parent`.
 }
 ```
 
-`pm tasks show PAY-1 --json` after the agent moved the task:
+`zamu tasks show PAY-1 --json` after the agent moved the task:
 
 ```json
 {
-  "schema": "pm.v1.tasks.show",
+  "schema": "zamu.v1.tasks.show",
   "data": {
     "task": {
       "id": "01a1657a-fc2c-7636-9dde-ba795eabea62",
@@ -518,11 +518,11 @@ of `parent`.
 When a cycle ends, each task that moved gets a `cycle.ended` activity entry with a `cycle` change. Its
 `actor` is null when the server's hourly job ended the cycle.
 
-A failure, here `pm tasks show PAY-99 --json` (exit code 3):
+A failure, here `zamu tasks show PAY-99 --json` (exit code 3):
 
 ```json
 {
-  "schema": "pm.v1.error",
+  "schema": "zamu.v1.error",
   "data": {
     "type": "about:blank",
     "title": "Not found",

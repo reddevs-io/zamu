@@ -3,7 +3,7 @@
 // The raw body is read once (signatures are computed over its exact bytes) and handed to core's
 // acceptBacklogWebhook, which verifies it, records the delivery and enqueues a refresh. Not oRPC:
 // the senders are git hosts, not API clients, and they get bare status codes.
-import { acceptBacklogWebhook, type WebhookContext } from '@pm/core';
+import { acceptBacklogWebhook, type WebhookContext } from '@zamu/core';
 
 /** Larger push payloads are refused before reading. GitHub caps deliveries at 25 MB. */
 export const MAX_WEBHOOK_BODY_BYTES = 25 * 1024 * 1024;

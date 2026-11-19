@@ -1,6 +1,6 @@
-import { type AssigneeRef, TASK_STATUSES, type TaskListItem, type TaskStatus } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
+import { type AssigneeRef, TASK_STATUSES, type TaskListItem, type TaskStatus } from '@zamu/contracts';
 import {
   type FocusEvent,
   type KeyboardEvent,
@@ -986,7 +986,9 @@ export function BoardScreen({ projectKey, search }: BoardScreenProps) {
                   New task
                 </Button>
               }
-              cli={{ command: `pm tasks create --project ${projectKey} "Match Stripe payouts to invoices"` }}
+              cli={{
+                command: `zamu tasks create --project ${projectKey} "Match Stripe payouts to invoices"`,
+              }}
             />
           )}
         </div>

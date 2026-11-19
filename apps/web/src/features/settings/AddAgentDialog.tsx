@@ -1,6 +1,6 @@
 // Add agent: name, responsible human, access and permission. On success the parent shows the agent's
 // first key in the reveal-once dialog.
-import { type AgentCreated, AgentName } from '@pm/contracts';
+import { type AgentCreated, AgentName } from '@zamu/contracts';
 import { type FormEvent, useState } from 'react';
 import {
   Banner,

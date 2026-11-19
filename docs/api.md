@@ -1,6 +1,6 @@
 # REST API
 
-The web app, the `pm` CLI and your scripts use the same REST API at `/api/v1`. The server publishes the full
+The web app, the `zamu` CLI and your scripts use the same REST API at `/api/v1`. The server publishes the full
 OpenAPI document at `GET /api/v1/openapi.json`; this page is an overview, with the routes 0.7.0 added.
 
 ## Requests
@@ -9,7 +9,7 @@ Send an API key as a bearer token. People create keys in Settings > My keys, and
 admin (see [agents.md](agents.md)):
 
 ```sh
-curl -H "Authorization: Bearer $PM_KEY" https://projects.example.com/api/v1/tasks?project=PAY
+curl -H "Authorization: Bearer $ZAMU_KEY" https://projects.example.com/api/v1/tasks?project=PAY
 ```
 
 A key only reaches the projects in its scope, and a read-only key cannot write. The web app signs its
@@ -145,5 +145,5 @@ colour still changes.
 - `agents`: on the Agents tab, one card per agent: working or idle, its current task, its counts for today
   and its last five actions.
 
-`GET /dashboard` and `GET /dashboard/counts` stay for `pm dashboard` and scripts written for 0.6.0. The web
+`GET /dashboard` and `GET /dashboard/counts` stay for `zamu dashboard` and scripts written for 0.6.0. The web
 app no longer uses them.

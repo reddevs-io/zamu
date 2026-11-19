@@ -56,7 +56,7 @@ describe('M2 migration on an M1 database with data', () => {
   let end: () => Promise<void>;
 
   beforeAll(async () => {
-    m1Folder = mkdtempSync(join(tmpdir(), 'pm-m1-migrations-'));
+    m1Folder = mkdtempSync(join(tmpdir(), 'zamu-m1-migrations-'));
     cpSync(join(migrationsFolder, M1_MIGRATION), join(m1Folder, M1_MIGRATION), { recursive: true });
     url = withDatabase(testServerUrl(), uniqueDatabaseName('pm_test_upgrade'));
     await createDatabase(url);
@@ -184,7 +184,7 @@ describe('M3 migration on an M2.1 database with data', () => {
   const WEB = '0190a1b2-0000-7000-8000-0000000000c2';
 
   beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), 'pm-m2-1-migrations-'));
+    folder = mkdtempSync(join(tmpdir(), 'zamu-m2-1-migrations-'));
     for (const name of M2_1_MIGRATIONS) {
       cpSync(join(migrationsFolder, name), join(folder, name), { recursive: true });
     }
@@ -318,7 +318,7 @@ describe('M5 migration on a 0.6.0 database with data', () => {
   const MILESTONE = '0190a1b2-0000-7000-8000-0000000000d1';
 
   beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), 'pm-0-6-0-migrations-'));
+    folder = mkdtempSync(join(tmpdir(), 'zamu-0-6-0-migrations-'));
     for (const name of V0_6_0_MIGRATIONS) {
       cpSync(join(migrationsFolder, name), join(folder, name), { recursive: true });
     }
@@ -477,7 +477,7 @@ describe('M5 mirror backfill on a 0.6.0 database with Backlog.md tasks', () => {
   const M5_TASK_FIELDS = '20261104104246_m5_task_fields';
 
   beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), 'pm-0-6-0-backfill-'));
+    folder = mkdtempSync(join(tmpdir(), 'zamu-0-6-0-backfill-'));
     for (const name of V0_6_0_MIGRATIONS) {
       cpSync(join(migrationsFolder, name), join(folder, name), { recursive: true });
     }

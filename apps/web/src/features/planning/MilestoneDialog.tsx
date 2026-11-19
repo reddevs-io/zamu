@@ -4,7 +4,7 @@ import {
   MILESTONE_STATUSES,
   type MilestoneStatus,
   type MilestoneWithProgress,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type FormEvent, useRef, useState } from 'react';
 import {
   Banner,

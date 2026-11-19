@@ -1,5 +1,5 @@
 import { ORPCError } from '@orpc/client';
-import type { StatusCounts } from '@pm/contracts';
+import type { StatusCounts } from '@zamu/contracts';
 import type { ReactNode } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import { useProjectSummary } from '~/features/project-header';

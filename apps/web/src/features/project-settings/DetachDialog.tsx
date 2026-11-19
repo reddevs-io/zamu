@@ -1,5 +1,5 @@
 // Detach from Backlog.md (frame 2m): irreversible, so the project key has to be typed.
-import type { BacklogSourceStatus } from '@pm/contracts';
+import type { BacklogSourceStatus } from '@zamu/contracts';
 import { type FormEvent, useState } from 'react';
 import {
   Banner,
@@ -83,7 +83,7 @@ function DetachContent({
             <li>
               Changes to the files no longer reach this project. Agents should stop editing{' '}
               <InlineCode className="text-xs">{folder}</InlineCode> and use{' '}
-              <InlineCode className="text-xs">pm</InlineCode>.
+              <InlineCode className="text-xs">zamu</InlineCode>.
             </li>
             <li>
               {status.nextTaskKey

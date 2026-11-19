@@ -1,7 +1,7 @@
 // The pg-boss worker: starts pg-boss (creating or migrating its schema), creates the queues core
 // declares, registers a handler per job name, schedules core's recurring jobs and stops cleanly.
-import { createJobQueue, ensureQueues, JOB_NAMES, JOB_SCHEDULES } from '@pm/core';
-import { createDb, type Db, type DbHandle } from '@pm/db';
+import { createJobQueue, ensureQueues, JOB_NAMES, JOB_SCHEDULES } from '@zamu/core';
+import { createDb, type Db, type DbHandle } from '@zamu/db';
 import { PgBoss } from 'pg-boss';
 import { createLogger, type Logger } from './logger';
 import { type RunJobContext, runJob } from './run-job';
@@ -29,7 +29,7 @@ export interface Worker {
   stop(): Promise<void>;
 }
 
-const APPLICATION_NAME = 'pm-worker';
+const APPLICATION_NAME = 'zamu-worker';
 
 export async function startWorker(options: WorkerOptions): Promise<Worker> {
   const {

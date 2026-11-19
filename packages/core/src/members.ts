@@ -9,8 +9,8 @@ import {
   UserId,
   type UserRef,
   type WorkspaceRole,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import { and, asc, eq, inArray, max, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { activeKeyCounts, issueApiKey, MAX_API_KEY_NAME_LENGTH, validateScope } from './api-keys';

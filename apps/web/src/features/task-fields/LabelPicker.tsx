@@ -1,5 +1,5 @@
-import { LABEL_COLOR_COUNT, type Label, type LabelWithUsage, MAX_LABEL_NAME_LENGTH } from '@pm/contracts';
 import { useQueries } from '@tanstack/react-query';
+import { LABEL_COLOR_COUNT, type Label, type LabelWithUsage, MAX_LABEL_NAME_LENGTH } from '@zamu/contracts';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { labelsQuery, useCreateLabel } from '~/features/labels/queries';
 import {

@@ -1,5 +1,5 @@
-import type { GetHomeInput, Home } from '@pm/contracts';
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
+import type { GetHomeInput, Home } from '@zamu/contracts';
 import { retryOnce, withTimeout } from '~/features/tasks/errors';
 import { membersQuery, meQuery, projectsQuery, REQUEST_TIMEOUT_MS } from '~/features/tasks/queries';
 import { client, orpc } from '~/lib/orpc';

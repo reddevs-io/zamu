@@ -1,10 +1,10 @@
-import { type DueState, dueState, type TaskStatus } from '@pm/contracts';
+import { type DueState, dueState, type TaskStatus } from '@zamu/contracts';
 import { cn } from './cn';
 
 /*
  * Margin due chip (margin.css .due): text-xs, no background. future "Nov 14" in --fg-2; soon "Tomorrow",
  * "In 2 days" and today "Today" in --fg 500; overdue "3 days overdue" in --danger 600; done (a Done or
- * Canceled task with a date) "Oct 2 · done" in --fg-3. The state comes from dueState() in @pm/contracts.
+ * Canceled task with a date) "Oct 2 · done" in --fg-3. The state comes from dueState() in @zamu/contracts.
  */
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;

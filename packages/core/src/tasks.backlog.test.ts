@@ -1,7 +1,7 @@
 // M3: tasks of projects mirrored from Backlog.md: suffixed keys, Backlog.md id lookups, the
 // Backlog.md block, hidden tasks and owned-field locks.
-import { TASK_OWNED_FIELDS } from '@pm/contracts';
-import { schema } from '@pm/db';
+import { TASK_OWNED_FIELDS } from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createComment } from './comments';

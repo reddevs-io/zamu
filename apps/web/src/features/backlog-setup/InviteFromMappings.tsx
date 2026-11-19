@@ -1,4 +1,4 @@
-import type { Invitation, InvitationRole } from '@pm/contracts';
+import type { Invitation, InvitationRole } from '@zamu/contracts';
 import { useRef } from 'react';
 import { InviteDialog } from '~/features/settings/InviteDialog';
 import { type InviteDraft, inviteHint } from './assignee-hints';

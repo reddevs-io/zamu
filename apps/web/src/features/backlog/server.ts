@@ -1,9 +1,12 @@
 // TanStack Start server functions for Backlog.md setup and the Backlog.md section of project settings
-// (M3). Settings-only data, so the screens call @pm/core through these thin adapters: validate with
+// (M3). Settings-only data, so the screens call @zamu/core through these thin adapters: validate with
 // the contract schema, build the actor from the request, call core, return a SettingsResult (unwrap
 // it in the browser with `unwrap` from features/settings/result). Product data (tasks, the status a
 // header shows) stays on /api/v1: GET /projects/{project}/backlog is `orpc.backlog.status`.
 // Handler bodies (and the server-only imports they use) are stripped from the client bundle.
+
+import { createServerFn } from '@tanstack/react-start';
+import { getRequestHeaders } from '@tanstack/react-start/server';
 import {
   BacklogProjectInput,
   BacklogWebhookInfoInput,
@@ -18,7 +21,7 @@ import {
   SetBacklogFolderInput,
   StartBacklogInput,
   UpdateBacklogMappingsInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import {
   type Actor,
   type CoreContext,
@@ -35,9 +38,7 @@ import {
   setBacklogFolder,
   startBacklog,
   updateBacklogMappings,
-} from '@pm/core';
-import { createServerFn } from '@tanstack/react-start';
-import { getRequestHeaders } from '@tanstack/react-start/server';
+} from '@zamu/core';
 import { getServerContext } from '../../server/context';
 import { runForRequest } from '../settings/adapter';
 

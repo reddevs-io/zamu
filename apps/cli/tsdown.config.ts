@@ -13,6 +13,6 @@ export default defineConfig({
   // package.json has "type": "module", so emit dist/index.js (the bin path) instead of .mjs.
   fixedExtension: false,
   deps: {
-    alwaysBundle: [/^@pm\//],
+    alwaysBundle: [/^@zamu\//],
   },
 });

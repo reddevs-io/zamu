@@ -3,7 +3,7 @@ import {
   type BacklogTrigger,
   type ProjectBacklogSummary,
   parseRepositoryUrl,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { SourceDotState } from '~/ui';
 
 // Mirror rules and copy shared by the project views (header, list, board, milestones, projects table,
@@ -50,7 +50,7 @@ export function triggerText(trigger: BacklogTrigger | null | undefined): string 
     case 'manual':
       return 'by Refresh now';
     case 'cli':
-      return 'from pm backlog refresh';
+      return 'from zamu backlog refresh';
     case 'setup':
       return 'at setup';
     default:

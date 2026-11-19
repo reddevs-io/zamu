@@ -26,8 +26,8 @@ import {
 } from './testing/fixtures';
 
 describe('CLI output', () => {
-  it('names schemas pm.v1.<name>', () => {
-    expect(cliSchemaId('tasks.list')).toBe('pm.v1.tasks.list');
+  it('names schemas zamu.v1.<name>', () => {
+    expect(cliSchemaId('tasks.list')).toBe('zamu.v1.tasks.list');
     expect(CLI_RESULT_NAMES).toEqual([
       'login',
       'logout',
@@ -69,7 +69,7 @@ describe('CLI output', () => {
         .success,
     ).toBe(true);
     expect(me.safeParse({ ...meFixture, project: null }).success).toBe(true);
-    expect(me.safeParse(meFixture).success, 'older pm without the field').toBe(true);
+    expect(me.safeParse(meFixture).success, 'older zamu without the field').toBe(true);
     expect(me.safeParse({ ...meFixture, project: { key: 'PAY', source: 'guess', from: null } }).success).toBe(
       false,
     );
@@ -81,7 +81,7 @@ describe('CLI output', () => {
       repository: 'gitlab.com/t/p',
       file: null,
     });
-    expect(link.schema).toBe('pm.v1.link');
+    expect(link.schema).toBe('zamu.v1.link');
     const agents = cliOutput('agents', {
       file: '/repo/AGENTS.md',
       action: 'created',
@@ -90,12 +90,12 @@ describe('CLI output', () => {
     });
     expect(agents.data.action).toBe('created');
     expect(ProjectFile.safeParse({ project: 'pay' }).data).toEqual({ project: 'PAY' });
-    expect(ProjectFile.safeParse({ project: 'PAY', url: 'https://pm.example.com' }).success).toBe(false);
+    expect(ProjectFile.safeParse({ project: 'PAY', url: 'https://zamu.example.com' }).success).toBe(false);
   });
 
   it('wraps data in the versioned envelope and serialises dates', () => {
     const out = cliOutput('tasks.create', taskFixture);
-    expect(out.schema).toBe('pm.v1.tasks.create');
+    expect(out.schema).toBe('zamu.v1.tasks.create');
     expect(out.data.key).toBe('PAY-142');
     expect(out.data.createdAt).toBe('2026-10-20T09:00:00.000Z');
   });
@@ -105,7 +105,7 @@ describe('CLI output', () => {
   });
 
   it.each([
-    ['login', { url: 'https://pm.example.com', me: meFixture }],
+    ['login', { url: 'https://zamu.example.com', me: meFixture }],
     ['logout', { url: null }],
     ['whoami', meFixture],
     ['projects.list', { items: [projectWithCountsFixture] }],
@@ -146,10 +146,10 @@ describe('CLI output', () => {
     const printed = JSON.stringify(cliOutput(name, data as never));
     const parsed = parseCliOutput(JSON.parse(printed), name);
     expect(parsed).toEqual(JSON.parse(printed));
-    expect(parseCliOutput(JSON.parse(printed)).schema).toBe(`pm.v1.${name}`);
+    expect(parseCliOutput(JSON.parse(printed)).schema).toBe(`zamu.v1.${name}`);
   });
 
-  it('describes pm backlog status and refresh', () => {
+  it('describes zamu backlog status and refresh', () => {
     const status = {
       id: '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4ad3',
       project: { id: projectWithCountsFixture.id, key: 'PAY', name: 'Payments' },
@@ -179,7 +179,7 @@ describe('CLI output', () => {
       history: [],
     } satisfies z.input<typeof BacklogSourceStatus>;
     const shown = cliOutput('backlog.status', status);
-    expect(shown.schema).toBe('pm.v1.backlog.status');
+    expect(shown.schema).toBe('zamu.v1.backlog.status');
     expect(shown.data.lastRead?.at).toBe('2026-10-23T14:02:00.000Z');
     expect(shown.data.lastRead?.commitUrl).toBeNull();
 
@@ -205,9 +205,9 @@ describe('CLI output', () => {
     expect(CLI_BACKLOG_REFRESH_WAIT_MS).toBe(300_000);
   });
 
-  it('describes pm projects delete with the deleted key', () => {
+  it('describes zamu projects delete with the deleted key', () => {
     expect(cliOutput('projects.delete', { deleted: 'PAY' })).toEqual({
-      schema: 'pm.v1.projects.delete',
+      schema: 'zamu.v1.projects.delete',
       data: { deleted: 'PAY' },
     });
     expect(() => cliOutput('projects.delete', { deleted: 'pay' })).toThrow();
@@ -232,7 +232,7 @@ describe('CLI output', () => {
   });
 
   it('rejects unknown versions and mismatched names', () => {
-    const v2 = { schema: 'pm.v2.whoami', data: cliOutput('whoami', meFixture).data };
+    const v2 = { schema: 'zamu.v2.whoami', data: cliOutput('whoami', meFixture).data };
     expect(() => parseCliOutput(v2)).toThrow();
     expect(() => parseCliOutput(cliOutput('whoami', meFixture), 'tasks.show')).toThrow();
   });

@@ -1,4 +1,4 @@
-import type { Cycle } from '@pm/contracts';
+import type { Cycle } from '@zamu/contracts';
 import { CycleDialog, type CycleField, type CycleValues, cycleDefaults } from './CycleDialog';
 import { writeFailure } from './errors';
 import { useCreateCycle, useUpdateCycle } from './queries';

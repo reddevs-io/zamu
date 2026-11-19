@@ -3,7 +3,7 @@
 //   pnpm exec tsx --env-file-if-exists=.env apps/web/src/server/scripts/dev-seed.ts      (repo root)
 //   eval "$(pnpm -s exec tsx --env-file-if-exists=.env apps/web/src/server/scripts/dev-seed.ts)"
 //
-// stdout carries only `export PM_API_KEY=...` lines (claude-dev's key) and PM_ADMIN_API_KEY (the
+// stdout carries only `export ZAMU_API_KEY=...` lines (claude-dev's key) and ZAMU_ADMIN_API_KEY (the
 // admin's), so `eval` sets them; the summary goes to stderr. Reads DATABASE_URL, BETTER_AUTH_SECRET,
 // BETTER_AUTH_URL and PUBLIC_URL; SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD and SEED_WORKSPACE override
 // the first-run admin and workspace. SEED_PLANNING=0 skips the M2 demo data; SEED_BACKLOG=1 adds the
@@ -38,9 +38,9 @@ async function main() {
         : 'Projects:  the seed projects already existed; left unchanged',
     );
     log('API keys (shown once), all projects, read and write:');
-    process.stdout.write(`export PM_API_KEY=${result.agentKey}\n`);
-    process.stdout.write(`export PM_ADMIN_API_KEY=${result.adminKey}\n`);
-    log(`Try: curl -H "Authorization: Bearer $PM_API_KEY" ${ctx.publicUrl}/api/v1/projects`);
+    process.stdout.write(`export ZAMU_API_KEY=${result.agentKey}\n`);
+    process.stdout.write(`export ZAMU_ADMIN_API_KEY=${result.adminKey}\n`);
+    log(`Try: curl -H "Authorization: Bearer $ZAMU_API_KEY" ${ctx.publicUrl}/api/v1/projects`);
   } finally {
     await ctx.jobs.stop();
     await ctx.pool.end();

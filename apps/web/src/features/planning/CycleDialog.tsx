@@ -1,4 +1,4 @@
-import { type Cycle, CycleName, MAX_CYCLE_DAYS } from '@pm/contracts';
+import { type Cycle, CycleName, MAX_CYCLE_DAYS } from '@zamu/contracts';
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { TextField as AriaTextField, Input } from 'react-aria-components';
 import {

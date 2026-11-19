@@ -1,4 +1,4 @@
-import type { TaskListItem } from '@pm/contracts';
+import type { TaskListItem } from '@zamu/contracts';
 import { memo, type ReactNode, useMemo } from 'react';
 import {
   DropIndicator,
@@ -15,7 +15,7 @@ import { Button, boardCardStyles, cn, dropIndicatorClass } from '~/ui';
 // card or on an empty cell.
 
 /** Drag type carrying the task key. */
-export const CARD_DRAG_TYPE = 'application/x-pm-task-key';
+export const CARD_DRAG_TYPE = 'application/x-zamu-task-key';
 
 export interface CardDrop {
   key: string;

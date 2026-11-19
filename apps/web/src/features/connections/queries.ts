@@ -1,6 +1,8 @@
 // TanStack Query wiring for the Git connections page. Connections are settings-only data, so every
 // call goes through the server functions in ./server and comes back as a SettingsResult. Tokens are
 // sent, never received.
+
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateGitConnectionInput,
   DeleteGitConnectionInput,
@@ -10,8 +12,7 @@ import type {
   GitConnectionTestResult,
   TestGitConnectionInput,
   UpdateGitConnectionInput,
-} from '@pm/contracts';
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import type { z } from 'zod';
 import { orpc } from '~/lib/orpc';
 import { SettingsError, unwrap } from '../settings/result';

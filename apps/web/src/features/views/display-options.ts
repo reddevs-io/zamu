@@ -9,7 +9,7 @@ import {
   type TaskListItem,
   type TaskSort,
   type TaskStatus,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { PRIORITY_LABELS, STATUS_LABELS, showsPriorityOnCards } from '~/ui';
 
 // Display options of a task view (brief "Display options", frame 045): how the list, the board and

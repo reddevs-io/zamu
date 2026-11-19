@@ -1,5 +1,5 @@
-import type { ProjectWithCounts } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { ProjectWithCounts } from '@zamu/contracts';
 import type { ReactNode } from 'react';
 import { projectsQuery } from '~/features/tasks/queries';
 import { ViewHeader } from '~/ui';

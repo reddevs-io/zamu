@@ -1,15 +1,18 @@
 // TanStack Start server functions for the Git connections page (M3). Connections are settings-only
-// data, not part of /api/v1, so the screens call @pm/core through these thin adapters: validate with
+// data, not part of /api/v1, so the screens call @zamu/core through these thin adapters: validate with
 // the contract schema, build the actor from the request, call core, return a SettingsResult (unwrap
 // it in the browser with `unwrap` from features/settings/result). Tokens go in, never out.
 // Handler bodies (and the server-only imports they use) are stripped from the client bundle.
+
+import { createServerFn } from '@tanstack/react-start';
+import { getRequestHeaders } from '@tanstack/react-start/server';
 import {
   CreateGitConnectionInput,
   DeleteGitConnectionInput,
   GitConnectionId,
   TestGitConnectionInput,
   UpdateGitConnectionInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import {
   type Actor,
   type CoreContext,
@@ -19,9 +22,7 @@ import {
   listConnections,
   testConnection,
   updateConnection,
-} from '@pm/core';
-import { createServerFn } from '@tanstack/react-start';
-import { getRequestHeaders } from '@tanstack/react-start/server';
+} from '@zamu/core';
 import { z } from 'zod';
 import { getServerContext } from '../../server/context';
 import { runForRequest } from '../settings/adapter';

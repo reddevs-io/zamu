@@ -10,7 +10,7 @@ export const Route = createFileRoute('/_app/')({
   validateSearch: parseHomeSearch,
   loaderDeps: ({ search }) => ({ input: homeInput(homeTabOf(search), homeFilterOf({ ...search })) }),
   loader: ({ context, deps }) => settleOnServer(prefetchHome(context.queryClient, deps.input)),
-  head: () => ({ meta: [{ title: 'Home · project-management' }] }),
+  head: () => ({ meta: [{ title: 'Home · Zamu' }] }),
   component: HomeRoute,
 });
 

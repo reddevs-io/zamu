@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased (0.8.0)
+
+Renamed to Zamu. The rename is breaking: none of the old names keep working.
+
+### Changed
+
+- The product is Zamu in the web app, page titles, the OpenAPI document and sign-in. The repository moves to
+  https://github.com/reddevs-io/zamu.
+- The CLI binary is `zamu` instead of `pm`. It reads `ZAMU_URL`, `ZAMU_KEY`, `ZAMU_API_KEY` and
+  `ZAMU_PROJECT` instead of the `PM_*` variables, stores its config in `$XDG_CONFIG_HOME/zamu/config.json`,
+  and looks for `.zamu.json` instead of `.pm.json`. `--json` output uses the schema ids `zamu.v1.*` instead
+  of `pm.v1.*`, and `zamu agents` writes its block between `<!-- zamu:start -->` and `<!-- zamu:end -->`
+  (blocks with the old `pm:` markers are not recognised; remove them by hand).
+- Display options, the sidebar state and other settings kept in the browser use new storage keys, so
+  everyone starts on the defaults once.
+- API keys start with `zamu_live_` instead of `pm_live_`, and key lists show their first 14 characters. Keys
+  created before 0.8.0 get 401; create new ones in Settings.
+- Workspace packages are `@zamu/*` instead of `@pm/*`, and the root package is `zamu`.
+- The image entrypoint is `zamu-entrypoint`, and `zamu` runs the bundled CLI. Compose projects are `zamu` and
+  `zamu-dev`, the default image is `zamu:local` (`ZAMU_IMAGE`), and the default database is `zamu`.
+- The git provider client sends the User-Agent `zamu-git-providers`.
+
 ## 0.7.0
 
 A new look for the web app, and four new task fields: labels, due dates, blockers and subtasks.

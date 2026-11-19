@@ -21,12 +21,12 @@ export default async function globalSetup(): Promise<void> {
 
   if (!skipBuild) {
     console.log('[e2e] building the CLI');
-    execFileSync('pnpm', ['--filter', '@pm/cli', 'build'], {
+    execFileSync('pnpm', ['--filter', '@zamu/cli', 'build'], {
       cwd: repoRoot,
       stdio: ['ignore', 'ignore', 'inherit'],
     });
   }
-  if (!existsSync(cliPath)) throw new Error(`CLI not built: ${cliPath}. Run pnpm --filter @pm/cli build.`);
+  if (!existsSync(cliPath)) throw new Error(`CLI not built: ${cliPath}. Run pnpm --filter @zamu/cli build.`);
 
   console.log(`[e2e] removing any previous ${composeProject} stack and its volume`);
   // A kept run (E2E_KEEP_STACK=1) leaves the Backlog.md specs' Forgejo attached to the stack network.

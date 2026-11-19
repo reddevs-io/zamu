@@ -12,9 +12,9 @@ const backlogSpecs = /backlog-.*\.spec\.ts$/;
 const browser = {
   ...devices['Desktop Chrome'],
   viewport: { width: 1280, height: 800 },
-  // The test reads the copied key with navigator.clipboard, which needs a secure context. In CI the stack is
-  // http://docker:<port>, not localhost: there the suite runs full Chromium in new headless mode, the only one
-  // that honours the flag below. On localhost the headless shell is enough, and it needs fewer system
+  // The test reads the copied key with navigator.clipboard, which needs a secure context. When E2E_BASE_URL
+  // points at another Docker host, the stack is not on localhost: there the suite runs full Chromium in new
+  // headless mode, the only one that honours the flag below. On localhost the headless shell is enough, and it needs fewer system
   // libraries than full Chromium.
   ...(isLocalhost
     ? {}

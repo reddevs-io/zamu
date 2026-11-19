@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { INVITATIONS_EXPIRE, JOB_NAMES } from '@pm/core';
-import { invitation, organization, user } from '@pm/db';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+import { INVITATIONS_EXPIRE, JOB_NAMES } from '@zamu/core';
+import { invitation, organization, user } from '@zamu/db';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createLogger } from './logger';
 import { startWorker, type Worker } from './worker';

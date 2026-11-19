@@ -1,5 +1,5 @@
-import type { BacklogSourceStatus, ProjectWithCounts } from '@pm/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { BacklogSourceStatus, ProjectWithCounts } from '@zamu/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { Button as AriaButton, Dialog, Link } from 'react-aria-components';
 import { errorMessage, unwrap } from '~/features/settings/result';

@@ -12,9 +12,9 @@
 import { createORPCClient } from '@orpc/client';
 import { RPCLink } from '@orpc/client/fetch';
 import { createTanstackQueryUtils } from '@orpc/tanstack-query';
-import { API_PREFIX } from '@pm/contracts';
 import { createIsomorphicFn } from '@tanstack/react-start';
 import { getRequestHeaders } from '@tanstack/react-start/server';
+import { API_PREFIX } from '@zamu/contracts';
 import { type ApiClient, createApiClient } from '../server/api';
 
 /** Must match RPC_PREFIX in server/api/handler.ts (not imported: that module is server-only). */

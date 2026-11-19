@@ -1,4 +1,4 @@
-import type { TaskListItem, TaskStatus } from '@pm/contracts';
+import type { TaskListItem, TaskStatus } from '@zamu/contracts';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { Button as AriaButton, isTextDropItem, useDrop } from 'react-aria-components';
 import type { TaskGroupValue } from '~/features/views';

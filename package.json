@@ -1,5 +1,5 @@
 {
-  "name": "project-management",
+  "name": "zamu",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -20,7 +20,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.2",
     "@playwright/test": "1.64.1",
-    "@pm/cli": "workspace:*",
+    "@zamu/cli": "workspace:*",
     "@types/node": "24.19.2",
     "oauth2-mock-server": "9.3.0",
     "tsx": "4.23.15",

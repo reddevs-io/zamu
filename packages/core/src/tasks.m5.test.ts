@@ -1,7 +1,7 @@
 // M5 task fields in lists and writes: filters, orderings with keyset cursors, list row fields, due
 // dates, and bulk changes.
-import { TASK_SORTS, type TaskListItem, type TaskSort } from '@pm/contracts';
-import { schema } from '@pm/db';
+import { TASK_SORTS, type TaskListItem, type TaskSort } from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listTaskActivity } from './activity';

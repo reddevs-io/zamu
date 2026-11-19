@@ -1,6 +1,8 @@
 // TanStack Query wiring for the settings screens. Reads of /api/v1 data (me, members, projects) go
 // through oRPC; everything else calls the settings server functions. Created API keys are never put
 // in the query cache: the secret lives only in the reveal dialog's state.
+
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   AgentCreated,
   ApiKeyCreated,
@@ -9,8 +11,7 @@ import type {
   CreateInvitationInput,
   Invitation,
   ListApiKeysInput,
-} from '@pm/contracts';
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import type { z } from 'zod';
 import { orpc } from '~/lib/orpc';
 import { SettingsError, unwrap } from './result';

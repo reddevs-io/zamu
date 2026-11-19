@@ -1,8 +1,8 @@
 // Turns anything a procedure throws into an ORPCError whose code, status and data match the
 // contract's error map, so every transport (OpenAPI, RPC, server-side calls) reports the same thing.
 import { ORPCError } from '@orpc/server';
-import { PROBLEM_STATUS, type ProblemCode, ProblemData } from '@pm/contracts';
-import { DependencyLoop, isCoreError, mirroredExtensions, problemCodeOf, TaskChanged } from '@pm/core';
+import { PROBLEM_STATUS, type ProblemCode, ProblemData } from '@zamu/contracts';
+import { DependencyLoop, isCoreError, mirroredExtensions, problemCodeOf, TaskChanged } from '@zamu/core';
 
 function withRequestId(data: unknown, requestId: string | undefined): ProblemData {
   const parsed = ProblemData.safeParse(data);

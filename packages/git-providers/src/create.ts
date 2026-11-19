@@ -5,7 +5,7 @@ import { deriveApiBaseUrl, deriveWebBaseUrl, normalizeHost } from './hosts';
 import { HttpClient } from './http';
 import type { CreateProviderOptions, GitProvider } from './types';
 
-const USER_AGENT = 'project-management-git-providers';
+const USER_AGENT = 'zamu-git-providers';
 
 /** Adapter for one host and token. Throws RangeError for a host that normalizeHost refuses. */
 export function createProvider(options: CreateProviderOptions): GitProvider {

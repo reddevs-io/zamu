@@ -4,11 +4,11 @@ import { meQuery } from '~/features/tasks/queries';
 import type { GroupBy } from '~/features/views';
 
 // Collapsed columns of a board, remembered per person, project and column field in localStorage:
-//   pm:board-columns:v1:<user id>:<project key>:<group by>  = { "done": true, "todo": false }
+//   zamu:board-columns:v1:<user id>:<project key>:<group by>  = { "done": true, "todo": false }
 // Only the person's changes are stored; a column without an entry takes the default (Done and Canceled
 // start collapsed on a status board).
 
-const PREFIX = 'pm:board-columns:v1';
+const PREFIX = 'zamu:board-columns:v1';
 
 export type FoldOverrides = Readonly<Record<string, boolean>>;
 

@@ -1,4 +1,4 @@
-// pm backlog status | refresh: the Backlog.md source of a mirrored project (M3).
+// zamu backlog status | refresh: the Backlog.md source of a mirrored project (M3).
 import {
   BACKLOG_MODE_LABELS,
   BACKLOG_STATE_LABELS,
@@ -13,17 +13,17 @@ import {
   GIT_CONNECTION_STATUS_LABELS,
   MAX_BACKLOG_PROBLEM_LIMIT,
   RefreshBacklogInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { ApiClient } from '../client';
 import { type CommandContext, emit } from '../context';
 import { fields, formatTime, type Style } from '../format';
 import { requireProject } from '../project';
 import { parseInput } from './shared';
 
-/** Time between two status checks of pm backlog refresh --wait. */
+/** Time between two status checks of zamu backlog refresh --wait. */
 export const BACKLOG_POLL_INTERVAL_MS = 2_000;
 
-/** Pages of problems pm backlog status --problems reads at most (200 each). */
+/** Pages of problems zamu backlog status --problems reads at most (200 each). */
 const MAX_PROBLEM_PAGES = 50;
 
 function plural(count: number, one: string, many = `${one}s`): string {
@@ -97,7 +97,7 @@ function statusText(status: BacklogSourceStatus, style: Style, withProblems: boo
   entries.push([
     'Problems',
     total && !withProblems
-      ? `${problemCounts(counts)} · pm backlog status --problems lists them`
+      ? `${problemCounts(counts)} · zamu backlog status --problems lists them`
       : problemCounts(counts),
   ]);
 
@@ -135,7 +135,7 @@ async function statusWithAllProblems(client: ApiClient, project: string): Promis
 }
 
 // ---------------------------------------------------------------------------
-// pm backlog status
+// zamu backlog status
 // ---------------------------------------------------------------------------
 
 export interface StatusOptions {
@@ -157,7 +157,7 @@ export async function backlogStatus(context: CommandContext, options: StatusOpti
 }
 
 // ---------------------------------------------------------------------------
-// pm backlog refresh
+// zamu backlog refresh
 // ---------------------------------------------------------------------------
 
 export interface RefreshOptions {
@@ -191,11 +191,11 @@ function refreshText(
     const head = data.queued
       ? `Queued a refresh of ${project} from Backlog.md.`
       : `A refresh of ${project} is already queued.`;
-    return `${head}\n${style.dim('pm backlog status shows the result; --wait waits for it.')}\n`;
+    return `${head}\n${style.dim('zamu backlog status shows the result; --wait waits for it.')}\n`;
   }
   const status = data.status;
   if (data.outcome === 'timeout' || !status) {
-    return `No refresh of ${project} finished within ${CLI_BACKLOG_REFRESH_WAIT_MS / 60_000} minutes. It may still run: check pm backlog status later, and that the worker is running.\n`;
+    return `No refresh of ${project} finished within ${CLI_BACKLOG_REFRESH_WAIT_MS / 60_000} minutes. It may still run: check zamu backlog status later, and that the worker is running.\n`;
   }
   const commit = status.lastRead ? ` at ${status.lastRead.commit.slice(0, 7)}` : '';
   // Every task the project holds from the files: tasks/, drafts and archived ones (as on the web).
@@ -206,7 +206,7 @@ function refreshText(
     case 'healthy':
       return `Refreshed ${project}: read Backlog.md${commit}, ${counts}, no problems.\n`;
     case 'warnings':
-      return `Refreshed ${project}: read Backlog.md${commit}, ${counts}, problems: ${problemCounts(status.problems.counts)}.\n${style.dim('pm backlog status --problems lists them.')}\n`;
+      return `Refreshed ${project}: read Backlog.md${commit}, ${counts}, problems: ${problemCounts(status.problems.counts)}.\n${style.dim('zamu backlog status --problems lists them.')}\n`;
     case 'failed':
       return `The refresh of ${project} failed: ${status.lastError ?? 'no reason given'}\n${style.dim('The last good read is kept.')}\n`;
     case 'paused':

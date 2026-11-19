@@ -1,4 +1,4 @@
-import { MIN_PASSWORD_LENGTH as SERVER_MIN_PASSWORD_LENGTH } from '@pm/auth';
+import { MIN_PASSWORD_LENGTH as SERVER_MIN_PASSWORD_LENGTH } from '@zamu/auth';
 import {
   AccountFields,
   InviteFields,
@@ -7,7 +7,7 @@ import {
   SetupInput,
   SignInFields,
   WorkspaceFields,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { fieldErrors, passwordHint, safeRedirect } from './validation';
 

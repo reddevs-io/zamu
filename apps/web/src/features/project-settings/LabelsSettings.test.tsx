@@ -1,7 +1,7 @@
 import { ORPCError } from '@orpc/client';
-import type { LabelWithUsage } from '@pm/contracts';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { LabelWithUsage } from '@zamu/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { LabelsView, type LabelsViewProps } from './LabelsSettings';
 import { labelFailure, labelNameError, sortLabels, usageText } from './labels';

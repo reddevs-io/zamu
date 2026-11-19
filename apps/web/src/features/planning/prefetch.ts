@@ -1,5 +1,5 @@
-import type { CycleSelector } from '@pm/contracts';
 import type { QueryClient } from '@tanstack/react-query';
+import type { CycleSelector } from '@zamu/contracts';
 import { membersQuery, projectsQuery, taskListQuery } from '~/features/tasks/queries';
 import { defaultDisplayOptions, type TaskFilter } from '~/features/views';
 import { cycleQuery, cyclesQuery, milestoneQuery, milestonesQuery } from './queries';

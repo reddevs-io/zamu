@@ -7,16 +7,16 @@
 # Variables come from .env (or the shell). DATABASE_URL in .env is for local development and is not used here:
 # the containers reach Postgres as "db" on the internal network. Postgres is not published on the host, so this
 # stack runs next to the development database from docker-compose.dev.yml.
-name: project-management
+name: zamu
 
 # web and worker run the image that the migrate service builds (building it once instead of three times).
 x-app: &app
-  image: ${PM_IMAGE:-project-management:local}
+  image: ${ZAMU_IMAGE:-zamu:local}
   pull_policy: never
   init: true
   restart: unless-stopped
   environment: &app-env
-    DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-project_management}
+    DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zamu}
     BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env (openssl rand -base64 32)}
     BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
     PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
@@ -50,7 +50,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-project_management}
+      POSTGRES_DB: ${POSTGRES_DB:-zamu}
     volumes:
       # postgres:18 keeps its data under /var/lib/postgresql/18/docker, so mount the parent directory.
       - pgdata:/var/lib/postgresql

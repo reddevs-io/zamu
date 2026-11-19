@@ -20,8 +20,8 @@ import type {
   TaskOwnedField,
   TaskStatus,
   TimelineItem,
-} from '@pm/contracts';
-import { isOpenStatus, PRIORITIES, TASK_STATUSES } from '@pm/contracts';
+} from '@zamu/contracts';
+import { isOpenStatus, PRIORITIES, TASK_STATUSES } from '@zamu/contracts';
 
 // In-memory stand-in for the /api/v1 client, for component tests of the task screens. It follows the
 // contract's shapes and rules that the screens rely on (ordering, counts ignoring the status filter,

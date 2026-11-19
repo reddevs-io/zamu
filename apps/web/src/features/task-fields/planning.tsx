@@ -1,11 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
 import {
   type Cycle,
   type CycleRef,
   cycleLengthDays,
   type MilestoneRef,
   type MilestoneWithProgress,
-} from '@pm/contracts';
-import { useQuery } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import { formatDateRange } from '~/features/tasks/format';
 import { cyclesQuery, milestonesQuery, projectsQuery } from '~/features/tasks/queries';
 import { CycleGlyph } from '~/ui';

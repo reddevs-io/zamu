@@ -1,4 +1,4 @@
-import type { Me } from '@pm/contracts';
+import type { Me } from '@zamu/contracts';
 import { ROLE_LABELS } from '~/features/settings/format';
 
 /** "Admin · Reddevs": role and workspace. */

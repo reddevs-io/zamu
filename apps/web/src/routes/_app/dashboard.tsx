@@ -1,5 +1,5 @@
-import { safeParseTaskKey } from '@pm/contracts';
 import { createFileRoute, redirect } from '@tanstack/react-router';
+import { safeParseTaskKey } from '@zamu/contracts';
 
 // M4's dashboard is Home (/) since M5. Old links land there: ?scope=everyone opens the Everyone tab, and
 // ?task=PAY-140 (the dashboard's side panel) opens that task's view.

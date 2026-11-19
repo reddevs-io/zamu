@@ -1,7 +1,7 @@
 // M3 test fixtures: git connections, Backlog.md sources and a mirrored project, written with raw
 // inserts that skip the services' rules (the mirror engine writes these rows itself). Test-only.
-import type { BacklogBlock, BacklogProblem } from '@pm/contracts';
-import { type Db, schema } from '@pm/db';
+import type { BacklogBlock, BacklogProblem } from '@zamu/contracts';
+import { type Db, schema } from '@zamu/db';
 import { eq, sql } from 'drizzle-orm';
 import { createMilestoneRow, type ProjectScope, randomProjectKey, scopeOf, type World } from './fixtures';
 

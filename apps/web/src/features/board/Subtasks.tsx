@@ -1,5 +1,5 @@
-import type { TaskListItem } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { TaskListItem } from '@zamu/contracts';
 import { useMemo } from 'react';
 import { retryOnce } from '~/features/tasks/errors';
 import { orpc } from '~/lib/orpc';

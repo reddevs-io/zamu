@@ -1,8 +1,8 @@
 // Backlog.md mirror errors at a terminal: the server's problem names the file and a Backlog.md
-// command; pm adds what it can look up (the task's key, the default branch, the project's cycle)
+// command; zamu adds what it can look up (the task's key, the default branch, the project's cycle)
 // so the message says where to make the change and what still works here. With --json the problem
 // is printed as the server sent it.
-import { isMirroredProblemCode, ProjectList, Task } from '@pm/contracts';
+import { isMirroredProblemCode, ProjectList, Task } from '@zamu/contracts';
 import type { CommandContext } from './context';
 import { type CliError, type MirroredContext, mirroredLines } from './errors';
 

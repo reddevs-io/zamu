@@ -1,6 +1,6 @@
-import type { ProjectWithCounts } from '@pm/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useRouterState } from '@tanstack/react-router';
+import type { ProjectWithCounts } from '@zamu/contracts';
 import { lazy, type ReactNode, Suspense, useCallback, useMemo, useRef } from 'react';
 import { CommandPalette } from '~/features/palette/CommandPalette';
 import { openPalette } from '~/features/palette/registry';

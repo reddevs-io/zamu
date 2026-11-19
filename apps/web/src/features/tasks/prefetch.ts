@@ -1,5 +1,5 @@
-import { parseBacklogId, safeParseTaskKey, TASK_STATUSES } from '@pm/contracts';
 import type { QueryClient } from '@tanstack/react-query';
+import { parseBacklogId, safeParseTaskKey, TASK_STATUSES } from '@zamu/contracts';
 import { boardColumnInput, boardColumnQuery } from '~/features/board/queries';
 import { labelsQuery } from '~/features/labels/queries';
 import { defaultDisplayOptions } from '~/features/views/display-options';

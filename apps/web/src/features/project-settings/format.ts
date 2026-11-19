@@ -6,7 +6,7 @@ import type {
   BacklogState,
   BacklogTrigger,
   GitConnectionRef,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { SourceDotState } from '~/ui';
 
 const MINUTE = 60_000;
@@ -92,7 +92,7 @@ const TRIGGER_TEXT: Record<BacklogTrigger, string> = {
   setup: 'at setup',
   webhook: 'by webhook',
   manual: 'by Refresh now',
-  cli: 'by pm backlog refresh',
+  cli: 'by zamu backlog refresh',
   poll: 'by the hourly check',
 };
 

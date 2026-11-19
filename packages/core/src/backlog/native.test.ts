@@ -3,10 +3,10 @@
 // its own database: the backfill migration touches every mirrored task of the database it runs on.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createAuth } from '@pm/auth';
-import { type Db, schema } from '@pm/db';
-import { migrationsFolder } from '@pm/db/migrate';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+import { createAuth } from '@zamu/auth';
+import { type Db, schema } from '@zamu/db';
+import { migrationsFolder } from '@zamu/db/migrate';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createWorld, TEST_PUBLIC_URL, TEST_SECRET, type TestContext, type World } from '../testing/fixtures';

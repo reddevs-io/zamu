@@ -1,5 +1,5 @@
 // Members table: people, pending invitations and agents, with a row menu per row.
-import type { Invitation, Member } from '@pm/contracts';
+import type { Invitation, Member } from '@zamu/contracts';
 import { useMemo } from 'react';
 import {
   Avatar,

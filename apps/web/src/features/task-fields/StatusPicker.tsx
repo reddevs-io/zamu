@@ -4,7 +4,7 @@ import {
   TASK_STATUS_LABELS,
   TASK_STATUSES,
   type TaskStatus,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { PickerMenu, type PickerMenuItem, PriorityGlyph, StatusGlyph } from '~/ui';
 import { useFieldChange } from './apply';
 import { commonValue, FieldPopover, type PickerAnchorProps, READ_ONLY_HINTS, ReadOnlyLine } from './shared';

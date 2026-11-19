@@ -15,7 +15,7 @@ import {
   type TaskStatus,
   type TimelineItem,
   type UserRef,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 
 export interface Style {
   bold: (text: string) => string;

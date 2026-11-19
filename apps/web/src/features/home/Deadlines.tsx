@@ -1,5 +1,5 @@
-import type { HomeDeadline } from '@pm/contracts';
 import { Link } from '@tanstack/react-router';
+import type { HomeDeadline } from '@zamu/contracts';
 import { useState } from 'react';
 import { Button, CycleGlyph, cn, MilestoneGlyph } from '~/ui';
 import { type DeadlineView, deadlineView } from './format';
