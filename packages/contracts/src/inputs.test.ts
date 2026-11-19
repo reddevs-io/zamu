@@ -819,7 +819,12 @@ describe('git connection inputs', () => {
         name: ' Forgejo at home ',
         token: ' 0123abcd \n',
       }),
-    ).toEqual({ provider: 'gitea', host: 'git.home.example.com', name: 'Forgejo at home', token: '0123abcd' });
+    ).toEqual({
+      provider: 'gitea',
+      host: 'git.home.example.com',
+      name: 'Forgejo at home',
+      token: '0123abcd',
+    });
   });
 
   it('refuses bad providers, names and tokens', () => {
