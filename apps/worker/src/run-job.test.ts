@@ -1,9 +1,9 @@
 // The invitations.expire handler as the worker runs it (core's parsing and handler, the worker's
 // logging), against the shared throwaway database.
 import { randomUUID } from 'node:crypto';
-import { INVITATIONS_EXPIRE } from '@pm/core';
-import { createDb, invitation, organization, user } from '@pm/db';
-import { sharedTestDatabaseUrl } from '@pm/db/test';
+import { INVITATIONS_EXPIRE } from '@zamu/core';
+import { createDb, invitation, organization, user } from '@zamu/db';
+import { sharedTestDatabaseUrl } from '@zamu/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createLogger } from './logger';
 import { runJob } from './run-job';

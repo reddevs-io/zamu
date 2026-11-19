@@ -8,8 +8,8 @@ import {
   type TaskKeyParts,
   TaskRefInput,
   type UserRef,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { type Actor, authorize, can } from './authz';
 import { Forbidden, Invalid, NotFound, parseInput } from './errors';

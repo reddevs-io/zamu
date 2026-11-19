@@ -95,9 +95,15 @@ export function collectPageErrors(page: Page, errors: string[], ignore: RegExp[]
 
 /**
  * Adds an agent in Settings > Members with a read-write key for the given projects and returns the key, read
- * from the clipboard after "Copy API key". The context needs clipboard permissions.
+ * from the clipboard after "Copy API key". The context needs clipboard permissions. `prefix` is the key prefix
+ * the server hands out: the upgrade spec passes the one an older release used.
  */
-export async function addAgent(page: Page, name: string, projectKeys: string[]): Promise<string> {
+export async function addAgent(
+  page: Page,
+  name: string,
+  projectKeys: string[],
+  prefix = 'zamu_live_',
+): Promise<string> {
   await page.goto('/settings/members');
   await settle(page);
   await page.getByRole('button', { name: 'Add agent' }).click();
@@ -115,7 +121,8 @@ export async function addAgent(page: Page, name: string, projectKeys: string[]):
   await expect(reveal).toContainText(`Key created for ${name}`);
   await reveal.getByRole('button', { name: 'Copy API key' }).click();
   const key = await page.evaluate(() => navigator.clipboard.readText());
-  expect(key).toMatch(/^pm_live_\S{20,}$/);
+  expect(key.startsWith(prefix), key).toBe(true);
+  expect(key.slice(prefix.length)).toMatch(/^\S{20,}$/);
   await reveal.getByRole('button', { name: 'I copied the key' }).click();
   await expect(reveal).toBeHidden();
   return key;

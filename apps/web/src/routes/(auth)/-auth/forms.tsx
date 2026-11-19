@@ -1,4 +1,4 @@
-import { AccountFields, InviteFields, SignInFields, WorkspaceFields } from '@pm/contracts';
+import { AccountFields, InviteFields, SignInFields, WorkspaceFields } from '@zamu/contracts';
 import { useState } from 'react';
 import { Link } from 'react-aria-components';
 import { AUTH_ERRORS } from '~/lib/auth-client';

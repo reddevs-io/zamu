@@ -20,7 +20,7 @@
 //   a workspace-wide write key.
 // M5: labels follow milestones: read with project.read, create, rename, recolour and delete with
 //   task.write. Bulk task changes need task.write on every project they touch.
-import type { Actor, WorkspaceRole } from '@pm/auth';
+import type { Actor, WorkspaceRole } from '@zamu/auth';
 import { Forbidden } from './errors';
 
 export type { Actor, WorkspaceRole };
@@ -66,7 +66,7 @@ export type Action =
   | 'connection.manage'
   /** Set up a Backlog.md source, edit its mappings, folder and connection, see the webhook secret, detach. */
   | 'backlog.manage'
-  /** Ask for a Backlog.md refresh now (Refresh now, pm backlog refresh). */
+  /** Ask for a Backlog.md refresh now (Refresh now, zamu backlog refresh). */
   | 'backlog.refresh'
   /** Read a project's Backlog.md source status and problems. */
   | 'backlog.read';

@@ -2,7 +2,7 @@
 // (`node --import tsx src/index.ts`) and checks it stops with exit code 0 on SIGTERM and SIGINT.
 import { type ChildProcess, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { sharedTestDatabaseUrl } from '@pm/db/test';
+import { sharedTestDatabaseUrl } from '@zamu/db/test';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const workerDir = fileURLToPath(new URL('..', import.meta.url));

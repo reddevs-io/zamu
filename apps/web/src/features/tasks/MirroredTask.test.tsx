@@ -1,4 +1,3 @@
-import type { Activity, Task } from '@pm/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -10,6 +9,7 @@ import {
 } from '@tanstack/react-router';
 import { configure, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Activity, Task } from '@zamu/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearCommentDrafts } from '~/features/comments/CommentComposer';
 import { resetTimelinePreferences } from '~/features/comments/TaskTimeline';

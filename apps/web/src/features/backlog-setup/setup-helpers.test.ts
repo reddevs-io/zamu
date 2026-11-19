@@ -1,4 +1,4 @@
-import type { BacklogMappingsView } from '@pm/contracts';
+import type { BacklogMappingsView } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { connectionReads, hostName, pickConnection } from './connections';
 import { applyManualPicks, mappingValueCount, setAssignee, setStatus, toMappings } from './mappings';
@@ -48,7 +48,7 @@ describe('connections by host', () => {
   });
 
   it('prefers a working connection on the repository host', () => {
-    expect(pickConnection(connections, 'http://localhost:3300/pm-admin/payments.git')?.id).toBe('fj');
+    expect(pickConnection(connections, 'http://localhost:3300/zamu-admin/payments.git')?.id).toBe('fj');
     expect(pickConnection(connections, 'git@github.com:ana/notes.git')?.id).toBe('gh');
     expect(pickConnection(connections, 'https://gitlab.com/team/app')).toBeNull();
     expect(pickConnection(connections, 'not a url')).toBeNull();

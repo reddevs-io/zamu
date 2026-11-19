@@ -1,8 +1,8 @@
 // The web server's configuration from environment variables, checked as a whole so a misconfigured server
 // refuses to start with one message listing every problem.
 // Framework-free: the startup plugin, getServerContext and tests import it.
-import { type AuthConfig, AuthConfigError, readAuthConfig } from '@pm/auth';
-import { isValidTimeZone, loadEncryptionKey, loadGitHosts } from '@pm/core';
+import { type AuthConfig, AuthConfigError, readAuthConfig } from '@zamu/auth';
+import { isValidTimeZone, loadEncryptionKey, loadGitHosts } from '@zamu/core';
 
 /** Better Auth signs sessions with BETTER_AUTH_SECRET; shorter secrets are refused. */
 export const MIN_SECRET_LENGTH = 32;

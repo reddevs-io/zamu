@@ -1,6 +1,6 @@
-import type { CreateProjectInput } from '@pm/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
+import type { CreateProjectInput } from '@zamu/contracts';
 import { useNewProject } from '~/features/shell/new-project';
 import { projectHref } from '~/features/shell/paths';
 import { orpc } from '~/lib/orpc';

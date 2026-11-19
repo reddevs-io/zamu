@@ -1,7 +1,7 @@
 // M5 plan risk "List performance": listTasks on a project with 5,000 tasks that carry labels,
 // blockers, subtasks and due dates. Prints the median time of each listing and fails when one
 // takes longer than a generous bound (the list fields are read for the page, not per row).
-import { schema } from '@pm/db';
+import { schema } from '@zamu/db';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createProject } from './projects';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AuthConfigError, type AuthEnv, discoveryUrl, readAuthConfig } from './config';
 
 const SSO: AuthEnv = {
-  OIDC_ISSUER: 'https://auth.example.com/application/o/project-management/',
+  OIDC_ISSUER: 'https://auth.example.com/application/o/zamu/',
   OIDC_CLIENT_ID: 'client',
   OIDC_CLIENT_SECRET: 'secret',
 };
@@ -31,7 +31,7 @@ describe('readAuthConfig', () => {
   it('enables SSO with defaults when issuer, client ID and secret are set', () => {
     expect(readAuthConfig(SSO)).toEqual({
       sso: {
-        issuer: 'https://auth.example.com/application/o/project-management',
+        issuer: 'https://auth.example.com/application/o/zamu',
         clientId: 'client',
         clientSecret: 'secret',
         providerName: 'SSO',
@@ -166,8 +166,8 @@ describe('readAuthConfig', () => {
   });
 
   it('builds the discovery URL', () => {
-    expect(discoveryUrl('https://auth.example.com/application/o/pm/')).toBe(
-      'https://auth.example.com/application/o/pm/.well-known/openid-configuration',
+    expect(discoveryUrl('https://auth.example.com/application/o/zamu/')).toBe(
+      'https://auth.example.com/application/o/zamu/.well-known/openid-configuration',
     );
   });
 });

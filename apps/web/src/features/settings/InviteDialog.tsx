@@ -1,5 +1,5 @@
 // Invite person: email and role, then the invitation link to copy. M1 sends no email.
-import type { Invitation, InvitationRole } from '@pm/contracts';
+import type { Invitation, InvitationRole } from '@zamu/contracts';
 import { type FormEvent, useState } from 'react';
 import { z } from 'zod';
 import {

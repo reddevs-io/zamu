@@ -4,8 +4,8 @@ import {
   type HomeGroupKey,
   type HomeItem,
   type HomeTab,
-} from '@pm/contracts';
-import { schema } from '@pm/db';
+} from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Actor } from './authz';

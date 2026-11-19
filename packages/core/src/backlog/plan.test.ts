@@ -1,7 +1,7 @@
 // Pure planner tests on the parser's fixture folders (read from disk, never copied).
-import { type FolderFile, parseBacklogFolder } from '@pm/backlog-md';
-import { readFixtureTree } from '@pm/backlog-md/testing/fixtures';
-import type { BacklogMappings, BacklogProblem } from '@pm/contracts';
+import { type FolderFile, parseBacklogFolder } from '@zamu/backlog-md';
+import { readFixtureTree } from '@zamu/backlog-md/testing/fixtures';
+import type { BacklogMappings, BacklogProblem } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { prefillMappings } from './mappings';
 import {

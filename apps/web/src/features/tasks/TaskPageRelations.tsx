@@ -1,5 +1,5 @@
-import { isOpenStatus, type RelatedTask, type Task } from '@pm/contracts';
 import { Link } from '@tanstack/react-router';
+import { isOpenStatus, type RelatedTask, type Task } from '@zamu/contracts';
 import type { ReactNode, RefObject } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import { useFieldChange } from '~/features/task-fields';

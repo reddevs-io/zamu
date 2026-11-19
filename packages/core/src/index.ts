@@ -1,4 +1,4 @@
-// Public API of @pm/core: business rules shared by the oRPC API, web server functions, the worker
+// Public API of @zamu/core: business rules shared by the oRPC API, web server functions, the worker
 // and (through the API) the CLI. Services take a context, the actor and a contract input.
 export * from './activity';
 export * from './api-keys';

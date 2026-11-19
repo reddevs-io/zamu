@@ -1,5 +1,5 @@
 // A Backlog.md source status for the project settings tests.
-import type { BacklogSourceStatus, GitConnectionRef } from '@pm/contracts';
+import type { BacklogSourceStatus, GitConnectionRef } from '@zamu/contracts';
 
 const ANA = { id: '00000000-0000-7000-8000-0000000000a1', name: 'Ana Ruiz', kind: 'person' as const };
 

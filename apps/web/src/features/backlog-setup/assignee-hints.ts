@@ -1,4 +1,4 @@
-import type { BacklogMappingsView } from '@pm/contracts';
+import type { BacklogMappingsView } from '@zamu/contracts';
 import { agentNameFrom, looksLikeAgent, type SuggestionMember } from './agent-suggestions';
 
 // The other lines of the note under the Assignees table: a member whose name matches a "No one" row

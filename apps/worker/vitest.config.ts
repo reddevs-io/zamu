@@ -8,7 +8,7 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     passWithNoTests: true,
     // One migrated throwaway database per run, read with sharedTestDatabaseUrl().
-    globalSetup: [fileURLToPath(import.meta.resolve('@pm/db/test/global-setup'))],
+    globalSetup: [fileURLToPath(import.meta.resolve('@zamu/db/test/global-setup'))],
     hookTimeout: 30_000,
     testTimeout: 30_000,
   },

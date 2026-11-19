@@ -1,3 +1,5 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type {
   BacklogDetection,
   BacklogMappingsView,
@@ -5,9 +7,7 @@ import type {
   BacklogSourceStatus,
   GitConnection,
   Invitation,
-} from '@pm/contracts';
-import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+} from '@zamu/contracts';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentSuggestion } from './agent-suggestions';
@@ -156,7 +156,7 @@ describe('SourceStep', () => {
       'docs/ 14 · ignored',
     ]);
     expect(screen.getByText(/becomes/)).toHaveTextContent(
-      'BACK-1 becomes PAY-1. Search and pm accept both. To keep them identical, change the project key to BACK in General first.',
+      'BACK-1 becomes PAY-1. Search and zamu accept both. To keep them identical, change the project key to BACK in General first.',
     );
     expect(screen.getByLabelText('Repository')).toHaveValue('gitlab.com/reddevs/payments');
   });
@@ -168,7 +168,7 @@ describe('SourceStep', () => {
       }),
     });
     expect(screen.getByText(/is longer than a project key can be/)).toHaveTextContent(
-      'The task prefix BACKLOG is longer than a project key can be (2 to 6 letters). Tasks get the key PAY: BACKLOG-1 becomes PAY-1. Search and pm still accept BACKLOG-1.',
+      'The task prefix BACKLOG is longer than a project key can be (2 to 6 letters). Tasks get the key PAY: BACKLOG-1 becomes PAY-1. Search and zamu still accept BACKLOG-1.',
     );
   });
 

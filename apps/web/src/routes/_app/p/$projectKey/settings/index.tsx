@@ -10,7 +10,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/settings/')({
       throw redirect({ to: '/p/$projectKey/settings', params: { projectKey: upper }, replace: true });
     }
   },
-  head: ({ params }) => ({ meta: [{ title: `Settings · ${params.projectKey} · project-management` }] }),
+  head: ({ params }) => ({ meta: [{ title: `Settings · ${params.projectKey} · Zamu` }] }),
   component: GeneralRoute,
 });
 

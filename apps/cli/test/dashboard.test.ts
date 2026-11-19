@@ -1,17 +1,17 @@
-// pm dashboard against a fake server: a fixed Dashboard with a full In review group (cut after 10
+// zamu dashboard against a fake server: a fixed Dashboard with a full In review group (cut after 10
 // lines), no mentions, a stalled agent task and both kinds of deadline. No database: the fake fetch
 // answers GET /api/v1/dashboard and records the scope it was asked for. The real route is covered
 // in cli.test.ts.
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type Dashboard, parseCliOutput } from '@pm/contracts';
+import { type Dashboard, parseCliOutput } from '@zamu/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CliIo } from '../src/io';
 import { main } from '../src/main';
 
-const URL = 'http://pm.test';
-const KEY = 'pm_live_fake_dashboard_key';
+const URL = 'http://zamu.test';
+const KEY = 'zamu_live_fake_dashboard_key';
 const NOW = '2026-10-23T12:00:00.000Z';
 
 const id = (n: number) => `00000000-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -151,7 +151,7 @@ let home: string;
 let requests: URL[];
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'pm-cli-dashboard-'));
+  home = await mkdtemp(join(tmpdir(), 'zamu-cli-dashboard-'));
   requests = [];
   return () => rm(home, { recursive: true, force: true });
 });
@@ -163,14 +163,14 @@ interface RunOptions {
   body?: (scope: 'mine' | 'everyone') => unknown;
 }
 
-async function pm(args: string[], options: RunOptions = {}) {
+async function zamu(args: string[], options: RunOptions = {}) {
   const out: string[] = [];
   const err: string[] = [];
   const io: CliIo = {
     stdout: (text) => out.push(text),
     stderr: (text) => err.push(text),
     readStdin: async () => '',
-    env: { XDG_CONFIG_HOME: join(home, 'xdg'), PM_URL: URL, PM_KEY: KEY, ...options.env },
+    env: { XDG_CONFIG_HOME: join(home, 'xdg'), ZAMU_URL: URL, ZAMU_KEY: KEY, ...options.env },
     homeDir: home,
     cwd: home,
     isTTY: options.tty ?? false,
@@ -203,19 +203,19 @@ function sectionOf(stdout: string, heading: string): string[] {
   return lines.slice(start, end === -1 ? undefined : end);
 }
 
-describe('pm dashboard --json', () => {
-  it('prints the pm.v1.dashboard envelope for Mine by default', async () => {
-    const result = await pm(['dashboard', '--json']);
+describe('zamu dashboard --json', () => {
+  it('prints the zamu.v1.dashboard envelope for Mine by default', async () => {
+    const result = await zamu(['dashboard', '--json']);
     expect(result.code, result.stderr).toBe(0);
     expect(requests.map((url) => url.searchParams.get('scope'))).toEqual(['mine']);
     expect(result.stdout.trim().split('\n')).toHaveLength(1);
     const output = parseCliOutput(JSON.parse(result.stdout), 'dashboard');
-    expect(output.schema).toBe('pm.v1.dashboard');
+    expect(output.schema).toBe('zamu.v1.dashboard');
     expect(output.data).toEqual(fixture('mine'));
   });
 
   it('asks for scope=everyone with --everyone', async () => {
-    const result = await pm(['dashboard', '--everyone', '--json']);
+    const result = await zamu(['dashboard', '--everyone', '--json']);
     expect(result.code, result.stderr).toBe(0);
     expect(requests.map((url) => url.searchParams.get('scope'))).toEqual(['everyone']);
     const output = parseCliOutput(JSON.parse(result.stdout), 'dashboard');
@@ -224,15 +224,15 @@ describe('pm dashboard --json', () => {
   });
 
   it('exits 5 when the server answers outside the contract', async () => {
-    const result = await pm(['dashboard', '--json'], { body: () => ({ scope: 'mine', groups: {} }) });
+    const result = await zamu(['dashboard', '--json'], { body: () => ({ scope: 'mine', groups: {} }) });
     expect(result.code).toBe(5);
     expect(parseCliOutput(JSON.parse(result.stdout), 'error').data.code).toBe('INTERNAL_SERVER_ERROR');
   });
 });
 
-describe('pm dashboard (human output)', () => {
+describe('zamu dashboard (human output)', () => {
   it('prints the four groups with totals, reasons and the "… N more" cut', async () => {
-    const result = await pm(['dashboard']);
+    const result = await zamu(['dashboard']);
     expect(result.code, result.stderr).toBe(0);
     const out = result.stdout;
     expect(out.startsWith('Needs you · 17\n\n')).toBe(true);
@@ -262,7 +262,7 @@ describe('pm dashboard (human output)', () => {
   });
 
   it('prints the projects table and the agents', async () => {
-    const result = await pm(['dashboard']);
+    const result = await zamu(['dashboard']);
     const out = result.stdout;
     expect(sectionOf(out, 'Projects')).toEqual([
       'Projects · 2',
@@ -290,7 +290,7 @@ describe('pm dashboard (human output)', () => {
       );
       return { ...data, groups: { ...data.groups, deadlines: { total: 3, items } }, projects };
     };
-    const result = await pm(['dashboard'], { body });
+    const result = await zamu(['dashboard'], { body });
     expect(result.code, result.stderr).toBe(0);
     expect(sectionOf(result.stdout, 'Deadlines').map((line) => line.replace(/ +/g, ' '))).toEqual([
       'Deadlines · 3',
@@ -303,7 +303,7 @@ describe('pm dashboard (human output)', () => {
   });
 
   it('shows who wrote and who is asked in Everyone', async () => {
-    const result = await pm(['dashboard', '--everyone']);
+    const result = await zamu(['dashboard', '--everyone']);
     expect(result.code, result.stderr).toBe(0);
     expect(result.stdout.startsWith('Needs someone · 18\n')).toBe(true);
     // Newlines in the excerpt collapse; inline code keeps its backticks.
@@ -314,7 +314,7 @@ describe('pm dashboard (human output)', () => {
   });
 
   it('fits the terminal width by cutting titles, and colours only when allowed', async () => {
-    const tty = await pm(['dashboard', '--everyone'], { tty: true, columns: 62 });
+    const tty = await zamu(['dashboard', '--everyone'], { tty: true, columns: 62 });
     expect(tty.code, tty.stderr).toBe(0);
     expect(tty.stdout).toContain('\u001b[');
     // biome-ignore lint/suspicious/noControlCharactersInRegex: strips ANSI escape sequences
@@ -326,7 +326,7 @@ describe('pm dashboard (human output)', () => {
     // A cut column keeps at least 10 characters, even if the line then runs past the width.
     expect(sectionOf(plain, 'Mentions')[1]).toMatch(/→ Tomás Berg {2}@Ana Ruiz… {2}2h ago$/);
 
-    const noColor = await pm(['dashboard'], { tty: true, columns: 60, env: { NO_COLOR: '1' } });
+    const noColor = await zamu(['dashboard'], { tty: true, columns: 60, env: { NO_COLOR: '1' } });
     expect(noColor.stdout).not.toContain('\u001b[');
   });
 });

@@ -1,5 +1,5 @@
-import { UserId } from '@pm/contracts';
 import { createFileRoute } from '@tanstack/react-router';
+import { UserId } from '@zamu/contracts';
 import { z } from 'zod';
 import { KeysPage } from '~/features/settings/KeysPage';
 import { apiKeysQuery, membersQuery } from '~/features/settings/queries';

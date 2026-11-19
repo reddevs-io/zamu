@@ -1,6 +1,6 @@
 // Access (whole workspace or selected projects) and permission (read and write, read only) for a new
 // API key, shared by the add agent and new key dialogs.
-import type { ApiKeyScope } from '@pm/contracts';
+import type { ApiKeyScope } from '@zamu/contracts';
 import { Checkbox, CheckboxGroup, RadioCard, RadioGroup } from '~/ui';
 import type { ScopeProject } from './types';
 

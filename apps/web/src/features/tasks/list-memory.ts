@@ -20,7 +20,7 @@ export function listSearchFor(projectKey: string, taskKey: string): TaskListSear
   return { ...lastSearch.get(projectKey), focus: taskKey };
 }
 
-const viewKey = (projectKey: string) => `pm:view:${projectKey}`;
+const viewKey = (projectKey: string) => `zamu:view:${projectKey}`;
 
 function storage(): Storage | null {
   try {

@@ -1,4 +1,4 @@
-import type { ProjectActivity, Task } from '@pm/contracts';
+import type { ProjectActivity, Task } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   describeBacklogFields,

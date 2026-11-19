@@ -1,5 +1,5 @@
-import type { Me, Theme } from '@pm/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Me, Theme } from '@zamu/contracts';
 import { useSyncExternalStore } from 'react';
 import { client, orpc } from '~/lib/orpc';
 

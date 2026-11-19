@@ -1,7 +1,7 @@
-import type { Task, TaskListItem } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { act, configure, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Task, TaskListItem } from '@zamu/contracts';
 import { useRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {

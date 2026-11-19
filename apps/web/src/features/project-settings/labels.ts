@@ -1,6 +1,6 @@
 // Project settings, Labels: order, copy and error text. The screen is LabelsSettings.tsx.
 import { ORPCError } from '@orpc/client';
-import { type LabelWithUsage, MAX_LABEL_NAME_LENGTH } from '@pm/contracts';
+import { type LabelWithUsage, MAX_LABEL_NAME_LENGTH } from '@zamu/contracts';
 
 const lower = (name: string) => name.toLocaleLowerCase();
 

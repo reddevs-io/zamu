@@ -1,7 +1,7 @@
 // The Backlog.md jobs as the worker runs them: the worker passes the encryption key, the git host
 // settings, the provider factory and its own job queue to core, so a refresh reads the repository
 // (a fake provider here) and the hourly poll can queue refreshes.
-import { BACKLOG_POLL, BACKLOG_REFRESH, createJobQueue, enqueueBacklogRefresh } from '@pm/core';
+import { BACKLOG_POLL, BACKLOG_REFRESH, createJobQueue, enqueueBacklogRefresh } from '@zamu/core';
 import {
   configFile,
   createMirror,
@@ -13,9 +13,9 @@ import {
   taskFile,
   taskPath,
   tasksByKey,
-} from '@pm/core/backlog/testing';
-import { createWorld, type TestContext } from '@pm/core/testing/fixtures';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+} from '@zamu/core/backlog/testing';
+import { createWorld, type TestContext } from '@zamu/core/testing/fixtures';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createLogger } from './logger';
 import { startWorker, type Worker } from './worker';

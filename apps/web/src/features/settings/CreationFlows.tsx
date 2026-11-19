@@ -1,6 +1,6 @@
 // Create, then reveal once: the form dialog closes and the reveal dialog shows the new secret. The
 // secret lives only in this component's state and is dropped when "I copied the key" is pressed.
-import type { ApiKeyCreated } from '@pm/contracts';
+import type { ApiKeyCreated } from '@zamu/contracts';
 import { useState } from 'react';
 import { AddAgentDialog, type AddAgentDialogProps } from './AddAgentDialog';
 import { KeyRevealDialog, type RevealedKey } from './KeyRevealDialog';

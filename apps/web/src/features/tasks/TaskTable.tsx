@@ -1,4 +1,4 @@
-import type { TaskListItem } from '@pm/contracts';
+import type { TaskListItem } from '@zamu/contracts';
 import {
   type CSSProperties,
   type KeyboardEvent,

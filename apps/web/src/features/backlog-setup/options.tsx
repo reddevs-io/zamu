@@ -1,4 +1,4 @@
-import type { Member } from '@pm/contracts';
+import type { Member } from '@zamu/contracts';
 import {
   type OptionItem,
   PRIORITIES,

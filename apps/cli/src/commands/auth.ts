@@ -1,4 +1,4 @@
-// pm login, pm logout, pm whoami.
+// zamu login, zamu logout, zamu whoami.
 import { relative } from 'node:path';
 import {
   ApiKeySecret,
@@ -7,7 +7,7 @@ import {
   Me as MeSchema,
   parseRepositoryUrl,
   toProblemIssues,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { createApiClient } from '../client';
 import {
   configPath,
@@ -28,19 +28,19 @@ export interface LoginOptions {
   url?: string;
 }
 
-const envKeyName = (io: CommandContext['io']) => (io.env.PM_KEY ? 'PM_KEY' : 'PM_API_KEY');
+const envKeyName = (io: CommandContext['io']) => (io.env.ZAMU_KEY ? 'ZAMU_KEY' : 'ZAMU_API_KEY');
 
 function whoLine(me: Me): string {
   return `${personLabel(me.user)} (${me.user.kind === 'agent' ? 'agent' : (me.user.email ?? 'person')})`;
 }
 
-/** "PAY (from .pm.json)", for whoami. */
+/** "PAY (from .zamu.json)", for whoami. */
 function projectLabel(context: CommandContext, project: CliResolvedProject | null | undefined): string {
-  if (!project) return 'none here: pass --project, or run pm link in a clone';
+  if (!project) return 'none here: pass --project, or run zamu link in a clone';
   const from = {
     flag: '--project',
-    env: 'PM_PROJECT',
-    file: project.from ? relative(context.io.cwd, project.from) || project.from : '.pm.json',
+    env: 'ZAMU_PROJECT',
+    file: project.from ? relative(context.io.cwd, project.from) || project.from : '.zamu.json',
     remote: `git remote ${parseRepositoryUrl(project.from ?? '')?.short ?? project.from ?? ''}`,
   }[project.source];
   return `${project.key} (from ${from})`;
@@ -64,12 +64,12 @@ export async function login(context: CommandContext, options: LoginOptions): Pro
   const key = options.key === '-' ? (await io.readStdin()).trim() : options.key.trim();
   const parsedKey = ApiKeySecret.safeParse(key);
   if (!parsedKey.success) {
-    throw usageError('That is not a pm API key.', toProblemIssues(parsedKey.error.issues), [
-      'Keys start with pm_live_. Create one in Settings > API keys.',
+    throw usageError('That is not a zamu API key.', toProblemIssues(parsedKey.error.issues), [
+      'Keys start with zamu_live_. Create one in Settings > API keys.',
     ]);
   }
   const stored = await readConfig(io).catch(() => null);
-  const url = normalizeUrl(options.url ?? (io.env.PM_URL || stored?.url || DEFAULT_URL));
+  const url = normalizeUrl(options.url ?? (io.env.ZAMU_URL || stored?.url || DEFAULT_URL));
   context.url = url;
 
   const client = createApiClient({ url, key: parsedKey.data, ...(io.fetch ? { fetch: io.fetch } : {}) });
@@ -77,7 +77,7 @@ export async function login(context: CommandContext, options: LoginOptions): Pro
   const path = await writeConfig(io, { url, key: parsedKey.data });
 
   if (envKey(io) && envKey(io) !== parsedKey.data) {
-    io.stderr(`pm: ${envKeyName(io)} is set in this shell and takes precedence over the stored key.\n`);
+    io.stderr(`zamu: ${envKeyName(io)} is set in this shell and takes precedence over the stored key.\n`);
   }
   emit(context, 'login', { url, me }, (data) => {
     const { style } = context;

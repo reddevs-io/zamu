@@ -3,7 +3,7 @@
 // fields filled from the files (labels, due date, blockers, parent) and read-only in the app, a push that
 // arrives through the webhook, a new webhook secret (Forgejo deliveries signed with the old one are refused), a
 // broken, a deleted and a restored file, the board refusing a status change, cycles and comments on a mirrored
-// task, the agent's pm backlog commands and refused update, a name match in Edit mappings, detach, and deleting
+// task, the agent's zamu backlog commands and refused update, a name match in Edit mappings, detach, and deleting
 // the project.
 //
 // The tests build on each other, so they share one page and run in order. Forgejo starts in beforeAll and is
@@ -638,14 +638,14 @@ test('the board refuses a status change; cycles and comments work on a mirrored 
   ).toBeVisible();
 });
 
-test('agent: pm backlog status and refresh --wait; pm refuses a mirrored field with exit code 6', async () => {
+test('agent: zamu backlog status and refresh --wait; zamu refuses a mirrored field with exit code 6', async () => {
   const apiKey = await addAgent(page, agentName, [project.key]);
   const login = cli.run(['login', '--key', apiKey, '--url', baseURL, '--json']);
   expect(login.code, login.stdout + login.stderr).toBe(0);
 
   const status = cli.run(['backlog', 'status', '--project', project.key, '--json']);
   expect(status.code, status.stdout + status.stderr).toBe(0);
-  expect(parseJson<{ state: string; mode: string }>(status, 'pm.v1.backlog.status')).toMatchObject({
+  expect(parseJson<{ state: string; mode: string }>(status, 'zamu.v1.backlog.status')).toMatchObject({
     mode: 'mirror',
     state: 'warnings',
   });
@@ -657,7 +657,7 @@ test('agent: pm backlog status and refresh --wait; pm refuses a mirrored field w
   expect(refresh.code, refresh.stdout + refresh.stderr).toBe(0);
   const result = parseJson<{ outcome: string; status: { lastRead: { commit: string } } }>(
     refresh,
-    'pm.v1.backlog.refresh',
+    'zamu.v1.backlog.refresh',
   );
   expect(result.outcome).toBe('finished');
   expect(result.status.lastRead.commit).toBe(commit);

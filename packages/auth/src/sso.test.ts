@@ -1,5 +1,5 @@
-import { schema } from '@pm/db';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+import { schema } from '@zamu/db';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getActorFromRequest } from './actor';
@@ -16,7 +16,7 @@ const PASSWORD = 'correct horse battery';
 function ssoConfig(mock: MockOidc, extra: Record<string, string> = {}): AuthConfig {
   return readAuthConfig({
     OIDC_ISSUER: mock.issuer,
-    OIDC_CLIENT_ID: 'project-management',
+    OIDC_CLIENT_ID: 'zamu',
     OIDC_CLIENT_SECRET: 'mock-secret',
     OIDC_PROVIDER_NAME: 'Authentik',
     ...extra,
@@ -77,7 +77,7 @@ describe('SSO: discovery and setup', () => {
     expect(`${result.authorizationUrl.origin}${result.authorizationUrl.pathname}`).toBe(
       `${mock.issuer}/authorize`,
     );
-    expect(params.get('client_id')).toBe('project-management');
+    expect(params.get('client_id')).toBe('zamu');
     expect(params.get('redirect_uri')).toBe(`${TEST_BASE_URL}/api/auth/oauth2/callback/oidc`);
     expect(params.get('code_challenge_method')).toBe('S256');
     expect(params.get('code_challenge')).toBeTruthy();

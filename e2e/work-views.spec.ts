@@ -281,7 +281,7 @@ test('cycle: create one starting today, end it early, unfinished tasks roll over
   for (const key of ['CHK-1', 'CHK-3', 'CHK-4']) {
     const update = cli.run(['tasks', 'update', key, '--cycle', 'current', '--json']);
     expect(update.code, update.stdout + update.stderr).toBe(0);
-    expect(parseJson<TaskRef>(update, 'pm.v1.tasks.update').cycle?.number).toBe(1);
+    expect(parseJson<TaskRef>(update, 'zamu.v1.tasks.update').cycle?.number).toBe(1);
   }
   const done = cli.run(['tasks', 'update', 'CHK-4', '--status', 'done', '--json']);
   expect(done.code, done.stdout + done.stderr).toBe(0);
@@ -340,7 +340,7 @@ test('comments: mention from the web, from the CLI as the agent, edit and delete
   // The agent answers from the CLI with a plain @email; the server turns it into a mention.
   const add = cli.run(['comments', 'add', 'CHK-1', `On it. @${admin.email}`, '--json']);
   expect(add.code, add.stdout + add.stderr).toBe(0);
-  const agentComment = parseJson<{ id: string; body: string }>(add, 'pm.v1.comments.add');
+  const agentComment = parseJson<{ id: string; body: string }>(add, 'zamu.v1.comments.add');
   expect(agentComment.body).toBe(`On it. [@${admin.name}](mention:${me.id})`);
 
   // Only authors edit or delete: the agent cannot delete Ana's comment (exit code 4).
@@ -348,7 +348,7 @@ test('comments: mention from the web, from the CLI as the agent, edit and delete
   expect(list.code, list.stdout + list.stderr).toBe(0);
   const comments = parseJson<{ items: { id: string; author: { name: string } }[] }>(
     list,
-    'pm.v1.comments.list',
+    'zamu.v1.comments.list',
   );
   const anaComment = comments.items.find((comment) => comment.author.name === admin.name);
   expect(anaComment).toBeTruthy();
@@ -377,7 +377,7 @@ test('comments: mention from the web, from the CLI as the agent, edit and delete
 
   const show = cli.run(['tasks', 'show', 'CHK-1', '--json']);
   expect(show.code, show.stdout + show.stderr).toBe(0);
-  const timeline = parseJson<{ timeline: { kind: string }[] }>(show, 'pm.v1.tasks.show').timeline;
+  const timeline = parseJson<{ timeline: { kind: string }[] }>(show, 'zamu.v1.tasks.show').timeline;
   expect(timeline.filter((entry) => entry.kind === 'comment')).toHaveLength(2);
 });
 
@@ -444,7 +444,7 @@ test('Home lists your tasks from both projects and opens them in the task view',
   expect(assign.code, assign.stdout + assign.stderr).toBe(0);
   const mine = cli.run(['tasks', 'list', '--mine', '--json']);
   expect(mine.code, mine.stdout + mine.stderr).toBe(0);
-  expect(parseJson<{ items: TaskRef[] }>(mine, 'pm.v1.tasks.list').items.map((task) => task.key)).toEqual([
+  expect(parseJson<{ items: TaskRef[] }>(mine, 'zamu.v1.tasks.list').items.map((task) => task.key)).toEqual([
     'WEB-2',
   ]);
 

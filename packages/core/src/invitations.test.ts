@@ -1,5 +1,5 @@
-import { hasPendingInvitation } from '@pm/auth';
-import { schema } from '@pm/db';
+import { hasPendingInvitation } from '@zamu/auth';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Conflict, Forbidden, NotFound } from './errors';

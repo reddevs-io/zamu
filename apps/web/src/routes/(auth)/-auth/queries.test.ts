@@ -1,6 +1,6 @@
-import { bootstrapAdmin, isFirstRun } from '@pm/auth';
-import { cookieHeaders, testAuth } from '@pm/auth/testing/helpers';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+import { bootstrapAdmin, isFirstRun } from '@zamu/auth';
+import { cookieHeaders, testAuth } from '@zamu/auth/testing/helpers';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadInstanceName, loadInvitation } from './queries';
 

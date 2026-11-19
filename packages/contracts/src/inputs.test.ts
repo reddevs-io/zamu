@@ -946,7 +946,7 @@ describe('Backlog.md setup and settings inputs', () => {
     });
     expect(
       DetectBacklogRepositoryInput.parse({
-        repository: 'http://localhost:3300/pm-admin/notes-sync',
+        repository: 'http://localhost:3300/zamu-admin/notes-sync',
         connectionId,
         folderOverride: './docs/backlog/',
       }).folderOverride,

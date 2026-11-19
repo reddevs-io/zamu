@@ -1,5 +1,5 @@
 {
-  "name": "@pm/git-providers",
+  "name": "@zamu/git-providers",
   "version": "0.0.0",
   "private": true,
   "type": "module",

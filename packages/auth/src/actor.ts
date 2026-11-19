@@ -1,4 +1,4 @@
-import { type Db, schema } from '@pm/db';
+import { type Db, schema } from '@zamu/db';
 import { and, asc, eq } from 'drizzle-orm';
 import { type ApiKeyAccess, parseApiKeyMetadata } from './api-key';
 import type { Auth } from './auth';
@@ -21,7 +21,7 @@ export interface Actor {
   apiKeyId?: string;
 }
 
-/** The pm_live_ key from `Authorization: Bearer ...`, or null. */
+/** The zamu_live_ key from `Authorization: Bearer ...`, or null. */
 export function bearerApiKey(headers: Headers): string | null {
   const header = headers.get('authorization');
   if (!header) return null;
@@ -69,7 +69,7 @@ function onBehalfOf(user: { kind: UserKind; responsibleUserId: string | null }):
 }
 
 /**
- * Resolves the actor of a request: `Authorization: Bearer pm_live_...` first, then the session cookie.
+ * Resolves the actor of a request: `Authorization: Bearer zamu_live_...` first, then the session cookie.
  * Returns null when the request is not authenticated, the key is invalid, disabled or expired, or the
  * user is not a member of the workspace. Agents never act through a session.
  */

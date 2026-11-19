@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client';
-import type { Task, TaskListItem } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
+import type { Task, TaskListItem } from '@zamu/contracts';
 import { useRef, useState } from 'react';
 import { relatedOf, taskQuery } from '~/features/tasks/queries';
 import { MenuNote, PickerMenu, type PickerMenuItem, StatusGlyph } from '~/ui';

@@ -1,8 +1,8 @@
 import { ORPCError } from '@orpc/client';
-import type { Me, Theme } from '@pm/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Me, Theme } from '@zamu/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { orpc } from '~/lib/orpc';
 import { AppearancePage } from './AppearancePage';

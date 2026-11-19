@@ -1,4 +1,4 @@
-import type { ApiKeyScope, CreateAgentInput, CreateApiKeyInput, ProjectRef } from '@pm/contracts';
+import type { ApiKeyScope, CreateAgentInput, CreateApiKeyInput, ProjectRef } from '@zamu/contracts';
 import type { z } from 'zod';
 
 export type CreateAgentValues = z.input<typeof CreateAgentInput>;

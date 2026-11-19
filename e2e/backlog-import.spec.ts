@@ -232,14 +232,14 @@ test('after the import every field is editable and the numbering continues', asy
   await expect(page.getByRole('button', { name: 'New task', exact: true })).toBeEnabled();
 });
 
-test('agents edit imported tasks with pm; the files no longer reach the project', async () => {
+test('agents edit imported tasks with zamu; the files no longer reach the project', async () => {
   const apiKey = await addAgent(page, agentName, [project.key]);
   const login = cli.run(['login', '--key', apiKey, '--url', baseURL, '--json']);
   expect(login.code, login.stdout + login.stderr).toBe(0);
 
   const update = cli.run(['tasks', 'update', 'BACK-786.1', '--status', 'in_progress', '--json']);
   expect(update.code, update.stdout + update.stderr).toBe(0);
-  expect(parseJson<TaskShape>(update, 'pm.v1.tasks.update').status).toBe('in_progress');
+  expect(parseJson<TaskShape>(update, 'zamu.v1.tasks.update').status).toBe('in_progress');
 
   // A push changes nothing, and a refresh is refused: the source is detached.
   await forgejo.commit(repo, 'Rename the parent task', {

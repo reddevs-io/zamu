@@ -1,4 +1,4 @@
-import type { TaskStatus } from '@pm/contracts';
+import type { TaskStatus } from '@zamu/contracts';
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Toast } from '~/ui';
 

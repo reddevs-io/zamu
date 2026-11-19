@@ -1,12 +1,12 @@
-// Stored credentials: $XDG_CONFIG_HOME/pm/config.json (fallback ~/.config/pm/config.json), mode 0600.
-// PM_URL and PM_KEY override the file, so agents in CI never need to write it.
+// Stored credentials: $XDG_CONFIG_HOME/zamu/config.json (fallback ~/.config/zamu/config.json), mode 0600.
+// ZAMU_URL and ZAMU_KEY override the file, so agents in CI never need to write it.
 import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { z } from 'zod';
 import { authError, usageError } from './errors';
 import type { CliIo } from './io';
 
-/** Server used by `pm login` when neither --url, PM_URL nor a stored URL says otherwise. */
+/** Server used by `zamu login` when neither --url, ZAMU_URL nor a stored URL says otherwise. */
 export const DEFAULT_URL = 'http://localhost:3000';
 
 export const StoredConfig = z.object({
@@ -19,7 +19,7 @@ export function configPath(io: Pick<CliIo, 'env' | 'homeDir'>): string {
   const xdg = io.env.XDG_CONFIG_HOME;
   // The XDG spec says relative values are invalid and must be ignored.
   const base = xdg && isAbsolute(xdg) ? xdg : join(io.homeDir, '.config');
-  return join(base, 'pm', 'config.json');
+  return join(base, 'zamu', 'config.json');
 }
 
 export async function readConfig(io: Pick<CliIo, 'env' | 'homeDir'>): Promise<StoredConfig | null> {
@@ -35,11 +35,11 @@ export async function readConfig(io: Pick<CliIo, 'env' | 'homeDir'>): Promise<St
   try {
     json = JSON.parse(text);
   } catch {
-    throw usageError(`${path} is not valid JSON. Run pm logout, then pm login again.`);
+    throw usageError(`${path} is not valid JSON. Run zamu logout, then zamu login again.`);
   }
   const parsed = StoredConfig.safeParse(json);
   if (!parsed.success)
-    throw usageError(`${path} is not a valid pm config. Run pm logout, then pm login again.`);
+    throw usageError(`${path} is not a valid zamu config. Run zamu logout, then zamu login again.`);
   return parsed.data;
 }
 
@@ -81,19 +81,19 @@ export interface Credentials {
   source: 'env' | 'config';
 }
 
-/** API key from the environment: PM_KEY, or PM_API_KEY (what the dev seed prints). */
+/** API key from the environment: ZAMU_KEY, or ZAMU_API_KEY (what the dev seed prints). */
 export function envKey(io: Pick<CliIo, 'env'>): string | undefined {
-  return io.env.PM_KEY || io.env.PM_API_KEY || undefined;
+  return io.env.ZAMU_KEY || io.env.ZAMU_API_KEY || undefined;
 }
 
-/** URL and key for API calls: PM_URL and PM_KEY first, then the config file. */
+/** URL and key for API calls: ZAMU_URL and ZAMU_KEY first, then the config file. */
 export async function resolveCredentials(io: Pick<CliIo, 'env' | 'homeDir'>): Promise<Credentials> {
   const fromEnv = envKey(io);
-  const stored = fromEnv && io.env.PM_URL ? null : await readConfig(io);
+  const stored = fromEnv && io.env.ZAMU_URL ? null : await readConfig(io);
   const key = fromEnv ?? stored?.key;
   if (!key) {
-    throw authError('Not logged in.', ['Run pm login --key <key>, or set PM_KEY (and PM_URL).']);
+    throw authError('Not logged in.', ['Run zamu login --key <key>, or set ZAMU_KEY (and ZAMU_URL).']);
   }
-  const url = normalizeUrl(io.env.PM_URL || stored?.url || DEFAULT_URL);
+  const url = normalizeUrl(io.env.ZAMU_URL || stored?.url || DEFAULT_URL);
   return { url, key, source: fromEnv ? 'env' : 'config' };
 }

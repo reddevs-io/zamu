@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 let role = 'web';
 try {
-  role = readFileSync('/tmp/pm-role', 'utf8').trim() || 'web';
+  role = readFileSync('/tmp/zamu-role', 'utf8').trim() || 'web';
 } catch {
   // No role file: the entrypoint did not run yet or /tmp is read-only. Assume web.
 }

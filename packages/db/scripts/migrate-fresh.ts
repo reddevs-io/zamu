@@ -1,4 +1,4 @@
-// pnpm --filter @pm/db migrate:fresh: drops the database named in DATABASE_URL, re-creates it and migrates it.
+// pnpm --filter @zamu/db migrate:fresh: drops the database named in DATABASE_URL, re-creates it and migrates it.
 // Destroys every row in that database. Refuses to run when NODE_ENV=production.
 import { createDatabase, databaseName, dropDatabase } from '../src/admin';
 import { migrate } from '../src/migrate';

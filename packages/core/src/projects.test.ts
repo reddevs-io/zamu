@@ -1,5 +1,5 @@
-import { getActorFromRequest } from '@pm/auth';
-import { type Db, schema } from '@pm/db';
+import { getActorFromRequest } from '@zamu/auth';
+import { type Db, schema } from '@zamu/db';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApiKey, listApiKeys, readKeyMetadata } from './api-keys';

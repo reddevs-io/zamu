@@ -42,9 +42,9 @@ import {
   type TaskSort,
   type TaskStatus,
   UpdateTaskInput,
-} from '@pm/contracts';
-import { type DbOrTx, schema, type Tx } from '@pm/db';
-import { createProvider, hostnameOf } from '@pm/git-providers';
+} from '@zamu/contracts';
+import { type DbOrTx, schema, type Tx } from '@zamu/db';
+import { createProvider, hostnameOf } from '@zamu/git-providers';
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {

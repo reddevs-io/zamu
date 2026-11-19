@@ -1,4 +1,4 @@
-import { PRIORITY_LABELS, TASK_STATUS_LABELS } from '@pm/contracts';
+import { PRIORITY_LABELS, TASK_STATUS_LABELS } from '@zamu/contracts';
 import type { BulkTaskPatch, TaskPatch } from '~/features/tasks/queries';
 import { formatShortDate } from '~/ui';
 import { cycleLabel } from './planning';

@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    name: '@pm/db',
+    name: '@zamu/db',
     environment: 'node',
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     passWithNoTests: true,

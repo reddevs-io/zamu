@@ -1,6 +1,6 @@
-import type { MilestoneWithProgress } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import type { MilestoneWithProgress } from '@zamu/contracts';
 import { type MouseEvent, useMemo, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { isMirrored, MilestoneRefusal, ProjectHeader, useProjectSummary } from '~/features/project-header';
@@ -185,7 +185,7 @@ export function MilestonesScreen({ projectKey }: MilestonesScreenProps) {
               text="A milestone collects the tasks behind one outcome, like a release or an audit, and tracks how many are done. Give it a target date if there is one. Each task belongs to at most one milestone."
               action={newMilestone}
               cli={{
-                command: `pm milestones create --project ${projectKey} "Webhooks v2" --target 2026-11-14`,
+                command: `zamu milestones create --project ${projectKey} "Webhooks v2" --target 2026-11-14`,
               }}
             />
           )}

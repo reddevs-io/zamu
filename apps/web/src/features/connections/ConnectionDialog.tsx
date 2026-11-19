@@ -7,7 +7,7 @@ import {
   type GitConnectionTestResult,
   type GitProvider,
   GitToken,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import {
   Banner,

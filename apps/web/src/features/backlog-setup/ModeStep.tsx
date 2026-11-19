@@ -1,4 +1,4 @@
-import type { BacklogMode } from '@pm/contracts';
+import type { BacklogMode } from '@zamu/contracts';
 import type { ReactNode } from 'react';
 import { Radio as AriaRadio, RadioGroup as AriaRadioGroup } from 'react-aria-components';
 import { Banner, Button, cn, InlineCode, NoticeStrip, RadioDot, Skeleton, SourceStatusDot } from '~/ui';

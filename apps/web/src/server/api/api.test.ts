@@ -2,7 +2,7 @@
 // keys of different scopes. Data comes from the dev seed (PAY with 11 tasks, WEB with 4).
 import { createORPCClient } from '@orpc/client';
 import { RPCLink } from '@orpc/client/fetch';
-import { createAuth } from '@pm/auth';
+import { createAuth } from '@zamu/auth';
 import {
   type Actor,
   type CoreContext,
@@ -11,9 +11,9 @@ import {
   createTask,
   listProjects,
   revokeApiKey,
-} from '@pm/core';
-import { createLabelRow, createWorld, projectRow, scopeOf } from '@pm/core/testing/fixtures';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+} from '@zamu/core';
+import { createLabelRow, createWorld, projectRow, scopeOf } from '@zamu/core/testing/fixtures';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedDevData } from '../seed';
 import { type ApiClient, createApiClient, createApiFetchHandler, RPC_PREFIX } from './index';
@@ -227,7 +227,7 @@ describe('authentication', () => {
   });
 
   it('returns 401 for unknown and revoked keys', async () => {
-    expectProblem(await call('GET', '/api/v1/me', { auth: { key: 'pm_live_nope' } }), 401, 'UNAUTHORIZED');
+    expectProblem(await call('GET', '/api/v1/me', { auth: { key: 'zamu_live_nope' } }), 401, 'UNAUTHORIZED');
     expectProblem(await call('GET', '/api/v1/me', { auth: key('revoked') }), 401, 'UNAUTHORIZED');
   });
 

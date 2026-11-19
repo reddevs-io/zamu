@@ -1,5 +1,5 @@
 // /api/v1 procedures. Each one hands the parsed input and the actor to a core service and returns
-// its result; the rules live in @pm/core.
+// its result; the rules live in @zamu/core.
 import {
   bulkUpdateTasks,
   createComment,
@@ -39,7 +39,7 @@ import {
   updateMilestone,
   updateProject,
   updateTask,
-} from '@pm/core';
+} from '@zamu/core';
 import { api } from './base';
 
 export const router = api.router({

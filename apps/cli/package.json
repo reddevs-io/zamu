@@ -1,11 +1,11 @@
 {
-  "name": "@pm/cli",
+  "name": "@zamu/cli",
   "version": "0.0.0",
-  "description": "pm: command-line client for project-management",
+  "description": "zamu: command-line client for Zamu",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "pm": "./dist/index.js"
+    "zamu": "./dist/index.js"
   },
   "files": [
     "dist"
@@ -27,7 +27,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@pm/contracts": "workspace:*",
+    "@zamu/contracts": "workspace:*",
     "tsdown": "0.23.1"
   }
 }

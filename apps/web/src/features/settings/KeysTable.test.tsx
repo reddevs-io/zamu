@@ -1,6 +1,6 @@
-import type { ApiKeySummary } from '@pm/contracts';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ApiKeySummary } from '@zamu/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { KeysTable } from './KeysTable';
 
@@ -11,7 +11,7 @@ export function keySummary(overrides: Partial<ApiKeySummary> = {}): ApiKeySummar
   return {
     id: '10000000-0000-4000-8000-000000000001',
     name: 'CI runner',
-    start: 'pm_live_Vb81',
+    start: 'zamu_live_Vb81',
     owner: claude,
     scope: { projects: 'all', access: 'write' },
     revoked: false,
@@ -46,7 +46,7 @@ describe('KeysTable', () => {
     const revokedRow = rows.find((row) => within(row).queryByText('Old laptop'));
     if (!activeRow || !revokedRow) throw new Error('rows not rendered');
 
-    expect(within(activeRow).getByText('pm_live_Vb81…')).toBeInTheDocument();
+    expect(within(activeRow).getByText('zamu_live_Vb81…')).toBeInTheDocument();
     expect(within(activeRow).getByText('Workspace · read and write')).toBeInTheDocument();
     expect(within(revokedRow).getByText('PAY, CLI · read only')).toBeInTheDocument();
     expect(within(revokedRow).getByText('Revoked')).toBeInTheDocument();

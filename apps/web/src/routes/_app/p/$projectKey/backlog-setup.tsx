@@ -21,7 +21,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/backlog-setup')({
   },
   loader: ({ context }) => context.queryClient.prefetchQuery(projectsQuery()),
   head: ({ params }) => ({
-    meta: [{ title: `Backlog.md setup · ${params.projectKey} · project-management` }],
+    meta: [{ title: `Backlog.md setup · ${params.projectKey} · Zamu` }],
   }),
   component: BacklogSetupRoute,
 });

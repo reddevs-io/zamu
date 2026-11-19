@@ -7,7 +7,7 @@ import {
   type Priority,
   safeParseTaskKey,
   type TaskStatus,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { type DisplayOptions, displayListInput } from '~/features/views/display-options';
 import {
   parseTaskFilter,

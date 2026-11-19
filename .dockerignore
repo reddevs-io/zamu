@@ -19,7 +19,7 @@ blob-report
 
 # Not needed to build the image
 .git
-.gitlab-ci.yml
+.github
 .agent
 memory-bank
 backlog

@@ -1,4 +1,4 @@
-import type { BacklogMappings, BacklogMappingsView, Priority, TaskStatus } from '@pm/contracts';
+import type { BacklogMappings, BacklogMappingsView, Priority, TaskStatus } from '@zamu/contracts';
 
 // The three mapping tables of the setup (step 3) and of Edit mappings. Rows come from detection (or
 // the source's status in edit mode) with their task counts; a pick by hand turns the row's `how`

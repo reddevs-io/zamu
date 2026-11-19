@@ -1,4 +1,4 @@
-import type { HomeItem, HomeTab } from '@pm/contracts';
+import type { HomeItem, HomeTab } from '@zamu/contracts';
 import type { MouseEvent, ReactNode, Ref } from 'react';
 import { Avatar, cn, DueChip, Pill, PriorityGlyph, ProjectTile, StatusGlyph } from '~/ui';
 import { pillView, rowAvatar, shownPills, showsDueChip, whyText } from './format';

@@ -72,7 +72,7 @@ describe('display options', () => {
 
     const stored = JSON.parse(localStorage.getItem(displayStorageKey(VIEWER.id, 'HBR', 'board')) ?? 'null');
     expect(stored).toMatchObject({ orderBy: 'due', boardSubtasks: 'cards', properties: { milestone: true } });
-    expect(localStorage.getItem(`pm:display:v1:${VIEWER.id}:HBR:board`)).not.toBeNull();
+    expect(localStorage.getItem(`zamu:display:v1:${VIEWER.id}:HBR:board`)).not.toBeNull();
     expect(localStorage.getItem(displayStorageKey(VIEWER.id, 'HBR', 'list'))).toBeNull();
 
     await user.click(within(dialog).getByRole('button', { name: 'Reset to default' }));

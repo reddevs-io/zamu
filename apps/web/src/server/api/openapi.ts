@@ -1,7 +1,7 @@
 // The OpenAPI 3.1 document of /api/v1, generated from the contract and served at /api/v1/openapi.json.
 import { OpenAPIGenerator } from '@orpc/openapi';
 import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4';
-import { contract, Problem, Task } from '@pm/contracts';
+import { contract, Problem, Task } from '@zamu/contracts';
 
 export const OPENAPI_PATH = '/api/v1/openapi.json';
 
@@ -17,10 +17,10 @@ const generator = new OpenAPIGenerator({ schemaConverters: [new ZodToJsonSchemaC
 export function generateOpenApiDocument(): Promise<OpenAPIDocument> {
   return generator.generate(contract, {
     info: {
-      title: 'project-management API',
+      title: 'Zamu API',
       version: '1',
       description:
-        'REST API of project-management. Authenticate with an API key (`Authorization: Bearer pm_live_...`) ' +
+        'REST API of Zamu. Authenticate with an API key (`Authorization: Bearer zamu_live_...`) ' +
         'or, from the web app, the session cookie. Errors use application/problem+json style bodies ' +
         '(RFC 9457) with `code`, `requestId` and `issues`.',
       license: { name: 'MIT', identifier: 'MIT' },
@@ -30,7 +30,7 @@ export function generateOpenApiDocument(): Promise<OpenAPIDocument> {
         apiKey: {
           type: 'http',
           scheme: 'bearer',
-          description: 'An API key created in Settings → API keys, starting with pm_live_.',
+          description: 'An API key created in Settings → API keys, starting with zamu_live_.',
         },
         session: { type: 'apiKey', in: 'cookie', name: 'better-auth.session_token' },
       },

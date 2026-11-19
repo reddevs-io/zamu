@@ -1,6 +1,6 @@
 // Setup: detection order and output, preview, start, and New project from Backlog.md.
-import { schema } from '@pm/db';
-import { GitRateLimited, GitUnauthorized } from '@pm/git-providers';
+import { schema } from '@zamu/db';
+import { GitRateLimited, GitUnauthorized } from '@zamu/git-providers';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Conflict, Forbidden, Invalid, ProjectNotEmpty } from '../errors';

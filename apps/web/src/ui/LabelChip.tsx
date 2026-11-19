@@ -8,7 +8,7 @@ import { LockGlyph } from './Glyphs';
  * labels add a lock (the name comes from the file; the colour stays editable).
  */
 
-/** Number of label hues (--label-1 … --label-9); matches LABEL_COLOR_COUNT in @pm/contracts. */
+/** Number of label hues (--label-1 … --label-9); matches LABEL_COLOR_COUNT in @zamu/contracts. */
 export const LABEL_HUES = 9;
 
 /** Names of the nine hues, for swatch labels and screen readers. */

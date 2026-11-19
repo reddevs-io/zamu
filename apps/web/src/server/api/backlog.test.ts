@@ -2,7 +2,7 @@
 // demo project BACK (seedDevData with `backlog`). Jobs go to a recording queue; the worker's side
 // is tested in apps/worker.
 import { createHmac } from 'node:crypto';
-import { createAuth } from '@pm/auth';
+import { createAuth } from '@zamu/auth';
 import {
   type Actor,
   type CoreContext,
@@ -12,9 +12,9 @@ import {
   getBacklogWebhookInfo,
   listProjects,
   updateProject,
-} from '@pm/core';
-import { type RecordingJobQueue, recordingJobQueue, TEST_ENCRYPTION_KEY } from '@pm/core/backlog/testing';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+} from '@zamu/core';
+import { type RecordingJobQueue, recordingJobQueue, TEST_ENCRYPTION_KEY } from '@zamu/core/backlog/testing';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seedDevData } from '../seed';
 import { BACKLOG_SEED } from '../seed-backlog';

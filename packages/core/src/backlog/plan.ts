@@ -12,7 +12,7 @@ import {
   type ParseResult,
   type ParseWarning,
   renderDescription,
-} from '@pm/backlog-md';
+} from '@zamu/backlog-md';
 import {
   BacklogBlock,
   type BacklogConfigSummary,
@@ -32,7 +32,7 @@ import {
   priorityToValue,
   TASK_STATUS_LABELS,
   type TaskStatus,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { z } from 'zod';
 import { compareLabelNames, compareTaskKeys } from '../activity';
 import {

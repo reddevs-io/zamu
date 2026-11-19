@@ -347,8 +347,8 @@ describe('M5 routes and problems', () => {
     });
   });
 
-  it('wraps the pm labels results', () => {
-    expect(cliOutput('labels.list', { items: [labelWithUsageFixture] }).schema).toBe('pm.v1.labels.list');
+  it('wraps the zamu labels results', () => {
+    expect(cliOutput('labels.list', { items: [labelWithUsageFixture] }).schema).toBe('zamu.v1.labels.list');
     expect(cliOutput('labels.delete', { deleted: labelFixture, usageCount: 12 }).data.usageCount).toBe(12);
   });
 });

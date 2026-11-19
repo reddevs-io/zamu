@@ -26,7 +26,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/cycles/$cycleNumber')(
       : settleOnServer(prefetchCycle(context.queryClient, params.projectKey, selector, planningFilter(deps)));
   },
   head: ({ params }) => ({
-    meta: [{ title: `Cycle ${params.cycleNumber} · ${params.projectKey} · project-management` }],
+    meta: [{ title: `Cycle ${params.cycleNumber} · ${params.projectKey} · Zamu` }],
   }),
   component: CycleRoute,
 });

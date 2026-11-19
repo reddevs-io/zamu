@@ -1,6 +1,6 @@
 // API keys: list, create (for yourself or an agent you are responsible for), revoke.
 // Keys are Better Auth API-key plugin rows; core stores the scope in metadata as ApiKeyMetadata.
-import { parseApiKeyMetadata } from '@pm/auth';
+import { parseApiKeyMetadata } from '@zamu/auth';
 import {
   type ApiKeyCreated,
   ApiKeyCreated as ApiKeyCreatedSchema,
@@ -11,8 +11,8 @@ import {
   CreateApiKeyInput,
   ListApiKeysInput,
   RevokeApiKeyInput,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import { and, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, type KeyOwner } from './authz';
@@ -22,7 +22,7 @@ import { loadUsers, userRef, workspaceMember } from './internal';
 
 const { apikey, member, project } = schema;
 
-/** Better Auth's API-key plugin rejects longer names (maximumNameLength in @pm/auth). */
+/** Better Auth's API-key plugin rejects longer names (maximumNameLength in @zamu/auth). */
 export const MAX_API_KEY_NAME_LENGTH = 100;
 
 /** Key metadata as stored by Better Auth (JSON text, possibly encoded twice), or null. */

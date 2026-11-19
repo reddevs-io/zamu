@@ -1,5 +1,5 @@
-import { getActorFromRequest } from '@pm/auth';
-import { schema } from '@pm/db';
+import { getActorFromRequest } from '@zamu/auth';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listApiKeys } from './api-keys';
@@ -70,7 +70,7 @@ describe('members', () => {
         responsible: { id: w.member.id },
         apiKeyCount: 1,
       });
-      expect(key.key).toMatch(/^pm_live_/);
+      expect(key.key).toMatch(/^zamu_live_/);
       expect(key).toMatchObject({
         name: 'docs-bot key',
         owner: { id: agent.id, kind: 'agent' },

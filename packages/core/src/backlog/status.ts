@@ -1,4 +1,4 @@
-// Source status for GET /projects/{key}/backlog, the settings page and pm backlog status:
+// Source status for GET /projects/{key}/backlog, the settings page and zamu backlog status:
 // state, last read, counts, the paged problem list, mappings with counts and the history.
 import {
   type BacklogConfigSummary,
@@ -9,8 +9,8 @@ import {
   GetBacklogStatusInput,
   OPEN_TASK_STATUSES,
   type UserRef,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { loadProjectActivityRows, toProjectActivities } from '../activity';
@@ -211,7 +211,7 @@ export async function backlogStatus(
   });
 }
 
-/** GET /projects/{project}/backlog (and pm backlog status): backlog.read. Problems are paged. */
+/** GET /projects/{project}/backlog (and zamu backlog status): backlog.read. Problems are paged. */
 export async function getBacklogStatus(
   ctx: DbContext,
   actor: Actor,

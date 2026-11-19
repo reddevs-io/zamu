@@ -1,29 +1,31 @@
 // Upgrades on a second compose stack (project <E2E_COMPOSE_PROJECT>-upgrade, port 3101) next to the main one. The
 // stack starts on M1 (release 0.1.1) and gets data through the M1 app, moves to M2.1 (0.3.0: the M2 and M2.1
 // migrations run against the M1 data, which shows on the board in its M1 order, and gets M2 and M2.1 data),
-// then to 0.6.0 (the M3 and M4 migrations: every key survives, and a Backlog.md mirror reads labels, a due
-// date, a dependency and a parent into its Backlog.md block), then to the image globalSetup built: the M5
-// migrations run, the backfill turns the mirror's block into native labels, due date, blockers and parent
-// with no activity rows, the next refresh changes nothing, and every key and route still works.
+// then to 0.6.0 (the M3 and M4 migrations: every task key survives, a Backlog.md mirror reads labels, a due
+// date, a dependency and a parent into its Backlog.md block, and an agent gets a pm_live_ API key), then to
+// the image globalSetup built: the M5 migrations run, the backfill turns the mirror's block into native
+// labels, due date, blockers and parent with no activity rows, the next refresh changes nothing, and every
+// task key and route still works. The rename to Zamu dropped the pm_live_ prefix with no fallback, so the
+// 0.6.0 API key gets 401 and a new key starts with zamu_live_.
 //
 // Older images, each used when it is already local:
 //   M1    E2E_M1_IMAGE (pulled if it is not local, for example
 //         registry.gitlab.com/reddevsdotio/tooling/project-management:0.1.1 after `docker login`), else
-//         project-management:m1-0.1.1, built once from the git tag 0.1.1.
+//         zamu:m1-0.1.1, built once from the git tag 0.1.1.
 //   M2.1  E2E_M2_1_IMAGE (pulled likewise, for example …/project-management:0.3.0), else
-//         project-management:m2.1-<ref>, built once from the git tag 0.3.0 when it exists, else from the M2.1
+//         zamu:m2.1-<ref>, built once from the git tag 0.3.0 when it exists, else from the M2.1
 //         merge commit (E2E_M2_1_REF overrides).
 //   0.6.0 E2E_0_6_IMAGE (pulled likewise, for example …/project-management:0.6.0), else
-//         project-management:release-0.6.0, built once from the git tag 0.6.0.
+//         zamu:release-0.6.0, built once from the git tag 0.6.0.
 // Builds use git archive, so the checkout is untouched. The mirror reads from a Forgejo container (e2e/forgejo.ts)
 // attached to the upgrade stack's network. E2E_SKIP_UPGRADE=1 skips this spec.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, request, test } from '@playwright/test';
 import { addConnection, type Forgejo, startForgejo } from './forgejo';
-import { api, settle, setUpServer, signInAsAdmin } from './session';
+import { addAgent, api, settle, setUpServer, signInAsAdmin } from './session';
 import {
   composeProject,
   createStack,
@@ -35,16 +37,18 @@ import {
 } from './stack';
 
 const M1_TAG = '0.1.1';
-const m1Image = process.env.E2E_M1_IMAGE ?? `project-management:m1-${M1_TAG}`;
+const m1Image = process.env.E2E_M1_IMAGE ?? `zamu:m1-${M1_TAG}`;
 /** The M2.1 merge to main, released as 0.3.0. */
 const M2_1_COMMIT = '7eb6b7e';
 const m2_1Ref = process.env.E2E_M2_1_REF ?? (gitRefExists('0.3.0') ? '0.3.0' : M2_1_COMMIT);
-const m2_1Image = process.env.E2E_M2_1_IMAGE ?? `project-management:m2.1-${m2_1Ref}`;
+const m2_1Image = process.env.E2E_M2_1_IMAGE ?? `zamu:m2.1-${m2_1Ref}`;
 /** The release before M5: the backlog sweep. */
 const RELEASE_0_6_TAG = '0.6.0';
-const release0_6Image = process.env.E2E_0_6_IMAGE ?? `project-management:release-${RELEASE_0_6_TAG}`;
+const release0_6Image = process.env.E2E_0_6_IMAGE ?? `zamu:release-${RELEASE_0_6_TAG}`;
 const upgradePort = process.env.E2E_UPGRADE_PORT ?? '3101';
-// Same host as the main stack (localhost, or "docker" in CI), another port.
+/** API key prefix up to 0.7.0. The current build no longer accepts it. */
+const OLD_API_KEY_PREFIX = 'pm_live_';
+// Same host as the main stack (localhost, or the host in E2E_BASE_URL), another port.
 const upgradeURL = (() => {
   const url = new URL(mainURL);
   url.port = upgradePort;
@@ -148,6 +152,8 @@ let context: BrowserContext;
 let page: Page;
 /** Task keys per status in the M1 list order (priority, then most recently updated). */
 let m1Order: Record<string, string[]> = {};
+/** The pm_live_ key created on 0.6.0. */
+let oldApiKey = '';
 /** Every task after the M2.1 step. */
 let m2_1Tasks: TaskRef[] = [];
 const repository = 'https://gitlab.com/reddevs/operations.git';
@@ -179,7 +185,7 @@ function ensureImage(name: string, fromEnv: boolean, ref: string): void {
     return;
   }
   console.log(`[e2e] building ${name} from git ${ref} (once; later runs reuse it)`);
-  const dir = mkdtempSync(join(tmpdir(), 'pm-e2e-image-'));
+  const dir = mkdtempSync(join(tmpdir(), 'zamu-e2e-image-'));
   try {
     const archive = join(dir, 'source.tar');
     const source = join(dir, 'source');
@@ -232,7 +238,11 @@ test.beforeAll(async ({ browser }) => {
   // The network outlives the image switches, so Forgejo stays reachable from every step.
   forgejo = await startForgejo('upgrade', stack.network, forgejoAliases.upgrade);
   await forgejo.createRepository(infraRepo, backlogFiles);
-  context = await browser.newContext({ baseURL: upgradeURL });
+  // Clipboard access: addAgent reads the new API key from it.
+  context = await browser.newContext({
+    baseURL: upgradeURL,
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
   page = await context.newPage();
 });
 
@@ -253,6 +263,17 @@ test.afterAll(async () => {
   forgejo?.stop();
   stack.compose(['down', '-v', '--remove-orphans'], { quiet: true });
 });
+
+/** Status of GET /api/v1/me with only the API key: a fresh request context, so no session cookie. */
+async function meStatusWithKey(key: string): Promise<number> {
+  const keyOnly = await request.newContext({ baseURL: upgradeURL });
+  try {
+    const response = await keyOnly.get('/api/v1/me', { headers: { authorization: `Bearer ${key}` } });
+    return response.status();
+  } finally {
+    await keyOnly.dispose();
+  }
+}
 
 async function timelineLength(key: string): Promise<number> {
   return (await api<{ items: unknown[] }>(page.request, 'GET', `/tasks/${key}/timeline`)).items.length;
@@ -449,12 +470,25 @@ test('0.6.0: the M3 and M4 migrations keep every key; a Backlog.md mirror reads 
   const runbook = await api<MirroredTask>(page.request, 'GET', '/tasks/INF-2');
   expect(runbook.backlog?.data.dependencies).toHaveLength(1);
   for (const key of infraKeys) timelineBefore[key] = await timelineLength(key);
+
+  // An agent key with the 0.6.0 prefix, which works on 0.6.0. The current build refuses it.
+  oldApiKey = await addAgent(page, 'upgrade-agent-0-6', ['OPS'], OLD_API_KEY_PREFIX);
+  expect(await meStatusWithKey(oldApiKey)).toBe(200);
 });
 
 test('this build: the M5 migrations backfill the mirror, and every key and route still works', async () => {
   test.setTimeout(6 * 60_000);
   await switchTo(currentImage);
   await signInAsAdmin(page);
+
+  // The rename to Zamu: the 0.6.0 pm_live_ key gets 401, and new keys start with zamu_live_ and work. The
+  // key list shows 14 characters of the new key.
+  expect(await meStatusWithKey(oldApiKey)).toBe(401);
+  const newApiKey = await addAgent(page, 'upgrade-agent', ['OPS']);
+  expect(await meStatusWithKey(newApiKey)).toBe(200);
+  await page.goto('/settings/api-keys');
+  await settle(page);
+  await expect(page.getByText(`${newApiKey.slice(0, 14)}…`)).toBeVisible();
 
   // Native tasks have the new fields, empty.
   const ops = await api<MirroredTask>(page.request, 'GET', '/tasks/OPS-1');

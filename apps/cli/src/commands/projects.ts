@@ -1,5 +1,5 @@
-// pm projects list | delete.
-import { DeleteProjectInput, ProjectKeyInput, parseRepositoryUrl } from '@pm/contracts';
+// zamu projects list | delete.
+import { DeleteProjectInput, ProjectKeyInput, parseRepositoryUrl } from '@zamu/contracts';
 import { type CommandContext, emit } from '../context';
 import { usageError } from '../errors';
 import { formatDate, table } from '../format';
@@ -39,7 +39,7 @@ export async function listProjects(context: CommandContext): Promise<void> {
 }
 
 /**
- * pm projects delete <KEY> --confirm <KEY>. Without --confirm, or with another key, nothing is
+ * zamu projects delete <KEY> --confirm <KEY>. Without --confirm, or with another key, nothing is
  * sent: deleting takes every task, comment and the Backlog.md mirror with it.
  */
 export async function deleteProject(

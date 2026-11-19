@@ -16,7 +16,7 @@ import {
   TASK_STATUSES,
   type TaskStatus,
   type UserRef,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 
 /** What a status without a mapping row becomes. */
 export const FALLBACK_STATUS: TaskStatus = 'todo';

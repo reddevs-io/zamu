@@ -1,4 +1,4 @@
-import { ListTasksInput } from '@pm/contracts';
+import { ListTasksInput } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   activeFilterFields,

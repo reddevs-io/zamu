@@ -1,6 +1,11 @@
-import type { BacklogMappingsView, BacklogMode, BacklogSourceStatus, ProjectWithCounts } from '@pm/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import type {
+  BacklogMappingsView,
+  BacklogMode,
+  BacklogSourceStatus,
+  ProjectWithCounts,
+} from '@zamu/contracts';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { startBacklogFn, updateBacklogMappingsFn } from '~/features/backlog/server';
 import { useSubmitHint } from '~/features/projects/NewProjectDialog';

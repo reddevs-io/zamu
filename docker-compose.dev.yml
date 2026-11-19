@@ -1,5 +1,5 @@
 # Local development database. Start with: docker compose -f docker-compose.dev.yml up -d db
-name: project-management-dev
+name: zamu-dev
 
 services:
   db:
@@ -7,14 +7,14 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: project_management
+      POSTGRES_DB: zamu
     ports:
       - "5432:5432"
     volumes:
       # postgres:18 keeps its data under /var/lib/postgresql/18/docker, so mount the parent directory.
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d project_management"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zamu"]
       interval: 2s
       timeout: 5s
       retries: 30

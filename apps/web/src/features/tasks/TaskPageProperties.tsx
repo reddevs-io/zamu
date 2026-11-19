@@ -1,5 +1,5 @@
-import { isOpenStatus, milestoneProgressRatio, type Task } from '@pm/contracts';
 import { Link } from '@tanstack/react-router';
+import { isOpenStatus, milestoneProgressRatio, type Task } from '@zamu/contracts';
 import { type ComponentProps, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import {
   Button as AriaButton,

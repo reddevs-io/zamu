@@ -16,8 +16,8 @@ import {
   type SubtaskProgress,
   splitTaskKey,
   type TaskStatus,
-} from '@pm/contracts';
-import { type DbOrTx, schema, type Tx } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema, type Tx } from '@zamu/db';
 import { and, eq, inArray, isNull, ne, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { compareTaskKeys, type StoredTaskRef } from './activity';

@@ -2,6 +2,8 @@
 // not set up, mirroring, refreshing, warnings with the paged problem list, failed, paused, imported with
 // its history, the member view and loading. Owners and admins refresh (⇧R), open the webhook setup,
 // edit mappings in the setup route and detach.
+
+import { useQuery } from '@tanstack/react-query';
 import {
   type BacklogMappingsView,
   type BacklogProblem,
@@ -9,8 +11,7 @@ import {
   type ProjectActivity,
   type ProjectWithCounts,
   parseRepositoryUrl,
-} from '@pm/contracts';
-import { useQuery } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { useBacklogStatus, useProjectSummary, useRefreshNow } from '~/features/project-header';

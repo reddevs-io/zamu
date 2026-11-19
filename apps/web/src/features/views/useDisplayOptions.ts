@@ -10,12 +10,12 @@ import {
 } from './display-options';
 
 // Display options in localStorage, per person, project and view (plan call 4):
-//   pm:display:v1:<user id>:<project key>:<view>     (Home: project key "~home")
+//   zamu:display:v1:<user id>:<project key>:<view>     (Home: project key "~home")
 // Every component reading the same key shares one value (the Display popover and the list it
 // changes), and other tabs follow through the storage event. Until the signed-in user is known
 // the defaults show and changes stay in memory.
 
-const PREFIX = 'pm:display:v1';
+const PREFIX = 'zamu:display:v1';
 /** Stands in for the project key on Home. */
 export const HOME_DISPLAY_SCOPE = '~home';
 

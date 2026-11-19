@@ -1,5 +1,5 @@
 import { ORPCError } from '@orpc/client';
-import type { Activity, TaskListItem } from '@pm/contracts';
+import type { Activity, TaskListItem } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { describeError } from './errors';
 import {

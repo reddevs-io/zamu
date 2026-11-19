@@ -1,8 +1,9 @@
 // /settings/api-keys (every key in the workspace, admins; or one agent's keys via ?owner=) and
 // /settings/my-keys (your own keys). New key, then the reveal-once dialog; Revoke with confirmation.
-import type { ApiKeySummary } from '@pm/contracts';
+
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import type { ApiKeySummary } from '@zamu/contracts';
 import { useCallback, useState } from 'react';
 import { Banner, Button, EmptyState, FilterBar, MemberLabel, PageHeader } from '~/ui';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -27,8 +28,8 @@ export interface KeysPageProps {
 }
 
 const SUBTITLES = {
-  workspace: 'Keys let agents and the pm CLI act in this workspace. Each key belongs to one member.',
-  mine: 'Keys that act as you, for the pm CLI and your scripts. Agents get their own keys.',
+  workspace: 'Keys let agents and the zamu CLI act in this workspace. Each key belongs to one member.',
+  mine: 'Keys that act as you, for the zamu CLI and your scripts. Agents get their own keys.',
 };
 
 function revokeText(key: ApiKeySummary): string {
@@ -68,8 +69,8 @@ export function KeysPage({ mode, ownerId }: KeysPageProps) {
         }
         text={
           mode === 'mine'
-            ? 'Create one to use the pm CLI as yourself.'
-            : 'Keys let agents and the pm CLI act in this workspace.'
+            ? 'Create one to use the zamu CLI as yourself.'
+            : 'Keys let agents and the zamu CLI act in this workspace.'
         }
         action={canCreate ? <Button onPress={() => setNewKeyOpen(true)}>New key</Button> : undefined}
       />

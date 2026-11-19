@@ -1,6 +1,6 @@
 // Display text for the Git connections page: provider hints, the checked column, the token preview
 // and the page subtitle. Copy follows the M3 canvas (frames 1a to 1j).
-import type { GitProvider } from '@pm/contracts';
+import type { GitProvider } from '@zamu/contracts';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;

@@ -8,7 +8,7 @@ import type {
   HomePill,
   HomeTab,
   UserRef,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import { describeActivity } from '~/features/tasks/format';
 import { formatShortDate, type PillTone, STATUS_LABELS } from '~/ui';
 

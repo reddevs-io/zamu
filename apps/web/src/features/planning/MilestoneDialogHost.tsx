@@ -1,5 +1,5 @@
-import type { MilestoneWithProgress } from '@pm/contracts';
 import { useNavigate } from '@tanstack/react-router';
+import type { MilestoneWithProgress } from '@zamu/contracts';
 import { writeFailure } from './errors';
 import { MilestoneDialog, type MilestoneField, type MilestoneValues } from './MilestoneDialog';
 import { useCreateMilestone, useDeleteMilestone, useUpdateMilestone } from './queries';

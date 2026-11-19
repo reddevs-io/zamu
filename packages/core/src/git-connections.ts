@@ -24,8 +24,8 @@ import {
   type ProjectRef,
   TestGitConnectionInput,
   UpdateGitConnectionInput,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import {
   createProvider,
   deriveApiBaseUrl,
@@ -36,7 +36,7 @@ import {
   isGitProviderError,
   type LookupFn,
   normalizeHost,
-} from '@pm/git-providers';
+} from '@zamu/git-providers';
 import { and, asc, eq, inArray, isNotNull, ne, notInArray, sql } from 'drizzle-orm';
 import { type Actor, authorize } from './authz';
 // Runtime-only cycle: backlog/refresh imports this module too; both use each other inside functions.

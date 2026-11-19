@@ -1,5 +1,5 @@
 // Deleting a project end to end: an admin deletes one from its General settings (type the key, toast on Home,
-// its tasks gone), then another with `pm projects delete`: no --confirm or the wrong key sends
+// its tasks gone), then another with `zamu projects delete`: no --confirm or the wrong key sends
 // nothing, an agent's key is refused, a person's workspace key deletes it. The agent's key covered both
 // projects; it stays, with no projects left. The tests build on each other, so they share one page and run
 // in order. The spec signs in as the admin of the other specs, or sets the server up when it runs alone.
@@ -20,9 +20,9 @@ test.describe.configure({ mode: 'serial' });
 let context: BrowserContext;
 let page: Page;
 const pageErrors: string[] = [];
-/** pm with the agent's key, scoped to both projects. */
+/** zamu with the agent's key, scoped to both projects. */
 const agentCli = createCli();
-/** pm with the admin's own key: whole workspace, read and write. */
+/** zamu with the admin's own key: whole workspace, read and write. */
 const personCli = createCli();
 
 async function projectKeys(): Promise<string[]> {
@@ -79,7 +79,7 @@ test('seed two projects with tasks, an agent key for both and a person key', asy
   await expect(reveal).toContainText('Scope: whole workspace, read and write.');
   await reveal.getByRole('button', { name: 'Copy API key' }).click();
   const personKey = await page.evaluate(() => navigator.clipboard.readText());
-  expect(personKey).toMatch(/^pm_live_\S{20,}$/);
+  expect(personKey).toMatch(/^zamu_live_\S{20,}$/);
   await reveal.getByRole('button', { name: 'I copied the key' }).click();
   const personLogin = personCli.run(['login', '--key', personKey, '--url', baseURL, '--json']);
   expect(personLogin.code, personLogin.stdout + personLogin.stderr).toBe(0);
@@ -128,7 +128,7 @@ test('General settings: Delete this project, type the key, "Deleted OLD" on Home
   await expect(agentKeyRow().getByRole('button', { name: 'Revoke' })).toBeVisible();
 });
 
-test('pm projects delete: --confirm required, agents refused, a person key deletes', async () => {
+test('zamu projects delete: --confirm required, agents refused, a person key deletes', async () => {
   const usage = `Pass --confirm ${inCli.key} to delete project ${inCli.key}.`;
   const missing = personCli.run(['projects', 'delete', inCli.key]);
   expect(missing.code, missing.stdout + missing.stderr).toBe(1);
@@ -151,7 +151,7 @@ test('pm projects delete: --confirm required, agents refused, a person key delet
     '--json',
   ]);
   expect(deleted.code, deleted.stdout + deleted.stderr).toBe(0);
-  expect(parseJson<{ deleted: string }>(deleted, 'pm.v1.projects.delete')).toEqual({ deleted: inCli.key });
+  expect(parseJson<{ deleted: string }>(deleted, 'zamu.v1.projects.delete')).toEqual({ deleted: inCli.key });
   expect(await projectKeys()).not.toContain(inCli.key);
 
   const again = personCli.run(['projects', 'delete', inCli.key, '--confirm', inCli.key]);
@@ -160,7 +160,7 @@ test('pm projects delete: --confirm required, agents refused, a person key delet
   // The agent's key covered only the two deleted projects: it still works, for nothing.
   const list = agentCli.run(['projects', 'list', '--json']);
   expect(list.code, list.stdout + list.stderr).toBe(0);
-  expect(parseJson<{ items: unknown[] }>(list, 'pm.v1.projects.list').items).toEqual([]);
+  expect(parseJson<{ items: unknown[] }>(list, 'zamu.v1.projects.list').items).toEqual([]);
   await page.goto('/settings/api-keys');
   await settle(page);
   await expect(agentKeyRow().getByRole('button', { name: 'Revoke' })).toBeVisible();

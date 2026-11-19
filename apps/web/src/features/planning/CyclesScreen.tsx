@@ -1,6 +1,6 @@
-import type { Cycle } from '@pm/contracts';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import type { Cycle } from '@zamu/contracts';
 import { type MouseEvent, useMemo, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { ProjectHeader, useProjectSummary } from '~/features/project-header';

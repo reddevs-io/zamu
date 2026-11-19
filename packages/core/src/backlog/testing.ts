@@ -1,10 +1,10 @@
 // Test support for the mirror engine: an in-memory git repository behind a fake GitProvider (with
 // call counters and failure injection), a recording job queue, and a helper that sets up a
-// project with a connection and a source. Test-only (imports @pm/db/test through the fixtures).
+// project with a connection and a source. Test-only (imports @zamu/db/test through the fixtures).
 import { createHash } from 'node:crypto';
-import { readFixtureTree } from '@pm/backlog-md/testing/fixtures';
-import type { BacklogMappings } from '@pm/contracts';
-import { type Db, schema } from '@pm/db';
+import { readFixtureTree } from '@zamu/backlog-md/testing/fixtures';
+import type { BacklogMappings } from '@zamu/contracts';
+import { type Db, schema } from '@zamu/db';
 import {
   type BlobRef,
   GitNotFound,
@@ -12,7 +12,7 @@ import {
   type ProviderKind,
   type TreeEntry,
   verifyWebhook,
-} from '@pm/git-providers';
+} from '@zamu/git-providers';
 import { eq } from 'drizzle-orm';
 import type { Actor } from '../authz';
 import type { ProviderFactory } from '../context';

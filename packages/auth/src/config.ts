@@ -85,7 +85,7 @@ function issuerProblem(issuer: string): string | null {
   try {
     url = new URL(issuer);
   } catch {
-    return `OIDC_ISSUER is not a URL: "${issuer}". Use the issuer URL of your provider, for example https://auth.example.com/application/o/project-management/.`;
+    return `OIDC_ISSUER is not a URL: "${issuer}". Use the issuer URL of your provider, for example https://auth.example.com/application/o/zamu/.`;
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     return `OIDC_ISSUER must start with https:// (got "${issuer}").`;

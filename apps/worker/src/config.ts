@@ -1,6 +1,6 @@
 // The worker's configuration from environment variables, checked as a whole so a misconfigured
 // worker exits listing every problem (one fatal log line each). Messages never echo secret values.
-import { isValidTimeZone, loadEncryptionKey, loadGitHosts } from '@pm/core';
+import { isValidTimeZone, loadEncryptionKey, loadGitHosts } from '@zamu/core';
 
 export interface WorkerEnv {
   DATABASE_URL?: string | undefined;

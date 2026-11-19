@@ -1,6 +1,6 @@
-import type { MilestoneWithProgress, StatusCounts } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import type { MilestoneWithProgress, StatusCounts } from '@zamu/contracts';
 import { type ReactNode, useState } from 'react';
 import { isMirrored } from '~/features/project-header';
 import { useOptionalQuickCreate } from '~/features/shell/quick-create';

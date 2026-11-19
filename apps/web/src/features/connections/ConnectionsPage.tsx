@@ -1,7 +1,8 @@
 // /settings/connections: the workspace's git connections (frames 1a to 1j). Owners and admins add,
 // edit, test and delete them; members see the list without actions. Tokens never come back.
-import type { GitConnection, GitConnectionList } from '@pm/contracts';
+
 import { useQuery } from '@tanstack/react-query';
+import type { GitConnection, GitConnectionList } from '@zamu/contracts';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { useNow } from '~/features/tasks/clock';

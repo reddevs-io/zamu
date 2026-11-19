@@ -1,4 +1,4 @@
-import type { Member } from '@pm/contracts';
+import type { Member } from '@zamu/contracts';
 import { useRef, useState } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import { describeError, isClientError } from '~/features/tasks/errors';

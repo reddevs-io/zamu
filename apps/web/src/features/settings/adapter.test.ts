@@ -1,6 +1,6 @@
 // The settings server functions' adapter against a throwaway database: actors from a session cookie
 // or an API key, core's rules, and failures returned as data.
-import { createAuth, getActorFromRequest } from '@pm/auth';
+import { createAuth, getActorFromRequest } from '@zamu/auth';
 import {
   type Actor,
   type CoreContext,
@@ -13,9 +13,9 @@ import {
   listMembers,
   removeMember,
   revokeApiKey,
-} from '@pm/core';
-import { createWorld } from '@pm/core/testing/fixtures';
-import { createTestDatabase, type TestDatabase } from '@pm/db/test';
+} from '@zamu/core';
+import { createWorld } from '@zamu/core/testing/fixtures';
+import { createTestDatabase, type TestDatabase } from '@zamu/db/test';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedDevData } from '../../server/seed';
 import { runAs, runForRequest } from './adapter';
@@ -94,7 +94,7 @@ describe('settings adapter', () => {
     );
     expect(created.agent).toMatchObject({ name: 'docs-bot', kind: 'agent', apiKeyCount: 1 });
     expect(created.agent.responsible?.id).toBe(adminId);
-    expect(created.key.key).toMatch(/^pm_live_/);
+    expect(created.key.key).toMatch(/^zamu_live_/);
 
     const agentActor = await getActorFromRequest(core, { headers: bearer(created.key.key) });
     expect(agentActor).toMatchObject({ userId: created.agent.id, kind: 'agent', onBehalfOfId: adminId });

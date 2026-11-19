@@ -1,9 +1,9 @@
 // Vitest globalSetup: one migrated throwaway database per test run, dropped at the end.
 //
 // Reuse it from another package's vitest.config.ts:
-//   globalSetup: [fileURLToPath(import.meta.resolve('@pm/db/test/global-setup'))]
+//   globalSetup: [fileURLToPath(import.meta.resolve('@zamu/db/test/global-setup'))]
 // then in tests:
-//   import { sharedTestDatabaseUrl } from '@pm/db/test';
+//   import { sharedTestDatabaseUrl } from '@zamu/db/test';
 //   const { db, pool } = createDb(sharedTestDatabaseUrl());
 // Tests that need an empty database (first-run checks, for example) call createTestDatabase() instead.
 import type { TestProject } from 'vitest/node';

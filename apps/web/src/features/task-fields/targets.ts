@@ -1,4 +1,4 @@
-import type { TaskOwnedField } from '@pm/contracts';
+import type { TaskOwnedField } from '@zamu/contracts';
 import { bulkRefusal, type CachedTask } from '~/features/tasks/queries';
 
 // What a picker or a task key acts on: one task (the open or focused one) or a selection. Mirrored

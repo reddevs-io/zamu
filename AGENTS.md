@@ -1,6 +1,6 @@
-# project-management
+# Zamu
 
-Self-hosted, MIT-licensed project management tool for agent-driven development. Stack, scope and decisions live in the Memory Bank (`memory-bank/`).
+Zamu is a self-hosted, MIT-licensed project management tool for agent-driven development. Stack, scope and decisions live in the Memory Bank (`memory-bank/`).
 
 ## Planning
 

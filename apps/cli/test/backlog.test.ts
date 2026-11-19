@@ -1,4 +1,4 @@
-// pm with Backlog.md mirrors (M3), in-process against the real /api/v1 handler on a throwaway
+// zamu with Backlog.md mirrors (M3), in-process against the real /api/v1 handler on a throwaway
 // database: the dev seed with `backlog` (BACK "Payments API", mirrored through the real refresh
 // engine, so Backlog.md ids equal its app keys) and a second mirrored project MIRR from core's
 // fixtures, whose tasks keep Backlog.md ids BACK-786, BACK-786.1, BACK-786.1.2 and DRAFT-3 under the
@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type CliData, type CliResultName, parseCliOutput } from '@pm/contracts';
+import { type CliData, type CliResultName, parseCliOutput } from '@zamu/contracts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type Actor, createCycle, detachBacklog, type JobQueue } from '../../../packages/core/src/index';
 import { createMirroredProject } from '../../../packages/core/src/testing/backlog';
@@ -21,7 +21,7 @@ import { seedDevData } from '../../web/src/server/seed';
 import type { CliIo, FetchLike } from '../src/io';
 import { main } from '../src/main';
 
-const URL = 'http://pm.test';
+const URL = 'http://zamu.test';
 const SECRET = 'test-secret-test-secret-test-secret-0123';
 const ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
 const MIRR_REPOSITORY = 'https://gitlab.com/reddevs/mirr-payments';
@@ -49,14 +49,14 @@ interface RunResult {
   stderr: string;
 }
 
-async function pm(key: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
+async function zamu(key: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
   const out: string[] = [];
   const err: string[] = [];
   const io: CliIo = {
     stdout: (text) => out.push(text),
     stderr: (text) => err.push(text),
     readStdin: async () => '',
-    env: { XDG_CONFIG_HOME: join(home, 'xdg'), PM_URL: URL, PM_KEY: key, ...options.env },
+    env: { XDG_CONFIG_HOME: join(home, 'xdg'), ZAMU_URL: URL, ZAMU_KEY: key, ...options.env },
     homeDir: home,
     cwd: options.cwd ?? home,
     isTTY: options.tty ?? false,
@@ -68,7 +68,7 @@ async function pm(key: string, args: string[], options: RunOptions = {}): Promis
   return { code, stdout: out.join(''), stderr: err.join('') };
 }
 
-const agent = (args: string[], options?: RunOptions) => pm(keys.agent, args, options);
+const agent = (args: string[], options?: RunOptions) => zamu(keys.agent, args, options);
 
 function parsed<N extends CliResultName>(result: RunResult, name: N): CliData<N> {
   expect(result.code, result.stdout + result.stderr).toBe(0);
@@ -163,12 +163,12 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'pm-cli-backlog-'));
+  home = await mkdtemp(join(tmpdir(), 'zamu-cli-backlog-'));
   sent.length = 0;
   return () => rm(home, { recursive: true, force: true });
 });
 
-describe('pm backlog status', () => {
+describe('zamu backlog status', () => {
   it('prints the source of a mirrored project', async () => {
     const status = parsed(
       await agent(['backlog', 'status', '--project', 'back', '--json']),
@@ -190,7 +190,7 @@ describe('pm backlog status', () => {
     expect(human.stdout).toMatch(/Branch\s+main · folder backlog\n/);
     expect(human.stdout).toMatch(/Connection\s+GitLab \(demo\) · gitlab\.example\.com · Working\n/);
     expect(human.stdout).toMatch(/Last read\s+\d{4}-\d\d-\d\d \d\d:\d\d · [0-9a-f]{7}/);
-    expect(human.stdout).toContain('pm backlog status --problems lists them');
+    expect(human.stdout).toContain('zamu backlog status --problems lists them');
     expect(human.stdout).not.toContain('\nProblems\n');
   });
 
@@ -203,7 +203,7 @@ describe('pm backlog status', () => {
     expect(all.problems.items).toHaveLength(total);
     expect(all.problems.nextCursor).toBeNull();
 
-    // One problem per page: pm follows the cursors.
+    // One problem per page: zamu follows the cursors.
     let pages = 0;
     const onePerPage: FetchLike = (request) => {
       const url = new globalThis.URL(request.url);
@@ -232,9 +232,9 @@ describe('pm backlog status', () => {
     }
   });
 
-  it('finds the project from PM_PROJECT and from the clone remote', async () => {
+  it('finds the project from ZAMU_PROJECT and from the clone remote', async () => {
     const env = parsed(
-      await agent(['backlog', 'status', '--json'], { env: { PM_PROJECT: 'MIRR' } }),
+      await agent(['backlog', 'status', '--json'], { env: { ZAMU_PROJECT: 'MIRR' } }),
       'backlog.status',
     );
     expect(env.project.key).toBe('MIRR');
@@ -250,7 +250,7 @@ describe('pm backlog status', () => {
   });
 });
 
-describe('pm backlog refresh', () => {
+describe('zamu backlog refresh', () => {
   afterAll(async () => {
     await setSource('BACK', { state: 'warnings', last_error: null });
   });
@@ -267,7 +267,7 @@ describe('pm backlog refresh', () => {
     const human = await agent(['backlog', 'refresh', '--project', 'BACK']);
     expect(human.code, human.stderr).toBe(0);
     expect(human.stdout).toBe(
-      'Queued a refresh of BACK from Backlog.md.\npm backlog status shows the result; --wait waits for it.\n',
+      'Queued a refresh of BACK from Backlog.md.\nzamu backlog status shows the result; --wait waits for it.\n',
     );
   });
 
@@ -361,11 +361,11 @@ describe('pm backlog refresh', () => {
     expect(paused.status).toBe(409);
     const human = await agent(['backlog', 'refresh', '--project', 'BACK']);
     expect(human.code).toBe(6);
-    expect(human.stderr).toContain('pm: The Backlog.md mirror of BACK is paused: The token was rejected\n');
+    expect(human.stderr).toContain('zamu: The Backlog.md mirror of BACK is paused: The token was rejected\n');
     await setSource('BACK', { state: 'warnings', last_error: null });
 
     expectFailure(
-      await pm(keys.adminRead, ['backlog', 'refresh', '--project', 'BACK', '--json']),
+      await zamu(keys.adminRead, ['backlog', 'refresh', '--project', 'BACK', '--json']),
       4,
       'FORBIDDEN',
     );
@@ -391,7 +391,7 @@ describe('task keys: suffixes and Backlog.md ids', () => {
     expect(human.stdout).toMatch(/Backlog\.md hid the task: its file is gone \([0-9a-f]{7}\)/);
   });
 
-  it('looks a Backlog.md id up in --project, PM_PROJECT and .pm.json', async () => {
+  it('looks a Backlog.md id up in --project, ZAMU_PROJECT and .zamu.json', async () => {
     const flag = parsed(
       await agent(['tasks', 'show', 'BACK-786', '--project', 'MIRR', '--json']),
       'tasks.show',
@@ -401,13 +401,13 @@ describe('task keys: suffixes and Backlog.md ids', () => {
     const plain = parsed(await agent(['tasks', 'show', 'BACK-786', '--json']), 'tasks.show');
     expect(plain.task.key).toBe('BACK-786');
     const env = parsed(
-      await agent(['tasks', 'show', 'back-786.1.2', '--json'], { env: { PM_PROJECT: 'mirr' } }),
+      await agent(['tasks', 'show', 'back-786.1.2', '--json'], { env: { ZAMU_PROJECT: 'mirr' } }),
       'tasks.show',
     );
     expect(env.task.key).toBe('MIRR-786.1.2');
-    // An app key of another project is still found with PM_PROJECT set.
+    // An app key of another project is still found with ZAMU_PROJECT set.
     const other = parsed(
-      await agent(['tasks', 'show', 'PAY-1', '--json'], { env: { PM_PROJECT: 'MIRR' } }),
+      await agent(['tasks', 'show', 'PAY-1', '--json'], { env: { ZAMU_PROJECT: 'MIRR' } }),
       'tasks.show',
     );
     expect(other.task.key).toBe('PAY-1');
@@ -468,7 +468,7 @@ describe('Backlog.md mirror errors', () => {
         "error: BACK-786 is mirrored from Backlog.md, so its status can't change here (task_mirrored).",
         `  file:  ${problem.file} (main)`,
         '  edit the file and push, or run: backlog task edit 786 -s Done',
-        '  still allowed here: comments (pm comments add BACK-786) and cycles (pm tasks update BACK-786 --cycle <number>)',
+        '  still allowed here: comments (zamu comments add BACK-786) and cycles (zamu tasks update BACK-786 --cycle <number>)',
         '',
       ].join('\n'),
     );
@@ -488,7 +488,7 @@ describe('Backlog.md mirror errors', () => {
         "error: MIRR-786 is mirrored from Backlog.md, so its title can't change here (task_mirrored).",
         '  file:  backlog/tasks/back-786 - Retry-failed-webhook-deliveries.md (main)',
         `  edit the file and push, or run: ${problem.hint}`,
-        '  still allowed here: comments (pm comments add MIRR-786) and cycles (pm tasks update MIRR-786 --cycle 1)',
+        '  still allowed here: comments (zamu comments add MIRR-786) and cycles (zamu tasks update MIRR-786 --cycle 1)',
         '',
       ].join('\n'),
     );

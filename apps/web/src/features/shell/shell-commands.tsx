@@ -1,4 +1,4 @@
-import type { ProjectWithCounts, Theme } from '@pm/contracts';
+import type { ProjectWithCounts, Theme } from '@zamu/contracts';
 import { useMemo, useRef } from 'react';
 import { PROJECT_COMMAND_PREFIX } from '~/features/palette/CommandPalette';
 import { type Command, openPalette, useRegisterCommands } from '~/features/palette/registry';

@@ -177,12 +177,12 @@ importers:
       '@playwright/test':
         specifier: 1.64.1
         version: 1.64.1
-      '@pm/cli':
-        specifier: workspace:*
-        version: link:apps/cli
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
+      '@zamu/cli':
+        specifier: workspace:*
+        version: link:apps/cli
       oauth2-mock-server:
         specifier: 9.3.0
         version: 9.3.0
@@ -214,7 +214,7 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@pm/contracts':
+      '@zamu/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       tsdown:
@@ -250,18 +250,6 @@ importers:
       '@orpc/zod':
         specifier: 1.16.0
         version: 1.16.0(@opentelemetry/api@1.10.0)(@orpc/contract@1.16.0(@opentelemetry/api@1.10.0))(@orpc/server@1.16.0(@opentelemetry/api@1.10.0)(crossws@0.4.15(srvx@1.0.6)))(crossws@0.4.15(srvx@1.0.6))(zod@4.6.7)
-      '@pm/auth':
-        specifier: workspace:*
-        version: link:../../packages/auth
-      '@pm/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@pm/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@pm/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       '@tanstack/react-query':
         specifier: 5.104.5
         version: 5.104.5(@types/react@19.3.0)(react@19.3.1)
@@ -274,6 +262,18 @@ importers:
       '@tanstack/react-start':
         specifier: 1.169.3
         version: 1.169.3(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.15)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+      '@zamu/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@zamu/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@zamu/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@zamu/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       better-auth:
         specifier: 1.7.12
         version: 1.7.12(@opentelemetry/api@1.10.0)(drizzle-orm@1.0.0-rc.5(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.7))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -353,10 +353,10 @@ importers:
       '@opentelemetry/api':
         specifier: 1.10.0
         version: 1.10.0
-      '@pm/core':
+      '@zamu/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@pm/db':
+      '@zamu/db':
         specifier: workspace:*
         version: link:../../packages/db
       pg-boss:
@@ -371,7 +371,7 @@ importers:
       '@better-auth/api-key':
         specifier: 1.7.12
         version: 1.7.12(@better-auth/core@1.7.12(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.2)(@opentelemetry/api@1.10.0)(better-call@1.4.4(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.5.0)(better-auth@1.7.12(@opentelemetry/api@1.10.0)(drizzle-orm@1.0.0-rc.5(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.7))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(better-call@1.4.4(zod@4.6.7))
-      '@pm/db':
+      '@zamu/db':
         specifier: workspace:*
         version: link:../db
       better-auth:
@@ -412,19 +412,19 @@ importers:
       '@opentelemetry/api':
         specifier: 1.10.0
         version: 1.10.0
-      '@pm/auth':
+      '@zamu/auth':
         specifier: workspace:*
         version: link:../auth
-      '@pm/backlog-md':
+      '@zamu/backlog-md':
         specifier: workspace:*
         version: link:../backlog-md
-      '@pm/contracts':
+      '@zamu/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@pm/db':
+      '@zamu/db':
         specifier: workspace:*
         version: link:../db
-      '@pm/git-providers':
+      '@zamu/git-providers':
         specifier: workspace:*
         version: link:../git-providers
       better-auth:

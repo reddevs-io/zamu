@@ -7,7 +7,7 @@ export const migrationsFolder = fileURLToPath(new URL('../migrations', import.me
 
 /**
  * Applies every pending migration to the database at `url`, then closes its connections.
- * Used by `pnpm --filter @pm/db migrate`, the Docker "migrate" entrypoint and the test helper.
+ * Used by `pnpm --filter @zamu/db migrate`, the Docker "migrate" entrypoint and the test helper.
  */
 export async function migrate(url: string): Promise<void> {
   const { db, pool } = createDb(url, { max: 1 });

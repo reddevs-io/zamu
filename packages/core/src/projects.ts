@@ -15,8 +15,8 @@ import {
   parseRepositoryUrl,
   UpdateProjectInput,
   type UserRef,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, can } from './authz';

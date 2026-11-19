@@ -1,5 +1,5 @@
-import { createDb } from '@pm/db';
 import { createFileRoute } from '@tanstack/react-router';
+import { createDb } from '@zamu/db';
 
 // Liveness and readiness probe used by the Docker HEALTHCHECK, docker compose and CI.
 // 200 { status: "ok" } when Postgres answers SELECT 1, 503 { status: "error" } otherwise.

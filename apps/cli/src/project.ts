@@ -1,5 +1,5 @@
-// Which project a command works on when it needs one: --project, then PM_PROJECT, then the nearest
-// .pm.json, then the project whose repository matches this clone's git remote. Also the git facts
+// Which project a command works on when it needs one: --project, then ZAMU_PROJECT, then the nearest
+// .zamu.json, then the project whose repository matches this clone's git remote. Also the git facts
 // behind it (repository root, remote URL), read with the git binary.
 import { execFile } from 'node:child_process';
 import { readFile, realpath } from 'node:fs/promises';
@@ -12,7 +12,7 @@ import {
   ProjectList,
   parseRepositoryUrl,
   toProblemIssues,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { CommandContext } from './context';
 import { usageError } from './errors';
 import type { CliIo } from './io';
@@ -54,7 +54,7 @@ export interface FoundProjectFile {
 }
 
 /**
- * The nearest .pm.json from the working directory up to the git root (the filesystem root outside a
+ * The nearest .zamu.json from the working directory up to the git root (the filesystem root outside a
  * repository). A file that is not valid JSON or has other fields is a usage error.
  */
 export async function findProjectFile(io: Pick<CliIo, 'cwd'>): Promise<FoundProjectFile | null> {
@@ -83,19 +83,19 @@ export function parseProjectFile(path: string, text: string): ProjectFile {
   }
   const parsed = ProjectFile.safeParse(json);
   if (!parsed.success) {
-    throw usageError(`${path} is not a valid pm project file.`, toProblemIssues(parsed.error.issues), [
+    throw usageError(`${path} is not a valid zamu project file.`, toProblemIssues(parsed.error.issues), [
       'It holds one field: { "project": "PAY" }',
     ]);
   }
   return parsed.data;
 }
 
-/** The project key in PM_PROJECT, upper-cased. A value that is not a key is a usage error. */
+/** The project key in ZAMU_PROJECT, upper-cased. A value that is not a key is a usage error. */
 function envProject(io: Pick<CliIo, 'env'>): string | null {
-  const value = io.env.PM_PROJECT?.trim();
+  const value = io.env.ZAMU_PROJECT?.trim();
   if (!value) return null;
   const parsed = ProjectKeyInput.safeParse(value);
-  if (!parsed.success) throw usageError(`PM_PROJECT is not a project key: ${value}`);
+  if (!parsed.success) throw usageError(`ZAMU_PROJECT is not a project key: ${value}`);
   return parsed.data;
 }
 
@@ -150,9 +150,9 @@ export async function requireProject(context: CommandContext, flag?: string): Pr
     [{ path: 'project', message: detail }],
     [
       repository
-        ? 'Pass --project KEY, or link this clone once: pm link --project KEY'
-        : 'Inside a clone, pm link --project KEY links the repository so pm finds the project itself.',
-      'PM_PROJECT or a committed .pm.json ({ "project": "KEY" }) also set it.',
+        ? 'Pass --project KEY, or link this clone once: zamu link --project KEY'
+        : 'Inside a clone, zamu link --project KEY links the repository so zamu finds the project itself.',
+      'ZAMU_PROJECT or a committed .zamu.json ({ "project": "KEY" }) also set it.',
     ],
   );
 }

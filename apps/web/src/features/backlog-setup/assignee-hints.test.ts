@@ -1,9 +1,9 @@
-import type { BacklogMappingsView } from '@pm/contracts';
+import type { BacklogMappingsView } from '@zamu/contracts';
 import {
   normalizeName as coreNormalizeName,
   type MemberCandidate,
   matchAssigneeByName,
-} from '@pm/core/backlog/mappings';
+} from '@zamu/core/backlog/mappings';
 import { describe, expect, it } from 'vitest';
 import {
   inviteHint,

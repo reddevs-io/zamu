@@ -3,9 +3,10 @@
 // the key and the milestones switch are locked and say why; the repository can only be cleared, which
 // pauses the mirror. Owners and admins get the danger zone with Delete project (PM-12). No web address
 // and no archive in M5 (design notes, "Answered by the product owner").
-import { parseRepositoryUrl, UpdateProjectInput } from '@pm/contracts';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { parseRepositoryUrl, UpdateProjectInput } from '@zamu/contracts';
 import { type FormEvent, type ReactNode, useRef, useState } from 'react';
 import { useProjectSummary } from '~/features/project-header';
 import { meQuery } from '~/features/projects/queries';

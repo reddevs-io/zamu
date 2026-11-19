@@ -2,7 +2,7 @@
 // rules shared by the refresh planner; the backfill migration
 // (packages/db/migrations/20261104110039_m5_backfill_mirrors) repeats them in SQL, so keep the two
 // in step.
-import { LABEL_COLOR_COUNT, MAX_LABEL_NAME_LENGTH } from '@pm/contracts';
+import { LABEL_COLOR_COUNT, MAX_LABEL_NAME_LENGTH } from '@zamu/contracts';
 
 /**
  * The due date a task gets from its block: the value when it is a real YYYY-MM-DD day (year 1 or

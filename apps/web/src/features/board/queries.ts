@@ -1,10 +1,10 @@
-import type { ListTasksInput, TaskListPage, TaskStatus } from '@pm/contracts';
 import {
   type InfiniteData,
   infiniteQueryOptions,
   type QueryClient,
   type QueryKey,
 } from '@tanstack/react-query';
+import type { ListTasksInput, TaskListPage, TaskStatus } from '@zamu/contracts';
 import type { z } from 'zod';
 import { retryOnce, withTimeout } from '~/features/tasks/errors';
 import { REQUEST_TIMEOUT_MS } from '~/features/tasks/queries';

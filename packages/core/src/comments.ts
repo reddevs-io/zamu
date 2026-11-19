@@ -11,8 +11,8 @@ import {
   ListCommentsInput,
   MAX_COMMENT_LENGTH,
   UpdateCommentInput,
-} from '@pm/contracts';
-import { type DbOrTx, schema, type Tx } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema, type Tx } from '@zamu/db';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize } from './authz';

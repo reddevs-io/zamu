@@ -1,15 +1,3 @@
-import type {
-  GetHomeInput,
-  Home,
-  HomeAgent,
-  HomeGroup,
-  HomeItem,
-  HomeTab,
-  Me,
-  TaskListItem,
-  UserRef,
-} from '@pm/contracts';
-import { HOME_GROUPS_BY_TAB } from '@pm/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -21,6 +9,18 @@ import {
 } from '@tanstack/react-router';
 import { act, configure, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type {
+  GetHomeInput,
+  Home,
+  HomeAgent,
+  HomeGroup,
+  HomeItem,
+  HomeTab,
+  Me,
+  TaskListItem,
+  UserRef,
+} from '@zamu/contracts';
+import { HOME_GROUPS_BY_TAB } from '@zamu/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closePeek, usePeek } from '~/features/peek/store';
 import { readTaskNavigation } from '~/features/views';

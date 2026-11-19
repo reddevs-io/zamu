@@ -1,4 +1,4 @@
-import type { TaskListItem, TaskListPage, TaskStatus } from '@pm/contracts';
+import type { TaskListItem, TaskListPage, TaskStatus } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import { cycleElapsed, cycleNote, projectViewHref } from '~/features/project-header/tabs';
 import {

@@ -149,7 +149,7 @@ export type ProblemData = z.infer<typeof ProblemData>;
  * Error body of every /api/v1 response with a 4xx or 5xx status, after RFC 9457 (problem details)
  * with these extensions: `code`, `requestId`, `issues`, `task` for TASK_CHANGED, `field`, `file`,
  * `backlogId`, `hint` for the *_MIRRORED codes (M3), and `loop` for DEPENDENCY_LOOP (M5). The CLI
- * prints it under `pm.v1.error`.
+ * prints it under `zamu.v1.error`.
  */
 export const Problem = z.object({
   type: z.string().default('about:blank'),

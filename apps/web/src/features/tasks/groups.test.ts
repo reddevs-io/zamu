@@ -1,5 +1,5 @@
-import { TaskListItem } from '@pm/contracts';
-import { taskListItemFixture } from '@pm/contracts/testing/fixtures';
+import { TaskListItem } from '@zamu/contracts';
+import { taskListItemFixture } from '@zamu/contracts/testing/fixtures';
 import { describe, expect, it } from 'vitest';
 import { buildListGroups } from './groups';
 

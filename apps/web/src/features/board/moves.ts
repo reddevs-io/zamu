@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client';
-import { TASK_CHANGED, type Task, type TaskListItem, type TaskStatus } from '@pm/contracts';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
+import { TASK_CHANGED, type Task, type TaskListItem, type TaskStatus } from '@zamu/contracts';
 import { useCallback, useRef, useState } from 'react';
 import { dismissFieldToast, showFieldToast } from '~/features/task-fields/toast';
 import { describeError } from '~/features/tasks/errors';

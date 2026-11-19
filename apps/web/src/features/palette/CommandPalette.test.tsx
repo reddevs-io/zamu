@@ -232,7 +232,7 @@ describe('command palette', () => {
       rememberTask('u1', { key: `PAY-${n}`, title: `Task ${n}`, status: 'todo', projectName: 'Payments' });
     }
     rememberTask('u1', { key: 'PAY-4', title: 'Task 4', status: 'todo', projectName: 'Payments' });
-    const saved = JSON.parse(window.localStorage.getItem('pm.palette.recent:u1') ?? '[]') as {
+    const saved = JSON.parse(window.localStorage.getItem('zamu.palette.recent:u1') ?? '[]') as {
       key: string;
     }[];
     expect(saved.map((task) => task.key)).toEqual(['PAY-4', 'PAY-7', 'PAY-6', 'PAY-5', 'PAY-3']);

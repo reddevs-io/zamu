@@ -2,16 +2,16 @@
 // error mapping first, then the actor. Both run before input validation, so a request without
 // credentials gets 401 even when its input is also wrong.
 import { implement } from '@orpc/server';
-import { getActorFromRequest } from '@pm/auth';
-import { contract } from '@pm/contracts';
-import type { Actor, CoreContext } from '@pm/core';
+import { getActorFromRequest } from '@zamu/auth';
+import { contract } from '@zamu/contracts';
+import type { Actor, CoreContext } from '@zamu/core';
 import { toApiError } from './errors';
 
 /** What each call starts with. HTTP handlers and the server-side client build it per request. */
 export interface ApiContext {
   /** Database, Better Auth and links, shared by the process. */
   core: CoreContext;
-  /** Request headers: the session cookie or `Authorization: Bearer pm_live_...`. */
+  /** Request headers: the session cookie or `Authorization: Bearer zamu_live_...`. */
   headers: Headers;
   /** Echoed in error bodies and the x-request-id header. */
   requestId?: string;
@@ -36,7 +36,7 @@ const authenticated = os.middleware(async ({ context, next, errors }) => {
   const actor = await getActorFromRequest(context.core, { headers: context.headers });
   if (!actor) {
     throw errors.UNAUTHORIZED({
-      message: 'Sign in, or send an API key as Authorization: Bearer pm_live_...',
+      message: 'Sign in, or send an API key as Authorization: Bearer zamu_live_...',
       data: {},
     });
   }

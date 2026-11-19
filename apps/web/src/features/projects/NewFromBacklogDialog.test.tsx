@@ -1,7 +1,7 @@
-import type { BacklogDetection, GitConnection } from '@pm/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { BacklogDetection, GitConnection } from '@zamu/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsError } from '~/features/settings/result';
 import {
@@ -122,7 +122,7 @@ describe('NewFromBacklogDialog', () => {
     expect(key().value).toBe('PAY');
 
     await user.clear(repository());
-    await user.type(repository(), 'http://localhost:3300/pm-admin/notes-sync');
+    await user.type(repository(), 'http://localhost:3300/zamu-admin/notes-sync');
     expect(within(connection()).getByText('Forgejo local')).toBeInTheDocument();
     expect(name().value).toBe('notes-sync');
   });

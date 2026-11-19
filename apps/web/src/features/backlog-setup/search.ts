@@ -1,4 +1,4 @@
-import { BACKLOG_MODES, type BacklogMode } from '@pm/contracts';
+import { BACKLOG_MODES, type BacklogMode } from '@zamu/contracts';
 
 // Search params of the Backlog.md setup route, so a reload keeps the step:
 //

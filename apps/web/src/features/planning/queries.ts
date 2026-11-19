@@ -1,3 +1,4 @@
+import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateCycleInput,
   CreateMilestoneInput,
@@ -5,8 +6,7 @@ import type {
   EndCycleInput,
   UpdateCycleInput,
   UpdateMilestoneInput,
-} from '@pm/contracts';
-import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import type { z } from 'zod';
 import { retryOnce } from '~/features/tasks/errors';
 import { client, orpc } from '~/lib/orpc';

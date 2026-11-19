@@ -1,4 +1,4 @@
-import type { Theme } from '@pm/contracts';
+import type { Theme } from '@zamu/contracts';
 import { useState } from 'react';
 import {
   Button as AriaButton,

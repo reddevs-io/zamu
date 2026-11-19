@@ -7,9 +7,9 @@
 import { OpenAPIHandler } from '@orpc/openapi/fetch';
 import { ORPCError } from '@orpc/server';
 import { RPCHandler } from '@orpc/server/fetch';
-import { bearerApiKey } from '@pm/auth';
-import { API_PREFIX, encodeProblem, type Problem, problem } from '@pm/contracts';
-import type { CoreContext } from '@pm/core';
+import { bearerApiKey } from '@zamu/auth';
+import { API_PREFIX, encodeProblem, type Problem, problem } from '@zamu/contracts';
+import type { CoreContext } from '@zamu/core';
 import type { ApiContext } from './base';
 import { getOpenApiDocument, OPENAPI_PATH } from './openapi';
 import { router } from './router';

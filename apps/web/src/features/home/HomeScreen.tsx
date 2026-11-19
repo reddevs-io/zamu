@@ -1,6 +1,6 @@
-import type { Home, HomeGroup, HomeGroupKey, HomeItem, HomeTab } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
+import type { Home, HomeGroup, HomeGroupKey, HomeItem, HomeTab } from '@zamu/contracts';
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { togglePeek, usePeek } from '~/features/peek/store';
 import { usePageSearchRef } from '~/features/shell/page-search';

@@ -1,5 +1,5 @@
 // Settings (refresh requests, webhook info, detach, folder, connection) and the status shape.
-import { schema } from '@pm/db';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BacklogDetached, BacklogPaused, Conflict, Forbidden, Invalid } from '../errors';

@@ -3,9 +3,9 @@
 // helpers, the /api/v1 handler, server functions, the webhook route and server-side oRPC calls all
 // share it.
 // Framework-free on purpose: tests and scripts import it without TanStack Start.
-import { type Auth, createAuth } from '@pm/auth';
-import type { CoreContext } from '@pm/core';
-import { createDb, type Db, type DbHandle } from '@pm/db';
+import { type Auth, createAuth } from '@zamu/auth';
+import type { CoreContext } from '@zamu/core';
+import { createDb, type Db, type DbHandle } from '@zamu/db';
 import { readServerConfig, type ServerEnv } from './config';
 import { createJobProducer, type JobProducer } from './jobs';
 
@@ -31,7 +31,7 @@ export function createServerContext(env: ServerEnv = process.env): ServerContext
   const auth = createAuth({ db, secret: config.secret, baseUrl: config.baseUrl, config: config.auth });
   const jobs = createJobProducer(config.databaseUrl);
   // PUBLIC_URL builds invitation and webhook links; it matches BETTER_AUTH_URL unless a proxy says
-  // otherwise. Git: core's default provider factory (@pm/git-providers createProvider) is used.
+  // otherwise. Git: core's default provider factory (@zamu/git-providers createProvider) is used.
   return {
     db,
     auth,
@@ -44,7 +44,7 @@ export function createServerContext(env: ServerEnv = process.env): ServerContext
   };
 }
 
-const globalKey = Symbol.for('pm.web.serverContext');
+const globalKey = Symbol.for('zamu.web.serverContext');
 type GlobalWithContext = typeof globalThis & { [globalKey]?: ServerContext };
 
 /**

@@ -1,4 +1,4 @@
-import type { TaskListItem } from '@pm/contracts';
+import type { TaskListItem } from '@zamu/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   BOARD_STATUS_ORDER,

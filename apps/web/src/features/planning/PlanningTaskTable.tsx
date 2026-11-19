@@ -1,6 +1,6 @@
-import type { TaskListItem, TaskStatus } from '@pm/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
+import type { TaskListItem, TaskStatus } from '@zamu/contracts';
 import { type MouseEvent, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-aria-components';
 import { togglePeek } from '~/features/peek/store';

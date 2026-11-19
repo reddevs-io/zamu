@@ -1,5 +1,5 @@
 // M5 labels: CRUD in project settings, created on use by task writes, locked names for Backlog.md.
-import { schema } from '@pm/db';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listTaskActivity } from './activity';

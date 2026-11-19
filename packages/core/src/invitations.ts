@@ -1,13 +1,13 @@
 // Invitations: copyable links, no email in M1. Rows live in Better Auth's invitation table, so the
-// organization plugin and the sign-up guard in @pm/auth see them.
-import { INVITATION_EXPIRES_IN_SECONDS } from '@pm/auth';
+// organization plugin and the sign-up guard in @zamu/auth see them.
+import { INVITATION_EXPIRES_IN_SECONDS } from '@zamu/auth';
 import {
   CancelInvitationInput,
   CreateInvitationInput,
   Invitation,
   type InvitationStatus,
-} from '@pm/contracts';
-import { type DbOrTx, schema } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema } from '@zamu/db';
 import { and, desc, eq, lte, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { type Actor, authorize, can } from './authz';

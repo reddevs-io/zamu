@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query';
 import {
   type AssigneeRef,
   OPEN_TASK_STATUSES,
@@ -5,8 +6,7 @@ import {
   type Priority,
   TASK_STATUS_LABELS,
   TASK_STATUSES,
-} from '@pm/contracts';
-import type { QueryClient } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import { labelsQuery } from '~/features/labels/queries';
 import type { Command, PaletteStep } from '~/features/palette/registry';
 import { cyclesQuery, membersQuery, milestonesQuery, relatedOf, taskQuery } from '~/features/tasks/queries';

@@ -12,7 +12,7 @@ export interface CliIo {
   env: Record<string, string | undefined>;
   /** Home directory, used when XDG_CONFIG_HOME is not set. */
   homeDir: string;
-  /** Working directory: where pm looks for .pm.json, the git remote and AGENTS.md. */
+  /** Working directory: where zamu looks for .zamu.json, the git remote and AGENTS.md. */
   cwd: string;
   /** stdout is a terminal: colour and column truncation are allowed. */
   isTTY: boolean;
@@ -20,7 +20,7 @@ export interface CliIo {
   columns?: number;
   /** Replaces the global fetch (tests pass the in-process API handler). */
   fetch?: FetchLike;
-  /** Waits between polls (pm backlog refresh --wait). Default: a timer. Tests pass a fake. */
+  /** Waits between polls (zamu backlog refresh --wait). Default: a timer. Tests pass a fake. */
   sleep?: (ms: number) => Promise<void>;
   /** Current time in milliseconds. Default: Date.now. */
   now?: () => number;

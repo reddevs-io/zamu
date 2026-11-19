@@ -1,5 +1,5 @@
-import type { StatusCounts, TaskListItem, TaskStatus } from '@pm/contracts';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import type { StatusCounts, TaskListItem, TaskStatus } from '@zamu/contracts';
 import { useEffect, useMemo } from 'react';
 import { taskListQuery } from '~/features/tasks/queries';
 import { type DisplayOptions, hideOldDone, type TaskFilter } from '~/features/views';

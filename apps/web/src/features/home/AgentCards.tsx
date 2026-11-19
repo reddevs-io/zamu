@@ -1,5 +1,5 @@
-import type { HomeAgent } from '@pm/contracts';
 import { Link } from '@tanstack/react-router';
+import type { HomeAgent } from '@zamu/contracts';
 import { Avatar, cn, Pill } from '~/ui';
 import { actionText, actsForText, agoText, forText } from './format';
 

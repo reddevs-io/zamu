@@ -1,4 +1,4 @@
-// pnpm --filter @pm/db migrate: applies pending migrations to DATABASE_URL.
+// pnpm --filter @zamu/db migrate: applies pending migrations to DATABASE_URL.
 import { migrate } from '../src/migrate';
 
 const url = process.env.DATABASE_URL;

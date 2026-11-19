@@ -1,4 +1,4 @@
-// Public API of @pm/auth. Server-only: never import it from client code.
+// Public API of @zamu/auth. Server-only: never import it from client code.
 export * from './actor';
 export * from './api-key';
 export * from './auth';

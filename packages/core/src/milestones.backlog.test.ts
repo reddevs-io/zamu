@@ -1,6 +1,6 @@
 // M3: milestones of a project mirrored from Backlog.md are read-only in the app.
-import { MILESTONE_OWNED_FIELDS } from '@pm/contracts';
-import { schema } from '@pm/db';
+import { MILESTONE_OWNED_FIELDS } from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MilestoneMirrored, mirroredExtensions } from './errors';

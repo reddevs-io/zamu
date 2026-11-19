@@ -1,4 +1,4 @@
-import { type Db, type DbOrTx, schema } from '@pm/db';
+import { type Db, type DbOrTx, schema } from '@zamu/db';
 import { asc, sql } from 'drizzle-orm';
 import type { Auth } from './auth';
 import { MIN_PASSWORD_LENGTH } from './options';

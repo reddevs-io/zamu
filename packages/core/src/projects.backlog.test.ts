@@ -1,7 +1,7 @@
 // M3: project shapes carry the Backlog.md source; an active source constrains key, repository and
 // the milestones switch.
-import { PROJECT_OWNED_FIELDS } from '@pm/contracts';
-import { schema } from '@pm/db';
+import { PROJECT_OWNED_FIELDS } from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mirroredExtensions, ProjectMirrored } from './errors';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readWorkerConfig, WorkerConfigError, type WorkerEnv } from './config';
 
-const BASE: WorkerEnv = { DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/pm' };
+const BASE: WorkerEnv = { DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/zamu' };
 
 function problems(env: WorkerEnv): string[] {
   try {

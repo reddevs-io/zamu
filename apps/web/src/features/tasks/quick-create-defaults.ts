@@ -1,4 +1,4 @@
-import { CYCLE_CURRENT, CYCLE_NEXT, type Cycle, type MilestoneWithProgress } from '@pm/contracts';
+import { CYCLE_CURRENT, CYCLE_NEXT, type Cycle, type MilestoneWithProgress } from '@zamu/contracts';
 
 // Quick create prefills milestone and cycle from the page it opened on:
 //   /p/PAY/milestones/<id>          the milestone

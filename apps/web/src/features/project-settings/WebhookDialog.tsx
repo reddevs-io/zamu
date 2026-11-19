@@ -1,8 +1,9 @@
 // "Refresh on every push" (frames 2k, 2l): the webhook URL and secret to paste into the repository,
 // steps per provider, and the last notification, polled every 5 seconds while the dialog is open.
 // "New secret" issues another secret (PM-9), also when the stored one can't be read.
-import type { BacklogWebhookInfo, BacklogWebhookSecret, GitProvider } from '@pm/contracts';
+
 import { useQuery } from '@tanstack/react-query';
+import type { BacklogWebhookInfo, BacklogWebhookSecret, GitProvider } from '@zamu/contracts';
 import { type ReactNode, useState } from 'react';
 import { useNow } from '~/features/tasks/clock';
 import {

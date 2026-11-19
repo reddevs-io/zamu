@@ -1,9 +1,9 @@
-import { BacklogMappings } from '@pm/contracts';
+import { BacklogMappings } from '@zamu/contracts';
 
 // Mappings picked during setup, kept in session storage per project so a reload on Mappings or
 // Preview keeps them. Cleared once the source is created.
 
-const keyFor = (projectKey: string) => `pm.backlog-setup.mappings.${projectKey}`;
+const keyFor = (projectKey: string) => `zamu.backlog-setup.mappings.${projectKey}`;
 
 function storage(): Storage | null {
   try {

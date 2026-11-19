@@ -25,8 +25,5 @@ blob-report/
 *.log
 .idea/
 
-# pnpm store used in CI
-.pnpm-store/
-
 # Local implementation screenshots from design checks
 .agent/design/*/impl/

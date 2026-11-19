@@ -1,6 +1,6 @@
-import { FILTER_NONE, type TaskListItem, type TaskStatus } from '@pm/contracts';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useRouter } from '@tanstack/react-router';
+import { FILTER_NONE, type TaskListItem, type TaskStatus } from '@zamu/contracts';
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { labelsQuery } from '~/features/labels/queries';
 import { useRegisterCommands } from '~/features/palette/registry';

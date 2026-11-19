@@ -3,7 +3,7 @@
 // @email; core rewrites those to the link form before saving. Only members of the actor's
 // workspace count: a mention link to anyone else loses its link and keeps its text. Nothing inside
 // code (inline spans or fenced blocks) is read or rewritten.
-import { type DbOrTx, schema } from '@pm/db';
+import { type DbOrTx, schema } from '@zamu/db';
 import { and, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
 
 export const MENTION_SCHEME = 'mention:';

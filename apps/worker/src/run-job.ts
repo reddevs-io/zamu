@@ -6,8 +6,8 @@ import {
   type JobName,
   type JobQueue,
   runJob as runCoreJob,
-} from '@pm/core';
-import type { Db } from '@pm/db';
+} from '@zamu/core';
+import type { Db } from '@zamu/db';
 import type { Logger } from './logger';
 
 /** The fields of a pg-boss job the worker uses. */

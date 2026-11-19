@@ -31,7 +31,7 @@ export const Route = createFileRoute('/_app/p/$projectKey/')({
   loaderDeps: ({ search }) => search,
   loader: ({ context, params, deps }) =>
     settleOnServer(prefetchTaskList(context.queryClient, params.projectKey, deps)),
-  head: ({ params }) => ({ meta: [{ title: `${params.projectKey} · project-management` }] }),
+  head: ({ params }) => ({ meta: [{ title: `${params.projectKey} · Zamu` }] }),
   component: TaskListRoute,
 });
 

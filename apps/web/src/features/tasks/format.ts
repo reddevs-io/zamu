@@ -1,4 +1,4 @@
-import type { Activity, ActivityChange, Priority, TaskStatus } from '@pm/contracts';
+import type { Activity, ActivityChange, Priority, TaskStatus } from '@zamu/contracts';
 import { PRIORITY_LABELS, STATUS_LABELS } from '~/ui';
 
 // Display helpers for the task screens: short times, activity sentences and Markdown checkbox lists.

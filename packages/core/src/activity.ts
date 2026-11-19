@@ -14,8 +14,8 @@ import {
   type ProjectActivityType,
   type TaskActivityType,
   type TaskStatus,
-} from '@pm/contracts';
-import { type DbOrTx, schema, type Tx } from '@pm/db';
+} from '@zamu/contracts';
+import { type DbOrTx, schema, type Tx } from '@zamu/db';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from './authz';

@@ -5,7 +5,7 @@ import { cn } from '~/ui';
 // column centred on the page background, the workspace mark on top, and the server's address at the bottom.
 
 /** Brand shown before the instance has a workspace. */
-export const PRODUCT_NAME = 'project-management';
+export const PRODUCT_NAME = 'Zamu';
 
 const noSubscribe = () => () => {};
 
@@ -97,7 +97,7 @@ export function ApiKeyHint() {
     <p className="m-0 border-t border-line-soft pt-4 text-xs text-fg-3">
       Agents and scripts sign in with an API key instead:{' '}
       <code className="rounded-sm bg-bg-lane px-1 py-px font-mono whitespace-nowrap text-fg-2">
-        {'pm login --key <key>'}
+        {'zamu login --key <key>'}
       </code>
     </p>
   );

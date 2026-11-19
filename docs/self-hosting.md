@@ -1,6 +1,6 @@
 # Self-hosting
 
-project-management runs as one Docker image with three roles, started by `docker-compose.yml`:
+Zamu runs as one Docker image with three roles, started by `docker-compose.yml`:
 
 | Service   | What it does                                                                               |
 | --------- | ------------------------------------------------------------------------------------------ |
@@ -21,27 +21,27 @@ project-management runs as one Docker image with three roles, started by `docker
 ## Configure
 
 ```sh
-git clone https://gitlab.com/reddevsdotio/tooling/project-management.git
-cd project-management
+git clone https://github.com/reddevs-io/zamu.git
+cd zamu
 cp .env.example .env
 ```
 
 Edit `.env`:
 
-| Variable                  | Required | Default                    | Meaning                                                                                                                       |
-| ------------------------- | -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `BETTER_AUTH_SECRET`      | yes      | none                       | Signs sessions. 32 characters or more: `openssl rand -base64 32`. Without it, compose and the image refuse to start.          |
-| `BETTER_AUTH_URL`         | no       | `http://localhost:3000`    | The URL people type in their browser. Sign-in fails when it does not match.                                                   |
-| `PUBLIC_URL`              | no       | `http://localhost:3000`    | Base URL for invitation links. Use the same value as `BETTER_AUTH_URL`.                                                       |
-| `PORT`                    | no       | `3000`                     | Host port the web app is published on.                                                                                        |
-| `POSTGRES_USER`           | no       | `postgres`                 | Database user.                                                                                                                |
-| `POSTGRES_PASSWORD`       | no       | `postgres`                 | Database password. Set it before the first start: Postgres only reads it when it creates the volume.                          |
-| `POSTGRES_DB`             | no       | `project_management`       | Database name.                                                                                                                |
-| `PM_IMAGE`                | no       | `project-management:local` | Tag of the image compose builds and runs.                                                                                     |
-| `APP_TIME_ZONE`           | no       | `UTC`                      | IANA time zone, such as `Europe/Brussels`. Decides when "today" starts for cycles. See below.                                 |
-| `APP_ENCRYPTION_KEY`      | no       | none                       | Encrypts git tokens. Without it, git connections and Backlog.md mirrors are off. See [below](#git-connections-and-backlogmd). |
-| `GIT_ALLOW_PRIVATE_HOSTS` | no       | `false`                    | `true` lets git connections reach hosts on private networks.                                                                  |
-| `GIT_HTTP_HOSTS`          | no       | none                       | Comma-separated git hosts reached over plain HTTP. For test containers only.                                                  |
+| Variable                  | Required | Default                 | Meaning                                                                                                                       |
+| ------------------------- | -------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_SECRET`      | yes      | none                    | Signs sessions. 32 characters or more: `openssl rand -base64 32`. Without it, compose and the image refuse to start.          |
+| `BETTER_AUTH_URL`         | no       | `http://localhost:3000` | The URL people type in their browser. Sign-in fails when it does not match.                                                   |
+| `PUBLIC_URL`              | no       | `http://localhost:3000` | Base URL for invitation links. Use the same value as `BETTER_AUTH_URL`.                                                       |
+| `PORT`                    | no       | `3000`                  | Host port the web app is published on.                                                                                        |
+| `POSTGRES_USER`           | no       | `postgres`              | Database user.                                                                                                                |
+| `POSTGRES_PASSWORD`       | no       | `postgres`              | Database password. Set it before the first start: Postgres only reads it when it creates the volume.                          |
+| `POSTGRES_DB`             | no       | `zamu`                  | Database name.                                                                                                                |
+| `ZAMU_IMAGE`              | no       | `zamu:local`            | Tag of the image compose builds and runs.                                                                                     |
+| `APP_TIME_ZONE`           | no       | `UTC`                   | IANA time zone, such as `Europe/Brussels`. Decides when "today" starts for cycles. See below.                                 |
+| `APP_ENCRYPTION_KEY`      | no       | none                    | Encrypts git tokens. Without it, git connections and Backlog.md mirrors are off. See [below](#git-connections-and-backlogmd). |
+| `GIT_ALLOW_PRIVATE_HOSTS` | no       | `false`                 | `true` lets git connections reach hosts on private networks.                                                                  |
+| `GIT_HTTP_HOSTS`          | no       | none                    | Comma-separated git hosts reached over plain HTTP. For test containers only.                                                  |
 
 `DATABASE_URL` and `TEST_DATABASE_URL` in `.env` are for local development. Compose ignores them: the
 containers reach Postgres as `db` on their own network.
@@ -91,7 +91,7 @@ lost or changed:
 - webhooks of existing mirrors stop working, because their secrets cannot be read. The webhook dialog in the
   project's Settings > Backlog.md says so; an owner or admin presses New secret there and pastes the new
   secret into the git host. The URL stays the same. Until then those mirrors still refresh every hour, on
-  Refresh now, and with `pm backlog refresh`.
+  Refresh now, and with `zamu backlog refresh`.
 
 There is no key rotation. Keep the same key for the life of the server.
 
@@ -130,12 +130,12 @@ services:
     environment:
       NODE_EXTRA_CA_CERTS: /certs/internal-ca.pem
     volumes:
-      - /etc/pm/internal-ca.pem:/certs/internal-ca.pem:ro
+      - /etc/zamu/internal-ca.pem:/certs/internal-ca.pem:ro
   worker:
     environment:
       NODE_EXTRA_CA_CERTS: /certs/internal-ca.pem
     volumes:
-      - /etc/pm/internal-ca.pem:/certs/internal-ca.pem:ro
+      - /etc/zamu/internal-ca.pem:/certs/internal-ca.pem:ro
 ```
 
 Keep the certificate outside the checkout and readable by everyone (the containers run as UID 1000, see
@@ -313,9 +313,9 @@ Authentik's default `email` scope mapping always sends `email_verified: false`, 
 until you pick one of these:
 - Set `OIDC_TRUST_EMAIL=true` (read the trade-off above first).
 - Or send a verified claim yourself: Customization > Property Mappings > Create > Scope Mapping, with a scope
-  name such as `pm-email` and the expression
+  name such as `zamu-email` and the expression
   `return {"email": request.user.email, "email_verified": True}`. Add it to the provider's scopes, and request
-  it instead of `email`: `OIDC_SCOPES=openid profile pm-email`. Only do this if users cannot change their
+  it instead of `email`: `OIDC_SCOPES=openid profile zamu-email`. Only do this if users cannot change their
   own email in Authentik, for the same reason.
 
 ## Ports
@@ -353,8 +353,8 @@ rate limit. For example, list `cf-connecting-ip` only when the app can be reache
 All state lives in Postgres. Dump it with `pg_dump` from the `db` container:
 
 ```sh
-mkdir -p ~/pm-backups
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/pm-backups/pm-$(date +%F).dump
+mkdir -p ~/zamu-backups
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/zamu-backups/zamu-$(date +%F).dump
 ```
 
 This works while the app runs. Keep the dumps outside the checkout (anything in it ends up in the image build
@@ -367,7 +367,7 @@ To restore, stop the app, recreate the database, load the dump and start again:
 ```sh
 docker compose stop web worker
 docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" --force "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
-docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner' < ~/pm-backups/pm-2026-10-22.dump
+docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner' < ~/zamu-backups/zamu-2026-10-22.dump
 docker compose up -d
 ```
 
@@ -380,7 +380,7 @@ run the two `docker compose exec` lines, then `docker compose up -d --build`.
 ## Upgrades
 
 ```sh
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/pm-backups/pm-before-upgrade.dump
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/zamu-backups/zamu-before-upgrade.dump
 git pull
 docker compose up -d --build
 ```
@@ -413,13 +413,13 @@ The end-to-end suite checks these paths: it starts 0.1.1 and adds data, switches
 
 ## The CLI in the image
 
-The image ships the `pm` CLI. It is handy for checking a key from the server:
+The image ships the `zamu` CLI. It is handy for checking a key from the server:
 
 ```sh
-docker compose exec -e PM_KEY=pm_live_... web pm whoami
+docker compose exec -e ZAMU_KEY=zamu_live_... web zamu whoami
 ```
 
-Agents normally run `pm` on their own machine. See [agents.md](agents.md).
+Agents normally run `zamu` on their own machine. See [agents.md](agents.md).
 
 ## Stop or remove
 

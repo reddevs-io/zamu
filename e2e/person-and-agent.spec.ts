@@ -248,7 +248,7 @@ test('add agent e2e-agent with a read-write key scoped to PAY and copy the key',
   await expect(reveal).toContainText(`Key created for ${agentName}`);
   await reveal.getByRole('button', { name: 'Copy API key' }).click();
   apiKey = await page.evaluate(() => navigator.clipboard.readText());
-  expect(apiKey).toMatch(/^pm_live_\S{20,}$/);
+  expect(apiKey).toMatch(/^zamu_live_\S{20,}$/);
   // The copied key is the one shown in the dialog.
   await expect(reveal).toContainText(apiKey);
 
@@ -263,14 +263,14 @@ test('the CLI lists and updates tasks with the agent key', async () => {
 
   const projects = cli.run(['projects', 'list', '--json']);
   expect(projects.code, projects.stdout + projects.stderr).toBe(0);
-  const projectKeys = parseJson<{ items: { key: string }[] }>(projects, 'pm.v1.projects.list').items.map(
+  const projectKeys = parseJson<{ items: { key: string }[] }>(projects, 'zamu.v1.projects.list').items.map(
     (item) => item.key,
   );
   expect(projectKeys).toEqual([project.key]);
 
   const list = cli.run(['tasks', 'list', '--project', project.key, '--json']);
   expect(list.code, list.stdout + list.stderr).toBe(0);
-  const tasks = parseJson<{ items: TaskSummary[] }>(list, 'pm.v1.tasks.list').items;
+  const tasks = parseJson<{ items: TaskSummary[] }>(list, 'zamu.v1.tasks.list').items;
   expect(tasks.map((task) => task.key).sort()).toEqual(['PAY-1', 'PAY-2', 'PAY-3']);
 
   const todo = tasks.find((task) => task.status === 'todo' && task.key !== viewedTask);
@@ -279,7 +279,7 @@ test('the CLI lists and updates tasks with the agent key', async () => {
 
   const update = cli.run(['tasks', 'update', agentTask, '--status', 'in_progress', '--json']);
   expect(update.code, update.stdout + update.stderr).toBe(0);
-  expect(parseJson<TaskSummary>(update, 'pm.v1.tasks.update')).toMatchObject({
+  expect(parseJson<TaskSummary>(update, 'zamu.v1.tasks.update')).toMatchObject({
     key: agentTask,
     status: 'in_progress',
   });

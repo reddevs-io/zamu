@@ -1,5 +1,5 @@
-import { MAX_COMMENT_LENGTH } from '@pm/contracts';
-import { schema } from '@pm/db';
+import { MAX_COMMENT_LENGTH } from '@zamu/contracts';
+import { schema } from '@zamu/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Actor } from './authz';

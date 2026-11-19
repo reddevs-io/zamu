@@ -1,5 +1,5 @@
-import type { HomeItem } from '@pm/contracts';
 import { useQueries, useQuery } from '@tanstack/react-query';
+import type { HomeItem } from '@zamu/contracts';
 import { useMemo, useState } from 'react';
 import { Button as AriaButton } from 'react-aria-components';
 import { labelsQuery } from '~/features/labels/queries';

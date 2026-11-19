@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { handleApiRequest } from '../../../server/api';
 
-// /api/v1/*: REST routes from @pm/contracts, the OpenAPI document at /api/v1/openapi.json and the
+// /api/v1/*: REST routes from @zamu/contracts, the OpenAPI document at /api/v1/openapi.json and the
 // RPC endpoint the web app's browser client uses (/api/v1/rpc/*). See server/api/handler.ts.
 
 function handle({ request }: { request: Request }) {

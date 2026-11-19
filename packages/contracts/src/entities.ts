@@ -811,12 +811,15 @@ export type Invitation = z.output<typeof Invitation>;
 // API keys
 // ---------------------------------------------------------------------------
 
-export const API_KEY_PREFIX = 'pm_live_';
+export const API_KEY_PREFIX = 'zamu_live_';
 
 /** Full API key secret. Only ever present in ApiKeyCreated and in client config. */
 export const ApiKeySecret = z
   .string()
-  .regex(/^pm_live_[A-Za-z0-9_-]{16,}$/, 'API keys start with pm_live_ followed by at least 16 characters');
+  .regex(
+    /^zamu_live_[A-Za-z0-9_-]{16,}$/,
+    'API keys start with zamu_live_ followed by at least 16 characters',
+  );
 
 /** Projects an API key may touch: the whole workspace, or a non-empty list of project ids. */
 export const ApiKeyProjects = z.union([z.literal('all'), z.array(ProjectId).min(1)]);
@@ -846,7 +849,7 @@ export type ApiKeyScopeView = z.output<typeof ApiKeyScopeView>;
 export const ApiKeySummary = z.object({
   id: AuthId,
   name: z.string(),
-  /** First characters of the key for recognition, e.g. `pm_live_4kQz`. */
+  /** First characters of the key for recognition, e.g. `zamu_live_4kQz`. */
   start: z.string().nullable(),
   owner: UserRef,
   scope: ApiKeyScopeView,
@@ -1621,7 +1624,7 @@ export const BacklogRead = z.object({
 });
 export type BacklogRead = z.output<typeof BacklogRead>;
 
-/** GET /projects/{key}/backlog, the settings page and pm backlog status. */
+/** GET /projects/{key}/backlog, the settings page and zamu backlog status. */
 export const BacklogSourceStatus = z.object({
   id: BacklogSourceId,
   project: ProjectRef,

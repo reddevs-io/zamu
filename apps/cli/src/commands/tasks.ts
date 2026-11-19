@@ -1,4 +1,4 @@
-// pm tasks list | show | create | update.
+// zamu tasks list | show | create | update.
 import { ORPCError } from '@orpc/client';
 import {
   ActivityList,
@@ -15,7 +15,7 @@ import {
   Timeline,
   type TimelineItem,
   UpdateTaskInput,
-} from '@pm/contracts';
+} from '@zamu/contracts';
 import type { ApiClient } from '../client';
 import { type CommandContext, emit } from '../context';
 import { usageError } from '../errors';
@@ -156,7 +156,7 @@ function localToday(): string {
 }
 
 // ---------------------------------------------------------------------------
-// pm tasks list
+// zamu tasks list
 // ---------------------------------------------------------------------------
 
 export interface ListOptions {
@@ -304,12 +304,12 @@ export async function listTasks(context: CommandContext, options: ListOptions): 
 }
 
 // ---------------------------------------------------------------------------
-// pm tasks show
+// zamu tasks show
 // ---------------------------------------------------------------------------
 
 /**
  * The task's timeline. A server older than M2 has no /timeline route: fall back to the activity
- * list so pm tasks show still works there.
+ * list so zamu tasks show still works there.
  */
 async function loadTimeline(client: ApiClient, input: GetTaskInput): Promise<TimelineItem[]> {
   try {
@@ -380,7 +380,7 @@ export async function showTask(
 }
 
 // ---------------------------------------------------------------------------
-// pm tasks create
+// zamu tasks create
 // ---------------------------------------------------------------------------
 
 export interface CreateOptions {
@@ -439,7 +439,7 @@ export async function createTask(
 }
 
 // ---------------------------------------------------------------------------
-// pm tasks update
+// zamu tasks update
 // ---------------------------------------------------------------------------
 
 export interface UpdateOptions {

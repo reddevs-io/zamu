@@ -1,5 +1,5 @@
 // Backlog.md settings of a project: mappings, folder, connection, Refresh now (web) and refresh
-// requests from the API (pm backlog refresh), webhook info, a new webhook secret, and detach.
+// requests from the API (zamu backlog refresh), webhook info, a new webhook secret, and detach.
 // Rules: M3 plan, section 5 "Setup, import and detach" and "Authorization (additions)".
 import {
   type BacklogRefreshResult,
@@ -16,9 +16,9 @@ import {
   SetBacklogConnectionInput,
   SetBacklogFolderInput,
   UpdateBacklogMappingsInput,
-} from '@pm/contracts';
-import { schema, type Tx } from '@pm/db';
-import { hostnameOf } from '@pm/git-providers';
+} from '@zamu/contracts';
+import { schema, type Tx } from '@zamu/db';
+import { hostnameOf } from '@zamu/git-providers';
 import { eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { recordActivity } from '../activity';
@@ -169,7 +169,7 @@ export async function refreshBacklogNow(
   return requestRefresh(ctx, actor, parsed.projectKey, 'manual');
 }
 
-/** POST /projects/{project}/backlog/refresh, pm backlog refresh (trigger cli). backlog.refresh. */
+/** POST /projects/{project}/backlog/refresh, zamu backlog refresh (trigger cli). backlog.refresh. */
 export async function requestBacklogRefresh(
   ctx: BacklogSettingsContext,
   actor: Actor,

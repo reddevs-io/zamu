@@ -1,6 +1,6 @@
-import type { Cycle, CycleDetail, MilestoneWithProgress, TaskListItem } from '@pm/contracts';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Cycle, CycleDetail, MilestoneWithProgress, TaskListItem } from '@zamu/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { CycleDialog, checkCycleDates, cycleDefaults } from './CycleDialog';
 import { activeCycleStats, cycleSummaryText, parseCycleParam, rolledOverTo } from './CyclePage';

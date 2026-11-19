@@ -1,4 +1,4 @@
-import { schema } from '@pm/db';
+import { schema } from '@zamu/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordActivities, recordActivity } from './activity';
 import { createComment, deleteComment } from './comments';

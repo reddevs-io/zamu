@@ -1,8 +1,8 @@
-// Test fixtures for @pm/core: a workspace with people and an agent on the shared test database.
-// Test-only (imports @pm/db/test, which imports vitest).
-import { type Auth, createAuth } from '@pm/auth';
-import { createDb, type Db, type DbHandle, schema } from '@pm/db';
-import { sharedTestDatabaseUrl } from '@pm/db/test';
+// Test fixtures for @zamu/core: a workspace with people and an agent on the shared test database.
+// Test-only (imports @zamu/db/test, which imports vitest).
+import { type Auth, createAuth } from '@zamu/auth';
+import { createDb, type Db, type DbHandle, schema } from '@zamu/db';
+import { sharedTestDatabaseUrl } from '@zamu/db/test';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Actor } from '../authz';
 import type { CoreContext } from '../context';

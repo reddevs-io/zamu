@@ -4,8 +4,9 @@
 // field). The dot opens the colour popover; a pick saves at once. Delete asks first and says how many tasks
 // lose the label. Labels from Backlog.md files (source "backlog") keep their name: they show a lock and
 // "From Backlog.md", Rename and Delete are off, and only the colour changes (never written to the files).
-import type { LabelWithUsage } from '@pm/contracts';
+
 import { type QueryKey, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { LabelWithUsage } from '@zamu/contracts';
 import { type KeyboardEvent, type ReactNode, useState } from 'react';
 import {
   Button as AriaButton,

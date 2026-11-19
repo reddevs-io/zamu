@@ -1,8 +1,8 @@
 // Server-side half of the settings server functions: resolve the actor from the request, call one
 // core service, and turn core's errors into a SettingsResult. No business rules live here.
-// Server-only (imports @pm/auth and @pm/core); import it only from server function handlers and tests.
-import { getActorFromRequest } from '@pm/auth';
-import { type Actor, type CoreContext, isCoreError } from '@pm/core';
+// Server-only (imports @zamu/auth and @zamu/core); import it only from server function handlers and tests.
+import { getActorFromRequest } from '@zamu/auth';
+import { type Actor, type CoreContext, isCoreError } from '@zamu/core';
 import type { SettingsResult } from './result';
 
 /** Calls `service` as `actor` and wraps the outcome. Errors that are not core's propagate (500). */

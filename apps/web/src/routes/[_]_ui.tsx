@@ -14,7 +14,7 @@ export const Route = createFileRoute('/__ui')({
   beforeLoad: () => {
     if (!import.meta.env.DEV) throw notFound();
   },
-  head: () => ({ meta: [{ title: 'UI kit · project-management' }] }),
+  head: () => ({ meta: [{ title: 'UI kit · Zamu' }] }),
   component: GalleryPage,
 });
 

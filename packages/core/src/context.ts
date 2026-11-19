@@ -1,8 +1,8 @@
 // What core services need from their host. Adapters build one CoreContext at startup and pass it
 // (or the subset a service asks for) with the actor of each request.
-import type { Auth } from '@pm/auth';
-import type { Db } from '@pm/db';
-import type { createProvider, GitProvider, LookupFn } from '@pm/git-providers';
+import type { Auth } from '@zamu/auth';
+import type { Db } from '@zamu/db';
+import type { createProvider, GitProvider, LookupFn } from '@zamu/git-providers';
 import type { JobQueue } from './jobs';
 
 export interface DbContext {
@@ -20,18 +20,18 @@ export interface AuthContext extends DbContext {
 
 /** Services that build links (invitations) need the public origin of the web app. */
 export interface LinkContext extends DbContext {
-  /** PUBLIC_URL, e.g. https://pm.example.com. No trailing slash needed. */
+  /** PUBLIC_URL, e.g. https://zamu.example.com. No trailing slash needed. */
   publicUrl: string;
 }
 
-/** Builds a git provider client. Tests inject a fake; adapters pass @pm/git-providers' createProvider. */
+/** Builds a git provider client. Tests inject a fake; adapters pass @zamu/git-providers' createProvider. */
 export type ProviderFactory = (options: Parameters<typeof createProvider>[0]) => GitProvider;
 
 /** Services that read repositories (git connections, Backlog.md mirrors) need these. */
 export interface GitContext extends DbContext {
   /** The decoded APP_ENCRYPTION_KEY (32 bytes). Undefined: git connections and mirrors are disabled. */
   encryptionKey?: Uint8Array;
-  /** Default: @pm/git-providers createProvider. */
+  /** Default: @zamu/git-providers createProvider. */
   providerFactory?: ProviderFactory;
   /**
    * GIT_ALLOW_PRIVATE_HOSTS and GIT_HTTP_HOSTS. Default: public hosts only, HTTPS only. `lookup`

@@ -196,7 +196,7 @@ describe('sidebar', () => {
     expect(within(pages).getByRole('link', { name: 'Board' })).toHaveAttribute('aria-current', 'page');
     await user.click(within(pages).getByRole('link', { name: 'List' }));
     await waitFor(() => expect(router.state.location.search).toEqual({}));
-    expect(window.localStorage.getItem('pm:view:PAY')).toBe('list');
+    expect(window.localStorage.getItem('zamu:view:PAY')).toBe('list');
   });
 
   it('collapses to icons with [ and keeps names in tooltips', async () => {
@@ -213,7 +213,7 @@ describe('sidebar', () => {
     // Still reachable by name.
     expect(within(nav).getByRole('link', { name: 'Payments, 40 open' })).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: 'Search or jump to' })).toBeInTheDocument();
-    expect(window.localStorage.getItem('pm.sidebar.collapsed:u1')).toBe('1');
+    expect(window.localStorage.getItem('zamu.sidebar.collapsed:u1')).toBe('1');
   });
 
   it('the workspace menu and the Projects "+" open New project', async () => {

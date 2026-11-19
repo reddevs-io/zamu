@@ -1,7 +1,7 @@
 // The General form of project settings: what changed, and how API errors map onto its fields. Moved
 // here from the Edit project dialog, which this page replaces; the key is editable now too.
 import { ORPCError } from '@orpc/client';
-import type { Project } from '@pm/contracts';
+import type { Project } from '@zamu/contracts';
 
 export type GeneralField = 'name' | 'key' | 'description' | 'repository' | 'usesMilestones';
 

@@ -1,3 +1,6 @@
+import { redirect } from '@tanstack/react-router';
+import { createServerFn, createServerOnlyFn } from '@tanstack/react-start';
+import { appendResponseHeader, getRequestHeaders } from '@tanstack/react-start/server';
 import {
   AcceptInvitationError,
   type Auth,
@@ -8,12 +11,9 @@ import {
   bootstrapWorkspace,
   type SetupState,
   setupState,
-} from '@pm/auth';
-import { AcceptInvitationInput, SetupInput, WorkspaceFields } from '@pm/contracts';
-import type { Db } from '@pm/db';
-import { redirect } from '@tanstack/react-router';
-import { createServerFn, createServerOnlyFn } from '@tanstack/react-start';
-import { appendResponseHeader, getRequestHeaders } from '@tanstack/react-start/server';
+} from '@zamu/auth';
+import { AcceptInvitationInput, SetupInput, WorkspaceFields } from '@zamu/contracts';
+import type { Db } from '@zamu/db';
 import { type AuthPage, type AuthState, authRedirect } from '../routes/(auth)/-auth/guards';
 import { loadInstanceName, loadInvitation } from '../routes/(auth)/-auth/queries';
 import type { SignInOptions } from '../routes/(auth)/-auth/sso';
@@ -21,7 +21,7 @@ import { getServerContext } from '../server/context';
 
 // Session helpers for route `beforeLoad` and the signed-out screens.
 // Server function handlers and createServerOnlyFn bodies are stripped from the client bundle, so the
-// @pm/auth and @pm/db imports above never reach the browser.
+// @zamu/auth and @zamu/db imports above never reach the browser.
 
 interface AuthContext {
   auth: Auth;
@@ -224,7 +224,7 @@ export type AcceptInvitationResult =
 /**
  * Invitation accept: creates the account for the invitation's email (never one sent by the browser),
  * signs the person in through the session cookie on this response, and joins the workspace.
- * Public HTTP sign-up is closed; besides this, people join through first-run setup and SSO (see @pm/auth sso.ts).
+ * Public HTTP sign-up is closed; besides this, people join through first-run setup and SSO (see @zamu/auth sso.ts).
  */
 export const acceptInvitation = createServerFn({ method: 'POST' })
   .validator(AcceptInvitationInput)

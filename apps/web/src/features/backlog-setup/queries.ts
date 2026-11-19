@@ -1,14 +1,15 @@
 // TanStack Query wiring for the Backlog.md setup. Setup data goes through the backlog and connection
 // server functions (settings-only data); the project, its task count and the members come from
 // /api/v1 through oRPC.
+
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import type {
   BacklogDetection,
   BacklogMappings,
   BacklogPreview,
   BacklogSourceStatus,
   GitConnectionList,
-} from '@pm/contracts';
-import { keepPreviousData, queryOptions } from '@tanstack/react-query';
+} from '@zamu/contracts';
 import { listConnectionsFn } from '~/features/connections/server';
 import { SettingsError, unwrap } from '~/features/settings/result';
 import { orpc } from '~/lib/orpc';

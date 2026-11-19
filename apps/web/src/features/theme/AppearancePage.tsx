@@ -1,5 +1,5 @@
 // Settings › Appearance: the theme as three cards (Light, Dark, System), saved to the account.
-import { THEME_LABELS, type Theme } from '@pm/contracts';
+import { THEME_LABELS, type Theme } from '@zamu/contracts';
 import { Radio, RadioGroup } from 'react-aria-components';
 import { Banner, Button, cn, FieldDescription, Label, PageHeader, RadioDot } from '~/ui';
 import { useThemeChoice } from './ThemeChoice';
