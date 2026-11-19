@@ -55,6 +55,9 @@ export async function createTestDatabase(
     throw error;
   }
   const { db, pool } = createDb(url);
+  // DROP DATABASE ... WITH (FORCE) terminates any connection still open (57P01). Without a listener,
+  // an idle client's error becomes an uncaught exception that fails the whole run (as fixtures.ts guards).
+  pool.on('error', () => {});
   let dropped = false;
   return {
     db,
