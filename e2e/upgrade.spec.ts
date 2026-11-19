@@ -39,7 +39,7 @@ import {
 const M1_TAG = '0.1.1';
 const m1Image = process.env.E2E_M1_IMAGE ?? `zamu:m1-${M1_TAG}`;
 /** The M2.1 merge to main, released as 0.3.0. */
-const M2_1_COMMIT = '7eb6b7e';
+const M2_1_COMMIT = '87306ff';
 const m2_1Ref = process.env.E2E_M2_1_REF ?? (gitRefExists('0.3.0') ? '0.3.0' : M2_1_COMMIT);
 const m2_1Image = process.env.E2E_M2_1_IMAGE ?? `zamu:m2.1-${m2_1Ref}`;
 /** The release before M5: the backlog sweep. */
