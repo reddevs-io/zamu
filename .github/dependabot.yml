@@ -1,0 +1,13 @@
+# Weekly updates for the pinned GitHub Actions, in the workflows and the shared setup action.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
