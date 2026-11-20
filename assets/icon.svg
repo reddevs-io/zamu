@@ -1,4 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#d97706"/>
-  <text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#ffffff">PM</text>
+  <!-- Zamu app icon, the source of the PNGs in apps/web/public. Square on purpose: iOS and Android round the
+       corners themselves. The mark stays inside the centre 80% circle, so the icon also works as maskable.
+       People quarters are round, agent quarters square; the accent quarter is the shift on duty. -->
+  <rect width="64" height="64" fill="#282320"/>
+  <g transform="translate(8 8) scale(0.75)">
+    <path fill="#ece9e4" d="M29 26V10A19 19 0 0 0 10 29H26A3 3 0 0 0 29 26Z"/>
+    <rect fill="#a4beef" x="35" y="10" width="19" height="19" rx="5.25"/>
+    <rect fill="#ece9e4" x="10" y="35" width="19" height="19" rx="5.25"/>
+    <path fill="#ece9e4" d="M35 38V54A19 19 0 0 0 54 35H38A3 3 0 0 0 35 38Z"/>
+  </g>
 </svg>

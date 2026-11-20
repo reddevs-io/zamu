@@ -13,6 +13,7 @@ import { EmptyState } from '../EmptyState';
 import { FiltersGlyph, LockGlyph } from '../Glyphs';
 import { KeyHint } from '../Kbd';
 import { LabelChip, LabelDot, LabelOverflow } from '../LabelChip';
+import { ZamuMark } from '../Logo';
 import { BlockedMarker, BlockedNotice, SubtaskProgress } from '../Markers';
 import type { TaskStatus } from '../meta';
 import { MenuRowButton, PickerMenu, type PickerMenuItem, PickerMenuPopover } from '../PickerMenu';
@@ -73,6 +74,7 @@ function KitFrame({ theme }: { theme: 'light' | 'dark' }) {
       <InputsSection />
       <StatusSection />
       <AvatarsSection />
+      <LogoSection />
       <ChipsSection />
       <CardsSection />
       <RowsSection />
@@ -283,6 +285,25 @@ function AvatarsSection() {
         </span>
       </Row>
       <Cap>People are round, agents square. Your own avatar is hidden on cards.</Cap>
+    </Sec>
+  );
+}
+
+function LogoSection() {
+  return (
+    <Sec title="Logo">
+      <Row className="items-end">
+        <ZamuMark size={64} label="Zamu" />
+        <ZamuMark size={32} />
+        <ZamuMark size={16} />
+        <ZamuMark size={32} mono />
+        <ZamuMark size={16} mono />
+        <span className="flex items-center gap-1.5 text-xs text-fg-3">
+          <ZamuMark size={16} />
+          Zamu · self-hosted at pm.northwind.dev
+        </span>
+      </Row>
+      <Cap>Below 32 px the mark switches to the drawing made for the 16 px grid.</Cap>
     </Sec>
   );
 }

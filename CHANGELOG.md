@@ -21,6 +21,9 @@ Renamed to Zamu. The rename is breaking: none of the old names keep working.
 - The image entrypoint is `zamu-entrypoint`, and `zamu` runs the bundled CLI. Compose projects are `zamu` and
   `zamu-dev`, the default image is `zamu:local` (`ZAMU_IMAGE`), and the default database is `zamu`.
 - The git provider client sends the User-Agent `zamu-git-providers`.
+- The favicon and the README show the Zamu logo instead of the amber "PM" placeholder. Both follow the
+  light or dark theme. The sign-in, setup and invite pages show the mark in their footer, and the app has
+  a web manifest with PNG icons, so phones get a Zamu icon when it is added to the home screen.
 
 ## 0.7.0
 

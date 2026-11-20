@@ -123,6 +123,7 @@ export {
   type DisabledCreateButtonProps,
   lockedHatch,
 } from './Locked';
+export { ZamuMark, type ZamuMarkProps } from './Logo';
 export { AppFrame, type AppFrameProps } from './layout/AppFrame';
 export { FilterBar, type FilterBarProps, FilterValue } from './layout/FilterBar';
 export { PageHeader, type PageHeaderProps } from './layout/PageHeader';

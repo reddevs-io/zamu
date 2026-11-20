@@ -1,8 +1,9 @@
 import { type FormEvent, type ReactNode, useSyncExternalStore } from 'react';
-import { cn } from '~/ui';
+import { cn, ZamuMark } from '~/ui';
 
 // Layout of the signed-out screens (Margin frame 128, source r2/Settings.dc.html state signin): one 400px
-// column centred on the page background, the workspace mark on top, and the server's address at the bottom.
+// column centred on the page background, the workspace mark on top, and the Zamu mark with the server's
+// address at the bottom.
 
 /** Brand shown before the instance has a workspace. */
 export const PRODUCT_NAME = 'Zamu';
@@ -29,24 +30,32 @@ export function AuthLayout({ brand, children }: { brand: string; children: React
         </div>
       </main>
       {host ? (
-        <footer className="absolute inset-x-0 bottom-6 text-center text-xs text-fg-3">
-          Self-hosted at {host}
+        <footer className="absolute inset-x-0 bottom-6 flex items-center justify-center gap-1.5 text-xs text-fg-3">
+          <ZamuMark size={16} />
+          {PRODUCT_NAME} · self-hosted at {host}
         </footer>
       ) : null}
     </div>
   );
 }
 
-/** Workspace mark and name (screens.css .auth-logo, .pmark). */
+/**
+ * Workspace mark and name (screens.css .auth-logo, .pmark). Before there is a workspace the brand is Zamu
+ * itself, so the Zamu mark stands in for the workspace's letter tile.
+ */
 function AuthBrand({ brand }: { brand: string }) {
   return (
     <div className="flex items-center gap-2.5 font-semibold">
-      <span
-        aria-hidden
-        className="grid size-7 shrink-0 place-items-center rounded-sm bg-fg font-serif text-lg font-semibold text-bg"
-      >
-        {brand.trim().charAt(0).toUpperCase() || 'P'}
-      </span>
+      {brand === PRODUCT_NAME ? (
+        <ZamuMark size={28} />
+      ) : (
+        <span
+          aria-hidden
+          className="grid size-7 shrink-0 place-items-center rounded-sm bg-fg font-serif text-lg font-semibold text-bg"
+        >
+          {brand.trim().charAt(0).toUpperCase() || 'P'}
+        </span>
+      )}
       <span className="truncate">{brand}</span>
     </div>
   );
