@@ -9,13 +9,13 @@
 // 0.6.0 API key gets 401 and a new key starts with zamu_live_.
 //
 // Older images, each used when it is already local:
-//   M1    E2E_M1_IMAGE (pulled if it is not local, for example
-//         registry.gitlab.com/reddevsdotio/tooling/project-management:0.1.1 after `docker login`), else
+//   M1    E2E_M1_IMAGE (pulled if it is not local, for example from a private registry after
+//         `docker login`), else
 //         zamu:m1-0.1.1, built once from the git tag 0.1.1.
-//   M2.1  E2E_M2_1_IMAGE (pulled likewise, for example …/project-management:0.3.0), else
+//   M2.1  E2E_M2_1_IMAGE (pulled likewise, for example <registry>/<image>:0.3.0), else
 //         zamu:m2.1-<ref>, built once from the git tag 0.3.0 when it exists, else from the M2.1
 //         merge commit (E2E_M2_1_REF overrides).
-//   0.6.0 E2E_0_6_IMAGE (pulled likewise, for example …/project-management:0.6.0), else
+//   0.6.0 E2E_0_6_IMAGE (pulled likewise, for example <registry>/<image>:0.6.0), else
 //         zamu:release-0.6.0, built once from the git tag 0.6.0.
 // Builds use git archive, so the checkout is untouched. The mirror reads from a Forgejo container (e2e/forgejo.ts)
 // attached to the upgrade stack's network. E2E_SKIP_UPGRADE=1 skips this spec.

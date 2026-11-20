@@ -12,10 +12,8 @@
       "!**/routeTree.gen.ts",
       "!**/migrations/meta",
       "!**/*.svg",
-      "!memory-bank",
       "!.agent",
-      "!packages/backlog-md/test/fixtures",
-      "!backlog"
+      "!packages/backlog-md/test/fixtures"
     ]
   },
   "formatter": {

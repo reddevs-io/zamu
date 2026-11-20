@@ -21,8 +21,6 @@ blob-report
 .git
 .github
 .agent
-memory-bank
-backlog
 assets
 Dockerfile
 .dockerignore
