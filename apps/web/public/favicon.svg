@@ -1,4 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#d97706"/>
-  <text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#ffffff">PM</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <!-- Zamu mark (Dial), drawn on the 16 px grid. Colours: the Margin ink (fg) and accent tokens, light and dark. -->
+  <style>
+    .i { fill: #27201b; }
+    .a { fill: #314c7e; }
+    @media (prefers-color-scheme: dark) {
+      .i { fill: #ece9e4; }
+      .a { fill: #a4beef; }
+    }
+  </style>
+  <path class="i" d="M7 6V1A6 6 0 0 0 1 7H6A1 1 0 0 0 7 6Z"/>
+  <rect class="a" x="9" y="1" width="6" height="6" rx="1.5"/>
+  <rect class="i" x="1" y="9" width="6" height="6" rx="1.5"/>
+  <path class="i" d="M9 10V15A6 6 0 0 0 15 9H10A1 1 0 0 0 9 10Z"/>
 </svg>

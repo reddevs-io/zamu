@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="7 7 50 50">
+  <!-- Zamu mark for dark backgrounds (the README on GitHub's dark theme): Margin dark ink and accent. -->
+  <path fill="#ece9e4" d="M29 26V10A19 19 0 0 0 10 29H26A3 3 0 0 0 29 26Z"/>
+  <rect fill="#a4beef" x="35" y="10" width="19" height="19" rx="5.25"/>
+  <rect fill="#ece9e4" x="10" y="35" width="19" height="19" rx="5.25"/>
+  <path fill="#ece9e4" d="M35 38V54A19 19 0 0 0 54 35H38A3 3 0 0 0 35 38Z"/>
+</svg>
