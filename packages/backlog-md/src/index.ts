@@ -1,5 +1,4 @@
 // Backlog.md folder parser. Pure: callers pass file contents and get typed records or error values.
-// See .agent/plans/m3-backlog-md-mirror.html, workstream M3-02, for the format reference.
 export {
   DEFAULT_PRIORITIES,
   DEFAULT_STATUSES,

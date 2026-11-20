@@ -1,6 +1,5 @@
 // Git provider adapters: one interface for reading repositories on GitHub, GitLab and Gitea/Forgejo,
 // webhook verification and the host safety check. Core reaches providers only through this package.
-// See .agent/plans/m3-backlog-md-mirror.html, workstream M3-03.
 
 export { createProvider } from './create';
 export {
